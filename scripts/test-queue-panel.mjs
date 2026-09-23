@@ -65,6 +65,28 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
       await page.waitForTimeout(350); await page.mouse.up();
     }
+    await t.test('documentary preparation shares the header queue with campaign and source controls', async () => {
+      const campaign = { id: 'prepare-one', vaultId: 'owner', vaultName: 'Research vault', state: 'active', createdAt: Date.now(), updatedAt: Date.now(), embedding: { provider: 'openrouter', model: 'baai/bge-m3', external: true }, jobs: [
+        { id: 'job-one', documentId: 'source-one', title: 'Full document', state: 'running', stage: 'embeddings', completedPassages: 32, totalPassages: 70, unknownRequests: 1, error: null },
+      ] };
+      await fresh({ getResearchPreparationProgress: { paused: false, campaigns: [campaign] } });
+      await count(1); await open();
+      const group = page.getByTestId('preparation-campaign-prepare-one');
+      await group.getByText('Embeddings: openrouter · baai/bge-m3', { exact: true }).waitFor();
+      await group.getByRole('button', { name: 'Pausar', exact: true }).click();
+      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, action: 'pause' });
+      const row = page.getByTestId('preparation-job-prepare-one-job-one');
+      await row.getByText(/32\/70/).waitFor();
+      assert.equal(await row.getByRole('progressbar').getAttribute('aria-valuenow'), String(32 / 70 * 100));
+      await row.getByRole('button', { name: 'Cancelar', exact: true }).click();
+      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, documentId: 'source-one', action: 'cancel' });
+      await close();
+      const done = { ...campaign, jobs: campaign.jobs.map(job => ({ ...job, state: 'complete', stage: 'complete', completedPassages: 70 })) };
+      await emit('onResearchPreparationProgress', { paused: false, campaigns: [done] });
+      await count(0); await open();
+      await group.getByRole('button', { name: 'Ocultar', exact: true }).click();
+      await group.waitFor({ state: 'detached' });
+    });
     await t.test('global clear confirms dismissal across lanes and preserves running, pending and paused tasks', async () => {
       const mixedScan = queue();
       mixedScan.items.push(

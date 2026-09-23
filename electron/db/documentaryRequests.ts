@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
 export interface DocumentaryRequest {
-  document_id: string; revision: string; vault_id: string; lease_token: string; attempts: number; configuration_json: string | null;
+  document_id: string; revision: string; vault_id: string; lease_token: string; attempts: number; configuration_json: string | null; source_id: string | null;
 }
 
 /** Source discovery/extraction needs a lease before a textual fingerprint exists.
@@ -14,7 +14,7 @@ export class DocumentaryRequests {
     )`);
     const columns = new Set((db.prepare('PRAGMA table_info(documentary_requests)').all() as { name: string }[]).map(column => column.name));
     for (const [name, sql] of Object.entries({ vault_id: "TEXT NOT NULL DEFAULT ''", lease_token: 'TEXT', lease_until: 'INTEGER',
-      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT' })) {
+      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT', source_id: 'TEXT', stage: "TEXT NOT NULL DEFAULT 'extraction'", completed_passages: 'INTEGER NOT NULL DEFAULT 0', total_passages: 'INTEGER', unknown_requests: 'INTEGER NOT NULL DEFAULT 0' })) {
       if (!columns.has(name)) db.exec(`ALTER TABLE documentary_requests ADD COLUMN ${name} ${sql}`);
     }
   }
@@ -33,7 +33,7 @@ export class DocumentaryRequests {
     return this.db.transaction(() => {
       this.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=MAX(0,attempts-1),
         lease_token=NULL,lease_until=NULL WHERE state='running' AND (lease_until IS NULL OR lease_until<=?)`).run(now);
-      const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts,configuration_json FROM documentary_requests
+      const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts,configuration_json,source_id FROM documentary_requests
         WHERE state='queued' AND available_at<=? AND attempts<3 AND (vault_id IN (${owners.map(() => '?').join(',')}) OR (?=0 AND vault_id=''))
         ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, ...owners, Number(exactOwner || Array.isArray(vaultId)), now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
       if (!row) return null;

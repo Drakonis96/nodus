@@ -1,3 +1,5 @@
+import * as preparationExperience from '../ai/researchPreparationExperience';
+import { onDocumentaryPreparationChanged } from '../ai/documentaryPreparationEvents';
 import { manualIndexStatus, scheduleManualIndex } from '../ai/manualIdeaIndex';
 import { embed as embedResearchQuery } from '../ai/aiClient';
 import { assertAcademicAutomation } from '../ai/academicMode';
@@ -459,7 +461,13 @@ function pageCapableLibraryCopy(nodusId: string): OpenEvidenceAtPageResult['loca
   return { itemId: nodusId, scope: inVault ? 'vault' : 'global' };
 }
 
+let releasePreparationProgress: (() => void) | null = null;
 export function registerAcademicIpc(context: IpcContext): void {
+  releasePreparationProgress?.();
+  releasePreparationProgress = onDocumentaryPreparationChanged(() => {
+    const progress = preparationExperience.getResearchPreparationProgress();
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('research:preparation:progress', progress);
+  });
   const { getWindow, chatAborters } = context;
   const h: IpcContext['h'] = (channel, listener) => context.h(channel, (event, ...args) => {
     if (/^(scan:|works:(setManualDeep|analyzeBoth|process|retry|rescan|reassignThemes|summarize|synthesizeIdeas)|study:improve$|themes:reprocess|bridges:discover|queue:enqueue|notes:reorderByAI|notes:folders:suggestIdeas|ideas:(merge|dedup|audit)|dictionary:(scan|retrieve))/.test(channel)) assertAcademicAutomation();
@@ -1656,6 +1664,12 @@ export function registerAcademicIpc(context: IpcContext): void {
     try { return await new ResearchCorpusRun(scope, notebook?.settings ?? RETRIEVAL_PRESETS.balanced, controller.signal).readDocument(input.documentId, input.operation); }
     finally { release(); }
   });
+  h('research:preparation:policy', async () => preparationExperience.getResearchPreparationPolicy());
+  h('research:preparation:policy:set', async (_e, input) => preparationExperience.setResearchPreparationPolicy(input));
+  h('research:preparation:preview', async (_e, input) => preparationExperience.previewResearchPreparation(input));
+  h('research:preparation:campaign:start', async (_e, input) => preparationExperience.startResearchPreparationCampaign(input));
+  h('research:preparation:progress', async () => preparationExperience.getResearchPreparationProgress());
+  h('research:preparation:campaign:control', async (_e, input) => preparationExperience.controlResearchPreparationCampaign(input));
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
   h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
   h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));

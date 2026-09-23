@@ -8,6 +8,7 @@ import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
 import { unpreparedResearchAttachmentIds } from '@shared/researchCorpus';
 import type { DocumentaryIndexIdentity, ResearchCorpusDocument, ResearchDocumentRead, ResearchEvidence, ResearchPreparationInventory, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { DocumentaryRequests } from '../db/documentaryRequests';
+import { DocumentaryCampaigns } from '../db/documentaryCampaigns';
 import { DocumentaryStore, type DocumentaryChunk } from '../db/documentaryStore';
 import { documentaryChunks } from './documentaryChunking';
 import { researchCorpusInventory } from './researchCorpusInventory';
@@ -20,13 +21,13 @@ import { DocumentaryEmbeddingBatches } from '../db/documentaryEmbeddingBatches';
 import { getWork } from '../db/worksRepo';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
 import { getNote } from '../db/notesRepo';
-import { listResearchNotebooks } from '../db/researchNotebooksRepo';
 import { getSettings } from '../db/settingsRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { documentarySourceText, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { getActiveVault, getVault, listVaults, withOwningVault, withoutOwningVault } from '../vaults/vaultRegistry';
 import { withVaultDatabase, withoutDatabaseContext } from '../db/database';
+import { notifyDocumentaryPreparation } from './documentaryPreparationEvents';
 import { onResearchCorpusChanged } from './researchCorpusEvents';
 
 let shared: DocumentaryStore | null = null;
@@ -36,7 +37,7 @@ export function documentaryStore(): DocumentaryStore {
     const directory = path.join(app.getPath('userData'), 'documentary');
     fs.mkdirSync(directory, { recursive: true });
     shared = new DocumentaryStore(path.join(directory, 'store.sqlite'));
-    new DocumentaryRequests(shared.db);
+    new DocumentaryCampaigns(shared.db);
   }
   return shared;
 }
@@ -83,7 +84,7 @@ function embeddingIdentityParameters(config: EmbeddingExecutionConfig) {
   return { endpoint: createHash('sha256').update(config.endpoint).digest('hex'), inputPolicy: 'utf8-4096/2' };
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: () => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: () => void = () => {}, progress: (completed: number, unknown: number) => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
   assertAuthorized();
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
@@ -97,6 +98,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     AND json_extract(identity_json,'$.embedding.parameters')=?`).get(base.documentId, base.textFingerprint, base.revision, base.chunkerVersion, config.provider, config.model, base.processingVersion, base.attachmentId, JSON.stringify(parameters)) as { index_key: string } | undefined;
   if (cached) {
     const rows = store.db.prepare('SELECT vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as { vector_json: string }[];
+    progress(rows.length, 0);
     return { indexKey: cached.index_key, vectors: rows.map(row => JSON.parse(row.vector_json)), ...config };
   }
   if (store.preference('paused')) throw new Error('documentary_paused');
@@ -120,6 +122,8 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     checkpoints.recover(operation);
     const texts = chunks.map(chunk => chunk.text);
     const vectors = checkpoints.read(operation, texts);
+    const updateProgress = () => progress(vectors.filter(Boolean).length, (store.db.prepare("SELECT COUNT(*) n FROM documentary_embedding_attempts WHERE operation=? AND state='unknown'").get(operation) as { n: number }).n);
+    updateProgress();
     // Sequential bounded batches checkpoint before the next paid request. The
     // persistent operation lease fences concurrent writers and late responses.
     for (let start = 0; start < texts.length;) {
@@ -136,7 +140,8 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
         if (received.some(vector => !vector?.length)) throw new Error('documentary_embeddings_unavailable');
         checkpoints.complete(attempt, batch, received as number[][], () => { requests.renew(lease); assertAuthorized(); });
         vectors.splice(start, batch.length, ...received);
-      } catch (error) { checkpoints.uncertain(attempt); throw error; }
+        updateProgress();
+      } catch (error) { checkpoints.uncertain(attempt); updateProgress(); throw error; }
       start = end;
     }
     signal?.throwIfAborted();
@@ -190,12 +195,14 @@ export function pinPublishedResearchDocument(document: ResearchCorpusDocument): 
   const published = store.publishedDocument(document);
   if (published) return published;
   // No partially built first revision may leak before the all-attachment switch.
-  const preparing = store.db.prepare('SELECT 1 FROM documentary_requests WHERE document_id=?').get(document.id);
+  const preparing = store.db.prepare('SELECT 1 FROM documentary_requests WHERE document_id=? OR source_id=?').get(document.id, document.id);
   return preparing ? { ...document, indexedSource: { revision: document.revision, attachmentId: document.attachmentId, attachments: document.attachments, indexKeys: [] } } : document;
 }
 
 export function getResearchPreparationInventory(): ResearchPreparationInventory {
   const store = documentaryStore();
+  let selectedEmbedding: EmbeddingExecutionConfig | null = null;
+  try { selectedEmbedding = effectiveEmbeddingConfig(); } catch { /* Text readiness does not depend on model configuration. */ }
   const embeddingSpaces = new Map<string, NonNullable<ResearchPreparationInventory['embeddingSpaces']>[number]>();
   for (const row of store.db.prepare('SELECT identity_json FROM documentary_revisions WHERE embedding_ready=1').all() as { identity_json: string }[]) {
     const embedding = (JSON.parse(row.identity_json) as DocumentaryIndexIdentity).embedding;
@@ -204,17 +211,25 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
       embeddingSpaces.set(id, { id, provider: embedding.provider, model: embedding.model, dimensions: embedding.dimensions, metric: embedding.metric });
     }
   }
-  return { enabled: store.preference('enabled'), embeddingSpaces: [...embeddingSpaces.values()], documents: researchCorpusInventory().documents.map(current => {
+  return { enabled: new DocumentaryCampaigns(store.db).policy(getActiveVault().id).futureAdditions, embeddingSpaces: [...embeddingSpaces.values()], documents: researchCorpusInventory().documents.map(current => {
     const document = pinPublishedResearchDocument(current);
     const stale = document.indexedSource && document.indexedSource.revision !== document.revision;
-    const revisions = attachmentRevisions(document).flatMap(group => group.find(row => row.lexical_ready) ?? []);
+    const groups = attachmentRevisions(document);
+    const revisions = groups.flatMap(group => group.find(row => row.lexical_ready && !row.embedding_ready) ?? group.find(row => row.lexical_ready) ?? []);
     const revision = revisions[0];
-    const request = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=?').get(document.id) as { state: string; error: string | null } | undefined;
+    const request = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=? OR source_id=? ORDER BY updated_at DESC LIMIT 1').get(document.id, document.id) as { state: string; error: string | null } | undefined;
     const passages = revisions.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
-    const embedded = revisions.reduce((sum, row) => sum + (row.embedding_ready ? (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length : 0), 0);
+    const compatibleVectors = groups.flatMap(group => group.find(row => {
+      const identity = JSON.parse(row.identity_json) as DocumentaryIndexIdentity;
+      return row.embedding_ready && selectedEmbedding && identity.embedding?.provider === selectedEmbedding.provider
+        && identity.embedding.model === selectedEmbedding.modelId
+        && JSON.stringify(identity.embedding.parameters) === JSON.stringify(embeddingIdentityParameters(selectedEmbedding));
+    }) ?? []);
+    const embedded = compatibleVectors.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
+    const incompatible = groups.some(group => group.some(row => row.embedding_ready)) && compatibleVectors.length === 0;
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     return { ...document, preparation: { documentId: document.id, revision: document.revision, text: coverage === 'abstract' ? 'abstract' : passages ? 'available' : 'missing',
-      lexical: revision ? stale ? 'stale' : 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? 'ready' : embedded > 0 ? 'partial' : request?.error ? 'failed' : 'missing',
+      lexical: revision ? stale ? 'stale' : 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? stale ? 'stale' : 'ready' : embedded > 0 ? 'partial' : incompatible ? 'stale' : request?.error ? 'failed' : 'missing',
       status: request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
       reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded,
       unpreparedAttachmentIds: unpreparedResearchAttachmentIds(document, revisions.map(row => JSON.parse(row.identity_json) as DocumentaryIndexIdentity)) } };
@@ -224,6 +239,12 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
 let draining = false;
 let activePreparation: AbortController | null = null;
 let activePreparationDocument: string | null = null;
+let activePreparationRequest: string | null = null;
+export function interruptUnusedDocumentaryRequest(): void {
+  if (!activePreparationRequest) return;
+  const row = documentaryStore().db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(activePreparationRequest) as { state: string } | undefined;
+  if (row?.state !== 'running') activePreparation?.abort();
+}
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
   const store = documentaryStore();
@@ -232,14 +253,14 @@ export async function prepareResearchDocuments(documentIds: string[], mode: 'emb
   const wanted = new Set(documentIds);
   const documents = inventory.documents.filter(document => wanted.has(document.id));
   if (documents.length !== wanted.size) throw new Error('research_source_not_authorized');
-  const requests = new DocumentaryRequests(store.db);
+  new DocumentaryCampaigns(store.db).create(getActiveVault().id, getActiveVault().name, documents, configuration);
   for (const document of documents) {
-    requests.enqueue(document.id, document.revision, getActiveVault().id, Date.now(), 0, configuration);
     for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state IN ('failed','cancelled')").all(document.id) as { id: string }[]) store.retry(row.id);
     const prefix = `embedding:${document.id}:`;
     store.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=0,error=NULL,available_at=?
       WHERE substr(document_id,1,?)=? AND state IN ('failed','cancelled')`).run(Date.now(), prefix.length, prefix);
   }
+  notifyDocumentaryPreparation();
   void drainDocumentaryRequests();
 }
 export function cancelResearchDocuments(documentIds: string[]): void {
@@ -247,7 +268,14 @@ export function cancelResearchDocuments(documentIds: string[]): void {
   if (documentIds.some(id => !allowed.has(id))) throw new Error('research_source_not_authorized');
   const store = documentaryStore();
   const requests = new DocumentaryRequests(store.db);
+  const campaigns = new DocumentaryCampaigns(store.db);
   for (const id of documentIds) {
+    const owned = store.db.prepare(`SELECT c.id FROM documentary_campaigns c JOIN documentary_campaign_members m ON m.campaign_id=c.id
+      WHERE c.vault_id=? AND m.document_id=?`).all(getActiveVault().id, id) as { id: string }[];
+    for (const campaign of owned) campaigns.control(campaign.id, 'cancel', id);
+    const interest = store.db.prepare(`SELECT 1 FROM documentary_campaign_members m JOIN documentary_campaigns c ON c.id=m.campaign_id
+      WHERE m.document_id=? AND m.state='active' AND c.state='active' LIMIT 1`).get(id);
+    if (interest) continue;
     requests.cancel(id);
     const prefix = `embedding:${id}:`;
     store.db.prepare(`UPDATE documentary_requests SET state='cancelled',lease_token=NULL,lease_until=NULL
@@ -255,6 +283,7 @@ export function cancelResearchDocuments(documentIds: string[]): void {
     for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state<>'complete'").all(id) as { id: string }[]) store.cancel(row.id);
     if (activePreparationDocument === id) activePreparation?.abort();
   }
+  notifyDocumentaryPreparation();
 }
 export function drainDocumentaryRequests(): Promise<void> {
   return withoutOwningVault(() => withoutDatabaseContext(drainOwnedDocumentaryRequests));
@@ -273,11 +302,14 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
     // One worker initially; existing Library extraction has its own bounded pool.
     for (;;) {
       if (stopping || store.preference('paused')) break;
+      new DocumentaryCampaigns(store.db).synchronizeOwners(owners());
       const request = requests.claim(owners());
       if (!request) break;
       const controller = new AbortController();
       activePreparation = controller;
-      activePreparationDocument = request.document_id;
+      activePreparationRequest = request.document_id;
+      notifyDocumentaryPreparation();
+      activePreparationDocument = request.source_id ?? request.document_id;
       const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
       let validateSource = () => {};
       const checkLease = () => { controller.signal.throwIfAborted(); validateSource(); if (getVault(request.vault_id)?.type !== 'academic') throw new Error('research_vault_unavailable'); requests.renew(request); };
@@ -289,7 +321,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           : { embedding: effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
         if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
         if (configuration.processingVersion !== 'nodus-documentary/1') throw new Error('documentary_processing_version_unavailable');
-        const document = researchCorpusInventory().documents.find(item => item.id === request.document_id);
+        const document = researchCorpusInventory().documents.find(item => item.id === (request.source_id ?? request.document_id));
         if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
         validateSource = () => {
           const current = researchCorpusInventory().documents.find(item => item.id === document.id);
@@ -353,6 +385,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         const current = researchCorpusInventory().documents.find(item => item.id === document.id);
         if (!current || current.revision !== document.revision) throw new Error('research_source_revision_changed');
         checkLease();
+        store.db.prepare("UPDATE documentary_requests SET stage='lexical' WHERE document_id=? AND lease_token=?").run(request.document_id, request.lease_token);
         const prepared = [];
         if (parts.length) {
           for (const part of parts) {
@@ -366,16 +399,28 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');
         store.publishDocument({ ...document, coverage: parts.length ? 'fulltext' : coverage }, prepared.map(result => result.indexKey));
         // Publish every lexical attachment before any optional vector request.
+        const total = prepared.reduce((sum, result) => sum + result.chunks.length, 0);
+        store.db.prepare("UPDATE documentary_requests SET stage=?,total_passages=?,completed_passages=0,unknown_requests=0 WHERE document_id=? AND lease_token=?").run(configuration.embedding ? 'embeddings' : 'lexical', total, request.document_id, request.lease_token);
+        let completed = 0, unknown = 0;
         for (const result of prepared) {
           checkLease();
-          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease);
+          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease, (count, uncertain) => {
+            store.db.prepare('UPDATE documentary_requests SET completed_passages=?,unknown_requests=?,updated_at=? WHERE document_id=? AND lease_token=?').run(completed + count, unknown + uncertain, Date.now(), request.document_id, request.lease_token);
+            notifyDocumentaryPreparation();
+          });
+          completed += result.chunks.length;
+          unknown = (store.db.prepare('SELECT unknown_requests FROM documentary_requests WHERE document_id=?').get(request.document_id) as { unknown_requests: number }).unknown_requests;
         }
         checkLease();
         requests.finish(request, null);
+        store.db.prepare("UPDATE documentary_requests SET stage='complete' WHERE document_id=?").run(request.document_id);
         }));
       } catch (error) {
+        if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && request.source_id) {
+          new DocumentaryCampaigns(store.db).blockOwner(request.document_id, request.vault_id);
+        }
         try { requests.finish(request, error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed', store.preference('paused') || stopping || controller.signal.aborted); } catch { /* A newer request owns publication. */ }
-      } finally { clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; } }
+      } finally { notifyDocumentaryPreparation(); clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; activePreparationRequest = null; } }
     }
   } finally {
     draining = false;
@@ -392,43 +437,58 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
 export function setResearchPreparationPaused(paused: boolean): void {
   if (typeof paused !== 'boolean') throw new Error('Invalid preparation preference');
   documentaryStore().setPreference('paused', paused);
+  notifyDocumentaryPreparation();
   if (paused) activePreparation?.abort(); else void drainDocumentaryRequests();
 }
 export function setResearchPreparationEnabled(enabled: boolean): void {
   if (typeof enabled !== 'boolean') throw new Error('Invalid preparation preference');
-  documentaryStore().setPreference('enabled', enabled);
+  if (getActiveVault().type !== 'academic') throw new Error('research_academic_vault_required');
+  const repo = new DocumentaryCampaigns(documentaryStore().db);
+  const policy = repo.policy(getActiveVault().id);
+  if (enabled && !policy.futureAdditions) policy.known = researchCorpusInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment).map(document => document.id);
+  repo.savePolicy({ ...policy, futureAdditions: enabled });
+  notifyDocumentaryPreparation();
   initializeDocumentaryPreparation();
 }
 
 let unsubscribe: (() => void) | null = null;
 let autoTimer: ReturnType<typeof setTimeout> | null = null;
 export function notifyResearchCorpusChanged(): void {
-  if (getActiveVault().type !== 'academic') return;
-  const vaultId = getActiveVault().id;
-    if (autoTimer) clearTimeout(autoTimer);
-    autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
-      autoTimer = null;
-      void Promise.resolve().then(() => withOwningVault(vaultId, () => withVaultDatabase(vaultId, async () => {
-      if (!documentaryStore().preference('enabled') || getActiveVault().type !== 'academic') return;
-      const documents = researchCorpusInventory().documents.filter(document => {
-        if (document.conversationAttachment && !listResearchNotebooks().some(notebook => notebook.sources.some(source => source.kind === 'conversation-attachment' && source.id === document.id)
-          && !notebook.exclusions.includes(document.id))) return false;
-        if (document.noteId && !listResearchNotebooks().some(notebook => notebook.sources.some(source => source.kind === 'note' && source.id === document.noteId)
-          && !notebook.exclusions.includes(document.id))) return false;
-        if (revisionsFor(document).some(row => row.lexical_ready)) return false;
-        const previous = documentaryStore().db.prepare('SELECT revision FROM documentary_requests WHERE document_id=?').get(document.id) as { revision: string } | undefined;
-        return previous?.revision !== document.revision;
-      });
-      if (documents.length) await prepareResearchDocuments(documents.map(document => document.id));
-      }))).catch(() => undefined);
-    }, 1000)));
-    autoTimer.unref();
+  if (autoTimer) clearTimeout(autoTimer);
+  autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
+    autoTimer = null;
+    void (async () => {
+      const repo = new DocumentaryCampaigns(documentaryStore().db);
+      for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
+        if (!repo.policy(vault.id).futureAdditions) continue;
+        await withOwningVault(vault.id, () => withVaultDatabase(vault.id, async () => {
+          const policy = repo.policy(vault.id);
+          if (!policy.futureAdditions) return;
+          const inventory = researchCorpusInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment);
+          const documents = inventory.filter(document => !policy.known.includes(document.id)
+            || (policy.authorized[document.id] !== undefined && policy.authorized[document.id] !== document.revision));
+          if (documents.length) await prepareResearchDocuments(documents.map(document => document.id));
+          const updated = repo.policy(vault.id);
+          repo.savePolicy({ ...updated, known: [...new Set([...updated.known, ...inventory.map(document => document.id)])] });
+        }));
+      }
+    })().catch(() => undefined);
+  }, 1000)));
+  autoTimer.unref();
 }
 export function initializeDocumentaryPreparation(): void {
   if (unsubscribe) return;
   const global = onGlobalLibraryChanged(notifyResearchCorpusChanged);
   const authored = onResearchCorpusChanged(notifyResearchCorpusChanged);
   unsubscribe = () => { global(); authored(); };
+  // A legacy profile preference must never authorize every vault.
+  if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite'))) {
+    const store = documentaryStore();
+    if (store.preference('enabled') && getActiveVault().type === 'academic') {
+      setResearchPreparationEnabled(true);
+      store.setPreference('enabled', false);
+    }
+  }
   // Resume explicitly queued work after a restart, including a crashed stage.
   if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite'))) void drainDocumentaryRequests().catch(() => undefined);
 }

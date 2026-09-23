@@ -47,7 +47,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Use notebook settings",
     "Cobertura documental": "Documentary coverage",
     "Cobertura parcial": "Partial coverage",
-    "Esta cita conserva una revisión anterior de la fuente.": "This citation preserves an earlier source revision."
+    "Esta cita conserva una revisión anterior de la fuente.": "This citation preserves an earlier source revision.",
+    "Búsqueda léxica": "Lexical search",
+    "{n} solicitudes con resultado desconocido": "{n} requests with unknown outcomes"
   },
   "fr": {
     "Disponible: revisión anterior": "Disponible : révision précédente",
@@ -97,7 +99,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Utiliser les paramètres du carnet",
     "Cobertura documental": "Couverture documentaire",
     "Cobertura parcial": "Couverture partielle",
-    "Esta cita conserva una revisión anterior de la fuente.": "Cette citation conserve une version antérieure de la source."
+    "Esta cita conserva una revisión anterior de la fuente.": "Cette citation conserve une version antérieure de la source.",
+    "Búsqueda léxica": "Recherche lexicale",
+    "{n} solicitudes con resultado desconocido": "{n} requêtes au résultat inconnu"
   },
   "de": {
     "Disponible: revisión anterior": "Verfügbar: vorherige Revision",
@@ -147,7 +151,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Notizbucheinstellungen verwenden",
     "Cobertura documental": "Dokumentabdeckung",
     "Cobertura parcial": "Teilweise Abdeckung",
-    "Esta cita conserva una revisión anterior de la fuente.": "Dieses Zitat bewahrt eine frühere Version der Quelle."
+    "Esta cita conserva una revisión anterior de la fuente.": "Dieses Zitat bewahrt eine frühere Version der Quelle.",
+    "Búsqueda léxica": "Lexikalische Suche",
+    "{n} solicitudes con resultado desconocido": "{n} Anfragen mit unbekanntem Ergebnis"
   },
   "it": {
     "Disponible: revisión anterior": "Disponibile: revisione precedente",
@@ -197,7 +203,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Usa le impostazioni del quaderno",
     "Cobertura documental": "Copertura documentale",
     "Cobertura parcial": "Copertura parziale",
-    "Esta cita conserva una revisión anterior de la fuente.": "Questa citazione conserva una versione precedente della fonte."
+    "Esta cita conserva una revisión anterior de la fuente.": "Questa citazione conserva una versione precedente della fonte.",
+    "Búsqueda léxica": "Ricerca lessicale",
+    "{n} solicitudes con resultado desconocido": "{n} richieste con esito sconosciuto"
   },
   "pt": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -247,7 +255,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Usar definições do caderno",
     "Cobertura documental": "Cobertura documental",
     "Cobertura parcial": "Cobertura parcial",
-    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação conserva uma revisão anterior da fonte."
+    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação conserva uma revisão anterior da fonte.",
+    "Búsqueda léxica": "Pesquisa lexical",
+    "{n} solicitudes con resultado desconocido": "{n} pedidos com resultado desconhecido"
   },
   "pt-BR": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -297,7 +307,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Usar configurações do caderno",
     "Cobertura documental": "Cobertura documental",
     "Cobertura parcial": "Cobertura parcial",
-    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação preserva uma revisão anterior da fonte."
+    "Esta cita conserva una revisión anterior de la fuente.": "Esta citação preserva uma revisão anterior da fonte.",
+    "Búsqueda léxica": "Busca lexical",
+    "{n} solicitudes con resultado desconocido": "{n} solicitações com resultado desconhecido"
   },
   "tr": {
     "Disponible: revisión anterior": "Kullanılabilir: önceki sürüm",
@@ -347,7 +359,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "Defter ayarlarını kullan",
     "Cobertura documental": "Belge kapsamı",
     "Cobertura parcial": "Kısmi kapsam",
-    "Esta cita conserva una revisión anterior de la fuente.": "Bu alıntı, kaynağın önceki bir sürümünü korur."
+    "Esta cita conserva una revisión anterior de la fuente.": "Bu alıntı, kaynağın önceki bir sürümünü korur.",
+    "Búsqueda léxica": "Sözcüksel arama",
+    "{n} solicitudes con resultado desconocido": "Sonucu bilinmeyen {n} istek"
   },
   "zh-CN": {
     "Disponible: revisión anterior": "可查询：先前版本",
@@ -397,7 +411,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "使用笔记本设置",
     "Cobertura documental": "文献覆盖范围",
     "Cobertura parcial": "部分覆盖",
-    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了来源的早期版本。"
+    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了来源的早期版本。",
+    "Búsqueda léxica": "词汇搜索",
+    "{n} solicitudes con resultado desconocido": "{n} 个结果未知的请求"
   },
   "zh-TW": {
     "Disponible: revisión anterior": "可查詢：先前版本",
@@ -447,7 +463,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "使用筆記本設定",
     "Cobertura documental": "文獻涵蓋範圍",
     "Cobertura parcial": "部分涵蓋",
-    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了來源的早期版本。"
+    "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了來源的早期版本。",
+    "Búsqueda léxica": "詞彙搜尋",
+    "{n} solicitudes con resultado desconocido": "{n} 個結果未知的請求"
   },
   "ja": {
     "Disponible: revisión anterior": "利用可能：以前の版",
@@ -497,7 +515,9 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "ノートの設定を使用",
     "Cobertura documental": "文献の網羅範囲",
     "Cobertura parcial": "一部のみ網羅",
-    "Esta cita conserva una revisión anterior de la fuente.": "この引用は出典の以前の版を保持しています。"
+    "Esta cita conserva una revisión anterior de la fuente.": "この引用は出典の以前の版を保持しています。",
+    "Búsqueda léxica": "語彙検索",
+    "{n} solicitudes con resultado desconocido": "結果が不明なリクエスト {n} 件"
   },
   "ko": {
     "Disponible: revisión anterior": "사용 가능: 이전 버전",
@@ -547,6 +567,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Usar ajustes del cuaderno": "노트북 설정 사용",
     "Cobertura documental": "문헌 검색 범위",
     "Cobertura parcial": "일부 범위만 검색",
-    "Esta cita conserva una revisión anterior de la fuente.": "이 인용은 출처의 이전 버전을 보존합니다."
+    "Esta cita conserva una revisión anterior de la fuente.": "이 인용은 출처의 이전 버전을 보존합니다.",
+    "Búsqueda léxica": "어휘 검색",
+    "{n} solicitudes con resultado desconocido": "결과를 알 수 없는 요청 {n}개"
   }
 };

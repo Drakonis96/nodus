@@ -52,6 +52,11 @@ try {
   const reused = await preparation.prepareDocumentaryEmbeddings(text.indexKey, text.chunks);
   assert.equal(calls, 1, 'compatible published vectors are reused');
   assert.deepEqual(reused.vectors, [[1, 0, 0]]);
+  const preferences = load('electron/db/settingsRepo.ts');
+  const savedModel = preferences.getSettings().embeddingModel;
+  preferences.updateSettings({ embeddingModel: 'incompatible-fixture-space' });
+  assert.equal(preparation.getResearchPreparationInventory().documents.find(item => item.id === doc.id).preparation.embeddings, 'stale', 'another configured vector space is not reported as compatible');
+  preferences.updateSettings({ embeddingModel: savedModel });
   const inventory = preparation.getResearchPreparationInventory();
   assert.equal(inventory.embeddingSpaces.length, 1);
   assert.match(inventory.embeddingSpaces[0].id, /^[a-f0-9]{64}$/);

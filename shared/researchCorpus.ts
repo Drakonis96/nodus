@@ -193,6 +193,13 @@ export interface ResearchPreparationInventory {
 }
 
 export interface ResearchCorpusApi {
+  getResearchPreparationPolicy(): Promise<ResearchPreparationPolicy>;
+  setResearchPreparationPolicy(input: { welcomeVersion?: number; decision?: ResearchPreparationPolicy['decision']; futureAdditions?: boolean }): Promise<ResearchPreparationPolicy>;
+  previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): Promise<ResearchPreparationPreview>;
+  startResearchPreparationCampaign(input: { previewId: string; mode: 'embeddings' | 'text'; documentIds?: string[] }): Promise<string>;
+  getResearchPreparationProgress(): Promise<ResearchPreparationProgress>;
+  onResearchPreparationProgress(listener: (progress: ResearchPreparationProgress) => void): () => void;
+  controlResearchPreparationCampaign(input: { campaignId: string; action: ResearchPreparationAction; documentId?: string }): Promise<void>;
   getResearchCorpusSources(): Promise<{ documents: ResearchCorpusDocument[]; collections: ResearchCorpusCollection[] }>;
   listResearchNotebooks(): Promise<ResearchNotebook[]>;
   saveResearchNotebook(input: ResearchNotebookInput): Promise<ResearchNotebook>;
@@ -209,4 +216,47 @@ export interface ResearchCorpusApi {
   connectResearchZotero(input: { notebookId?: string | null; mode: 'managed' | 'external'; externalUrl?: string }): Promise<ZoteroMcpStatus>;
   disconnectResearchZotero(): Promise<void>;
   readResearchZotero(input: { notebookId?: string | null; documentId: string; operation: 'metadata' | 'fulltext'; attachmentKey?: string }): Promise<unknown>;
+}
+
+/** User-visible preparation contracts contain no credentials or provider URLs. */
+export interface ResearchPreparationPolicy {
+  vaultId: string;
+  welcomeVersion: number;
+  decision: 'pending' | 'accepted' | 'declined';
+  futureAdditions: boolean;
+}
+export interface ResearchPreparationPreview {
+  id: string;
+  vaultId: string;
+  createdAt: number;
+  documents: ResearchPreparationInventory['documents'];
+  embedding: { provider: string; model: string; external: boolean } | null;
+  embeddingAvailable: boolean;
+  block: 'no_model' | null;
+}
+export type ResearchPreparationAction = 'pause' | 'resume' | 'cancel' | 'retry';
+export interface ResearchPreparationJob {
+  id: string;
+  documentId: string;
+  title: string;
+  state: 'queued' | 'running' | 'paused' | 'complete' | 'failed' | 'cancelled' | 'blocked';
+  stage: 'extraction' | 'lexical' | 'embeddings' | 'complete';
+  completedPassages: number;
+  totalPassages: number | null;
+  unknownRequests: number;
+  error: string | null;
+}
+export interface ResearchPreparationCampaign {
+  id: string;
+  vaultId: string;
+  vaultName: string;
+  createdAt: number;
+  updatedAt: number;
+  state: 'active' | 'paused' | 'cancelled';
+  embedding: ResearchPreparationPreview['embedding'];
+  jobs: ResearchPreparationJob[];
+}
+export interface ResearchPreparationProgress {
+  paused: boolean;
+  campaigns: ResearchPreparationCampaign[];
 }

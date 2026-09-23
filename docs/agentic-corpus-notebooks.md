@@ -823,3 +823,41 @@ switches the UI during an extraction await, checks the owning connections and
 proves text-only work cannot call the stubbed embedding or conversation methods.
 Both TypeScript projects passed. These are deterministic native repository/queue
 tests, not live-provider or GUI acceptance.
+
+## Closing delivery: campaigns, consent contracts and Queue
+
+Preparation campaigns are persisted interests in the existing documentary request
+queue. Identity/configuration-compatible requests are shared; pausing one campaign
+retains another campaign's live lease, while withdrawing the final interest fences
+publication. Campaign/source pause, resume, cancel and retry are exposed through
+additive IPC/preload contracts. Queue's existing badge, history and panel now consume
+initial snapshots and real updates, including owning vault, frozen model, stage,
+committed passage count and unknown request outcomes. No competing executor was added.
+
+The backend preview fixes active This-vault membership, permission/revision receipts
+and model configuration before confirmation. Explicit empty selections stay empty;
+archived works and unrelated vaults are excluded. Text-only confirmation remains
+available without embedding credentials. Per-vault welcome/future-addition policies
+preserve the initial membership baseline; disabling future work does not cancel
+explicit campaigns. Legacy profile opt-in is adopted once for the active academic
+vault only. Automatic discovery checks explicitly opted-in vaults in their own contexts.
+Indices in another configured vector space are reported as stale. Source-level
+publication also guards new campaign job IDs, preventing a first partial attachment
+from becoming searchable before the complete lexical publication.
+
+Validation: four focused queue/repository scripts passed at
+`/private/tmp/nodus-research-D7F7gN`; vector-space readiness passed at `a7TtDt` and
+the amended atomic-publication/consent fixture passed at `MT4HCl`. The source-owner
+fixture now explicitly uses the real `estudio` vault identifier (the earlier `study`
+fixture spelling normalized to academic). The Queue browser suite passed all 26
+checks at `/private/tmp/nodus-research-q7m6l5`, including the new preparation lane,
+controls, reopen/history behavior and existing lane/theme/width regressions. IPC
+and translation coverage also passed at `A8wCRh`. Both TypeScript projects and
+focused lint passed. These remain deterministic tests, not live model acceptance.
+
+The installed Chrome launcher was rejected by Seatbelt when it attempted a Crashpad
+write outside the isolated root (`XyYDNi`). Restrictions were preserved. The successful
+UI run used the existing Playwright Chromium headless shell 1228 with disposable
+browser data inside the root; filesystem, descendant and network negative probes
+passed before either run. No paid calls were made. Welcome/Library presentation,
+OCR recovery, agent tool orchestration and the remaining acceptance matrix are open.

@@ -26,6 +26,17 @@ export const academicApi: AcademicApi = {
   resolveResearchNotebook: id => ipcRenderer.invoke('research:notebooks:resolve', id),
   readResearchDocument: input => ipcRenderer.invoke('research:corpus:read', input),
   searchResearchNotebook: (id, query) => ipcRenderer.invoke('research:notebooks:search', id, query),
+  getResearchPreparationPolicy: () => ipcRenderer.invoke('research:preparation:policy'),
+  setResearchPreparationPolicy: input => ipcRenderer.invoke('research:preparation:policy:set', input),
+  previewResearchPreparation: input => ipcRenderer.invoke('research:preparation:preview', input),
+  startResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:start', input),
+  getResearchPreparationProgress: () => ipcRenderer.invoke('research:preparation:progress'),
+  controlResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:control', input),
+  onResearchPreparationProgress: callback => {
+    const listener = (_event: unknown, value: import('@shared/researchCorpus').ResearchPreparationProgress) => callback(value);
+    ipcRenderer.on('research:preparation:progress', listener);
+    return () => ipcRenderer.removeListener('research:preparation:progress', listener);
+  },
   getResearchPreparationInventory: () => ipcRenderer.invoke('research:preparation:inventory'),
   prepareResearchDocuments: ids => ipcRenderer.invoke('research:preparation:start', ids),
   cancelResearchDocuments: ids => ipcRenderer.invoke('research:preparation:cancel', ids),

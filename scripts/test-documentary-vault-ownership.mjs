@@ -16,7 +16,8 @@ const preparation = load('electron/ai/documentaryPreparation.ts');
 try {
   const first = registry.getActiveVault();
   const second = registry.createVault('Second academic', 'academic');
-  const nonAcademic = registry.createVault('Other engine', 'study');
+  const nonAcademic = registry.createVault('Other engine', 'estudio');
+  assert.equal(nonAcademic.type, 'estudio');
   const seed = async (vault, title) => registry.withOwningVault(vault.id, () => database.withVaultDatabase(vault.id, () => {
     database.getDb().prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES('owned','owned',?,'[]','book','text')").run(title);
     return load('electron/ai/researchCorpusInventory.ts').researchCorpusInventory().documents.find(doc => doc.workId === 'owned');
