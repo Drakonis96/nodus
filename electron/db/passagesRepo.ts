@@ -43,7 +43,7 @@ export function lexicalPassageSearch(
   limit: number,
   opts: { nodusIds?: string[] } = {},
 ): SimilarPassage[] {
-  if (limit <= 0) return [];
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const fold = (value: string) => value.normalize('NFKD').replace(/\p{M}+/gu, '').toLocaleLowerCase();
   const tokens = fold(query).match(/[\p{L}\p{N}]+/gu) ?? [];
   // FTS5 has no language stemmer in this index. Prefix roots recover predictable
@@ -136,7 +136,7 @@ export function findSimilarPassages(
   limit: number,
   opts: { nodusIds?: string[] } = {}
 ): SimilarPassage[] {
-  if (limit <= 0) return [];
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length
@@ -178,6 +178,7 @@ export async function findSimilarPassagesPaged(
   limit: number,
   opts: { nodusIds?: string[] } = {}
 ): Promise<SimilarPassage[]> {
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';

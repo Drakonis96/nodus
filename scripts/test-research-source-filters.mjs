@@ -94,6 +94,10 @@ try {
     checks++;
   }
   // Prove filtering happens before top-K, even when excluded vectors rank higher.
+  assert.deepEqual(passages.lexicalPassageSearch('topic', 10, { nodusIds: [] }), []);
+  assert.deepEqual(passages.findSimilarPassages([1, 0], -1, 10, { nodusIds: [] }), []);
+  assert.deepEqual(await passages.findSimilarPassagesPaged([1, 0], -1, 10, { nodusIds: [] }), []);
+  assert.deepEqual(await ideas.findSimilarIdeasPaged([1, 0], -1, 10, { nodusIds: [] }), []);
   const { retrieveHierarchical } = load('electron/ai/hierarchicalRetrieval.ts');
   const hit = await retrieveHierarchical('topic', { embedding: [1, 0], nodusIds: ['a1'], ideaLimit: 1, passageLimit: 1, documentLimit: 1 });
   assert.ok(hit.ideas.length && hit.documents.length && hit.passages.length);

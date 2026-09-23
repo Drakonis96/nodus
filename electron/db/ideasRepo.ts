@@ -411,6 +411,7 @@ export async function findSimilarIdeasPaged(
   limit: number,
   opts: { nodusIds?: string[] } = {}
 ): Promise<{ global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[]> {
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length

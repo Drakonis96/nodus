@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 178;
+export const SCHEMA_VERSION = 179;
 
 export const migrations: Migration[] = [
   {
@@ -9313,6 +9313,23 @@ export const migrations: Migration[] = [
   // Rows written before this column read as 'model', which is what they were.
   { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
   { version: 178, up: `ALTER TABLE chat_messages ADD COLUMN concilium_json TEXT;` },
+  { version: 179, up: `
+    CREATE TABLE research_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+      revision INTEGER NOT NULL DEFAULT 1, mode TEXT NOT NULL CHECK(mode IN ('fixed','linked')),
+      sources_json TEXT NOT NULL, exclusions_json TEXT NOT NULL, resolved_ids_json TEXT NOT NULL,
+      settings_json TEXT, notes_json TEXT NOT NULL DEFAULT '[]', conversation_settings_json TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE research_notebook_conversations (
+      conversation_id TEXT PRIMARY KEY REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      notebook_id TEXT NOT NULL REFERENCES research_notebooks(id) ON DELETE CASCADE
+    );
+    CREATE INDEX research_notebook_conversations_notebook ON research_notebook_conversations(notebook_id);
+    CREATE TABLE research_run_scopes (
+      id TEXT PRIMARY KEY, notebook_id TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  ` },
 ];
 
 /**
