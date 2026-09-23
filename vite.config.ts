@@ -281,7 +281,8 @@ export default defineConfig({
         // packaged filenames stable, this prevents Rollup from coalescing
         // worker entries that share most of their Library dependency graph.
         entry: {
-          main: 'electron/main.ts',
+          main: 'electron/bootstrap.ts',
+          application: 'electron/main.ts',
           computeWorker: 'electron/workers/computeWorker.ts',
           libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
           libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',

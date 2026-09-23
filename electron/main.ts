@@ -103,7 +103,7 @@ registerNodusClientVersion(app.getVersion());
 // Google blocks OAuth in embedded webviews; the correct pattern is
 // system browser -> your-site.com/authorize -> nodus://authorize?code=... .
 // Register the scheme so the OS launches Nodus for nodus:// URLs.
-if (!app.isDefaultProtocolClient('nodus')) {
+if (!process.env.NODUS_USERDATA && !app.isDefaultProtocolClient('nodus')) {
   try { app.setAsDefaultProtocolClient('nodus'); } catch {}
 }
 registerImageSchemePrivileges();
@@ -352,7 +352,7 @@ function unsignedMacUpdateHelperScript(): string {
  * a window.
  */
 function removeDisplacedMacBundle(): void {
-  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  if (process.env.NODUS_ISOLATED_ROOT || process.platform !== 'darwin' || !app.isPackaged) return;
   const appPath = macAppBundlePath();
   if (!appPath) return;
   const displaced = `${appPath}.previous`;
@@ -1005,7 +1005,7 @@ app.whenReady().then(async () => {
   // its handshake and is torn down in the same millisecond — reported either way as a
   // capability that would not start, for a worker that comes up in about 100 ms on a free
   // loop. Nothing here is urgent, and 5.4.0 shipped this in the contended window.
-  void afterFirstPaint(() => {
+  if (!process.env.NODUS_ISOLATED_ROOT) void afterFirstPaint(() => {
     void settleInstalledPluginMigrations()
       .then(settled => { if (settled.length) rebuildCapabilityRegistry(); })
       .catch(error => console.warn('[capabilities] outstanding data migrations could not be settled:', error));
@@ -1054,7 +1054,7 @@ app.whenReady().then(async () => {
   // Do this before creating either the main window or a browser tab: Chromium
   // then exposes the same effective preference to pages from their first frame.
   setBrowserTheme(getSettings().theme);
-  if (process.env.NODUS_STELLAR_PREVIEW !== '1') await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
+  if (!process.env.NODUS_ISOLATED_ROOT && process.env.NODUS_STELLAR_PREVIEW !== '1') await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
@@ -1080,7 +1080,7 @@ app.whenReady().then(async () => {
   );
   createWindow();
   // The isolated graph review copy never resumes background jobs or connects integrations.
-  if (process.env.NODUS_STELLAR_PREVIEW === '1') return;
+  if (process.env.NODUS_ISOLATED_ROOT || process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
   // Queue every registered vault after the window exists; the utility worker applies
   // retention without delaying startup or opening any vault on the main thread.
