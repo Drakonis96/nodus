@@ -14,6 +14,15 @@ import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, ve
 const root = createResearchTestRoot();
 const policy = macResearchSandbox(root);
 const proof = verifyResearchSandbox(root, policy);
+let providerProxy;
+if (process.argv.includes('--live')) {
+  const campaignRoot = process.argv.find(argument => argument.startsWith('--campaign-root='))?.slice('--campaign-root='.length);
+  if (!campaignRoot) throw new Error('Live runs require the same explicit --campaign-root for the entire $5 campaign');
+  const { startResearchProviderProxy } = await import('./research-provider-proxy.mjs');
+  providerProxy = await startResearchProviderProxy(campaignRoot);
+  const { importResearchTestCredentials } = await import('./research-test-credentials.mjs');
+  try { importResearchTestCredentials(root); } catch (error) { await providerProxy.close(); throw error; }
+}
 const profile = path.join(root, 'zotero/profile');
 const data = path.join(root, 'zotero/data');
 fs.mkdirSync(path.join(profile, 'extensions'), { recursive: true });
@@ -129,16 +138,20 @@ try {
     assert.equal((await client.callTool({ name: 'zotero_get_item_metadata', arguments: { ...args, item_key: corpus.items[1].key } })).isError, true);
     Object.assign(report, { mcp: { version: client.getServerVersion(), transport: 'stdio', physicalPage: 1, evidenceMarker: 'NORTH23', unauthorizedSourceRejected: true } });
   } finally { await client.close(); }
-  if (process.argv.includes('--nodus')) {
+  if (process.argv.includes('--nodus') || providerProxy) {
     const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
-    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus);
+    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url });
   }
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {
+  if (providerProxy) { report.accounting = providerProxy.ledger.read(); await providerProxy.close(); }
   if (child.exitCode === null) child.kill('SIGTERM');
   await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);
   if (child.exitCode === null) child.kill('SIGKILL');
   fs.closeSync(log);
   fs.writeFileSync(path.join(root, 'artifacts/zotero-startup.json'), JSON.stringify(report, null, 2));
-  console.log(JSON.stringify(report));
+  console.log(JSON.stringify({ root, passed: report.passed, proof, zoteroVersion: report.zoteroVersion,
+    mcp: report.mcp, nodusPassed: report.nodus?.passed, liveChecks: report.nodus?.live?.checks.map(check => ({
+      name: check.name, expectedAnswer: check.expectedAnswer, citationsExist: check.citationsExist, knownEvidenceRetrieved: check.knownEvidenceRetrieved })),
+    calls: report.accounting?.calls.length, accountedUsd: report.accounting?.calls.reduce((sum, call) => sum + (call.actualUsd ?? call.maximumUsd), 0) }));
 }

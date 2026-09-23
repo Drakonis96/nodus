@@ -8,18 +8,26 @@ import { _electron } from 'playwright-core';
 import { researchTestEnvironment } from './research-isolation.mjs';
 
 /** Called only after the parent harness has verified the inherited OS boundary. */
-export async function verifyZoteroNodusProduct(root, endpoint, corpus) {
+export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy } = {}) {
   const require = createRequire(import.meta.url);
   const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
   const wrapper = path.join(root, 'electron-isolated');
   fs.writeFileSync(wrapper, `#!/bin/sh\nexec /usr/bin/sandbox-exec -f ${quote(path.join(root, 'isolation.sb'))} ${quote(require('electron'))} "$@"\n`, { mode: 0o700 });
   const app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', path.resolve(import.meta.dirname, '..')], cwd: root,
-    env: { ...researchTestEnvironment(root), NODUS_ZOTERO_API_BASE: endpoint }, timeout: 60000 });
+    env: { ...researchTestEnvironment(root), NODUS_ZOTERO_API_BASE: endpoint,
+      ...(providerProxy ? { NODUS_RESEARCH_PROVIDER_PROXY: providerProxy } : {}) }, timeout: 60000 });
   let external;
   let externalLog;
   try {
     const page = await app.firstWindow();
     await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+    if (providerProxy) {
+      await page.evaluate(() => window.nodus.updateSettings({ chatModel: { provider: 'deepseek', model: 'deepseek-flash' },
+        deepResearchModel: { provider: 'deepseek', model: 'deepseek-flash' }, synthesisModel: { provider: 'deepseek', model: 'deepseek-flash' },
+        embeddingProvider: 'openrouter', embeddingModel: 'baai/bge-m3', chatReasoning: 'off', promptLanguage: 'es',
+        autoLightScan: false, autoDeepScanOnReadTag: false, autoSummaryAfterDeep: false, autoBridgeAfterQueue: false,
+        autoResumeQueue: false, documentIndexingEnabled: false, syncMode: 'manual' }));
+    }
     const imported = await page.evaluate(async root => {
       await window.nodus.updateSettings({ autoBackupFolder: `${root}/library`, onboardingComplete: true,
         basicsTutorialVersion: 99, recoverySetupVersion: 999, tourComplete: true, advancedTourComplete: true,
@@ -94,8 +102,13 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus) {
     await page.evaluate(notebook => window.nodus.saveResearchNotebook({ ...notebook, exclusions: notebook.resolvedDocumentIds }), notebook);
     await assert.rejects(page.evaluate(input => window.nodus.readResearchZotero(input), { notebookId: notebook.id, documentId: source.id, operation: 'metadata' }), /scope_mismatch|unavailable/);
     await page.screenshot({ path: path.join(root, 'artifacts/nodus-zotero.png') });
+    let live;
+    if (providerProxy) {
+      const { runResearchLiveCampaign } = await import('./research-live-campaign.mjs');
+      live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents);
+    }
     return { passed: true, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
-      modelCalls: 0, unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
+      ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {
     await app.close();

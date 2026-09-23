@@ -9,6 +9,7 @@ import { getSettings } from '../db/settingsRepo';
 import { DEFAULT_LOCAL_BASE_URLS, normalizeCustomBaseUrl, normalizeCustomModels } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
+import { researchTestProviderBase } from '../qa/researchProviderProxy';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
@@ -40,6 +41,8 @@ function localHeaders(key: string | null): Record<string, string> {
  * native (non-OpenAI) API (Anthropic uses its own SDK).
  */
 export function openAiCompatBase(provider: AiProvider): string | null {
+  const testProxy = researchTestProviderBase(provider);
+  if (testProxy) return testProxy;
   switch (provider) {
     case 'openai':
       return 'https://api.openai.com/v1';
