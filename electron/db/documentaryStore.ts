@@ -62,6 +62,10 @@ export class DocumentaryStore {
       );
       CREATE INDEX IF NOT EXISTS documentary_jobs_claim ON documentary_jobs(state, available_at, priority);
       CREATE TABLE IF NOT EXISTS documentary_preferences (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS documentary_mcp_choices (
+        vault_id TEXT NOT NULL, notebook_id TEXT NOT NULL, endpoint TEXT NOT NULL,
+        PRIMARY KEY(vault_id,notebook_id)
+      );
     `);
   }
   close(): void { this.db.close(); }

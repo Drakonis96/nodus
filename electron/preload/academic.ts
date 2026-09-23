@@ -17,9 +17,9 @@ let activeStudySttRequestId: string | null = null;
 export const academicApi: AcademicApi = {
   getResearchCorpusSources: () => ipcRenderer.invoke('research:corpus:sources'),
   setResearchZoteroAutomatic: enabled => ipcRenderer.invoke('research:zotero:automatic', enabled),
-  getZoteroMcpStatus: () => ipcRenderer.invoke('research:zotero:status'),
+  getZoteroMcpStatus: notebookId => ipcRenderer.invoke('research:zotero:status', notebookId),
   connectResearchZotero: input => ipcRenderer.invoke('research:zotero:connect', input),
-  disconnectResearchZotero: () => ipcRenderer.invoke('research:zotero:disconnect'),
+  disconnectResearchZotero: notebookId => ipcRenderer.invoke('research:zotero:disconnect', notebookId),
   readResearchZotero: input => ipcRenderer.invoke('research:zotero:read', input),
   listResearchNotebooks: () => ipcRenderer.invoke('research:notebooks:list'),
   saveResearchNotebook: input => ipcRenderer.invoke('research:notebooks:save', input),
@@ -33,6 +33,7 @@ export const academicApi: AcademicApi = {
   startResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:start', input),
   getResearchPreparationProgress: () => ipcRenderer.invoke('research:preparation:progress'),
   controlResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:control', input),
+  controlAllResearchPreparation: action => ipcRenderer.invoke('research:preparation:control', action),
   onResearchPreparationProgress: callback => {
     const listener = (_event: unknown, value: import('@shared/researchCorpus').ResearchPreparationProgress) => callback(value);
     ipcRenderer.on('research:preparation:progress', listener);

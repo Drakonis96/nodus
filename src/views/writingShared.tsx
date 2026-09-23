@@ -8,6 +8,7 @@ import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
 import { t, tx, getActiveLang } from '../i18n';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { ResearchCoverage } from '../components/ResearchCoverage';
 
 /** Human labels for every workshop/report kind (deep reports use `deep_research`). */
 export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -285,11 +286,7 @@ export function SupportMatrix({
             </div>
           ))}
           <SupportAudit entries={draft.supportAudit ?? []} />
-          {draft.researchTraversal && <details className="card p-3 text-sm">
-            <summary>{t('Cobertura documental')}: {draft.researchTraversal.sourceCount} {t('Fuentes')}{draft.researchTraversal.partial ? ` · ${t('Cobertura parcial')}` : ''}</summary>
-            <p className="my-2">{t('Tokens de evidencia')}: {draft.researchTraversal.evidenceTokens}</p>
-            <ol className="list-decimal pl-5">{draft.researchTraversal.queries.map((query, index) => <li key={index}>{query.query} · {query.candidates} {t('Candidatos por búsqueda')}</li>)}</ol>
-          </details>}
+          {draft.researchTraversal && <ResearchCoverage value={draft.researchTraversal} />}
           {draft.qualityAssessment && <DeepResearchQualityPanel assessment={draft.qualityAssessment} />}
           <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
           <PanelList title={t('Limitaciones')} items={draft.limitations} />

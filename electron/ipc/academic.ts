@@ -1634,9 +1634,9 @@ export function registerAcademicIpc(context: IpcContext): void {
   // research assistant
   h('research:corpus:sources', async () => researchCorpusInventory());
   h('research:zotero:automatic', async (_e, enabled: boolean) => researchZotero.setResearchZoteroAutomatic(enabled));
-  h('research:zotero:status', async () => researchZotero.getResearchZoteroStatus());
+  h('research:zotero:status', async (_e, notebookId) => researchZotero.getResearchZoteroStatus(notebookId));
   h('research:zotero:connect', async (_e, input: Parameters<typeof researchZotero.connectResearchZotero>[0]) => researchZotero.connectResearchZotero(input));
-  h('research:zotero:disconnect', async () => researchZotero.disconnectResearchZotero());
+  h('research:zotero:disconnect', async (_e, notebookId) => researchZotero.disconnectResearchZotero(notebookId));
   h('research:zotero:read', async (_e, input: Parameters<typeof researchZotero.readResearchZotero>[0]) => researchZotero.readResearchZotero(input));
   h('research:notebooks:list', async () => researchNotebooks.listResearchNotebooks());
   h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));
@@ -1671,6 +1671,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('research:preparation:campaign:start', async (_e, input) => preparationExperience.startResearchPreparationCampaign(input));
   h('research:preparation:progress', async () => preparationExperience.getResearchPreparationProgress());
   h('research:preparation:campaign:control', async (_e, input) => preparationExperience.controlResearchPreparationCampaign(input));
+  h('research:preparation:control', async (_e, action) => preparationExperience.controlAllResearchPreparation(action));
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
   h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
   h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));

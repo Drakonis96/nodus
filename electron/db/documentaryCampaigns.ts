@@ -62,7 +62,10 @@ export class DocumentaryCampaigns {
       if (!documentId) this.db.prepare('UPDATE documentary_campaigns SET state=?,updated_at=? WHERE id=?').run(state, Date.now(), campaignId);
       else if (action === 'resume' || action === 'retry') this.db.prepare("UPDATE documentary_campaigns SET state='active',updated_at=? WHERE id=?").run(Date.now(), campaignId);
       else this.db.prepare('UPDATE documentary_campaigns SET updated_at=? WHERE id=?').run(Date.now(), campaignId);
-      this.db.prepare('UPDATE documentary_campaign_members SET state=? WHERE campaign_id=? AND (? IS NULL OR document_id=?)').run(state, campaignId, documentId ?? null, documentId ?? null);
+      // A campaign pause is an independent interest gate. It must not erase a
+      // document's explicit pause/cancellation when the campaign resumes.
+      if (documentId) this.db.prepare('UPDATE documentary_campaign_members SET state=? WHERE campaign_id=? AND document_id=?').run(state, campaignId, documentId);
+      else if (action === 'retry') this.db.prepare("UPDATE documentary_campaign_members SET state='active' WHERE campaign_id=? AND state IN ('blocked','cancelled')").run(campaignId);
       const members = this.db.prepare('SELECT job_id,document_id FROM documentary_campaign_members WHERE campaign_id=? AND (? IS NULL OR document_id=?)').all(campaignId, documentId ?? null, documentId ?? null) as { job_id: string; document_id: string }[];
       if (documentId && !members.length) throw new Error('research_source_not_authorized');
       for (const member of members) {

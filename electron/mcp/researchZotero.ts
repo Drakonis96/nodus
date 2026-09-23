@@ -17,34 +17,45 @@ import { documentaryStore } from '../ai/documentaryPreparation';
 const runtimePath = () => app.isPackaged ? path.join(process.resourcesPath, 'zotero-mcp') : path.join(app.getAppPath(), 'build/zotero-mcp');
 interface Session {
   id: string; scope: ResolvedResearchScope; connection: ManagedZoteroConnection; root: string | null;
-  controller: AbortController; release: () => void; manifest?: ManagedZoteroScopeManifest; manual: boolean;
+  closing?: Promise<void>; controller: AbortController; release: () => void; manifest?: ManagedZoteroScopeManifest; manual: boolean;
 }
 const sessions = new Map<string, Session>();
-const externalChoices = new Map<string, string>();
-const choiceKey = (scope: ResolvedResearchScope) => JSON.stringify([scope.vaultId, scope.notebookId]);
+function externalChoice(scope: Pick<ResolvedResearchScope, 'vaultId' | 'notebookId'>): string | undefined {
+  return (documentaryStore().db.prepare('SELECT endpoint FROM documentary_mcp_choices WHERE vault_id=? AND notebook_id=?').get(scope.vaultId, scope.notebookId ?? '') as { endpoint: string } | undefined)?.endpoint;
+}
+function setExternalChoice(scope: Pick<ResolvedResearchScope, 'vaultId' | 'notebookId'>, endpoint?: string): void {
+  if (endpoint) documentaryStore().db.prepare('INSERT INTO documentary_mcp_choices VALUES(?,?,?) ON CONFLICT(vault_id,notebook_id) DO UPDATE SET endpoint=excluded.endpoint').run(scope.vaultId, scope.notebookId ?? '', endpoint);
+  else documentaryStore().db.prepare('DELETE FROM documentary_mcp_choices WHERE vault_id=? AND notebook_id=?').run(scope.vaultId, scope.notebookId ?? '');
+}
 const stopped: ZoteroMcpStatus = { installed: false, mode: 'managed', state: 'stopped', version: null, transport: 'stdio', error: null };
 let diagnostic: ZoteroMcpStatus = { ...stopped };
 const enabled = () => documentaryStore().preference('managed-zotero-disabled') !== true;
-export function getResearchZoteroStatus(): ZoteroMcpStatus {
+export function getResearchZoteroStatus(notebookId?: string | null): ZoteroMcpStatus {
   const session = [...sessions.values()].at(-1);
+  const externalUrl = externalChoice({ vaultId: getActiveVault().id, notebookId: notebookId ?? null });
   return { ...(session?.connection.status ?? diagnostic), installed: fs.existsSync(path.join(runtimePath(), 'runtime.json')),
+    externalUrl: externalUrl ?? null,
     automatic: enabled(), sessionId: session?.id ?? null, activeSessions: sessions.size,
     ...(!enabled() && !session ? { state: 'disabled' as const } : {}), notebookId: session?.scope.notebookId ?? null, scopeId: session?.scope.id ?? null };
 }
-async function closeSession(session: Session): Promise<void> {
-  session.controller.abort(); session.release();
-  try { await session.connection.close(); }
-  finally {
-    if (session.root) await fs.promises.rm(session.root, { recursive: true, force: true });
-    if (sessions.get(session.id) === session) sessions.delete(session.id);
-  }
+function closeSession(session: Session): Promise<void> {
+  return session.closing ??= Promise.resolve().then(async () => {
+    session.controller.abort(); session.release();
+    try { await session.connection.close(); }
+    finally {
+      if (session.root) await fs.promises.rm(session.root, { recursive: true, force: true });
+      if (sessions.get(session.id) === session) sessions.delete(session.id);
+      if (!sessions.size && diagnostic.state === 'connected') diagnostic = { ...diagnostic, state: 'stopped' };
+    }
+  });
 }
 /** App shutdown closes only processes created by this module. */
 export async function closeResearchZotero(): Promise<void> { await Promise.all([...sessions.values()].map(closeSession)); }
 /** Compatibility disconnect affects the manual diagnostic connection, not live runs. */
-export async function disconnectResearchZotero(): Promise<void> {
-  const manual = [...sessions.values()].filter(session => session.manual);
-  for (const session of manual) externalChoices.delete(choiceKey(session.scope));
+export async function disconnectResearchZotero(notebookId?: string | null): Promise<void> {
+  const manual = [...sessions.values()].filter(session => session.manual && (notebookId === undefined || session.scope.notebookId === notebookId));
+  for (const session of manual) setExternalChoice(session.scope);
+  if (notebookId !== undefined) setExternalChoice({ vaultId: getActiveVault().id, notebookId });
   await Promise.all(manual.map(closeSession));
 }
 export async function setResearchZoteroAutomatic(value: boolean): Promise<ZoteroMcpStatus> {
@@ -122,7 +133,7 @@ async function createSession(resolved: ResolvedResearchScope, mode: 'managed' | 
   const session: Session = { id: randomUUID(), scope: structuredClone(resolved), connection: new ManagedZoteroConnection(), root: null,
     controller: new AbortController(), release: () => {}, manual };
   sessions.set(session.id, session);
-  session.controller.signal.addEventListener('abort', () => { void session.connection.close(); }, { once: true });
+  session.controller.signal.addEventListener('abort', () => { void closeSession(session); }, { once: true });
   const abort = () => { session.controller.abort(); void session.connection.close(); };
   signal?.addEventListener('abort', abort, { once: true });
   const releaseNotebook = resolved.notebookId ? registerNotebookRun(resolved.notebookId, session.controller) : () => {};
@@ -198,12 +209,15 @@ async function createSession(resolved: ResolvedResearchScope, mode: 'managed' | 
 type ConnectionInput = { notebookId?: string | null; mode: 'managed' | 'external'; externalUrl?: string };
 export async function connectResearchZotero(input: ConnectionInput) {
   if (!input || !['managed', 'external'].includes(input.mode)) throw new Error('research_invalid_mcp_mode');
-  await disconnectResearchZotero();
+  if (input.mode === 'external') {
+    const endpoint = new URL(input.externalUrl ?? '');
+    if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash) throw new Error('external_zotero_endpoint_invalid');
+  }
+  await Promise.all([...sessions.values()].filter(session => session.manual).map(closeSession));
   const scope = input.notebookId ? resolveResearchNotebook(input.notebookId) : resolveAcademicResearchScope();
   await createSession(scope, input.mode, input.externalUrl, true);
-  if (input.mode === 'external') externalChoices.set(choiceKey(scope), input.externalUrl!);
-  else externalChoices.delete(choiceKey(scope));
-  return getResearchZoteroStatus();
+  setExternalChoice(scope, input.mode === 'external' ? input.externalUrl : undefined);
+  return getResearchZoteroStatus(scope.notebookId);
 }
 async function readSession(session: Session, input: { documentId: string; operation: 'metadata' | 'fulltext' | 'pages'; attachmentKey?: string; from?: number; to?: number }): Promise<unknown> {
   session.controller.signal.throwIfAborted(); validateScope(session.scope);
@@ -215,15 +229,16 @@ async function readSession(session: Session, input: { documentId: string; operat
   const key = input.attachmentKey ?? (available.length === 1 ? available[0].key : undefined);
   if (input.operation !== 'metadata' && !key) throw new Error('research_attachment_selection_required');
   const result = await researchActivityStep('zotero', input.operation, () => session.connection.call(tool, {
-    library_type: origin.libraryType, library_id: origin.libraryId, item_key: origin.itemKey, attachment_key: key,
-    start_page: input.from, end_page: input.to ?? input.from,
+    library_type: origin.libraryType, library_id: origin.libraryId, item_key: origin.itemKey,
+    ...(input.operation !== 'metadata' ? { attachment_key: key } : {}),
+    ...(input.operation === 'pages' ? { start_page: input.from, end_page: input.to ?? input.from } : {}),
   }, session.controller.signal), document.title);
   session.controller.signal.throwIfAborted(); validateScope(session.scope);
   return result;
 }
 export async function readResearchZotero(input: { notebookId?: string | null; documentId: string; operation: 'metadata' | 'fulltext'; attachmentKey?: string }) {
   const session = [...sessions.values()].find(item => item.manual && item.scope.notebookId === (input.notebookId ?? null));
-  if (!session) throw new Error('research_mcp_scope_mismatch');
+  if (!session || session.controller.signal.aborted) throw new Error('research_mcp_scope_mismatch');
   return readSession(session, input);
 }
 /** Lazy managed original access; a run owns the immutable scope and this lease.
@@ -231,8 +246,17 @@ export async function readResearchZotero(input: { notebookId?: string | null; do
 export async function readAutomaticResearchZotero(scope: ResolvedResearchScope, input: { documentId: string; from: number; to?: number; attachmentKey?: string }, signal?: AbortSignal, pins?: ZoteroOriginalPins): Promise<unknown> {
   const document = scope.documents.find(item => item.id === input.documentId);
   if (!document) throw new Error('research_source_not_authorized');
-  const external = externalChoices.get(choiceKey(scope));
-  const session = await createSession(external ? scope : { ...scope, documents: [document] }, external ? 'external' : 'managed', external, false, signal, pins);
-  try { return await readSession(session, { ...input, operation: 'pages' }); }
-  finally { await closeSession(session); }
+  const external = externalChoice(scope);
+  for (let attempt = 0; ; attempt++) {
+    let session: Session | undefined;
+    try {
+      session = await createSession(external ? scope : { ...scope, documents: [document] }, external ? 'external' : 'managed', external, false, signal, pins);
+      return await readSession(session, { ...input, operation: 'pages' });
+    } catch (error) {
+      signal?.throwIfAborted(); validateScope(scope);
+      // One fresh managed process may recover a dead transport. Identity,
+      // permission, revision and capability failures are never retried.
+      if (external || attempt > 0 || !/Connection closed|EPIPE|ECONNRESET|managed_zotero_unavailable/.test(error instanceof Error ? error.message : '')) throw error;
+    } finally { if (session) await closeSession(session); }
+  }
 }

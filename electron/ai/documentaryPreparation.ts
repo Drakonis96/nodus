@@ -23,7 +23,7 @@ import { readResearchAttachmentSource } from './researchAttachmentSources';
 import { getNote } from '../db/notesRepo';
 import { getSettings } from '../db/settingsRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
-import { documentarySourceText, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
+import { documentarySourceText, documentaryReaderComplete, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { getActiveVault, getVault, listVaults, withOwningVault, withoutOwningVault } from '../vaults/vaultRegistry';
 import { withVaultDatabase, withoutDatabaseContext } from '../db/database';
@@ -328,9 +328,9 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision) throw new Error('research_source_not_authorized');
         };
         checkLease();
-        const extractionOptions = configuration.processingVersion === 'nodus-documentary/2'
-          ? { ocrMode: 'local' as const, localOcrOnly: true, ocrLanguages: configuration.ocrLanguages || 'spa+eng', maxOcrPages: 1000000 }
-          : { ocrMode: 'off' as const, maxOcrPages: 0 };
+        // OCR is deferred for documentary preparation, including already queued
+        // v2 jobs. Detect scanned pages, preserve the last publication and skip.
+        const extractionOptions = { ocrMode: 'off' as const, localOcrOnly: true, maxOcrPages: 0 };
         const onExtractionProgress = (progress: { phase: string; page?: number; totalPages?: number }) => {
           checkLease();
           store.db.prepare('UPDATE documentary_requests SET stage=?,current_page=?,total_pages=?,updated_at=? WHERE document_id=? AND lease_token=?').run(progress.phase === 'ocr' ? 'ocr' : 'extraction', progress.page ?? null, progress.totalPages ?? null, Date.now(), request.document_id, request.lease_token);
@@ -378,6 +378,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           const raw = getLibraryReaderRawContent(document.libraryItemId);
           const map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
           const compatible = !!raw && !!map && map.reader.sha256 === createHash('sha256').update(raw.markdown).digest('hex')
+            && documentaryReaderComplete(raw.folder, item?.files?.qualityReport)
             && item?.attachments.length === 1 && item.attachments[0].sha256 === map.source.sha256
             && item.contentRevision?.components.extraction.freshness === 'current';
           if (compatible && raw?.markdown) {
@@ -443,7 +444,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         }
         try {
           const code = error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed';
-          if (/^documentary_(ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
+          if (/^documentary_(ocr_deferred|ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
           else requests.finish(request, code, store.preference('paused') || stopping || controller.signal.aborted);
         } catch { /* A newer request owns publication. */ }
       } finally { notifyDocumentaryPreparation(); clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; activePreparationRequest = null; } }

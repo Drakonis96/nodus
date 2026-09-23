@@ -12,10 +12,18 @@ export async function deepenResearch(run: ResearchCorpusRun, question: string, m
   const attempted = new Set<string>();
   while (run.budget.rounds < run.budget.settings.rounds) {
     run.validate();
-    const user = JSON.stringify({ question: question.slice(0, 3000), sources: run.scope.documents.slice(0, run.budget.settings.candidates).map(doc => ({
-      id: doc.id, title: doc.title.slice(0, 180), origin: doc.origin.kind, coverage: doc.coverage, attachments: doc.attachments,
-    })), evidence: [...run.evidence.values()].slice(-12).map(item => ({ id: item.id, source: item.nodus_id, text: item.summary?.slice(0, 350), page: item.pageLabel })),
-      coverage: run.coverage(), attempted: [...attempted] });
+    const ordered = [...run.scope.documents].sort((a, b) => Number(run.matchedDocuments.has(b.id)) - Number(run.matchedDocuments.has(a.id)));
+    const payload = { question: question.slice(0, 1000), sources: ordered.slice(0, 8).map(doc => ({
+      id: doc.id, title: doc.title.slice(0, 80), origin: doc.origin.kind, coverage: doc.coverage,
+      attachments: doc.attachments?.slice(0, 4).map(item => item.id),
+    })), evidence: [...run.evidence.values()].slice(-3).map(item => ({ id: item.id, source: item.nodus_id, text: item.summary?.slice(0, 160), page: item.pageLabel })),
+      coverage: { sources: run.scope.documents.length, matched: run.matchedDocuments.size, read: run.readDocuments.size, limitations: [...run.limitations] }, attempted: [...attempted].slice(-4) };
+    const availableInput = run.budget.evidenceTokenLimit - run.budget.usedEvidenceTokens - Buffer.byteLength(SYSTEM) - 384 - 1024 - 512;
+    // Do not serialize the full traversal/source list into every decision.
+    // Keep a bounded source menu and enough allowance for the resulting read.
+    while (Buffer.byteLength(JSON.stringify(payload)) > availableInput && payload.evidence.length) payload.evidence.shift();
+    while (Buffer.byteLength(JSON.stringify(payload)) > availableInput && payload.sources.length > 1) payload.sources.pop();
+    const user = JSON.stringify(payload);
     // Conservative upper bound includes all supervisor input, framing and output.
     // It is charged to this run even if the provider fails or returns invalid JSON.
     if (!run.budget.reserveDecision(SYSTEM, user, 384)) { run.limitations.add('budget_exhausted'); return; }
@@ -43,6 +51,7 @@ export async function deepenResearch(run: ResearchCorpusRun, question: string, m
       const message = error instanceof Error ? error.message : '';
       if (/not_authorized|scope_changed/.test(message) || (!run.pinRevisions && /revision_changed/.test(message))) throw error;
       if (/revision_changed/.test(message)) run.limitations.add('original_revision_changed');
+      if (/ocr_deferred/.test(message)) run.limitations.add('ocr_pending');
       run.budget.partial = true; run.limitations.add('research_read_unavailable');
     }
   }

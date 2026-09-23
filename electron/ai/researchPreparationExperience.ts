@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { ResearchPreparationAction, ResearchPreparationCampaign, ResearchPreparationPolicy, ResearchPreparationPreview, ResearchPreparationProgress } from '@shared/researchCorpus';
 import { DocumentaryCampaigns } from '../db/documentaryCampaigns';
-import { getActiveVault, getVault } from '../vaults/vaultRegistry';
+import { getActiveVault, getVault, withOwningVault } from '../vaults/vaultRegistry';
+import { withVaultDatabase } from '../db/database';
+import { preparationPreflight } from './researchPreparationPreflight';
 import { getSettings } from '../db/settingsRepo';
 import { effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
-import { documentaryStore, drainDocumentaryRequests, getResearchPreparationInventory, interruptUnusedDocumentaryRequest } from './documentaryPreparation';
+import { documentaryStore, drainDocumentaryRequests, getResearchPreparationInventory, interruptUnusedDocumentaryRequest, setResearchPreparationPaused } from './documentaryPreparation';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { notifyDocumentaryPreparation } from './documentaryPreparationEvents';
 
@@ -40,7 +42,7 @@ export function setResearchPreparationPolicy(input: { welcomeVersion?: number; d
   notifyDocumentaryPreparation();
   return getResearchPreparationPolicy();
 }
-export function previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): ResearchPreparationPreview {
+export async function previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): Promise<ResearchPreparationPreview> {
   if (!input || !['vault', 'selection'].includes(input.scope)
     || (input.scope === 'selection' && (!Array.isArray(input.documentIds) || input.documentIds.length > 50000 || input.documentIds.some(id => typeof id !== 'string' || id.length > 1000)))) throw new Error('Invalid preparation selection');
   const vault = academicVault(), repo = campaigns();
@@ -55,7 +57,8 @@ export function previewResearchPreparation(input: { scope: 'vault' | 'selection'
   const preview: ResearchPreparationPreview = { id: randomUUID(), vaultId: vault.id, createdAt: Date.now(), documents,
     embedding: config ? { provider: config.provider, model: config.modelId, external: externalEmbedding(config) } : null,
     embeddingAvailable: available, block: available ? null : 'no_model' };
-  const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' } };
+  const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/2' } };
+  preview.preflight = await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => preparationPreflight(documents)));
   repo.db.prepare('INSERT INTO documentary_preparation_previews VALUES(?,?,?,?)').run(preview.id, vault.id, JSON.stringify(payload), preview.createdAt);
   // Unconfirmed previews carry no authority and can be reconstructed safely.
   repo.db.prepare('DELETE FROM documentary_preparation_previews WHERE created_at<?').run(Date.now() - 7 * 86400000);
@@ -109,4 +112,20 @@ export async function controlResearchPreparationCampaign(input: { campaignId: st
   interruptUnusedDocumentaryRequest();
   notifyDocumentaryPreparation();
   void drainDocumentaryRequests();
+}
+
+export async function controlAllResearchPreparation(action: ResearchPreparationAction): Promise<void> {
+  if (!['pause', 'resume', 'cancel', 'retry'].includes(action)) throw new Error('Invalid preparation action');
+  if (action === 'pause' || action === 'resume') { setResearchPreparationPaused(action === 'pause'); return; }
+  const repo = campaigns();
+  const progress = getResearchPreparationProgress();
+  repo.db.transaction(() => {
+    for (const campaign of progress.campaigns) {
+      if (action === 'cancel') repo.control(campaign.id, action);
+      else if (campaign.state === 'active') for (const job of campaign.jobs) {
+        if (['failed', 'blocked'].includes(job.state)) repo.control(campaign.id, 'retry', job.documentId);
+      }
+    }
+  }).immediate();
+  interruptUnusedDocumentaryRequest(); notifyDocumentaryPreparation(); void drainDocumentaryRequests();
 }

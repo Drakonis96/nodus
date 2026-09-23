@@ -9,6 +9,7 @@ import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapt
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
 import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
+import { ResearchCoverage } from '../components/ResearchCoverage';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import type { ResearchEffort } from '@shared/researchReasoning';
 import { ChatMarkdown } from '../components/ChatMarkdown';
@@ -1097,6 +1098,7 @@ export function ResearchAssistantModal({
                           {message.stats.sections.join(', ') || t('Sin secciones')} · {tx('{n} obras', { n: message.stats.works })} ·{' '}
                           {tx('{n} docs', { n: message.stats.documents })} · {tx('{n} pasajes', { n: message.stats.passages })} · {formatChars(message.stats.contextChars)}
                           {message.stats.truncated ? ` · ${t('recortado')}` : ''}
+                          {message.stats.researchTraversal && <ResearchCoverage value={message.stats.researchTraversal} />}
                         </div>
                       )}
                     </div>

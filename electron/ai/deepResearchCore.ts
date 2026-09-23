@@ -1,3 +1,5 @@
+import { researchEvidenceLimitation } from '@shared/researchEvidenceMessages';
+import type { ResearchProseAudit, ResearchClaimRecord } from '@shared/researchClaimAudit';
 // Citation naming lives in @shared/citationLabel so the reader that re-derives a
 // stored label at open time cannot drift from the writer that produced it.
 import {
@@ -626,6 +628,9 @@ export interface FinalizeResult {
  * logic can be tested with fakes — no DB, no AI provider, no Electron.
  */
 export interface DeepResearchDeps {
+  strictDocumentaryGrounding?: boolean;
+  auditFactualProse?(markdown: string): Promise<ResearchProseAudit & { passages?: import('@shared/types').WritingWorkshopPassageCandidate[] }>;
+
   researchTraversal?(): Promise<import('@shared/researchCorpus').ResearchTraversal>;
   buildSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
   /** Academic adapters may plan specialized probes using an already authorized
@@ -760,6 +765,17 @@ export async function orchestrateDeepResearch(
     language,
   };
   const snapshot = await deps.buildSnapshot(brief);
+  if (deps.strictDocumentaryGrounding && !snapshot.passages.length && !snapshot.ideas.length) {
+    const explanation = researchEvidenceLimitation(language);
+    const traversal = await deps.researchTraversal?.();
+    const words = countWords(explanation);
+    return { draft: { generatedAt: new Date().toISOString(), brief, title: request.objective, abstract: explanation,
+      selection: { ideaIds: [], themeIds: [], gapIds: [], contradictionIds: [], workIds: [], passageIds: [], tutorRouteIds: [] },
+      outline: [], draftMarkdown: explanation, matrix: [], bibliography: [], nextSteps: [], limitations: [explanation], claimLedger: [], researchTraversal: traversal,
+      stats: { selectedIdeas: 0, selectedThemes: 0, selectedGaps: 0, selectedContradictions: 0, selectedWorks: 0, selectedPassages: 0, selectedTutorRoutes: 0, contextChars: explanation.length, truncated: true } },
+      meta: { deepResearchVersion: request.deepResearchVersion ?? 'v1', sections: 0, words, pages: pagesFromWords(words), ideasCovered: 0, ideasConsidered: 0,
+        worksCited: 0, stoppedReason: explanation, verification: null, retrievalStrategy: 'scoped_documentary', researchTraversal: traversal } };
+  }
   const maps = buildSnapshotMaps(snapshot);
 
   let coverageQuestions = (request.coverageQuestions ?? [])
@@ -1419,6 +1435,34 @@ export async function orchestrateDeepResearch(
     }
   }
 
+  const claimLedger: ResearchClaimRecord[] = [];
+  if (deps.auditFactualProse) {
+    for (const item of written) {
+      const audit = await deps.auditFactualProse(item.markdown);
+      if (audit.passages?.length) mergeRetrievedMaterial(maps, { passages: audit.passages });
+      item.markdown = audit.markdown;
+      claimLedger.push(...audit.claims);
+      // Planned claims are research questions, not verified findings. Only the
+      // audited prose may populate the published outline's factual claims.
+      item.section.keyClaims = audit.claims.filter(claim => claim.status === 'supported' && claim.kind !== 'nonfactual').map(claim => claim.sentence);
+      item.section.coverageClaims = [];
+      item.section.title = audit.markdown.match(/^#{1,6}\s+(.+)$/m)?.[1] ?? effectiveRequest.objective;
+    }
+    for (let index = written.length - 1; index >= 0; index--) {
+      if (!stripInitialHeading(written[index].markdown).trim()) written.splice(index, 1);
+    }
+    if (!claimLedger.some(claim => claim.status === 'supported' && claim.kind !== 'nonfactual')) written.length = 0;
+    if (claimLedger.some(claim => claim.status !== 'supported') || !written.length) stoppedReason = researchEvidenceLimitation(language);
+    coveredIdeaIds.clear(); Object.values(citedIds).forEach(set => set.clear());
+    for (const item of written) {
+      const { cited } = applyCitationPolicy(item.markdown, maps);
+      for (const key of Object.keys(citedIds) as Array<keyof typeof citedIds>) cited[key].forEach(id => citedIds[key].add(id));
+      cited.ideas.forEach(id => coveredIdeaIds.add(id));
+      cited.passages.forEach(id => { const work = maps.passageWorkId.get(id); if (work) citedIds.works.add(work); });
+    }
+    totalWords = written.reduce((sum, item) => sum + countWords(item.markdown), 0);
+  }
+
   emit({
     phase: 'assembling',
     message: L.assembling,
@@ -1456,10 +1500,12 @@ export async function orchestrateDeepResearch(
       title: item.section.title,
       text: clip(stripInitialHeading(item.markdown), 2_400),
     })),
-    supportConcerns: supportAudit.slice(0, 20).map((entry) => entry.sentence),
+    supportConcerns: [...supportAudit.map(entry => entry.sentence), ...claimLedger.filter(claim => claim.status !== 'supported').map(claim => claim.sentence)].slice(0, 30),
   };
-  let finalize = await finalizeWithFallback(deps, finalizeInput, L);
-  if (deps.auditFinalSummary) {
+  let finalize = deps.strictDocumentaryGrounding && !written.length
+    ? { title: request.objective, abstract: researchEvidenceLimitation(language), limitations: [researchEvidenceLimitation(language)], nextSteps: [] }
+    : await finalizeWithFallback(deps, finalizeInput, L);
+  if (deps.auditFinalSummary && (!deps.strictDocumentaryGrounding || written.length)) {
     try {
       const audited = await deps.auditFinalSummary(finalizeInput, finalize);
       finalize = {
@@ -1475,11 +1521,33 @@ export async function orchestrateDeepResearch(
     }
   }
 
+  if (deps.auditFactualProse && written.length) {
+    const auditFinalText = async (markdown: string) => {
+      const audit = await deps.auditFactualProse!(markdown);
+      claimLedger.push(...audit.claims);
+      if (audit.passages?.length) mergeRetrievedMaterial(maps, { passages: audit.passages });
+      const citations = applyCitationPolicy(audit.markdown, maps).cited;
+      citations.passages.forEach(id => { citedIds.passages.add(id); const work = maps.passageWorkId.get(id); if (work) citedIds.works.add(work); });
+      return audit.markdown;
+    };
+    finalize.title = request.objective;
+    finalize.abstract = await auditFinalText(finalize.abstract) || researchEvidenceLimitation(language);
+    // Recommendations and limitations can also smuggle in unsupported facts.
+    // Audit them before reintroducing deterministic coverage limitations below.
+    finalize.limitations = (await auditFinalText([...finalize.limitations, ...coherenceIssues.map(issue => L.coherenceLimitation(issue))].join('\n'))).split('\n').filter(Boolean);
+    finalize.nextSteps = (await auditFinalText(finalize.nextSteps.join('\n'))).split('\n').filter(Boolean);
+    if (claimLedger.some(claim => claim.status !== 'supported') || !written.length) {
+      finalize.limitations = dedupe([...finalize.limitations, researchEvidenceLimitation(language)]);
+      stoppedReason = researchEvidenceLimitation(language);
+    }
+  }
+
   // Works actually referenced = works cited directly + the works behind every cited idea.
   const citedWorkIds = collectCitedWorkIds(citedIds, maps);
   const references = buildReferences(citedWorkIds, maps, language);
   const singleNarrative = effectiveRequest.sectionLimit === 'single';
-  const draftMarkdown = assembleMarkdown(written, references, finalize, language, effectiveRequest.sectionLimit);
+  const draftMarkdown = deps.strictDocumentaryGrounding && !written.length ? researchEvidenceLimitation(language)
+    : assembleMarkdown(written, references, finalize, language, effectiveRequest.sectionLimit);
   const worksCited = citedWorkIds.size;
 
   const outline: WritingWorkshopSection[] = singleNarrative ? [] : written.map((w, index) => ({
@@ -1506,6 +1574,8 @@ export async function orchestrateDeepResearch(
     })),
   });
 
+  // Automated citation existence/entailment checks never constitute acceptance.
+  if (deps.auditFactualProse && qualityAssessment.grade !== 'weak') qualityAssessment.grade = 'needs_review';
   const draft: WritingWorkshopDraft = {
     generatedAt: new Date().toISOString(),
     brief,
@@ -1526,8 +1596,9 @@ export async function orchestrateDeepResearch(
     bibliography: references,
     nextSteps: finalize.nextSteps,
     supportAudit,
+    ...(deps.auditFactualProse ? { claimLedger } : {}),
     qualityAssessment,
-    limitations: [...finalize.limitations, ...coherenceIssues.map((issue) => L.coherenceLimitation(issue))],
+    limitations: [...finalize.limitations, ...(!deps.auditFactualProse ? coherenceIssues.map(issue => L.coherenceLimitation(issue)) : [])],
     deepResearchStructure: singleNarrative ? 'single' : 'sectioned',
     deepResearchSectionLength: requestedSectionLength,
     stats: {
@@ -1544,6 +1615,10 @@ export async function orchestrateDeepResearch(
   };
 
   const meta: DeepResearchMeta = {
+    ...(deps.auditFactualProse ? { factualAudit: { checked: claimLedger.length,
+      supported: claimLedger.filter(claim => claim.status === 'supported').length,
+      removed: claimLedger.filter(claim => claim.status === 'removed').length,
+      unverified: claimLedger.filter(claim => claim.status === 'unverified').length } } : {}),
     deepResearchVersion: request.deepResearchVersion ?? 'v1',
     structure: singleNarrative ? 'single' : 'sectioned',
     sectionLength: requestedSectionLength,
@@ -1556,7 +1631,7 @@ export async function orchestrateDeepResearch(
       reached: written.filter((item) => countWords(item.markdown) >= Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
       short: written.filter((item) => countWords(item.markdown) < Math.round(sectionLengthPlan.targetWords! * 0.92)).length,
     },
-    sections: singleNarrative ? 1 : written.length,
+    sections: singleNarrative && written.length ? 1 : written.length,
     words: totalWords,
     pages: pagesFromWords(totalWords),
     ideasCovered: coveredIdeaIds.size,
@@ -2453,6 +2528,11 @@ export function fallbackPlan(
   L: Labels = labels(request.language ?? 'es')
 ): DeepResearchPlan {
   const ideas = snapshot.ideas;
+  if (!ideas.length && snapshot.passages.length) return { title: request.objective, abstract: '', sections: [{
+    id: 's1', title: request.objective, purpose: L.threadPurpose, keyClaims: [], ideaIds: [],
+    workIds: [...new Set(snapshot.passages.map(passage => passage.nodus_id))], gapIds: [], contradictionIds: [],
+    passageIds: snapshot.passages.map(passage => passage.id),
+  }] };
   const bodyCount = Math.max(1, sectionCount - 2);
   const perSection = Math.max(1, Math.ceil(ideas.length / bodyCount));
   const sections: DeepResearchPlanSection[] = [];

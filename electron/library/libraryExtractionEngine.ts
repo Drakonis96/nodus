@@ -1222,6 +1222,7 @@ async function pdfBlocks(
       page.cleanup?.();
       onProgress?.({ phase: 'extract', progress: 0.08 + (pageNumber / pdf.numPages) * 0.47, message: `Extrayendo página ${pageNumber} de ${pdf.numPages}…`, page: pageNumber, totalPages: pdf.numPages });
     }
+    if (blank.length && options.localOcrOnly && options.ocrMode === 'off') throw new Error('documentary_ocr_deferred');
     if (blank.length && options.ocrMode !== 'off') {
       const pages = blank.slice(0, options.maxOcrPages);
       if (options.ocrMode === 'local') {

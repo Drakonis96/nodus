@@ -125,6 +125,7 @@ export interface ResearchEvidence {
 }
 
 export interface ResearchTraversal {
+  sourceCoverage?: Array<{ documentId: string; title: string; reasons: string[] }>;
   decisionTokens?: number;
   matchedDocumentIds?: string[];
   readDocumentIds?: string[];
@@ -180,6 +181,7 @@ export interface DocumentPreparationState {
 }
 
 export interface ZoteroMcpStatus {
+  externalUrl?: string | null;
   automatic?: boolean;
   sessionId?: string | null;
   activeSessions?: number;
@@ -207,6 +209,7 @@ export interface ResearchCorpusApi {
   getResearchPreparationProgress(): Promise<ResearchPreparationProgress>;
   onResearchPreparationProgress(listener: (progress: ResearchPreparationProgress) => void): () => void;
   controlResearchPreparationCampaign(input: { campaignId: string; action: ResearchPreparationAction; documentId?: string }): Promise<void>;
+  controlAllResearchPreparation(action: ResearchPreparationAction): Promise<void>;
   getResearchCorpusSources(): Promise<{ documents: ResearchCorpusDocument[]; collections: ResearchCorpusCollection[] }>;
   listResearchNotebooks(): Promise<ResearchNotebook[]>;
   saveResearchNotebook(input: ResearchNotebookInput): Promise<ResearchNotebook>;
@@ -220,9 +223,9 @@ export interface ResearchCorpusApi {
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;
   setResearchPreparationPaused(paused: boolean): Promise<void>;
   setResearchZoteroAutomatic(enabled: boolean): Promise<ZoteroMcpStatus>;
-  getZoteroMcpStatus(): Promise<ZoteroMcpStatus>;
+  getZoteroMcpStatus(notebookId?: string | null): Promise<ZoteroMcpStatus>;
   connectResearchZotero(input: { notebookId?: string | null; mode: 'managed' | 'external'; externalUrl?: string }): Promise<ZoteroMcpStatus>;
-  disconnectResearchZotero(): Promise<void>;
+  disconnectResearchZotero(notebookId?: string | null): Promise<void>;
   readResearchZotero(input: { notebookId?: string | null; documentId: string; operation: 'metadata' | 'fulltext'; attachmentKey?: string }): Promise<unknown>;
 }
 
@@ -241,6 +244,7 @@ export interface ResearchPreparationPreview {
   embedding: { provider: string; model: string; external: boolean } | null;
   embeddingAvailable: boolean;
   block: 'no_model' | null;
+  preflight?: Array<{ documentId: string; status: 'available' | 'abstract' | 'inaccessible' | 'ocr_pending' | 'unknown'; pages: number | null; reason: string | null }>;
 }
 export type ResearchPreparationAction = 'pause' | 'resume' | 'cancel' | 'retry';
 export interface ResearchPreparationJob {

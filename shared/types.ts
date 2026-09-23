@@ -5862,6 +5862,7 @@ export interface ResearchChatRequest {
 }
 
 export interface ResearchContextStats {
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
   sections: string[];
   works: number;
   documents: number;
@@ -7097,6 +7098,7 @@ export interface SupportAuditEntry {
 }
 
 export interface WritingWorkshopDraft {
+  claimLedger?: import('./researchClaimAudit').ResearchClaimRecord[];
   researchTraversal?: import('./researchCorpus').ResearchTraversal;
   documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   documentVisualHints?: string[];
@@ -7419,6 +7421,7 @@ export interface DeepResearchJobRecord {
 
 /** Coverage + evidence accounting attached to a finished report. */
 export interface DeepResearchMeta {
+  factualAudit?: { checked: number; supported: number; removed: number; unverified: number };
   researchTraversal?: import('./researchCorpus').ResearchTraversal;
   /** Engine generation that produced the report. */
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
@@ -9360,6 +9363,7 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  attachmentRevision?: string;
   conversationAttachment?: { conversationId: string; attachmentId: string };
   noteId?: string;
   revision?: string;

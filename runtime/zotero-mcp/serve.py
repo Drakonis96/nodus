@@ -167,6 +167,7 @@ def build_server(scope: dict) -> FastMCP:
             if hashlib.file_digest(stream, 'sha256').hexdigest() != attachment['sha256']:
                 raise ToolError('source_revision_changed')
         return {"itemKey": item_key, "attachmentKey": attachment_key, "revision": item["revision"],
+                "attachmentVersion": attachment['version'], "attachmentSha256": attachment.get('sha256'),
                 "pages": [{"pageNumber": n + 1, "text": text[:16000], "partial": len(text) > 16000} for n, text in zip(document.page_numbers, document.pages)],
                 "needsOcr": [n + 1 for n in document.needs_ocr], "totalPages": document.page_count}
 

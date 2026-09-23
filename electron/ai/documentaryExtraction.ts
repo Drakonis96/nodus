@@ -38,6 +38,17 @@ export function readDocumentarySourceMap(folder: string, relativePath = 'source-
   } catch { return null; }
 }
 
+export function documentaryReaderComplete(folder: string, relativePath?: string): boolean {
+  if (!relativePath) return false;
+  try {
+    const root = fs.realpathSync(folder);
+    const target = fs.realpathSync(path.resolve(root, relativePath));
+    if (!target.startsWith(`${root}${path.sep}`) || fs.statSync(target).size > 1024 * 1024) return false;
+    const quality = JSON.parse(fs.readFileSync(target, 'utf8'));
+    return quality.blankPages === 0 && ['passed', 'needs-review'].includes(quality.status);
+  } catch { return false; }
+}
+
 async function fileHash(filename: string): Promise<string> {
   const hash = createHash('sha256');
   for await (const data of fs.createReadStream(filename)) hash.update(data);

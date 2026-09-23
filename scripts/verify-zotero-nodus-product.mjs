@@ -54,6 +54,22 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
     const source = imported.inventory.documents.find(document => document.origin.itemKey === corpus.items[0].key);
     assert.ok(source, 'supported Zotero import exposes the synthetic source');
     const notebook = await page.evaluate(async id => window.nodus.saveResearchNotebook({ name: 'Real isolated Zotero', mode: 'fixed', sources: [{ kind: 'library-item', id }], exclusions: [] }), source.id);
+    // A missing owned library copy must trigger automatic scoped MCP, without
+    // connecting manually or authorizing an embedding campaign. Never move the
+    // independent Zotero source, only Nodus's copied attachment in this root.
+    const localItem = await page.evaluate(id => window.nodus.getGlobalLibraryItem(id), source.id);
+    const copiedAttachment = localItem.attachments.find(item => item.sourceKey === corpus.items[0].attachment.key);
+    const copiedPath = path.join(root, 'library/nodus-library', encodeURIComponent(localItem.storageId).replaceAll('.', '%2E'), copiedAttachment.relativePath);
+    assert.ok(fs.realpathSync(copiedPath).startsWith(`${root}${path.sep}`));
+    fs.renameSync(copiedPath, `${copiedPath}.temporarily-unavailable`);
+    let automaticOriginal;
+    try {
+      automaticOriginal = await page.evaluate(input => window.nodus.readResearchDocument(input), { notebookId: notebook.id, documentId: source.id, operation: { kind: 'pages', from: 1 } });
+      assert.ok(automaticOriginal.evidence.some(evidence => evidence.text.includes('NORTH23') && evidence.locator.pageNumber === 1));
+      assert.equal((await page.evaluate(() => window.nodus.getResearchPreparationProgress())).campaigns.length, 0);
+      assert.equal((await page.evaluate(() => window.nodus.getZoteroMcpStatus())).activeSessions, 0);
+      fs.writeFileSync(path.join(root, 'artifacts/nodus-automatic-original.json'), JSON.stringify(automaticOriginal, null, 2));
+    } finally { fs.renameSync(`${copiedPath}.temporarily-unavailable`, copiedPath); }
     const status = await page.evaluate(id => window.nodus.connectResearchZotero({ notebookId: id, mode: 'managed' }), notebook.id);
     assert.equal(status.state, 'connected');
     assert.equal(status.transport, 'stdio');
@@ -86,6 +102,10 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
     const externalRoot = path.join(root, 'mcp/external');
     fs.mkdirSync(externalRoot);
     const externalScope = path.join(externalRoot, 'scope.json');
+    for (const item of manifest.items) for (const attachment of item.attachments) if (attachment.path) {
+      const copy = path.join(externalRoot, `${attachment.key}.pdf`);
+      fs.copyFileSync(attachment.path, copy); attachment.path = copy;
+    }
     fs.writeFileSync(externalScope, JSON.stringify({ ...manifest, root: externalRoot }));
     await page.evaluate(() => window.nodus.disconnectResearchZotero());
     const port = externalMcpPort;
@@ -125,7 +145,7 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
       assert.ok(ownedWorkers.some(worker => worker.service === name && worker.pid !== app.process().pid), `${name} must run outside the main OS process`);
     }
     return { passed: true, ownedWorkers, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
-      attachmentReads,
+      attachmentReads, automaticOriginalWithoutConnect: true, automaticReadCreatedNoCampaign: true,
       ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {

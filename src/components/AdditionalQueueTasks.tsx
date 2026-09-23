@@ -30,6 +30,7 @@ function Action({ label, run }: { label: string; run: () => unknown | Promise<un
   }}>{label}</button>{error && <span role="alert" className="max-w-64 break-words text-red-400">{error}</span>}</>;
 }
 const preparationError = (error: string | null): string | null => ({
+  documentary_ocr_deferred: t('Documento omitido: necesita OCR. Puedes continuar con las demás fuentes.'),
   documentary_ocr_resources_missing: t('Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.'),
   documentary_ocr_incomplete: t('El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.'),
   documentary_embeddings_unavailable: t('El modelo de embeddings no está disponible. Revisa su configuración y reintenta.'),
@@ -63,6 +64,8 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
   return <>
     {activity.preparation.campaigns.length > 0 && <Task testId="research-preparation-controls" title={t('Preparar fuentes')}>
       <Action label={t(activity.preparation.paused ? 'Reanudar' : 'Pausar')} run={() => window.nodus.setResearchPreparationPaused(!activity.preparation.paused)} />
+      {activity.preparation.campaigns.some(preparationLive) && <Action label={t('Cancelar preparación')} run={() => window.nodus.controlAllResearchPreparation('cancel')} />}
+      {activity.preparation.campaigns.some(campaign => campaign.jobs.some(job => ['failed', 'blocked'].includes(job.state))) && <Action label={t('Reintentar')} run={() => window.nodus.controlAllResearchPreparation('retry')} />}
     </Task>}
     {activity.preparation.campaigns.slice(0, limit).map(campaign => <Fragment key={campaign.id}>
       <Task testId={`preparation-campaign-${campaign.id}`} title={`${t('Preparar fuentes')} · ${campaign.vaultName}`}
