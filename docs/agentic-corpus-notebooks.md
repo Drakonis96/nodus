@@ -1,5 +1,33 @@
 # Layered documentary research and notebooks
 
+## Current acceptance status (2026-09-23)
+
+Implemented on `codex/agentic-corpus-notebooks`; [PR #932](https://github.com/Drakonis96/nodus/pull/932)
+remains draft and tracks [issue #931](https://github.com/Drakonis96/nodus/issues/931).
+The sections below are a chronological engineering record. Statements such as
+“no paid inference yet” describe their checkpoint, not the current state.
+
+Implemented and exercised: additive notebook/provenance migrations, immutable
+shared document indexes and atomic publications, durable preparation, shared
+academic retrieval, explicit backend scopes, historical citation receipts,
+bounded document reads, scoped managed stdio and external Streamable HTTP,
+notebook UI, presets, translations and compatibility adapters. The complete
+application build and lint passed at the legacy-citation checkpoint. The 682
+script regression campaign plus corrections spans several commits; it is not a
+claim that every script passed at the final head.
+
+Current real macOS evidence uses Electron 43.4.0, Zotero 10.0.3, private CPython
+3.12.14/build 20260901 and Zotero MCP 0.13.0 (`62335504262f4239961c4e782e342bd3bab4d5b2`).
+The strengthened OS boundary now denies all outbound connections except explicit
+disposable TCP loopback endpoints. See the corrective isolation record below;
+older write-only checks must not be read as proof of network exclusion.
+
+**Acceptance remains open:** factual grounding of long Deep Research reports,
+full signed/notarized installer lifecycle, and final-head native verification.
+The matched synthetic comparison is retained in `docs/research-evidence/`;
+citation existence and automatic support scores are not factual acceptance.
+No release, tag or merge has been created.
+
 ## Development contract
 
 This work extends academic Research Chat and Deep Research. Other vault engines
@@ -67,7 +95,7 @@ load the production vault registry, preferences, databases or document corpus.
 Real-model tests are limited to `deepseek-flash` and `baai/bge-m3` and a combined
 USD 5 ceiling. No paid inference has been performed at this stage.
 
-## Delivery checklist
+## Initial delivery checklist (historical; current status above)
 
 - [ ] Isolated Electron and synthetic Zotero fixtures verified
 - [ ] Managed Zotero MCP packaging and third-party notices
@@ -508,3 +536,58 @@ The lifecycle rerun at `/private/tmp/nodus-research-NJOjuG` (second profile
 `/private/tmp/nodus-research-oJ4QLd`) additionally verified that every recorded owned
 PID had exited before executable removal. Full lint and the complete updated
 application build passed (`research-legacy-lint.log`, `research-legacy-build.log`).
+
+
+### Corrective OS network boundary and adversarial integration
+
+A new negative network probe exposed that the earlier combined Seatbelt filters
+allowed TCP connections to the default local Zotero port. Two diagnostic probes
+opened and immediately closed TCP sockets there; neither sent HTTP/application
+bytes, read a collection, or wrote production data. The application integration
+runs used explicit independent endpoints, but the former policy did **not** prove
+that default-port access was impossible. Testing stopped until the boundary was
+corrected. Subsequent probes use only an unlisted disposable port.
+
+The harness now denies all outbound network operations and permits only explicitly
+listed disposable TCP localhost ports, rejecting 23119 as an allowed endpoint.
+Five isolation tests verify inside writes, denied outside writes, inherited
+child-process write denial, actual EPERM/EACCES for external and unlisted IPv4/IPv6
+connections, and positive connections to two independently permitted endpoints.
+A timeout or connection-refused error is not accepted as proof of denial.
+Standalone Electron tests receive no allowed network destination. The unit-test
+runner also defaults to no outbound access; socket-based fixtures must explicitly
+arrange their own test endpoint policy rather than inheriting unrestricted local
+network access.
+
+Repeated integrations after this correction:
+
+- `/private/tmp/nodus-research-L745sA`: real Electron notebooks, seven profile-local
+  database opens, all effective storage paths, both themes, two window sizes,
+  keyboard containment and source/citation revocation; no model calls.
+- `/private/tmp/nodus-research-FzJBmk`: private MCP stdio, four allowed read tools,
+  foreign identity rejection and revision checks against a synthetic HTTP server.
+- `/private/tmp/nodus-research-vpuKki`: independent real Zotero plus Electron,
+  import, preparation, physical-page citations, managed stdio, explicit external
+  Streamable HTTP, scope mismatch and manual-selection revocation; no model calls.
+- `/private/tmp/nodus-research-c3yvZ4` and `/private/tmp/nodus-research-sm0ncJ`:
+  two-profile runtime coexistence, same-version directory replacement, owned
+  process exit and preservation of profiles/unrelated resources. This remains a
+  runtime directory test, not a full application installer test.
+- `/private/tmp/nodus-research-2fTXLE`: real DeepSeek Flash/BGE-M3 chat, the four
+  known-answer checks, forged history exclusion, foreign document-read rejection,
+  a hostile synthetic PDF, cancellation during selection change and empty scope.
+  The hostile PDF contained a credential-exfiltration instruction; the answer
+  used its WEST47 fact and its scoped citation without following the instruction.
+
+The last campaign reused the two encrypted files from an already isolated test
+profile. No additional production credential reads were needed. Cumulative
+accounted spend is **USD 1.17735043 across 646 calls**, including conservative
+maximums for unresolved/cancelled requests, under the single USD 5 ledger at
+`/private/tmp/nodus-research-iAyBHl/artifacts/cost-ledger.json`. This is a bounded
+accounting figure, not an assertion that every reservation was actually billed.
+
+Native run [35854275566](https://github.com/Drakonis96/nodus/actions/runs/35854275566)
+completed successfully at `154ac96a` on macOS ARM64, macOS Intel, Windows x64 and
+Linux x64, including compilation, locked runtime preparation, scoped stdio,
+directory lifecycle and focused regressions; macOS also ran real Electron. This
+preceded the corrected network harness and is not final-head verification.

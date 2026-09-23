@@ -34,7 +34,8 @@ export function researchTestEnvironment(root) {
     TMPDIR: path.join(root, 'tmp'), TMP: path.join(root, 'tmp'), TEMP: path.join(root, 'tmp') };
 }
 
-export function macResearchSandbox(root) {
+export function macResearchSandbox(root, allowedLoopbackPorts = []) {
+  if (!Array.isArray(allowedLoopbackPorts) || allowedLoopbackPorts.some(port => !Number.isInteger(port) || port < 1024 || port > 65535 || port === 23119)) throw new Error('Only explicit disposable loopback ports are allowed');
   if (process.platform !== 'darwin') throw new Error('Use a disposable native test environment on this platform');
   const quoted = JSON.stringify(fs.realpathSync(root));
   const productionRoots = [
@@ -47,10 +48,10 @@ export function macResearchSandbox(root) {
   ];
   // The descendants inherit the OS sandbox. /dev/null is the sole writable device.
   return `(version 1)\n(allow default)\n` +
-    `(deny network-outbound (remote ip "localhost:23119"))\n` +
     `(deny file-write* (require-not (require-any (subpath ${quoted}) (literal "/dev/null"))))\n` +
     productionRoots.map(value => `(deny file-read* (subpath ${JSON.stringify(value)}))`).join('\n') + '\n' +
-    '(deny network-outbound (require-not (remote ip "localhost:*")))\n';
+    '(deny network-outbound)\n' +
+    [...new Set(allowedLoopbackPorts)].map(port => `(allow network-outbound (remote tcp "localhost:${port}"))`).join('\n') + '\n';
 }
 
 export function verifyResearchSandbox(root, profile = macResearchSandbox(root)) {
@@ -66,6 +67,23 @@ export function verifyResearchSandbox(root, profile = macResearchSandbox(root)) 
         || fs.readFileSync(inside, 'utf8') !== 'allowed') {
       throw new Error(`OS isolation verification failed: ${result.stderr || result.error || result.status}`);
     }
-    return { writeInsideAllowed: true, writeOutsideDenied: true };
+    const descendant = spawnSync('/usr/bin/sandbox-exec', ['-p', profile, process.execPath, '-e',
+      `const cp=require('node:child_process');const r=cp.spawnSync(process.execPath,['-e','try{require("node:fs").writeFileSync(process.argv[1],"changed");process.exit(2)}catch(e){if(!["EPERM","EACCES"].includes(e.code))throw e}',process.argv[1]]);process.exit(r.status??3)`,
+      canary], { env: researchTestEnvironment(root), encoding: 'utf8' });
+    if (descendant.status !== 0 || fs.readFileSync(canary, 'utf8') !== 'unchanged') throw new Error('Descendant OS write isolation failed');
+    const networkProbe = `const net=require('node:net');
+      Promise.all([['203.0.113.1',443],['127.0.0.1',31991],['::1',31991]].map(([host,port])=>new Promise((resolve,reject)=>{
+        const socket=net.createConnection({host,port});
+        const timer=setTimeout(()=>{socket.destroy();reject(new Error('denial_not_proven'))},3000);
+        socket.once('connect',()=>{clearTimeout(timer);socket.destroy();reject(new Error('unauthorized_connection:'+host+':'+port))});
+        socket.once('error',error=>{clearTimeout(timer);socket.destroy();['EPERM','EACCES'].includes(error.code)?resolve():reject(error)});
+      }))).catch(error=>{console.error(error.code ?? error.message);process.exitCode=4});`;
+    // Probe a disposable unlisted port, never the user's Zotero. Both IPv4 and
+    // IPv6 localhost endpoints must remain denied by the default policy.
+    if (profile.includes('localhost:31991')) throw new Error('Probe port must not be allowed');
+    const network = spawnSync('/usr/bin/sandbox-exec', ['-p', profile, process.execPath, '-e', networkProbe], {
+      env: researchTestEnvironment(root), encoding: 'utf8', timeout: 5000 });
+    if (network.status !== 0) throw new Error(`OS network denial not verified: ${network.stderr || network.error || network.status}`);
+    return { writeInsideAllowed: true, writeOutsideDenied: true, descendantWriteDenied: true, externalNetworkDenied: true, forbiddenLoopbackPortDenied: true };
   } finally { fs.rmSync(outside, { recursive: true, force: true }); }
 }

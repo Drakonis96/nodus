@@ -10,7 +10,7 @@ export const RESEARCH_CAMPAIGN_QUERIES = [
 ];
 
 /** Real provider calls only through the separately owned, cost-reserving gate. */
-export async function runResearchLiveCampaign(page, app, root, documents) {
+export async function runResearchLiveCampaign(page, app, root, documents, { chatOnly = false, adversarial = false } = {}) {
   const ids = documents.map(document => document.id);
   const metrics = [];
   let sampling = false;
@@ -60,7 +60,7 @@ export async function runResearchLiveCampaign(page, app, root, documents) {
       assert.ok(check.knownEvidenceRetrieved, `${query.name}: search must retrieve the known source marker`);
     }
     result.deepResearchCases = [];
-    for (const [deepResearchVersion, approach] of [['v1', 'general'], ['v2', 'general'], ['v1', 'comparative'], ['v2', 'comparative']]) {
+    for (const [deepResearchVersion, approach] of (chatOnly ? [] : [['v1', 'general'], ['v2', 'general'], ['v1', 'comparative'], ['v2', 'comparative']])) {
       const started = performance.now();
       const report = await page.evaluate(async input => window.nodus.generateDeepResearchReport({ notebookId: input.id,
         objective: 'Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.',
@@ -73,6 +73,7 @@ export async function runResearchLiveCampaign(page, app, root, documents) {
       assert.equal(report.draft.researchTraversal.sourceCount, 3, 'each engine records its authorized corpus');
       assert.ok(report.draft.researchTraversal.queries.length > 0, 'each engine records its documentary traversal');
     }
+    if (adversarial) result.adversarial = await (await import('./research-adversarial-campaign.mjs')).runResearchAdversarialCampaign(page, app, root, documents);
     result.completedAt = new Date().toISOString();
     return result;
   } finally {

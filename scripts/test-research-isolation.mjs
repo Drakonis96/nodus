@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
+import net from 'node:net';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
-import { createResearchTestRoot, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
+import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
 
 const root = createResearchTestRoot();
 const outfile = path.join(root, 'paths.mjs');
@@ -46,6 +48,23 @@ test('private single-instance lock rejects another owner and releases on close',
   next();
 });
 
-test('macOS denies an actual child-process write outside the test root', { skip: process.platform !== 'darwin' }, () => {
-  assert.deepEqual(verifyResearchSandbox(root), { writeInsideAllowed: true, writeOutsideDenied: true });
+test('macOS denies outside writes, descendant writes and forbidden network connections', { skip: process.platform !== 'darwin' }, () => {
+  assert.deepEqual(verifyResearchSandbox(root), { writeInsideAllowed: true, writeOutsideDenied: true, descendantWriteDenied: true, externalNetworkDenied: true, forbiddenLoopbackPortDenied: true });
+});
+
+
+test('explicit disposable endpoints are reachable while all other network destinations are denied', { skip: process.platform !== 'darwin' }, async () => {
+  const servers = [net.createServer(socket => socket.destroy()), net.createServer(socket => socket.destroy())];
+  try {
+    for (const server of servers) await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const ports = servers.map(server => server.address().port);
+    const policy = macResearchSandbox(root, ports);
+    assert.equal(verifyResearchSandbox(root, policy).externalNetworkDenied, true);
+    const result = spawnSync('/usr/bin/sandbox-exec', ['-p', policy, process.execPath, '-e',
+      `const net=require('node:net');for(const port of JSON.parse(process.argv[1])){const socket=net.createConnection({host:'127.0.0.1',port});socket.once('connect',()=>socket.destroy());socket.once('error',()=>{process.exitCode=1});socket.setTimeout(1000,()=>{socket.destroy();process.exitCode=2})}`, JSON.stringify(ports)],
+    { env: researchTestEnvironment(root), encoding: 'utf8', timeout: 3000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.throws(() => macResearchSandbox(root, [23119]), /explicit disposable/);
+    assert.throws(() => macResearchSandbox(root, ['49100']), /explicit disposable/);
+  } finally { await Promise.all(servers.map(server => new Promise(resolve => server.close(resolve)))); }
 });

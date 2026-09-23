@@ -49,7 +49,8 @@ async function connect(profile, index) {
     endpoint: `http://127.0.0.1:${server.address().port}/api`, items: [{ libraryType: 'user', libraryId: '0', itemKey: 'SOURCE01', version: 1, revision: marker, attachments: [] }] }));
   const python = path.join(runtime, process.platform === 'win32' ? 'python/python.exe' : 'python/bin/python3');
   const args = ['-I', '-B', path.join(runtime, 'serve.py'), manifest];
-  const policy = process.platform === 'darwin' ? macResearchSandbox(profile) : null;
+  const policy = process.platform === 'darwin' ? macResearchSandbox(profile, [server.address().port]) : null;
+  if (policy) verifyResearchSandbox(profile, policy);
   const transport = new StdioClientTransport({ command: policy ? '/usr/bin/sandbox-exec' : python,
     args: policy ? ['-p', policy, python, ...args] : args, stderr: 'pipe',
     env: { ...researchTestEnvironment(profile), PATH: foreign, HOME: profile,

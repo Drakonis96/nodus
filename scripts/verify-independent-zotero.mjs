@@ -18,8 +18,8 @@ if (baselineWorkspace) {
   const manifest = JSON.parse(fs.readFileSync(path.join(baselineWorkspace, '../artifacts/baseline.json'), 'utf8'));
   if (manifest.base !== 'f54995e7' || manifest.exitCode !== 0 || manifest.workspace !== fs.realpathSync(baselineWorkspace)) throw new Error('Unverified baseline build');
 }
-const policy = macResearchSandbox(root);
-const proof = verifyResearchSandbox(root, policy);
+// Verify a deny-all boundary before fixture/credential preparation.
+verifyResearchSandbox(root);
 let providerProxy;
 if (process.argv.includes('--live')) {
   const campaignRoot = process.argv.find(argument => argument.startsWith('--campaign-root='))?.slice('--campaign-root='.length);
@@ -27,7 +27,7 @@ if (process.argv.includes('--live')) {
   const { startResearchProviderProxy } = await import('./research-provider-proxy.mjs');
   providerProxy = await startResearchProviderProxy(campaignRoot);
   const { importResearchTestCredentials } = await import('./research-test-credentials.mjs');
-  try { importResearchTestCredentials(root); } catch (error) { await providerProxy.close(); throw error; }
+  try { importResearchTestCredentials(root, process.argv.find(argument => argument.startsWith('--credentials-root='))?.slice('--credentials-root='.length)); } catch (error) { await providerProxy.close(); throw error; }
 }
 const profile = path.join(root, 'zotero/profile');
 const data = path.join(root, 'zotero/data');
@@ -37,6 +37,12 @@ const probe = http.createServer();
 await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
 const port = probe.address().port;
 await new Promise(resolve => probe.close(resolve));
+await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
+const externalMcpPort = probe.address().port;
+await new Promise(resolve => probe.close(resolve));
+const allowedPorts = [port, externalMcpPort, ...(providerProxy ? [Number(new URL(providerProxy.url).port)] : [])];
+const policy = macResearchSandbox(root, allowedPorts);
+const proof = { ...verifyResearchSandbox(root, policy), allowedLoopbackPorts: allowedPorts };
 const prefs = {
   'extensions.zotero.useDataDir': true, 'extensions.zotero.dataDir': data,
   'extensions.zotero.sync.autoSync': false, 'extensions.zotero.sync.storage.enabled': false,
@@ -146,7 +152,7 @@ try {
   } finally { await client.close(); }
   if (process.argv.includes('--nodus') || providerProxy) {
     const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
-    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, baselineWorkspace });
+    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, externalMcpPort, baselineWorkspace, chatOnly: process.argv.includes('--chat-only'), adversarial: process.argv.includes('--adversarial') });
   }
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {

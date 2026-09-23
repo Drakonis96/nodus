@@ -9,8 +9,6 @@ import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, ve
 const root = createResearchTestRoot();
 const disposableCI = process.argv.includes('--disposable-ci') && process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted';
 if (process.platform !== 'darwin' && !disposableCI) throw new Error('Non-macOS runtime tests require a disposable hosted CI runner');
-const policy = process.platform === 'darwin' ? macResearchSandbox(root) : null;
-const isolation = policy ? verifyResearchSandbox(root, policy) : { environment: 'disposable-hosted-ci', osWriteBoundaryVerified: false };
 const calls = [];
 let version = 3;
 const fixture = http.createServer((request, response) => {
@@ -23,6 +21,8 @@ const fixture = http.createServer((request, response) => {
     : { key, version, data: { key, version, title: 'Synthetic source' } }));
 });
 await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
+const policy = process.platform === 'darwin' ? macResearchSandbox(root, [fixture.address().port]) : null;
+const isolation = policy ? verifyResearchSandbox(root, policy) : { environment: 'disposable-hosted-ci', osWriteBoundaryVerified: false };
 const scope = { format: 'nodus.zotero-mcp-scope/1', root,
   serverId: 'synthetic-server',
   endpoint: `http://127.0.0.1:${fixture.address().port}/api`,

@@ -4,10 +4,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-export function importResearchTestCredentials(root) {
+export function importResearchTestCredentials(root, isolatedSource) {
   const resolved = fs.realpathSync(root);
   const marker = JSON.parse(fs.readFileSync(path.join(resolved, 'isolation.json'), 'utf8'));
   if (marker.format !== 'nodus.isolated-research-profile/1' || marker.root !== resolved) throw new Error('Invalid isolated credential destination');
+  let copiedSource;
+  if (isolatedSource) {
+    copiedSource = fs.realpathSync(isolatedSource);
+    const sourceMarker = JSON.parse(fs.readFileSync(path.join(copiedSource, 'isolation.json'), 'utf8'));
+    if (sourceMarker.format !== 'nodus.isolated-research-profile/1' || sourceMarker.root !== copiedSource) throw new Error('Invalid isolated credential source');
+  }
   const target = path.join(resolved, 'profile/secrets');
   fs.mkdirSync(target, { recursive: true, mode: 0o700 });
   if (fs.realpathSync(target) !== target) throw new Error('Credential destination contains a symlink');
@@ -16,7 +22,7 @@ export function importResearchTestCredentials(root) {
     const filename = `ai_key_${provider}.bin`;
     // These are the only production files this helper may read. A missing file
     // is a missing credential, never permission to scan vaults or keychains.
-    const candidates = ['Nodus', 'nodus'].map(name => path.join(os.homedir(), 'Library/Application Support', name, 'secrets', filename));
+    const candidates = copiedSource ? [path.join(copiedSource, 'profile/secrets', filename)] : ['Nodus', 'nodus'].map(name => path.join(os.homedir(), 'Library/Application Support', name, 'secrets', filename));
     const source = candidates.find(file => fs.existsSync(file));
     if (!source) throw new Error(`Authorized ${provider} credential not found`);
     if (fs.lstatSync(source).isSymbolicLink() || fs.realpathSync(source) !== source) throw new Error('Credential source cannot contain a symlink');

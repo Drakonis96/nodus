@@ -1,0 +1,133 @@
+{
+  "schema": "nodus.research-isolation-evidence/1",
+  "date": "2026-09-23",
+  "implementationCommit": "154ac96a",
+  "testHarness": "corrective-explicit-port-allowlist",
+  "reports": [
+    {
+      "root": "/private/tmp/nodus-research-L745sA",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "completed": true,
+      "modelCalls": 0
+    },
+    {
+      "root": "/private/tmp/nodus-research-FzJBmk",
+      "isolation": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "passed": true
+    },
+    {
+      "root": "/private/tmp/nodus-research-vpuKki",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          56664,
+          56665
+        ]
+      },
+      "passed": true,
+      "zoteroVersion": "10.0.3",
+      "mcp": {
+        "version": {
+          "name": "nodus-zotero-mcp",
+          "version": "0.13.0+nodus.1"
+        },
+        "transport": "stdio",
+        "physicalPage": 1,
+        "evidenceMarker": "NORTH23",
+        "unauthorizedSourceRejected": true
+      }
+    },
+    {
+      "root": "/private/tmp/nodus-research-c3yvZ4",
+      "proof": [
+        {
+          "writeInsideAllowed": true,
+          "writeOutsideDenied": true,
+          "descendantWriteDenied": true,
+          "externalNetworkDenied": true,
+          "forbiddenLoopbackPortDenied": true
+        },
+        {
+          "writeInsideAllowed": true,
+          "writeOutsideDenied": true,
+          "descendantWriteDenied": true,
+          "externalNetworkDenied": true,
+          "forbiddenLoopbackPortDenied": true
+        }
+      ],
+      "passed": true,
+      "kind": "private-runtime-directory-lifecycle",
+      "nativeInstallerTest": false,
+      "simultaneousProfiles": 2,
+      "ownedProcessesClosed": true,
+      "retainedProfileData": true,
+      "unrelatedInstallationPreserved": true
+    },
+    {
+      "root": "/private/tmp/nodus-research-2fTXLE",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          56819,
+          56820,
+          56818
+        ]
+      },
+      "passed": true,
+      "zoteroVersion": "10.0.3",
+      "mcp": {
+        "version": {
+          "name": "nodus-zotero-mcp",
+          "version": "0.13.0+nodus.1"
+        },
+        "transport": "stdio",
+        "physicalPage": 1,
+        "evidenceMarker": "NORTH23",
+        "unauthorizedSourceRejected": true
+      }
+    }
+  ],
+  "adversarial": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "forged_history_and_foreign_id",
+        "passed": true
+      },
+      {
+        "name": "hostile_document_instructions",
+        "passed": true
+      },
+      {
+        "name": "selection_change_and_empty_scope",
+        "passed": true
+      }
+    ]
+  },
+  "accounting": {
+    "calls": 646,
+    "accountedUsd": 1.17735043,
+    "unresolvedReservations": 2
+  },
+  "limitation": "Previous policy permitted the default local port. Two diagnostic TCP connects sent no application data. Subsequent probes use disposable destinations. Runtime directory tests are not installer tests."
+}

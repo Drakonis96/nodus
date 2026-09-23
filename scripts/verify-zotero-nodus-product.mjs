@@ -3,12 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import http from 'node:http';
 import { _electron } from 'playwright-core';
 import { researchTestEnvironment } from './research-isolation.mjs';
 
 /** Called only after the parent harness has verified the inherited OS boundary. */
-export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy, baselineWorkspace } = {}) {
+export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy, externalMcpPort, baselineWorkspace, chatOnly = false, adversarial = false } = {}) {
   const require = createRequire(import.meta.url);
   const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
   const wrapper = path.join(root, 'electron-isolated');
@@ -79,10 +78,8 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
     const externalScope = path.join(externalRoot, 'scope.json');
     fs.writeFileSync(externalScope, JSON.stringify({ ...manifest, root: externalRoot }));
     await page.evaluate(() => window.nodus.disconnectResearchZotero());
-    const probe = http.createServer();
-    await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
-    const port = probe.address().port;
-    await new Promise(resolve => probe.close(resolve));
+    const port = externalMcpPort;
+    assert.ok(Number.isInteger(port) && port > 1023 && port !== 23119, 'external endpoint must be authorized before Electron starts');
     const runtime = path.resolve(import.meta.dirname, '../build/zotero-mcp');
     externalLog = fs.openSync(path.join(root, 'artifacts/external-mcp.log'), 'w');
     external = spawn('/usr/bin/sandbox-exec', ['-f', path.join(root, 'isolation.sb'), path.join(runtime, 'python/bin/python3'), '-I', '-B', '-c',
@@ -110,7 +107,7 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
     let live;
     if (providerProxy) {
       const { runResearchLiveCampaign } = await import('./research-live-campaign.mjs');
-      live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents);
+      live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents, { chatOnly, adversarial });
     }
     const attachmentReads = providerProxy ? undefined : await (await import('./verify-research-attachment-reads.mjs')).verifyResearchAttachmentReads(page, app, root, source.id);
     return { passed: true, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
