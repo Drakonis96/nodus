@@ -23,9 +23,11 @@ disposable TCP loopback endpoints. See the corrective isolation record below;
 older write-only checks must not be read as proof of network exclusion.
 
 **Acceptance remains open:** factual grounding of long Deep Research reports,
-upgrades between different versions, exhaustive failure-matrix coverage, and final-head native verification.
+upgrades between different versions and exhaustive failure-matrix coverage.
 The matched synthetic comparison is retained in `docs/research-evidence/`;
 citation existence and automatic support scores are not factual acceptance.
+See the [acceptance map](research-evidence/acceptance.md) for reproducible checks,
+checkpoint commits and precise limits. The draft PR carries the live CI status.
 No release, tag or merge has been created.
 
 ## Development contract
