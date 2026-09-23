@@ -48,14 +48,19 @@ export async function auditResearchProse(markdown: string, sources: ResearchAudi
   for (let offset = 0; offset < spans.length; offset += RESEARCH_AUDIT_BATCH) {
     signal?.throwIfAborted();
     const batch = spans.slice(offset, offset + RESEARCH_AUDIT_BATCH);
-    try {
-      const result = await completeJson({ system: SYSTEM, user: JSON.stringify({
-        sentences: batch.map((span, index) => ({ index, text: span.text, context: offset + index > 0 ? researchPlainSentence(spans[offset + index - 1].text).slice(0, 400) : '' })),
-        ...(previouslyRejected.length ? { previouslyRejected } : {}), sources }),
-        maxTokens: 6000, temperature: 0, noRetry: true, corpusContext: true, signal }, validResearchProseVerdicts, model);
-      // Missing, duplicated or malformed items stay unverified and are removed.
-      normalizeResearchProseVerdicts(result, batch.length).forEach((claim, index) => { if (claim) verdicts[offset + index] = claim; });
-    } catch { signal?.throwIfAborted(); /* Unverified claims fail closed, not silently accepted. */ }
+    // One retry for a malformed or failed batch; a second failure leaves the
+    // batch unverified, and unverified sentences are removed.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await completeJson({ system: SYSTEM, user: JSON.stringify({
+          sentences: batch.map((span, index) => ({ index, text: span.text, context: offset + index > 0 ? researchPlainSentence(spans[offset + index - 1].text).slice(0, 400) : '' })),
+          ...(previouslyRejected.length ? { previouslyRejected } : {}), sources }),
+          maxTokens: 6000, temperature: 0, noRetry: true, corpusContext: true, signal }, validResearchProseVerdicts, model);
+        // Missing, duplicated or malformed items stay unverified and are removed.
+        normalizeResearchProseVerdicts(result, batch.length).forEach((claim, index) => { if (claim) verdicts[offset + index] = claim; });
+        break;
+      } catch { signal?.throwIfAborted(); }
+    }
   }
   return applyResearchProseVerdicts(markdown, sources, verdicts, rejected.sentences);
 }

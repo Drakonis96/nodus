@@ -57,6 +57,8 @@ try {
   const longCitation = `[${'Synthetic research source, p. 1'.repeat(4)}](nodus://passage/${'a'.repeat(200)})`;
   assert.equal(researchProseSpans(`A claim ${longCitation} ${longCitation} Next claim. ${longCitation} Final claim.`).length, 2,
     'segmentation stays linear and splits only after terminal punctuation');
+  assert.equal(researchProseSpans('La fuente registra «South field measured 41 units. SOUTH41 contradicts a uniform result» y lo atribuye. Otra frase.').length, 2,
+    'a direct quotation containing several sentences is never cut open');
 
   // ── Failures observed in the 23 September live review ─────────────────────
   // The fixtures use the reviewed sentences, but every decision below depends only

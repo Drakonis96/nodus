@@ -77,8 +77,18 @@ export function researchProseSpans(markdown: string): Array<{ start: number; end
   const spans: Array<{ start: number; end: number; text: string }> = [];
   const masked = markdown.replace(CITATION, match => '·'.repeat(match.length));
   const boundaries: Array<{ index: number; length: number }> = [];
+  // A direct quotation may contain several sentences; never split inside one.
+  const open = new Set(['«', '“', '„']), close = new Set(['»', '”']);
+  const depth: number[] = [];
+  for (let index = 0, level = 0; index < masked.length; index++) {
+    if (masked[index] === '\n') level = 0;
+    else if (open.has(masked[index])) level++;
+    else if (close.has(masked[index])) level = Math.max(0, level - 1);
+    depth[index] = level;
+  }
   for (const match of masked.matchAll(/\n+|[ \t]+(?=[\p{Lu}¿¡“«])/gu)) {
     if (match[0].startsWith('\n')) { boundaries.push({ index: match.index!, length: match[0].length }); continue; }
+    if (depth[match.index!] > 0) continue;
     let before = match.index! - 1;
     while (before >= 0 && (masked[before] === '·' || masked[before] === ' ' || masked[before] === '\t')) before--;
     if (before >= 0 && '.!?。！？'.includes(masked[before])) boundaries.push({ index: match.index!, length: match[0].length });
