@@ -289,3 +289,60 @@ installation/update/removal remain unverified. Full-suite attempts using Node's
 shared runner were interrupted; the harness now owns two independent single-file
 runners, retains every result and continues after failures. No interrupted run is
 counted as a suite pass.
+
+
+### Explicit attachment promotion and revision revocation
+
+Conversational text/PDF attachments can now be explicitly selected in an academic
+notebook without copying their original files. Selection references their owning
+conversation; removing that conversation revokes access. The reader rejects
+traversal, metadata identity mismatches and symlink aliases. Image-only/unsupported
+attachments are not presented as extracted text. Notes and reports retain authored
+provenance; note edits and notebook selection changes notify the consent-gated
+preparation queue. General research does not implicitly include these sources.
+
+Deep Research continues to use its immutable indexed revisions when a document
+changes. Mutable legacy passages and graph derivatives are discarded on a revision
+change instead of substituting newer material. Removing a pinned attachment or
+revoking source access aborts access, including historical citations. Retrieval
+rechecks permissions after its worker returns and marks candidate truncation or
+missing prepared sources as partial coverage.
+
+Six focused scripts passed at `/private/tmp/nodus-research-q1hEe5`: source selection,
+history/revocation, immutable revision reads, transactional writers, Concilium,
+sync compatibility and text recovery. The earlier explicit attachment tests also
+passed at `/private/tmp/nodus-research-Hm3Qs5`. Full lint passed. The application
+build passed before the final revision/coverage follow-up; a final build remains
+necessary. Notebook definitions/associations are now classified as authored sync
+rows, while permission receipts and writer fencing remain profile-local.
+
+Full-suite shard 1 (`/private/tmp/nodus-research-6d5uzL`) completed 164/171 scripts
+successfully; shard 2 (`/private/tmp/nodus-research-MWECby`) completed 168/171.
+Failures exposed missing sync-table classification, the old CommonJS test loader,
+a stale Concilium skill expectation, missing Server Web build assets and Chrome's
+attempt to create files outside the sandbox. These have corrections or isolated
+retests pending. The OCR test's four cases failed because the offline boundary
+blocked its unprovisioned language-data download; its owned process group was
+terminated after it failed to exit. This is recorded in `ocr-termination.json`,
+not counted as a pass. The harness supports copying existing system OCR assets
+with a SHA-256 manifest and uses a dedicated headless browser for UI tests.
+
+Native run 35848154546 passed Windows and macOS ARM, including runtime startup,
+application build and focused regressions. The remaining native jobs were still
+running at this checkpoint. No signing/notarization or native install lifecycle
+acceptance is claimed.
+
+Real campaign `/private/tmp/nodus-research-Cq5QqL` passed four chat known-answer,
+retrieval-marker and citation-existence checks and completed all four Deep Research
+routes. Their report quality remained **weak**. Citation support audit totals were:
+v1 general 16 checked/9 partial/0 unsupported; v2 general 15/2/0;
+v1 comparative 23/17/1; v2 comparative 16/11/0. The shared ledger then recorded
+288 calls and a $0.58171052 accounted upper bound, with no unresolved reservations.
+The source-reuse defect is corrected; these quality scores are not acceptance.
+
+Baseline attempt `/private/tmp/nodus-research-XMrHkl` made no paid calls: changing
+Electron's HOME prevented access to the OS encryption context for the authorized
+copied credentials. It is a harness failure, not a baseline capability result.
+Only the browser/unit-test environment now changes HOME; Electron retains its
+existing OS keychain identity while all application paths and writes remain under
+the verified isolated root. A new baseline Deep Research campaign is running.

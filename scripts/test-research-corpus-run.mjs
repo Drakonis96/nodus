@@ -97,6 +97,27 @@ try {
   assert.equal(noteScope.documents[0].authoredKind, 'generated-report');
   load('electron/db/notesRepo.ts').trashNotes([note.id]);
   assert.equal(notebookService.resolveResearchNotebook(noteBook.id).documents.length, 0, 'trashing a promoted note revokes future access');
+  const attachmentOwner = { surface: 'research', conversationId: conversation.id };
+  const fixtureFile = path.join(scratch, 'explicit-attachment.txt');
+  fs.writeFileSync(fixtureFile, 'Synthetic conversational source: FIELD97 measured 97 units.');
+  const attachment = await load('electron/researchAttachments.ts').importResearchAttachment(attachmentOwner, fixtureFile);
+  const inventory = load('electron/ai/researchCorpusInventory.ts').researchCorpusInventory();
+  const attachmentDocument = inventory.documents.find(document => document.conversationAttachment?.attachmentId === attachment.id);
+  assert.ok(attachmentDocument);
+  assert.ok(!notebookService.resolveAcademicResearchScope().documents.some(document => document.id === attachmentDocument.id));
+  const attachmentBook = notebookService.saveResearchNotebook({ name: 'Explicit attachment source', mode: 'fixed', sources: [{ kind: 'conversation-attachment', id: attachmentDocument.id }], exclusions: [] });
+  assert.equal(notebookService.resolveResearchNotebook(attachmentBook.id).documents.length, 1);
+  const attachmentSources = load('electron/ai/researchAttachmentSources.ts');
+  assert.equal(attachmentSources.readResearchAttachmentSource('../escape', attachment.id), null);
+  const attachmentFolder = path.join(load('electron/researchAttachments.ts').researchAttachmentDirectory(attachmentOwner), attachment.id);
+  fs.renameSync(path.join(attachmentFolder, 'original'), path.join(attachmentFolder, 'saved-original'));
+  fs.symlinkSync(fixtureFile, path.join(attachmentFolder, 'original'));
+  assert.equal(attachmentSources.readResearchAttachmentSource(conversation.id, attachment.id), null, 'symlink aliases cannot promote arbitrary paths');
+  fs.unlinkSync(path.join(attachmentFolder, 'original'));
+  fs.renameSync(path.join(attachmentFolder, 'saved-original'), path.join(attachmentFolder, 'original'));
+  assert.ok(attachmentSources.readResearchAttachmentSource(conversation.id, attachment.id));
+  db.prepare('DELETE FROM chat_conversations WHERE id=?').run(conversation.id);
+  assert.equal(notebookService.resolveResearchNotebook(attachmentBook.id).documents.length, 0, 'deleting a conversation revokes promoted attachment access');
   console.log('Corpus run: pre-ranking scope, mixed Ideas, lexical-only retrieval, shared section budget, no profile barrier and selection revocation passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();

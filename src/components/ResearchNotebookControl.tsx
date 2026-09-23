@@ -56,8 +56,8 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
   }, [notebook?.id, notebook?.mode]);
   const selected = new Set<string>();
   for (const source of draft.sources) {
-    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note') {
-      documents.filter(document => (source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id).forEach(document => selected.add(document.id));
+    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note' || source.kind === 'conversation-attachment') {
+      documents.filter(document => (source.kind === 'conversation-attachment' ? document.conversationAttachment && document.id : source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id).forEach(document => selected.add(document.id));
     } else {
       const stack = collections.filter(collection => referenceKey(collection.reference) === referenceKey(source));
       const visited = new Set<string>();
@@ -102,7 +102,7 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
       <label className="block">{t('Buscar')}<input type="search" className="input w-full" value={query} onChange={event => setQuery(event.target.value)} /></label>
       <fieldset className="my-3 max-h-56 overflow-auto"><legend>{t('Fuentes')} · {selected.size}</legend>
         {documents.filter(document => document.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(document => {
-          const reference: ResearchSourceReference = document.noteId ? { kind: 'note', id: document.noteId } : document.libraryItemId ? { kind: 'library-item', id: document.libraryItemId } : { kind: 'work', id: document.workId! };
+          const reference: ResearchSourceReference = document.conversationAttachment ? { kind: 'conversation-attachment', id: document.id } : document.noteId ? { kind: 'note', id: document.noteId } : document.libraryItemId ? { kind: 'library-item', id: document.libraryItemId } : { kind: 'work', id: document.workId! };
           const state = inventory?.documents.find(item => item.id === document.id)?.preparation;
           return <label key={document.id} className="flex items-start gap-2 py-1 text-sm"><input type="checkbox" checked={selected.has(document.id)} onChange={event => setDraft({ ...draft,
             sources: event.target.checked && !draft.sources.some(item => referenceKey(item) === referenceKey(reference)) ? [...draft.sources, reference] : draft.sources,

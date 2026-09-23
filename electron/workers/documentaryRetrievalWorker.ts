@@ -41,7 +41,8 @@ parentPort?.once('message', (input: { filename: string; query: string; lexicalKe
       frontier = next;
     }
     parentPort!.postMessage({ passages: chosen, traversal: { rounds: budget.rounds, candidates: budget.candidates, evidenceTokens: budget.usedEvidenceTokens,
-      partial: budget.partial || chosen.length < ranked.length, visited: [...budget.visited] } });
+      partial: budget.partial || chosen.length < ranked.length || lexical.length >= input.settings.candidates || semantic.length >= input.settings.candidates,
+      visited: [...budget.visited] } });
   } catch (error) { parentPort!.postMessage({ error: error instanceof Error ? error.message : 'documentary_retrieval_failed' }); }
   finally { store.close(); }
 });

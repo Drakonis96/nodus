@@ -62,6 +62,8 @@ try {
   const before = citations.getDocumentaryPassageDetail(citationId);
   assert.equal(before.attachmentId, found.evidence[0].attachmentId);
   db.prepare('UPDATE works SET resolved_text_hash=? WHERE nodus_id=?').run('changed-content', 'inside');
+  const pinnedRead = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
+  assert.deepEqual(pinnedRead.evidence.map(item => item.text), found.evidence.map(item => item.text), 'frozen executions keep original indexed revisions after content changes');
   const historical = citations.getDocumentaryPassageDetail(citationId);
   assert.equal(historical.historical, true);
   assert.equal(historical.text, before.text, 'immutable citation keeps its exact original text after a content edit');

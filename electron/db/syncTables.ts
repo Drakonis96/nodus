@@ -221,7 +221,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'dictionary_relations',
     ],
   },
-  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations'] },
+  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations', 'research_notebooks', 'research_notebook_conversations'] },
   { key: 'content', tables: ['content_translations', 'decorative_images', 'audio_clips', 'page_block_blobs'] },
 ];
 
@@ -239,6 +239,10 @@ const NOT_SYNCED_TABLES = new Set([
   'saved_authors',
   'ideas', 'idea_occurrences', 'idea_theme_links', 'themes', 'edges', 'edge_traces', 'gaps',
   'passages', 'collections', 'zotero_tags', 'external_refs', 'extraction_cache', 'scan_checkpoints',
+  // Scope receipts authorize evidence against THIS profile's revisions and
+  // permissions. Importing them would incorrectly trust another device's history.
+  // Publication fencing likewise belongs to the local passage writer.
+  'research_run_scopes', 'research_conversation_provenance', 'passage_publications',
   // Source-resolution provenance is rebuilt from this machine's Zotero/library files.
   // Shipping it would create attachment locators that may not exist on the receiver.
   'work_text_sources',

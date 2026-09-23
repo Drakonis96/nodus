@@ -24,7 +24,7 @@ export function saveResearchNotebook(input: ResearchNotebookInput, resolvedIds: 
   if (!['fixed', 'linked'].includes(input.mode) || !Array.isArray(input.sources) || input.sources.length > 10000
     || !Array.isArray(input.exclusions) || input.exclusions.length > 10000 || input.exclusions.some(id => typeof id !== 'string')) throw new Error('Invalid notebook selection');
   for (const source of input.sources) {
-    if (!source || !['work', 'library-item', 'library-collection', 'zotero-collection', 'note'].includes(source.kind)
+    if (!source || !['work', 'library-item', 'library-collection', 'zotero-collection', 'note', 'conversation-attachment'].includes(source.kind)
       || typeof source.id !== 'string' || !source.id || source.id.length > 500
       || (source.kind === 'zotero-collection' && (!['user', 'group'].includes(source.libraryType ?? '') || !source.libraryId))) throw new Error('Invalid notebook source');
   }

@@ -1,12 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
 const repo = path.resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
 const shard = args.find(argument => argument.startsWith('--shard='))?.slice('--shard='.length);
 if (shard && !/^[1-9]\d*\/[1-9]\d*$/.test(shard)) throw new Error('Invalid test shard');
-const files = args.includes('--all') ? fs.readdirSync(path.join(repo, 'scripts')).filter(name => /^test-.*\.mjs$/.test(name)).sort() : args.filter(argument => !argument.startsWith('--shard='));
+if (args.some(argument => argument.startsWith('--') && !['--all', '--workspace'].includes(argument) && !argument.startsWith('--shard='))) throw new Error('Unknown test option');
+const files = args.includes('--all') ? fs.readdirSync(path.join(repo, 'scripts')).filter(name => /^test-.*\.mjs$/.test(name)).sort() : args.filter(argument => !argument.startsWith('--'));
 if (!files.length || files.some(name => !/^test-[a-z0-9-]+\.mjs$/.test(name))) throw new Error('Pass test script basenames or --all');
 for (const file of files) if (!fs.existsSync(path.join(repo, 'scripts', file))) throw new Error(`Unknown test script: ${file}`);
 const root = createResearchTestRoot();
@@ -17,7 +19,7 @@ if (files.includes('test-research-isolation.mjs')) {
   files.splice(files.indexOf('test-research-isolation.mjs'), 1);
 }
 let testRepo = repo;
-if (args.includes('--all')) {
+if (args.includes('--all') || args.includes('--workspace')) {
   // Some established tests create bundles beside node_modules for ESM package
   // resolution. Give them a disposable checkout rather than weakening Seatbelt.
   testRepo = path.join(root, 'workspace');
@@ -29,15 +31,28 @@ if (args.includes('--all')) {
     fs.mkdirSync(path.dirname(to), { recursive: true });
     fs.copyFileSync(from, to, fs.constants.COPYFILE_FICLONE);
   }
-  for (const name of ['node_modules', 'dist', 'dist-electron', 'build/zotero-mcp']) {
+  for (const name of ['node_modules', 'dist', 'server/dist/web', 'dist-electron', 'build/zotero-mcp']) {
     if (!fs.existsSync(path.join(repo, name))) continue;
     fs.mkdirSync(path.dirname(path.join(testRepo, name)), { recursive: true });
     execFileSync('/bin/cp', ['-cR', path.join(repo, name), path.join(testRepo, name)]);
   }
+  if (process.env.NODUS_RESEARCH_TESSDATA) {
+    const source = fs.realpathSync(process.env.NODUS_RESEARCH_TESSDATA);
+    const target = path.join(testRepo, 'scripts/.cache/tessdata');
+    fs.mkdirSync(target, { recursive: true });
+    const assets = [];
+    for (const name of fs.readdirSync(source).filter(name => /^[a-z_]+\.traineddata$/.test(name))) {
+      const filename = path.join(source, name);
+      if (fs.realpathSync(filename) !== filename || !fs.statSync(filename).isFile()) throw new Error('Invalid OCR fixture data');
+      fs.copyFileSync(filename, path.join(target, name));
+      assets.push({ name, source: filename, sha256: createHash('sha256').update(fs.readFileSync(filename)).digest('hex') });
+    }
+    fs.writeFileSync(path.join(root, 'artifacts/ocr-assets.json'), JSON.stringify(assets, null, 2));
+  }
 }
 const policy = macResearchSandbox(root);
 const proof = verifyResearchSandbox(root, policy);
-const environment = researchTestEnvironment(root);
+const environment = { ...researchTestEnvironment(root), HOME: root };
 if (process.env.CHROME_BIN) environment.CHROME_BIN = fs.realpathSync(process.env.CHROME_BIN);
 const [part, total] = (shard ?? '1/1').split('/').map(Number);
 if (part > total) throw new Error('Test shard exceeds count');

@@ -1,4 +1,5 @@
 import type { ResearchCorpusCollection, ResearchCorpusDocument } from '@shared/researchCorpus';
+import { listResearchAttachmentSources } from './researchAttachmentSources';
 import type { Work } from '@shared/types';
 import { getDb } from '../db/database';
 import { getSettings } from '../db/settingsRepo';
@@ -79,6 +80,14 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
       workId: null, libraryItemId: null, title: note.title, authors: [], year: null, attachmentId: null,
       origin: { kind: 'nodus', id }, revision: researchFingerprint([note.title, note.content]),
       permissionRevision: researchFingerprint([vault.id, note.id, 'active-note']), coverage: 'fulltext' });
+  }
+  for (const { conversationId, attachmentId, source } of listResearchAttachmentSources()) {
+    const id = `vault:${vault.id}:conversation:${conversationId}:attachment:${attachmentId}`;
+    const revision = researchFingerprint([source.name, source.text, source.warning]);
+    documents.push({ id, conversationAttachment: { conversationId, attachmentId }, sourceWarning: source.warning,
+      workId: null, libraryItemId: null, title: source.name, authors: [], year: null, attachmentId,
+      attachments: [{ id: attachmentId, revision }], origin: { kind: 'nodus', id }, revision,
+      permissionRevision: researchFingerprint([vault.id, conversationId, attachmentId]), coverage: 'fulltext' });
   }
   return { documents, collections };
 }

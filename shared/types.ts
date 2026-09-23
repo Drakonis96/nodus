@@ -9359,6 +9359,7 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  conversationAttachment?: { conversationId: string; attachmentId: string };
   noteId?: string;
   revision?: string;
   historical?: boolean;

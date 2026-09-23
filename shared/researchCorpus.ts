@@ -1,6 +1,6 @@
 /** Documentary retrieval contracts. No credentials or model-generated permissions. */
 export interface ResearchSourceReference {
-  kind: 'work' | 'library-item' | 'library-collection' | 'zotero-collection' | 'note';
+  kind: 'work' | 'library-item' | 'library-collection' | 'zotero-collection' | 'note' | 'conversation-attachment';
   id: string;
   libraryId?: string;
   libraryType?: 'user' | 'group';
@@ -66,6 +66,8 @@ export interface ResearchCorpusDocument {
   workId: string | null;
   libraryItemId: string | null;
   noteId?: string;
+  conversationAttachment?: { conversationId: string; attachmentId: string };
+  sourceWarning?: string;
   authoredKind?: 'user-note' | 'generated-report';
   origin: { kind: 'zotero'; libraryType: 'user' | 'group'; libraryId: string; itemKey: string } | { kind: 'nodus'; id: string };
   revision: string;

@@ -8,7 +8,7 @@ import { getDb } from '../db/database';
 import { getResearchNotebook } from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { resolveResearchNotebook, resolveAcademicResearchScope } from './researchNotebookService';
-import { assertResearchDocument } from './researchCorpusScope';
+import { assertResearchDocument, assertResearchDocumentPermission } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
@@ -33,7 +33,7 @@ export class ResearchCorpusRun {
   private readonly workIds: string[];
   private readonly ideaIds: string[];
   private graphSnapshot: Pick<WritingWorkshopSnapshot, 'gaps' | 'contradictions' | 'themes'> | null = null;
-  constructor(readonly scope: ResolvedResearchScope, settings: RetrievalSettings, readonly signal?: AbortSignal) {
+  constructor(readonly scope: ResolvedResearchScope, settings: RetrievalSettings, readonly signal?: AbortSignal, readonly pinRevisions = false) {
     this.budget = new ResearchRetrievalBudget(settings);
     this.workIds = scope.documents.flatMap(document => document.workId ? [document.workId] : []);
     const manual = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
@@ -44,7 +44,15 @@ export class ResearchCorpusRun {
     if (getActiveVault().id !== this.scope.vaultId) throw new Error('research_scope_changed');
     if (this.scope.notebookId && getResearchNotebook(this.scope.notebookId)?.revision !== this.scope.notebookRevision) throw new Error('research_scope_changed');
     const current = researchCorpusInventory().documents;
-    for (const document of this.scope.documents) assertResearchDocument(this.scope, document.id, current.find(item => item.id === document.id));
+    for (const document of this.scope.documents) (this.pinRevisions ? assertResearchDocumentPermission : assertResearchDocument)(this.scope, document.id, current.find(item => item.id === document.id));
+    if (this.pinRevisions && this.scope.documents.some(document => current.find(item => item.id === document.id)?.revision !== document.revision)) {
+      // Shared evidence is immutable. Legacy passages and graph analyses are not;
+      // discard their cached copies instead of reading a silently newer revision.
+      this.ideas.clear();
+      for (const id of this.evidence.keys()) if (!id.startsWith('documentary:')) this.evidence.delete(id);
+      this.graphSnapshot = { gaps: [], contradictions: [], themes: [] };
+      this.budget.partial = true;
+    }
   }
   async retrieve(query: string, expandRounds = 2): Promise<void> {
     this.validate();
@@ -56,7 +64,10 @@ export class ResearchCorpusRun {
     if (!this.scope.documents.length) return;
     const vector = await embed(query, this.signal).catch(() => null);
     this.validate();
-    const hierarchy = await retrieveHierarchical(query, { embedding: vector, nodusIds: this.workIds, ideaIds: this.ideaIds,
+    const current = researchCorpusInventory().documents;
+    const stableWorks = this.pinRevisions ? this.scope.documents.filter(document => current.find(item => item.id === document.id)?.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []) : this.workIds;
+    const stableIdeas = stableWorks.length === this.workIds.length ? this.ideaIds : [];
+    const hierarchy = await retrieveHierarchical(query, { embedding: vector, nodusIds: stableWorks, ideaIds: stableIdeas,
       documentLimit: settings.candidates, ideaLimit: settings.passagesPerRound, passageLimit: settings.candidates,
       minIdeaSimilarity: -1, minPassageSimilarity: -1, minDocumentSimilarity: -1 });
     const remaining = this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens;
@@ -79,7 +90,7 @@ export class ResearchCorpusRun {
       if (selected >= settings.passagesPerRound * shared.traversal.rounds) { this.budget.partial = true; break; }
       if (this.budget.accept(key, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
     }
-    const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(this.ideaIds)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
+    const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(stableIdeas)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
     const ordered = [...hierarchy.ideas, ...lexical.map(idea => ({ ...idea, similarity: words.reduce((score, word) => score + Number(`${idea.label} ${idea.statement}`.toLocaleLowerCase().includes(word)), 0) })).filter(idea => idea.similarity > 0).sort((a, b) => b.similarity - a.similarity)];
     for (const row of ordered.slice(0, settings.passagesPerRound)) {
@@ -104,7 +115,7 @@ export class ResearchCorpusRun {
     const id = documentaryCitationId(this.scope.id, item.id);
     return { id, label: document.title, summary: item.text, nodus_id: document.workId ?? document.id,
       authors: document.authors, year: document.year, zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '',
-      pageLabel: item.locator.pageLabel, citation: `nodus://passage/${encodeURIComponent(id)}`, score: 1, reason: item.provenance };
+      pageLabel: item.locator.pageLabel, ...(item.limitations.length ? { limitations: item.limitations } : {}), citation: `nodus://passage/${encodeURIComponent(id)}`, score: 1, reason: item.provenance };
   }
   async snapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot> {
     await this.retrieve(brief.objective);
@@ -168,7 +179,7 @@ export class ResearchCorpusRun {
 export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResearchRequest, signal?: AbortSignal): DeepResearchDeps {
   const scope = resolveAcademicRunScope(request.notebookId);
   const settings = validateRetrievalSettings(request.retrieval ?? (request.notebookId ? getResearchNotebook(request.notebookId)?.settings : undefined) ?? RETRIEVAL_PRESETS.deep);
-  const run = new ResearchCorpusRun(scope, settings, signal);
+  const run = new ResearchCorpusRun(scope, settings, signal, true);
   const bounded: DeepResearchDeps = { ...deps, buildSnapshot: async brief => {
     const snapshot = await run.snapshot(brief);
     if (!deps.prepareScopedSnapshot) return snapshot;

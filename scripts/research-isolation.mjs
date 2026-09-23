@@ -25,7 +25,8 @@ export function researchTestEnvironment(root) {
   for (const name of ['PATH', 'LANG', 'LC_ALL', 'DISPLAY', 'XAUTHORITY', 'SystemRoot', 'WINDIR']) {
     if (process.env[name]) env[name] = process.env[name];
   }
-  return { ...env, NODUS_ISOLATED_ROOT: root, NODUS_USERDATA: path.join(root, 'profile'),
+  return { ...env, XDG_CONFIG_HOME: path.join(root, 'profile/config'), XDG_CACHE_HOME: path.join(root, 'profile/cache'),
+    NODUS_ISOLATED_ROOT: root, NODUS_USERDATA: path.join(root, 'profile'),
     NODUS_ZOTERO_SQLITE: path.join(root, 'fixtures/no-production-zotero.sqlite'),
     // No test may silently fall back to the user's running Zotero on 23119.
     NODUS_ZOTERO_API_BASE: 'http://127.0.0.1:1/api',

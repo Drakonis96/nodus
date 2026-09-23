@@ -48,13 +48,13 @@ try {
   assert.deepEqual(chat, ['Verified consensus.'], 'member answers and reasoning never enter the main chat');
   assert.equal(executions.length, 1, 'only the chairman executes skills');
   assert.deepEqual(executions[0].model, models[1]);
-  assert.ok(executions[0].skills.length > 0);
+  assert.equal(executions[0].skills.length, 0, 'academic corpus scope disables external skill tools, including the chairman');
   for (const call of calls.slice(0, 3)) {
     assert.match(call.options.system, /No skills or tools are available/);
     assert.equal(JSON.parse(call.options.user).application_output_contract, undefined);
     assert.doesNotMatch(call.options.system, /nodus-svg/);
   }
-  assert.match(calls[3].options.system, /svg/i);
+  assert.doesNotMatch(calls[3].options.system, /nodus-svg/);
   assert.ok(snapshots.some(s => s.members[1].status === 'complete' && s.members[0].status === 'thinking'), 'out-of-order completion is delivered live');
   const { SCHEMA_VERSION } = load('electron/db/migrations.ts');
   assert.equal(load('electron/db/database.ts').getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION, 'Concilium migration matches the advertised schema version');

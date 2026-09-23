@@ -7,6 +7,7 @@ import * as notebooks from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { researchFingerprint, resolveNotebookScope, selectResearchDocuments } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
+import { notifyAuthoredResearchSourceChanged } from './researchCorpusEvents';
 
 const active = new Map<string, Set<AbortController>>();
 const key = (id: string) => `${getActiveVault().id}:${id}`;
@@ -22,6 +23,7 @@ export function saveResearchNotebook(input: ResearchNotebookInput) {
     : selectResearchDocuments(input.sources, input.exclusions, inventory.documents, inventory.collections);
   const result = notebooks.saveResearchNotebook(input, ids);
   for (const controller of active.get(key(result.id)) ?? []) controller.abort();
+  notifyAuthoredResearchSourceChanged();
   return result;
 }
 export function deleteResearchNotebook(id: string) {

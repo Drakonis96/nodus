@@ -446,7 +446,12 @@ export function LibraryDocumentReader({
     const initialIsAvailable = initialSource === 'clean'
       ? reader.cleanAvailable
       : !!initialSource && !!reader.attachments.find((attachment) => attachment.id === initialSource && attachment.available);
-    if (initialSource && initialIsAvailable) {
+    const citedAttachment = reference.attachmentId && reader.attachments.find(attachment => attachment.id === reference.attachmentId && attachment.available);
+    if (citedAttachment) {
+      setSelectedSource(citedAttachment.id);
+      onSourceChangeRef.current?.(citedAttachment.id);
+      setOpeningFormatPrompt(false);
+    } else if (initialSource && initialIsAvailable) {
       setSelectedSource(initialSource);
       setOpeningFormatPrompt(false);
     } else if (preferred === 'clean' && reader.cleanAvailable) {
@@ -466,7 +471,7 @@ export function LibraryDocumentReader({
       onSourceChangeRef.current?.(fallback);
       setOpeningFormatPrompt(false);
     }
-  }, [initialSource, reader, reference.preferredSource]);
+  }, [initialSource, reader, reference.preferredSource, reference.attachmentId]);
   useEffect(() => {
     if (!reader) return;
     let alive = true;

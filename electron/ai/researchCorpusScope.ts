@@ -21,9 +21,9 @@ export function selectResearchDocuments(sources: ResearchSourceReference[], excl
   const available = new Map(documents.map(document => [document.id, document]));
   const byKey = new Map(collections.map(collection => [sourceReferenceKey(collection.reference), collection]));
   for (const source of sources) {
-    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note') {
+    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note' || source.kind === 'conversation-attachment') {
       for (const document of documents) {
-        if ((source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id) selected.add(document.id);
+        if ((source.kind === 'conversation-attachment' ? document.conversationAttachment && document.id : source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id) selected.add(document.id);
       }
       continue;
     }
@@ -76,5 +76,8 @@ export function assertResearchDocument(scope: ResolvedResearchScope, documentId:
 export function assertResearchDocumentPermission(scope: ResolvedResearchScope, documentId: string, current: ResearchCorpusDocument | undefined): ResearchCorpusDocument {
   const pinned = scope.documents.find(document => document.id === documentId);
   if (!pinned || !current || pinned.permissionRevision !== current.permissionRevision) throw new Error('research_source_not_authorized');
+  // Removing an attachment is an access revocation, whereas replacing its
+  // content under the same identity leaves immutable historical citations valid.
+  if (pinned.attachments?.some(attachment => !current.attachments?.some(item => item.id === attachment.id))) throw new Error('research_source_not_authorized');
   return pinned;
 }

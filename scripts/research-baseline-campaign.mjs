@@ -40,6 +40,18 @@ export async function runResearchBaselineCampaign(page, app, root, documents) {
       } catch (error) { result.checks.push({ name: query.name, error: String(error), latencyMs: performance.now() - started }); }
       fs.writeFileSync(path.join(root, 'artifacts/live-campaign.json'), JSON.stringify(result, null, 2));
     }
+    result.deepResearchCases = [];
+    for (const [deepResearchVersion, approach] of [['v1', 'general'], ['v2', 'general'], ['v1', 'comparative'], ['v2', 'comparative']]) {
+      const started = performance.now();
+      try {
+        const report = await page.evaluate(input => window.nodus.generateDeepResearchReport({
+          objective: 'Compara las mediciones de los campos norte y sur, señala los límites de comparabilidad y la ausencia de datos del campo este. Usa exclusivamente las tres fuentes sintéticas y citas verificables.',
+          deepResearchVersion: input.deepResearchVersion, approach: input.approach, language: 'es', sectionLimit: 3,
+          sectionLength: 300, model: { provider: 'deepseek', model: 'deepseek-flash' } }), { deepResearchVersion, approach });
+        result.deepResearchCases.push({ deepResearchVersion, approach, latencyMs: performance.now() - started, report });
+      } catch (error) { result.deepResearchCases.push({ deepResearchVersion, approach, latencyMs: performance.now() - started, error: String(error) }); }
+      fs.writeFileSync(path.join(root, 'artifacts/live-campaign.json'), JSON.stringify(result, null, 2));
+    }
     result.completedAt = new Date().toISOString();
     return result;
   } finally {

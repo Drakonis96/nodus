@@ -9,13 +9,14 @@ import { DocumentaryRequests } from '../db/documentaryRequests';
 import { DocumentaryStore, type DocumentaryChunk } from '../db/documentaryStore';
 import { documentaryChunks } from './documentaryChunking';
 import { researchCorpusInventory } from './researchCorpusInventory';
-import { assertResearchDocument, researchFingerprint } from './researchCorpusScope';
+import { assertResearchDocumentPermission, researchFingerprint } from './researchCorpusScope';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { getGlobalLibraryItem, enqueueLibraryExtraction, listLibraryExtractionJobs } from '../library/libraryService';
 import { openAiCompatBase } from './providers';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
 import { embedMany } from './aiClient';
 import { getWork } from '../db/worksRepo';
+import { readResearchAttachmentSource } from './researchAttachmentSources';
 import { getNote } from '../db/notesRepo';
 import { listResearchNotebooks } from '../db/researchNotebooksRepo';
 import { getSettings } from '../db/settingsRepo';
@@ -23,6 +24,7 @@ import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { documentarySourceText, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { getActiveVault } from '../vaults/vaultRegistry';
+import { onResearchCorpusChanged } from './researchCorpusEvents';
 
 let shared: DocumentaryStore | null = null;
 let stopping = false;
@@ -229,6 +231,19 @@ export async function drainDocumentaryRequests(): Promise<void> {
         let coverage = document.coverage;
         let sourceMap: Record<string, string> = {};
         let parts: DocumentarySourcePart[] = [];
+        if (document.conversationAttachment) {
+          const { conversationId, attachmentId } = document.conversationAttachment;
+          const source = readResearchAttachmentSource(conversationId, attachmentId);
+          if (!source) throw new Error('research_source_not_authorized');
+          // PDF import records physical page boundaries, not printed folios.
+          text = `[[src:conversation]]\n${source.text}`;
+          if (source.kind === 'pdf') text = text.split('\n').map(line => {
+            const prefix = `[${source.name}, página `;
+            const number = line.startsWith(prefix) && line.endsWith(']') ? line.slice(prefix.length, -1) : '';
+            return /^[1-9]\d*$/.test(number) ? `[[src:conversation p. ${number}]]` : line;
+          }).join('\n');
+          sourceMap.conversation = `conversation:${conversationId}:${attachmentId}`;
+        }
         if (document.noteId) {
           const note = getNote(document.noteId);
           if (!note || note.trashedAt) throw new Error('research_source_not_authorized');
@@ -334,6 +349,8 @@ export function notifyResearchCorpusChanged(): void {
       autoTimer = null;
       if (!documentaryStore().preference('enabled') || getActiveVault().type !== 'academic') return;
       const documents = researchCorpusInventory().documents.filter(document => {
+        if (document.conversationAttachment && !listResearchNotebooks().some(notebook => notebook.sources.some(source => source.kind === 'conversation-attachment' && source.id === document.id)
+          && !notebook.exclusions.includes(document.id))) return false;
         if (document.noteId && !listResearchNotebooks().some(notebook => notebook.sources.some(source => source.kind === 'note' && source.id === document.noteId)
           && !notebook.exclusions.includes(document.id))) return false;
         if (revisionsFor(document).some(row => row.lexical_ready)) return false;
@@ -346,7 +363,9 @@ export function notifyResearchCorpusChanged(): void {
 }
 export function initializeDocumentaryPreparation(): void {
   if (unsubscribe) return;
-  unsubscribe = onGlobalLibraryChanged(notifyResearchCorpusChanged);
+  const global = onGlobalLibraryChanged(notifyResearchCorpusChanged);
+  const authored = onResearchCorpusChanged(notifyResearchCorpusChanged);
+  unsubscribe = () => { global(); authored(); };
   // Resume explicitly queued work after a restart, including a crashed stage.
   if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite')) && getActiveVault().type === 'academic') void drainDocumentaryRequests().catch(() => undefined);
 }
@@ -356,8 +375,9 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
   const config = currentEmbeddingConfig();
   const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
   const vectorKeys: string[] = [];
+  const indexedDocuments = new Set<string>();
   const keys = scope.documents.flatMap(document => {
-    assertResearchDocument(scope, document.id, inventory.documents.find(item => item.id === document.id));
+    assertResearchDocumentPermission(scope, document.id, inventory.documents.find(item => item.id === document.id));
     return attachmentRevisions(document).flatMap(revisions => {
     const semantic = revisions.find(row => {
       const identity: DocumentaryIndexIdentity = JSON.parse(row.identity_json);
@@ -365,6 +385,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     });
     if (semantic) vectorKeys.push(semantic.index_key);
     const revision = revisions.find(row => row.lexical_ready && !row.embedding_ready) ?? revisions.find(row => row.lexical_ready);
+      if (revision) indexedDocuments.add(document.id);
       return revision ? [revision.index_key] : [];
     });
   });
@@ -392,6 +413,8 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     worker.once('exit', () => { if (!settled) finish(new Error('documentary_retrieval_worker_stopped')); });
     worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold });
   });
+  const latest = researchCorpusInventory().documents;
+  for (const document of scope.documents) assertResearchDocumentPermission(scope, document.id, latest.find(item => item.id === document.id));
   const evidence = result.passages.map(passage => {
     const document = scope.documents.find(document => document.id === passage.document_id)!;
     const identity = JSON.parse(documentaryStore().getJob(passage.index_key)!.identity_json) as DocumentaryIndexIdentity;
@@ -399,7 +422,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     return { id: passage.id, documentId: document.id, workId: document.workId, attachmentId: identity.attachmentId, attachmentRevision: identity.attachmentRevision,
       revision: document.revision, text: passage.text, locator: JSON.parse(passage.locator_json),
       provenance: document.authoredKind ?? (coverage === 'abstract' ? 'abstract' as const : 'source' as const),
-      limitations: document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : [] };
+      limitations: [...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : [])] };
   });
-  return { evidence, traversal: result.traversal };
+  return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || indexedDocuments.size < scope.documents.length } };
 }

@@ -39,7 +39,7 @@ export function getDocumentaryPassageDetail(id: string): PassageDetail | null {
     const locator = JSON.parse(passage.locator_json);
     return { passage_id: id, nodus_id: document.workId ?? document.id, libraryItemId: document.libraryItemId,
       attachmentId: identity.attachmentId,
-      noteId: document.noteId,
+      noteId: document.noteId, conversationAttachment: document.conversationAttachment,
       revision: identity.revision, historical: current?.revision !== identity.revision,
       provenance: document.authoredKind ?? ((identity.coverage ?? document.coverage) === 'abstract' ? 'abstract' : 'source'), text: passage.text,
       page_label: locator.pageLabel, source_ref: locator.sourceRef, page_number: locator.pageNumber,
