@@ -25,6 +25,11 @@ try {
   }
   db.prepare("INSERT INTO idea_occurrences(global_id,nodus_id) VALUES ('mixed','outside')").run();
   const notebookService = load('electron/ai/researchNotebookService.ts');
+  const emptyGeneral = notebookService.authorizeNotebookRequest({ selection: { sourceFilter: { enabled: true, authorIds: [], workIds: [] } }, messages: [{ role: 'user', content: 'No sources' }] });
+  assert.deepEqual(notebookService.requestNotebookScope(emptyGeneral).documents, [], 'general chat also resolves explicit empty scopes');
+  const general = notebookService.authorizeNotebookRequest({ selection: {}, messages: [{ role: 'user', content: 'All active vault works' }] });
+  assert.equal(notebookService.requestNotebookScope(general).documents.length, 2);
+  notebookService.validateNotebookRequest(general);
   const notebook = notebookService.saveResearchNotebook({ name: 'bounded', mode: 'fixed', sources: [{ kind: 'work', id: 'inside' }], exclusions: [] });
   const scope = notebookService.resolveResearchNotebook(notebook.id);
   const ai = load('electron/ai/aiClient.ts');

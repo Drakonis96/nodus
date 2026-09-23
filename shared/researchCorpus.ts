@@ -140,6 +140,7 @@ export interface ZoteroMcpStatus {
 
 export interface ResearchPreparationInventory {
   enabled: boolean;
+  embeddingSpaces?: Array<{ id: string; provider: string; model: string; dimensions: number; metric: 'cosine' }>;
   documents: Array<ResearchCorpusDocument & { preparation: DocumentPreparationState }>;
 }
 
@@ -152,6 +153,7 @@ export interface ResearchCorpusApi {
   searchResearchNotebook(id: string, query: string): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   getResearchPreparationInventory(): Promise<ResearchPreparationInventory>;
   prepareResearchDocuments(documentIds: string[]): Promise<void>;
+  cancelResearchDocuments(documentIds: string[]): Promise<void>;
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;
   setResearchPreparationPaused(paused: boolean): Promise<void>;
   getZoteroMcpStatus(): Promise<ZoteroMcpStatus>;

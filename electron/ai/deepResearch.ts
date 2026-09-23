@@ -481,6 +481,19 @@ function legacySpecializedAcademicDeps(
     relationships: [],
   };
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const retrieval = await planApproachRetrieval({ approach, variant: 'academic', objective: request.objective,
+        language: request.language ?? 'es', model, corpusPreview: {
+          themes: ordinary.themes.slice(0, 16).map(item => item.label),
+          works: ordinary.works.slice(0, 24).map(item => ({ title: item.title, authors: item.authors, year: item.year })),
+          contradictions: ordinary.contradictions.slice(0, 16).map(item => item.summary),
+          gaps: ordinary.gaps.slice(0, 16).map(item => item.summary),
+        } });
+      const supplemental = await extend(retrieval.probes);
+      const merged = mergeApproachSnapshots(ordinary, supplemental, approach);
+      context = { ...context, retrieval, relationships: academicRelationshipContext(merged) };
+      return merged;
+    },
     buildSnapshot: async (brief) => {
       const ordinary = await buildHistoricalWritingWorkshopSnapshot(brief);
       const retrieval = await planApproachRetrieval({
@@ -514,6 +527,11 @@ function realDeps(model: ModelRef | null, signal?: AbortSignal): DeepResearchDep
   const experimentalProse = process.env.NODUS_EXPERIMENTAL_DEEP_RESEARCH_PROSE === '1';
   let relationships: ReturnType<typeof academicRelationshipContext> = [];
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const snapshot = await extend(academicObjectiveProbes(ordinary.brief.objective));
+      relationships = academicRelationshipContext(snapshot);
+      return snapshot;
+    },
     buildSnapshot: async (brief) => {
       const snapshot = await buildIdeaFirstWritingWorkshopSnapshot(brief, academicObjectiveProbes(brief.objective));
       relationships = academicRelationshipContext(snapshot);
@@ -569,6 +587,19 @@ function specializedAcademicDeps(
     relationships: [],
   };
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const retrieval = await planApproachRetrieval({ approach, variant: 'academic', objective: request.objective,
+        language: request.language ?? 'es', model, corpusPreview: {
+          themes: ordinary.themes.slice(0, 16).map(item => item.label),
+          works: ordinary.works.slice(0, 24).map(item => ({ title: item.title, authors: item.authors, year: item.year })),
+          contradictions: ordinary.contradictions.slice(0, 16).map(item => item.summary),
+          gaps: ordinary.gaps.slice(0, 16).map(item => item.summary),
+        } });
+      const supplemental = await extend(retrieval.probes);
+      const merged = mergeApproachSnapshots(ordinary, supplemental, approach);
+      context = { ...context, retrieval, relationships: academicRelationshipContext(merged) };
+      return merged;
+    },
     buildSnapshot: async (brief) => {
       // Specialized probes may broaden the IDEA graph before planning. Document
       // profiles and passages remain excluded until the resulting plan is fixed.

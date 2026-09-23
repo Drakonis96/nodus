@@ -1640,6 +1640,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
   h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
+  h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));
   h('research:preparation:enabled', async (_e, enabled: boolean) => documentaryPreparation.setResearchPreparationEnabled(enabled));
   h('research:preparation:paused', async (_e, paused: boolean) => documentaryPreparation.setResearchPreparationPaused(paused));
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));

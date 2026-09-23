@@ -169,3 +169,32 @@ full-text acceptance fixture now contains a complete synthetic paragraph.
 The shared cost ledger additionally has regression coverage for durable unknown
 usage, the strict combined five-dollar boundary, invalid numbers, corrupt state
 and idempotent settlement. It is not yet wired to a live inference campaign.
+
+### Shared writers and retrieval controls milestone
+
+The passage embedding pipeline and Documentary Index now call the shared
+preparation service. Text is published lexically before embeddings. Persistent
+embedding-operation leases are acquired before provider dispatch, compatible
+vectors are reused, and migration 181 adds a vault publication token so a slower
+legacy writer cannot replace newer passages. Explicit preparation can retry a
+failed stage; cancellation revokes leases without deleting published evidence.
+
+General academic chat now resolves an explicit active-vault scope as well as
+notebook chat. Both exclude inseparable mixed-source Ideas and unproven historical
+turns; external skills are disabled on these academic routes. Specialized Deep
+Research probe planning receives an authorized snapshot and extends it using the
+same execution budget. Other vault engine dispatch remains separate.
+
+Notebook controls include validated custom budgets, a manual cosine threshold
+bound to a fingerprint of the complete embedding configuration, linked collection
+change counts, and cancellation. New strings cover all eleven translated locales.
+Five focused scripts passed under the verified OS boundary in
+`/private/tmp/nodus-research-W8lYxw`, including actual SQLite writer fencing and
+pre-dispatch exclusion with a deterministic provider double. Real paid provider
+inference remains unperformed.
+
+The initial native CI exposed packaging/test-harness defects: Windows CRLF in tar
+listings, parallel lazy extraction of Electron, and the absence of cryptography
+50 wheels for Intel macOS. Fixes normalize listings, materialize Electron before
+parallel workers, and build current cryptography against pinned static OpenSSL
+on Intel. Native CI must pass before those targets are described as verified.

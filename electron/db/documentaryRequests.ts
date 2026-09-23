@@ -27,13 +27,13 @@ export class DocumentaryRequests {
       attempts=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision THEN documentary_requests.attempts ELSE 0 END,
       error=NULL,updated_at=excluded.updated_at,available_at=excluded.available_at,priority=excluded.priority`).run(documentId, revision, vaultId, now, now, priority, now);
   }
-  claim(vaultId: string, now = Date.now(), leaseMs = 60000): DocumentaryRequest | null {
+  claim(vaultId: string, now = Date.now(), leaseMs = 60000, exactOwner = false): DocumentaryRequest | null {
     return this.db.transaction(() => {
       this.db.prepare(`UPDATE documentary_requests SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,
         lease_token=NULL,lease_until=NULL WHERE state='running' AND (lease_until IS NULL OR lease_until<=?)`).run(now);
       const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts FROM documentary_requests
-        WHERE state='queued' AND available_at<=? AND attempts<3 AND vault_id IN (?, '')
-        ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, vaultId, now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
+        WHERE state='queued' AND available_at<=? AND attempts<3 AND (vault_id=? OR (?=0 AND vault_id=''))
+        ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, vaultId, Number(exactOwner), now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
       if (!row) return null;
       const lease_token = randomUUID();
       this.db.prepare(`UPDATE documentary_requests SET state='running',vault_id=?,lease_token=?,lease_until=?,attempts=attempts+1,updated_at=? WHERE document_id=?`)

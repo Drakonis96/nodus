@@ -627,6 +627,9 @@ export interface FinalizeResult {
  */
 export interface DeepResearchDeps {
   buildSnapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot>;
+  /** Academic adapters may plan specialized probes using an already authorized
+   * snapshot; every supplemental query uses the same run's scope and budget. */
+  prepareScopedSnapshot?(snapshot: WritingWorkshopSnapshot, extend: (queries: string[]) => Promise<WritingWorkshopSnapshot>): Promise<WritingWorkshopSnapshot>;
   planReport(input: PlanInput): Promise<DeepResearchPlan>;
   writeSection(input: SectionInput): Promise<string>;
   finalize(input: FinalizeInput): Promise<FinalizeResult>;

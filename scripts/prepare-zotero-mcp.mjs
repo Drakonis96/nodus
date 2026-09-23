@@ -52,19 +52,57 @@ const dependencies = path.join(output, 'dependencies');
 fs.rmSync(dependencies, { recursive: true, force: true });
 execFileSync(python, ['-I', '-m', 'pip', '--isolated', '--cache-dir', path.join(cache, 'pip'), 'install', '--disable-pip-version-check', '--only-binary=:all:',
   '--require-hashes', '--no-compile', '-r', path.join(source, 'build-requirements.lock')], { cwd: cache, stdio: 'inherit' });
-execFileSync(python, ['-I', '-m', 'pip', '--isolated', '--cache-dir', path.join(cache, 'pip'), 'install', '--disable-pip-version-check', '--only-binary=:all:', '--no-binary=bibtexparser', '--no-build-isolation',
+let nativeCrypto = null;
+let buildEnvironment = { ...process.env, PIP_CACHE_DIR: path.join(cache, 'pip'), PYTHONNOUSERSITE: '1' };
+if (platform === 'darwin-x64') {
+  const cryptoBuild = manifest.nativeCryptoBuild;
+  const opensslArchive = await archive(cryptoBuild.url, cryptoBuild.sha256, `openssl-${cryptoBuild.openssl}.tar.gz`);
+  const buildRoot = path.join(cache, `native-crypto-${platform}`);
+  fs.rmSync(buildRoot, { recursive: true, force: true });
+  fs.mkdirSync(buildRoot, { recursive: true });
+  execFileSync('tar', ['-xzf', opensslArchive, '-C', buildRoot], { stdio: 'inherit' });
+  const opensslSource = path.join(buildRoot, `openssl-${cryptoBuild.openssl}`);
+  const prefix = path.join(buildRoot, 'install');
+  execFileSync('perl', ['Configure', 'darwin64-x86_64-cc', 'no-shared', 'no-tests', 'no-module', `--prefix=${prefix}`], { cwd: opensslSource, stdio: 'inherit' });
+  execFileSync('make', ['-j2', 'install_sw'], { cwd: opensslSource, stdio: 'inherit' });
+  const rustVersion = execFileSync('rustc', [`+${cryptoBuild.rust}`, '--version'], { encoding: 'utf8' }).trim();
+  if (!rustVersion.startsWith(`rustc ${cryptoBuild.rust} `)) throw new Error('Incorrect native crypto Rust toolchain');
+  buildEnvironment = { ...buildEnvironment, OPENSSL_DIR: prefix, OPENSSL_STATIC: '1', RUSTUP_TOOLCHAIN: cryptoBuild.rust,
+    CARGO_BUILD_JOBS: '2', CARGO_HOME: path.join(cache, 'native-crypto-cargo'), MATURIN_PEP517_ARGS: '--locked', MATURIN_NO_INSTALL_RUST: '1' };
+  nativeCrypto = { source: opensslSource, ...cryptoBuild, rustVersion };
+}
+execFileSync(python, ['-I', '-m', 'pip', '--isolated', '--cache-dir', path.join(cache, 'pip'), 'install', '--disable-pip-version-check', '--only-binary=:all:', `--no-binary=${nativeCrypto ? 'bibtexparser,cryptography' : 'bibtexparser'}`, '--no-build-isolation',
   '--require-hashes', '--no-compile', '--target', dependencies, '-r', path.join(source, 'requirements.lock')], {
-  cwd: cache, env: { ...process.env, PIP_CACHE_DIR: path.join(cache, 'pip'), PYTHONNOUSERSITE: '1' }, stdio: 'inherit',
+  cwd: cache, env: buildEnvironment, stdio: 'inherit',
 });
 fs.cpSync(path.join(upstreamRoot, 'src/zotero_mcp'), path.join(dependencies, 'zotero_mcp'), { recursive: true });
 fs.copyFileSync(path.join(source, 'serve.py'), path.join(output, 'serve.py'));
 const legal = path.join(output, 'legal');
 fs.mkdirSync(legal, { recursive: true });
+if (nativeCrypto) {
+  fs.copyFileSync(path.join(nativeCrypto.source, 'LICENSE.txt'), path.join(legal, 'NATIVE_CRYPTO_OPENSSL_LICENSE.txt'));
+  const { source: _source, ...provenance } = nativeCrypto;
+  fs.writeFileSync(path.join(legal, 'native-crypto-build.json'), JSON.stringify(provenance, null, 2));
+  // Retain the exact locked Rust dependency source archives with their embedded
+  // notices. These are build sources, never importable runtime dependencies.
+  const registry = path.join(buildEnvironment.CARGO_HOME, 'registry/cache');
+  const rustSources = path.join(legal, 'rust-sources');
+  fs.mkdirSync(rustSources, { recursive: true });
+  const crates = [];
+  for (const registryName of fs.readdirSync(registry)) for (const name of fs.readdirSync(path.join(registry, registryName))) {
+    if (!name.endsWith('.crate')) continue;
+    const bytes = fs.readFileSync(path.join(registry, registryName, name));
+    fs.writeFileSync(path.join(rustSources, name), bytes);
+    crates.push({ name, sha256: digest(bytes) });
+  }
+  fs.writeFileSync(path.join(rustSources, 'inventory.json'), JSON.stringify(crates, null, 2));
+}
 fs.copyFileSync(path.join(upstreamRoot, 'LICENSE'), path.join(legal, 'ZOTERO_MCP_LICENSE.txt'));
 fs.copyFileSync(path.join(source, 'requirements.lock'), path.join(legal, 'requirements.lock'));
 const fullName = `cpython-${manifest.python}+${manifest.pythonBuild}-${target.triple}-${target.fullBuild}-full.tar.zst`;
 const fullArchive = await archive(`https://github.com/astral-sh/python-build-standalone/releases/download/${manifest.pythonBuild}/${encodeURIComponent(fullName)}`, target.fullSha256, fullName);
 const licenseEntries = execFileSync('tar', ['-tf', fullArchive], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\n')
+  .map(name => name.trim())
   .filter(name => name === 'python/PYTHON.json' || name.startsWith('python/licenses/'));
 if (!licenseEntries.includes('python/PYTHON.json') || licenseEntries.some(name => name.includes('..'))) throw new Error('Invalid Python license archive');
 execFileSync('tar', ['-xf', fullArchive, '-C', legal, ...licenseEntries]);

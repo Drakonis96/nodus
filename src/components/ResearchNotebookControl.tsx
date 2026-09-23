@@ -37,14 +37,18 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [membershipChanges, setMembershipChanges] = useState<{ added: string[]; removed: string[] }>({ added: [], removed: [] });
   useEffect(() => {
     dialog.current?.showModal();
     let active = true;
     void Promise.all([window.nodus.getResearchCorpusSources(), window.nodus.getResearchPreparationInventory()]).then(([sources, preparation]) => {
       if (active) { setDocuments(sources.documents); setCollections(sources.collections); setInventory(preparation); }
     }).catch(reason => { if (active) setError(String(reason)); });
+    if (notebook?.mode === 'linked') void window.nodus.resolveResearchNotebook(notebook.id).then(scope => {
+      if (active) setMembershipChanges(scope.changes);
+    }).catch(reason => { if (active) setError(String(reason)); });
     return () => { active = false; };
-  }, []);
+  }, [notebook?.id, notebook?.mode]);
   const selected = new Set<string>();
   for (const source of draft.sources) {
     if (source.kind === 'work' || source.kind === 'library-item') {
@@ -71,7 +75,7 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
   draft.exclusions.forEach(id => selected.delete(id));
   const act = async (action: () => Promise<void>) => { setBusy(true); setError(''); try { await action(); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
   const settings = draft.settings ?? RETRIEVAL_PRESETS.balanced;
-  return createPortal(<dialog ref={dialog} onCancel={onClose} aria-labelledby="research-notebook-title" className="rounded-xl border border-neutral-700 bg-neutral-900 text-neutral-100 p-5 w-[min(760px,94vw)] max-h-[88vh] overflow-auto backdrop:bg-black/60">
+  return createPortal(<dialog ref={dialog} onCancel={onClose} aria-labelledby="research-notebook-title" className="card-modal text-neutral-100 p-5 w-[min(760px,94vw)] max-h-[88vh] overflow-auto backdrop:bg-black/60">
     <form onSubmit={event => { event.preventDefault(); void act(async () => { const saved = await window.nodus.saveResearchNotebook(draft); await onSaved(saved.id); }); }}>
       <h2 id="research-notebook-title" className="text-lg font-semibold mb-4">{t('Cuaderno de investigación')}</h2>
       <label className="block mb-3">{t('Nombre')}<input autoFocus required maxLength={160} className="input block w-full" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
@@ -81,6 +85,9 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
           <option value="fixed">{t('Selección fija')}</option><option value="linked">{t('Colecciones vinculadas')}</option>
         </select>
       </label>
+      {draft.mode === 'linked' && (membershipChanges.added.length > 0 || membershipChanges.removed.length > 0) && <p role="status" className="text-sm mb-3">
+        {t('Cambios en las colecciones')}: +{membershipChanges.added.length} / −{membershipChanges.removed.length}. {t('Se aplicarán en la próxima ejecución.')}
+      </p>}
       <fieldset className="border border-neutral-700 rounded p-3 mb-3"><legend>{t('Colecciones')}</legend>
         {collections.map(collection => { const source = draft.sources.find(item => referenceKey(item) === referenceKey(collection.reference)); return <div key={referenceKey(collection.reference)} className="flex flex-wrap gap-3 mb-1">
           <label><input type="checkbox" checked={!!source} onChange={event => setDraft({ ...draft, sources: event.target.checked ? [...draft.sources, collection.reference] : draft.sources.filter(item => referenceKey(item) !== referenceKey(collection.reference)) })} /> {collection.name}</label>
@@ -99,11 +106,32 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
         })}
       </fieldset>
       <div className="flex flex-wrap items-center gap-3 mb-3">
-        <label>{t('Profundidad')} <select className="input" value={settings.preset} onChange={event => setDraft({ ...draft, settings: RETRIEVAL_PRESETS[event.target.value as keyof typeof RETRIEVAL_PRESETS] })}>
+        <label>{t('Profundidad')} <select className="input" value={settings.preset} onChange={event => setDraft({ ...draft, settings: event.target.value === 'custom' ? { ...settings, preset: 'custom' } : RETRIEVAL_PRESETS[event.target.value as keyof typeof RETRIEVAL_PRESETS] })}>
           <option value="fast">{t('Rápido')}</option><option value="balanced">{t('Equilibrado')}</option><option value="deep">{t('Profundo')}</option>
+          <option value="custom">{t('Personalizado')}</option>
         </select></label>
         <label><input type="checkbox" checked={settings.autoExpand} onChange={event => setDraft({ ...draft, settings: { ...settings, autoExpand: event.target.checked } })} /> {t('Ampliar contexto automáticamente')}</label>
       </div>
+      {settings.preset === 'custom' && <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3"><legend>{t('Presupuesto de recuperación')}</legend>
+        {([
+          ['candidates', 'Candidatos por búsqueda', 1, 500], ['passagesPerRound', 'Pasajes por ronda', 1, settings.candidates],
+          ['evidenceTokens', 'Tokens de evidencia', 256, 64000], ['rounds', 'Rondas máximas', 1, 16],
+        ] as const).map(([key, label, min, max]) => <label key={key}>{t(label)}<input className="input block w-full" type="number" required min={min} max={max} step={1} value={settings[key]}
+          onChange={event => setDraft({ ...draft, settings: { ...settings, [key]: Number(event.target.value) } })} /></label>)}
+      </fieldset>}
+      <details className="mb-3 text-sm"><summary>{t('Umbral vectorial avanzado')}</summary>
+        <label className="block my-2"><input type="checkbox" checked={settings.threshold.mode === 'automatic'} disabled={!inventory?.embeddingSpaces?.length}
+          onChange={event => setDraft({ ...draft, settings: { ...settings, threshold: event.target.checked ? { mode: 'automatic' } : { mode: 'manual', value: 0.3, metric: 'cosine', embeddingSpace: inventory!.embeddingSpaces![0].id } } })} /> {t('Umbral automático')}</label>
+        {settings.threshold.mode === 'manual' && <div className="flex flex-wrap gap-3">
+          <label>{t('Espacio de embeddings')}<select className="input block max-w-full" value={settings.threshold.embeddingSpace} onChange={event => {
+            if (settings.threshold.mode === 'manual') setDraft({ ...draft, settings: { ...settings, threshold: { ...settings.threshold, embeddingSpace: event.target.value } } });
+          }}>{inventory?.embeddingSpaces?.map(space => <option key={space.id} value={space.id}>{space.provider} · {space.model} · {space.dimensions} · cosine · {space.id.slice(0, 8)}</option>)}</select></label>
+          <label>{t('Similitud mínima')}<input type="number" className="input block" min={-1} max={1} step={0.01} required value={settings.threshold.value} onChange={event => {
+            if (settings.threshold.mode === 'manual') setDraft({ ...draft, settings: { ...settings, threshold: { ...settings.threshold, value: Number(event.target.value) } } });
+          }} /></label>
+        </div>}
+        <p>{t('El umbral manual solo se aplica al espacio seleccionado.')}</p>
+      </details>
       <div className="rounded border border-neutral-700 p-3 text-sm mb-3">
         <p>{t('Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.')}</p>
         <label className="block my-2"><input type="checkbox" checked={inventory?.enabled ?? false} disabled={busy} onChange={event => { const enabled = event.target.checked; void act(async () => { await window.nodus.setResearchPreparationEnabled(enabled); setInventory(await window.nodus.getResearchPreparationInventory()); }); }} /> {t('Preparar nuevas incorporaciones')}</label>
@@ -111,6 +139,7 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
           <button type="button" className="btn btn-ghost" disabled={busy || !selected.size} onClick={() => void act(async () => { await window.nodus.prepareResearchDocuments([...selected]); setInventory(await window.nodus.getResearchPreparationInventory()); })}>{t('Preparar fuentes')}</button>
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(() => window.nodus.setResearchPreparationPaused(true))}>{t('Pausar')}</button>
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(() => window.nodus.setResearchPreparationPaused(false))}>{t('Reanudar')}</button>
+          <button type="button" className="btn btn-ghost" disabled={busy || !selected.size} onClick={() => void act(async () => { await window.nodus.cancelResearchDocuments([...selected]); setInventory(await window.nodus.getResearchPreparationInventory()); })}>{t('Cancelar preparación')}</button>
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(async () => setInventory(await window.nodus.getResearchPreparationInventory()))}>{t('Actualizar')}</button>
         </div>
       </div>

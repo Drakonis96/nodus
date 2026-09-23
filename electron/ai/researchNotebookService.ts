@@ -6,6 +6,7 @@ import { getActiveVault } from '../vaults/vaultRegistry';
 import * as notebooks from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { researchFingerprint, resolveNotebookScope, selectResearchDocuments } from './researchCorpusScope';
+import { resolveResearchSourceScope } from './researchSourceScope';
 
 const active = new Map<string, Set<AbortController>>();
 const key = (id: string) => `${getActiveVault().id}:${id}`;
@@ -47,23 +48,33 @@ export function registerNotebookRun(id: string, controller: AbortController): ()
 const pinnedScope = Symbol('backendResearchScope');
 type ScopedRequest = ResearchChatRequest & { [pinnedScope]?: ResolvedResearchScope };
 export function requestNotebookScope(input: ResearchChatRequest): ResolvedResearchScope | null { return (input as ScopedRequest)[pinnedScope] ?? null; }
+export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selection']['sourceFilter']): ResolvedResearchScope {
+  const vault = getActiveVault();
+  const allowed = filter?.enabled ? resolveResearchSourceScope(filter, true) : null;
+  const documents = researchCorpusInventory().documents.filter(document => document.workId && (!allowed || allowed.workIds.has(document.workId))).sort((a, b) => a.id.localeCompare(b.id));
+  const permissionFingerprint = researchFingerprint(documents.map(document => [document.id, document.permissionRevision]));
+  const scope: ResolvedResearchScope = { id: researchFingerprint([vault.id, documents, permissionFingerprint]), vaultId: vault.id,
+    notebookId: null, notebookRevision: null, documents, permissionFingerprint, resolvedAt: new Date().toISOString(), changes: { added: [], removed: [] } };
+  notebooks.recordResearchScope(scope);
+  return scope;
+}
 export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequest {
-  if (!input.selection.notebookId) return input;
+  if (!input.selection.notebookId && getActiveVault().type !== 'academic') return input;
   const prior = (input as ScopedRequest)[pinnedScope];
-  const scope = prior ?? resolveResearchNotebook(input.selection.notebookId);
-  const notebook = notebooks.getResearchNotebook(input.selection.notebookId)!;
-  if (scope.vaultId !== getActiveVault().id || notebook.revision !== scope.notebookRevision) throw new Error('research_scope_changed');
-  if (input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
+  const scope = prior ?? (input.selection.notebookId ? resolveResearchNotebook(input.selection.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter));
+  const notebook = input.selection.notebookId ? notebooks.getResearchNotebook(input.selection.notebookId) : null;
+  if (scope.vaultId !== getActiveVault().id || (notebook && notebook.revision !== scope.notebookRevision)) throw new Error('research_scope_changed');
+  if (notebook && input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
   return { ...input, [pinnedScope]: scope, attachmentIds: [],
     messages: authorizedNotebookHistory(input, scope),
-    selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
+    selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
       sourceFilter: { enabled: true, authorIds: [], workIds: scope.documents.flatMap(document => document.workId ? [document.workId] : []) } } };
 }
 export function validateNotebookRequest(input: ResearchChatRequest): void {
   const scope = (input as ScopedRequest)[pinnedScope];
   if (!scope) return;
   if (getActiveVault().id !== scope.vaultId) throw new Error('research_scope_changed');
-  const current = resolveResearchNotebook(scope.notebookId!);
+  const current = scope.notebookId ? resolveResearchNotebook(scope.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter);
   if (current.id !== scope.id) throw new Error('research_scope_changed');
 }
 

@@ -1219,7 +1219,8 @@ export function DeepResearchView({
             if (mode === 'manual') setDeepSectionLimit('auto');
           }}
           onUnitOutline={setUnitOutline}
-          notebookControl={<ResearchNotebookControl value={notebookId} onChange={setNotebookId} />}
+          isAcademic={variant === 'academic'}
+          notebookControl={variant === 'academic' ? <ResearchNotebookControl value={notebookId} onChange={setNotebookId} /> : undefined}
           objective={objective}
           approach={approach}
           version={deepResearchVersion}
@@ -2232,6 +2233,7 @@ function ReaderView({
 
 export function ComposerModal({
   documentSkills,
+  isAcademic = false,
   settings,
   isGenealogy = false,
   isTeaching = false,
@@ -2271,6 +2273,7 @@ export function ComposerModal({
   onClose,
 }: {
   documentSkills: ReturnType<typeof useDocumentSkills>;
+  isAcademic?: boolean;
   settings: AppSettings;
   isGenealogy?: boolean;
   isTeaching?: boolean;
@@ -2491,7 +2494,7 @@ export function ComposerModal({
               <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
           </div>
-          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
+          {!isAcademic && <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />}
           <div className="flex flex-wrap items-center gap-2">
             <button
               className={`theme-toggle-button rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}

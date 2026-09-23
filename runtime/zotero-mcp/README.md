@@ -46,3 +46,12 @@ Its license file hashes to
 `6c9f0d975b41afaa34d22f55bb8986ce69e5cb7ad327cb2b28820cd425edf5ee`.
 Native tests on a disposable hosted runner are identified separately from the
 macOS OS write-boundary test; they are not installation/uninstallation evidence.
+
+Intel macOS has no cryptography 50 wheel (upstream dropped the target in 49).
+Its native build keeps 50.0.1, compiles with Rust 1.93.0 and a SHA-256-pinned
+OpenSSL 4.0.2 archive, statically links OpenSSL, and enforces Cargo.lock through
+Maturin. Locked build tools are separate from runtime dependencies. The legal
+bundle retains native OpenSSL provenance and the exact Rust dependency source
+archives with their embedded licenses. The CI installs this compiler only in its
+disposable Intel runner. See [upstream platform change](https://cryptography.io/en/49.0.0/changelog/)
+and [static build instructions](https://cryptography.io/en/stable/installation/).

@@ -9,7 +9,7 @@ import { DocumentaryRequests } from '../db/documentaryRequests';
 import { DocumentaryStore, type DocumentaryChunk } from '../db/documentaryStore';
 import { documentaryChunks } from './documentaryChunking';
 import { researchCorpusInventory } from './researchCorpusInventory';
-import { assertResearchDocument } from './researchCorpusScope';
+import { assertResearchDocument, researchFingerprint } from './researchCorpusScope';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { getGlobalLibraryItem, enqueueLibraryExtraction, listLibraryExtractionJobs } from '../library/libraryService';
 import { openAiCompatBase } from './providers';
@@ -68,30 +68,57 @@ export async function prepareDocumentaryText(document: ResearchCorpusDocument, t
   } finally { clearInterval(heartbeat); }
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal): Promise<void> {
+export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
   const config = currentEmbeddingConfig();
   const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
-  const cached = store.db.prepare(`SELECT 1 FROM documentary_revisions WHERE document_id=? AND embedding_ready=1
+  const cached = store.db.prepare(`SELECT index_key FROM documentary_revisions WHERE document_id=? AND embedding_ready=1
     AND json_extract(identity_json,'$.textFingerprint')=? AND json_extract(identity_json,'$.revision')=?
     AND json_extract(identity_json,'$.chunkerVersion')=? AND json_extract(identity_json,'$.embedding.provider')=?
     AND json_extract(identity_json,'$.embedding.model')=? AND json_extract(identity_json,'$.processingVersion')=?
-    AND json_extract(identity_json,'$.embedding.parameters')=?`).get(base.documentId, base.textFingerprint, base.revision, base.chunkerVersion, config.provider, config.model, base.processingVersion, JSON.stringify(parameters));
-  if (cached) return;
-  const vectors = await embedMany(chunks.map(chunk => chunk.text), signal);
-  signal?.throwIfAborted();
-  if (vectors.some(vector => !vector?.length) || !vectors.length) throw new Error('documentary_embeddings_unavailable');
-  if (JSON.stringify(currentEmbeddingConfig()) !== JSON.stringify(config)) throw new Error('documentary_embedding_configuration_changed');
-  const identity: DocumentaryIndexIdentity = { ...base, embedding: { ...config, dimensions: vectors[0]!.length, metric: 'cosine', parameters } };
-  const id = store.enqueue(identity, {});
-  const job = store.claim(Date.now(), 60000, id);
-  if (!job) return;
+    AND json_extract(identity_json,'$.embedding.parameters')=?`).get(base.documentId, base.textFingerprint, base.revision, base.chunkerVersion, config.provider, config.model, base.processingVersion, JSON.stringify(parameters)) as { index_key: string } | undefined;
+  if (cached) {
+    const rows = store.db.prepare('SELECT vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as { vector_json: string }[];
+    return { indexKey: cached.index_key, vectors: rows.map(row => JSON.parse(row.vector_json)), ...config };
+  }
+  if (store.preference('paused')) throw new Error('documentary_paused');
+  // Dimensions are measured from the response, so lease a persistent operation
+  // identity before calling the provider, then publish under the complete space.
+  const operation = `embedding:${base.documentId}:${researchFingerprint([indexKey, config, parameters])}`;
+  const requests = new DocumentaryRequests(store.db);
+  store.db.transaction(() => {
+    if (!store.db.prepare('SELECT 1 FROM documentary_requests WHERE document_id=?').get(operation)) requests.enqueue(operation, base.revision, operation);
+  }).immediate();
+  const lease = requests.claim(operation, Date.now(), 60000, true);
+  if (!lease) throw new Error('documentary_embedding_job_unavailable');
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  const heartbeat = setInterval(() => { try { requests.renew(lease); } catch { controller.abort(); } }, 15000);
+  let job: ReturnType<DocumentaryStore['claim']> = null;
   try {
+    signal?.throwIfAborted();
+    const vectors = await embedMany(chunks.map(chunk => chunk.text), controller.signal);
+    signal?.throwIfAborted();
+    requests.renew(lease);
+    if (store.preference('paused')) throw new Error('documentary_paused');
+    if (vectors.some(vector => !vector?.length) || !vectors.length) throw new Error('documentary_embeddings_unavailable');
+    if (JSON.stringify(currentEmbeddingConfig()) !== JSON.stringify(config)) throw new Error('documentary_embedding_configuration_changed');
+    const identity: DocumentaryIndexIdentity = { ...base, embedding: { ...config, dimensions: vectors[0]!.length, metric: 'cosine', parameters } };
+    const id = store.enqueue(identity, {});
+    job = store.claim(Date.now(), 60000, id);
+    if (!job) throw new Error('documentary_embedding_publication_unavailable');
     store.saveChunks(job, chunks);
     store.publishLexical(job);
     store.publishEmbeddings(job, vectors as number[][]);
-  } catch (error) { store.fail(job, 'documentary_embedding_publication_failed'); throw error; }
+    requests.finish(lease, null);
+    return { indexKey: id, vectors: vectors as number[][], ...config };
+  } catch (error) {
+    if (job && store.getJob(job.id)?.state === 'running') store.fail(job, 'documentary_embedding_publication_failed');
+    try { requests.finish(lease, 'documentary_embedding_failed', store.preference('paused')); } catch { /* Lease was fenced. */ }
+    throw error;
+  } finally { clearInterval(heartbeat); signal?.removeEventListener('abort', abort); }
 }
 
 function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number; chunks_json: string }> {
@@ -100,20 +127,29 @@ function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: stri
 }
 export function getResearchPreparationInventory(): ResearchPreparationInventory {
   const store = documentaryStore();
-  return { enabled: store.preference('enabled'), documents: researchCorpusInventory().documents.map(document => {
+  const embeddingSpaces = new Map<string, NonNullable<ResearchPreparationInventory['embeddingSpaces']>[number]>();
+  for (const row of store.db.prepare('SELECT identity_json FROM documentary_revisions WHERE embedding_ready=1').all() as { identity_json: string }[]) {
+    const embedding = (JSON.parse(row.identity_json) as DocumentaryIndexIdentity).embedding;
+    if (embedding) {
+      const id = researchFingerprint(embedding);
+      embeddingSpaces.set(id, { id, provider: embedding.provider, model: embedding.model, dimensions: embedding.dimensions, metric: embedding.metric });
+    }
+  }
+  return { enabled: store.preference('enabled'), embeddingSpaces: [...embeddingSpaces.values()], documents: researchCorpusInventory().documents.map(document => {
     const revision = revisionsFor(document).find(row => row.lexical_ready);
     const request = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=?').get(document.id) as { state: string; error: string | null } | undefined;
     const passages = revision ? (JSON.parse(revision.chunks_json) as DocumentaryChunk[]).length : 0;
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     return { ...document, preparation: { documentId: document.id, revision: document.revision, text: coverage === 'abstract' ? 'abstract' : passages ? 'available' : 'missing',
       lexical: revision ? 'ready' : 'missing', embeddings: revision?.embedding_ready ? 'ready' : request?.error ? 'failed' : 'missing',
-      status: store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
+      status: request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
       reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded: revision?.embedding_ready ? passages : 0 } };
   }) };
 }
 
 let draining = false;
 let activePreparation: AbortController | null = null;
+let activePreparationDocument: string | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 export async function prepareResearchDocuments(documentIds: string[]): Promise<void> {
   const store = documentaryStore();
@@ -122,8 +158,28 @@ export async function prepareResearchDocuments(documentIds: string[]): Promise<v
   const documents = inventory.documents.filter(document => wanted.has(document.id));
   if (documents.length !== wanted.size) throw new Error('research_source_not_authorized');
   const requests = new DocumentaryRequests(store.db);
-  for (const document of documents) requests.enqueue(document.id, document.revision, getActiveVault().id);
+  for (const document of documents) {
+    requests.enqueue(document.id, document.revision, getActiveVault().id);
+    for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state IN ('failed','cancelled')").all(document.id) as { id: string }[]) store.retry(row.id);
+    const prefix = `embedding:${document.id}:`;
+    store.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=0,error=NULL,available_at=?
+      WHERE substr(document_id,1,?)=? AND state IN ('failed','cancelled')`).run(Date.now(), prefix.length, prefix);
+  }
   void drainDocumentaryRequests();
+}
+export function cancelResearchDocuments(documentIds: string[]): void {
+  const allowed = new Set(researchCorpusInventory().documents.map(document => document.id));
+  if (documentIds.some(id => !allowed.has(id))) throw new Error('research_source_not_authorized');
+  const store = documentaryStore();
+  const requests = new DocumentaryRequests(store.db);
+  for (const id of documentIds) {
+    requests.cancel(id);
+    const prefix = `embedding:${id}:`;
+    store.db.prepare(`UPDATE documentary_requests SET state='cancelled',lease_token=NULL,lease_until=NULL
+      WHERE substr(document_id,1,?)=? AND state<>'complete'`).run(prefix.length, prefix);
+    for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state<>'complete'").all(id) as { id: string }[]) store.cancel(row.id);
+    if (activePreparationDocument === id) activePreparation?.abort();
+  }
 }
 export async function drainDocumentaryRequests(): Promise<void> {
   if (draining || stopping) return;
@@ -142,6 +198,7 @@ export async function drainDocumentaryRequests(): Promise<void> {
       if (!request) break;
       const controller = new AbortController();
       activePreparation = controller;
+      activePreparationDocument = request.document_id;
       const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
       const checkLease = () => { controller.signal.throwIfAborted(); if (getActiveVault().id !== vaultId) throw new Error('research_scope_changed'); requests.renew(request); };
       try {
@@ -201,7 +258,7 @@ export async function drainDocumentaryRequests(): Promise<void> {
         requests.finish(request, null);
       } catch (error) {
         try { requests.finish(request, error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed', store.preference('paused')); } catch { /* A newer request owns publication. */ }
-      } finally { clearInterval(heartbeat); if (activePreparation === controller) activePreparation = null; }
+      } finally { clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; } }
     }
   } finally {
     draining = false;
@@ -264,7 +321,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     const revision = revisions.find(row => row.lexical_ready && !row.embedding_ready) ?? revisions.find(row => row.lexical_ready);
     return revision ? [revision.index_key] : [];
   });
-  const space = `${config.provider}:${config.model}:${vector?.length ?? 0}:cosine`;
+  const space = researchFingerprint({ ...config, dimensions: vector?.length ?? 0, metric: 'cosine', parameters });
   const threshold = settings.threshold.mode === 'manual' && settings.threshold.embeddingSpace === space ? settings.threshold.value : -1;
   signal?.throwIfAborted();
   const worker = new Worker(path.join(__dirname, 'documentaryRetrievalWorker.js'));

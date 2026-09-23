@@ -9338,6 +9338,12 @@ export const migrations: Migration[] = [
       PRIMARY KEY(conversation_id,scope_id,role,content_hash)
     );
   ` },
+  { version: 181, up: `
+    CREATE TABLE passage_publications (
+      nodus_id TEXT PRIMARY KEY REFERENCES works(nodus_id) ON DELETE CASCADE,
+      token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  ` },
 ];
 
 /**

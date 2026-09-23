@@ -32,7 +32,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx electron-builder install-app-deps
+      - name: Materialize Electron before parallel tests
+        run: node scripts/prepare-electron-tests.mjs
+      - name: Install pinned native crypto compiler on Intel macOS
+        if: matrix.os == 'macos-15-intel'
+        run: rustup toolchain install 1.93.0 --profile minimal
       - name: Hash-locked private runtime and installed-byte license inventory
+        # Intel macOS uses the current cryptography sdist with pinned static OpenSSL.
+        # Other targets use the hash-locked upstream wheels.
         run: npm run research:runtime
       - name: Native stdio against synthetic local API
         run: node scripts/verify-managed-zotero-mcp.mjs --disposable-ci

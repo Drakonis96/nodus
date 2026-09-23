@@ -7,6 +7,12 @@
   "adapterVersion": "1",
   "python": "3.12.14",
   "pythonBuild": "20260901",
+  "nativeCryptoBuild": {
+    "rust": "1.93.0",
+    "openssl": "4.0.2",
+    "url": "https://github.com/openssl/openssl/releases/download/openssl-4.0.2/openssl-4.0.2.tar.gz",
+    "sha256": "736b467530f916737b7031310ccb21d8218c6229e61e8e160cd1d3458cd543a8"
+  },
   "platforms": {
     "darwin-arm64": {
       "triple": "aarch64-apple-darwin",

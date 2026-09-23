@@ -1,5 +1,6 @@
 import type { PassageDetail, WorkPassageStatus } from '@shared/types';
 import { getDb } from './database';
+import { assertPassagePublication, type PassagePublication } from './passagePublications';
 import { currentEmbeddingConfig, embeddingTextHash, encodeEmbedding } from './ideasRepo';
 import { scanSimilar } from './vectorScan';
 
@@ -95,7 +96,7 @@ export function lexicalPassageSearch(
 }
 
 /** Replace one work atomically so interrupted/reprocessed runs never mix chunks. */
-export function replaceWorkPassages(nodusId: string, contentHash: string, rows: PassageInsert[]): void {
+export function replaceWorkPassages(nodusId: string, contentHash: string, rows: PassageInsert[], prepared?: { publication: PassagePublication; embeddingProvider: string; embeddingModel: string }): void {
   const db = getDb();
   const config = currentEmbeddingConfig();
   const now = new Date().toISOString();
@@ -106,6 +107,10 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   db.transaction(() => {
+    if (prepared) {
+      assertPassagePublication(nodusId, prepared.publication);
+      if (config.provider !== prepared.embeddingProvider || config.model !== prepared.embeddingModel) throw new Error('documentary_embedding_configuration_changed');
+    }
     db.prepare('DELETE FROM passages WHERE nodus_id = ?').run(nodusId);
     rows.forEach((row, chunkIndex) => {
       const embedding = row.embedding;

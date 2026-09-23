@@ -201,7 +201,7 @@ function skillExecution(request: ResearchChatRequest) {
   const vaultId = getActiveVault().id;
   const owner = request.conversationId ? chatAssetOwner('assistant', request.conversationId, vaultId) : undefined;
   const userMessages = request.messages.filter(message => message.role === 'user').map(message => message.content);
-  return { skills: request.selection.notebookId ? [] : enabledChatSkills('assistant'), question: userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+  return { skills: getActiveVault().type === 'academic' ? [] : enabledChatSkills('assistant'), question: userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
@@ -507,8 +507,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
 
   const retrieval = validateRetrievalSettings(request.selection.retrieval ?? RETRIEVAL_PRESETS.balanced);
   contextBudget = Math.min(contextBudget, retrieval.evidenceTokens * LOCAL_CHARS_PER_TOKEN);
-  const { context, stats, queryEmbedding } = await buildResearchContext(request.selection, question, request.selection.notebookId ? Math.floor(contextBudget / 2) : contextBudget, promptLanguage);
   const notebookScope = requestNotebookScope(request);
+  const { context, stats, queryEmbedding } = await buildResearchContext(request.selection, question, notebookScope ? Math.floor(contextBudget / 2) : contextBudget, promptLanguage);
   if (notebookScope) {
     const vector = queryEmbedding ?? await embed(question).catch(() => null);
     const { evidence, traversal } = await retrieveSharedDocumentaryEvidence(notebookScope, question,
@@ -603,8 +603,9 @@ function buildGenealogyChatSystemPrompt(compact: boolean, language: PromptLangua
  * bounded, question-relevant slice rather than a full-corpus dump.
  */
 async function buildRelevanceScope(selection: ResearchContextSelection, question: string): Promise<RelevanceScope> {
-  const sourceScope = resolveResearchSourceScope(selection.sourceFilter, Boolean(selection.notebookId));
-  const corpus = { nodusIds: sourceScope ? [...sourceScope.workIds] : undefined, ideaIds: selection.notebookId && sourceScope ? [...sourceScope.ideaIds] : undefined };
+  const strict = getActiveVault().type === 'academic';
+  const sourceScope = resolveResearchSourceScope(selection.sourceFilter, strict);
+  const corpus = { nodusIds: sourceScope ? [...sourceScope.workIds] : undefined, ideaIds: strict && sourceScope ? [...sourceScope.ideaIds] : undefined };
   if (sourceScope && !sourceScope.workIds.size) return { sourceScope, queryEmbedding: null, ideaIds: [], ideaIdSet: new Set(), workIdSet: new Set(), documentHits: [], passageHits: [] };
   const needsRelevance =
     selection.ideas ||

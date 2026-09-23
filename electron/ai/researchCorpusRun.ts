@@ -5,28 +5,23 @@ import type { DeepResearchRequest, WritingWorkshopBrief, WritingWorkshopIdeaCand
 import type { DeepResearchDeps, SectionRetrievalInput } from './deepResearchCore';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { getDb } from '../db/database';
-import { getResearchNotebook, recordResearchScope } from '../db/researchNotebooksRepo';
+import { getResearchNotebook } from '../db/researchNotebooksRepo';
 import { researchCorpusInventory } from './researchCorpusInventory';
-import { resolveResearchNotebook } from './researchNotebookService';
-import { assertResearchDocument, researchFingerprint } from './researchCorpusScope';
+import { resolveResearchNotebook, resolveAcademicResearchScope } from './researchNotebookService';
+import { assertResearchDocument } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
 import { embed } from './aiClient';
 import { documentaryCitationId } from '../citations/documentaryCitations';
+import { getSettings } from '../db/settingsRepo';
+import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
 
 /** Compatibility requests are explicit snapshots of the active vault. A notebook
  * may additionally authorize unlinked Global Library works. Neither path uses a
  * missing filter to mean "all" inside a repository. */
 export function resolveAcademicRunScope(notebookId?: string | null): ResolvedResearchScope {
-  if (notebookId) return resolveResearchNotebook(notebookId);
-  const vault = getActiveVault();
-  const documents = researchCorpusInventory().documents.filter(document => document.workId).sort((a, b) => a.id.localeCompare(b.id));
-  const permissionFingerprint = researchFingerprint(documents.map(document => [document.id, document.permissionRevision]));
-  const scope: ResolvedResearchScope = { id: researchFingerprint([vault.id, documents, permissionFingerprint]), vaultId: vault.id,
-    notebookId: null, notebookRevision: null, documents, permissionFingerprint, resolvedAt: new Date().toISOString(), changes: { added: [], removed: [] } };
-  recordResearchScope(scope);
-  return scope;
+  return notebookId ? resolveResearchNotebook(notebookId) : resolveAcademicResearchScope();
 }
 
 /** One run owns the scope, evidence ledger and traversal across all sections. */
@@ -37,10 +32,12 @@ export class ResearchCorpusRun {
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
   private readonly workIds: string[];
   private readonly ideaIds: string[];
+  private graphSnapshot: Pick<WritingWorkshopSnapshot, 'gaps' | 'contradictions' | 'themes'> | null = null;
   constructor(readonly scope: ResolvedResearchScope, settings: RetrievalSettings, readonly signal?: AbortSignal) {
     this.budget = new ResearchRetrievalBudget(settings);
     this.workIds = scope.documents.flatMap(document => document.workId ? [document.workId] : []);
-    this.ideaIds = [...resolveResearchSourceScope({ enabled: true, authorIds: [], workIds: this.workIds }, true)!.ideaIds];
+    const manual = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
+    this.ideaIds = [...resolveResearchSourceScope({ enabled: true, authorIds: [], workIds: this.workIds }, true)!.ideaIds].filter(id => !manual || manual.has(id));
   }
   validate(): void {
     this.signal?.throwIfAborted();
@@ -96,6 +93,10 @@ export class ResearchCorpusRun {
   }
   async snapshot(brief: WritingWorkshopBrief): Promise<WritingWorkshopSnapshot> {
     await this.retrieve(brief.objective);
+    return this.snapshotFromEvidence(brief);
+  }
+  snapshotFromEvidence(brief: WritingWorkshopBrief): WritingWorkshopSnapshot {
+    this.validate();
     const rankedDocuments = [...this.scope.documents].sort((a, b) => Number([...this.evidence.values()].some(item => item.nodus_id === (b.workId ?? b.id))) - Number([...this.evidence.values()].some(item => item.nodus_id === (a.workId ?? a.id))));
     if (rankedDocuments.length > this.budget.settings.candidates) this.budget.partial = true;
     const works = rankedDocuments.slice(0, this.budget.settings.candidates).map(document => ({ id: document.workId ?? document.id, title: document.title, label: document.title,
@@ -103,7 +104,7 @@ export class ResearchCorpusRun {
       zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '', deepStatus: 'pending' as const, ideaCount: 0, gapCount: 0 }));
     const ideas = [...this.ideas.values()];
     const passages = [...this.evidence.values()];
-    const { gaps, contradictions, themes } = this.graph();
+    const { gaps, contradictions, themes } = this.graphSnapshot ??= this.graph();
     return { generatedAt: new Date().toISOString(), brief, works, ideas, passages, themes, gaps, contradictions, tutorRoutes: [],
       stats: { works: works.length, ideas: ideas.length, passages: passages.length, themes: themes.length, gaps: gaps.length, contradictions: contradictions.length, tutorRoutes: 0 },
       recommendedSelection: { workIds: works.map(work => work.id), ideaIds: ideas.map(idea => idea.id), passageIds: passages.map(passage => passage.id), themeIds: themes.map(theme => theme.id), gapIds: gaps.map(gap => gap.id), contradictionIds: contradictions.map(edge => edge.id), tutorRouteIds: [] } };
@@ -148,7 +149,19 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   const scope = resolveAcademicRunScope(request.notebookId);
   const settings = validateRetrievalSettings(request.retrieval ?? (request.notebookId ? getResearchNotebook(request.notebookId)?.settings : undefined) ?? RETRIEVAL_PRESETS.deep);
   const run = new ResearchCorpusRun(scope, settings, signal);
-  const bounded: DeepResearchDeps = { ...deps, buildSnapshot: brief => run.snapshot(brief), retrieveForSection: input => run.section(input),
+  const bounded: DeepResearchDeps = { ...deps, buildSnapshot: async brief => {
+    const snapshot = await run.snapshot(brief);
+    if (!deps.prepareScopedSnapshot) return snapshot;
+    const result = await deps.prepareScopedSnapshot(snapshot, async queries => {
+      run.validate();
+      const available = Math.max(0, Math.min(3, settings.rounds - run.budget.rounds - 1));
+      for (const query of queries.slice(0, available)) await run.retrieve(query);
+      if (queries.length > available) run.budget.partial = true;
+      return run.snapshotFromEvidence(brief);
+    });
+    run.validate();
+    return result;
+  }, retrieveForSection: input => run.section(input),
     // Basic searchable documents are independent from optional enriched analyses.
     preparePlanEvidence: undefined,
     finalize: input => deps.finalize({ ...input, supportConcerns: [...(input.supportConcerns ?? []), ...(run.budget.partial ? ['Documentary coverage is partial: the shared retrieval budget was reached.'] : [])] }) };

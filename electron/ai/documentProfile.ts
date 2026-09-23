@@ -24,8 +24,8 @@ import {
   updateDocumentIndexJob,
 } from '../db/documentProfilesRepo';
 import { cosineSimilarity, currentEmbeddingConfig, decodeEmbedding } from '../db/ideasRepo';
-import type { PassageInsert } from '../db/passagesRepo';
-import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
+import { prepareLegacyDocumentaryPassages, type PreparedLegacyPassages } from './documentaryLegacyPreparation';
+import { resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
 import { setResolvedTextState } from '../db/worksRepo';
 import { analysisFingerprint, analysisModelFingerprint, upsertLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
@@ -84,12 +84,7 @@ interface AuditResponse {
   overview: string;
 }
 interface SectionAuditResponse { passed: boolean; issues: string[]; analysis: SectionAnalysis | null }
-interface PreparedPassages {
-  contentHash: string;
-  rows: PassageInsert[];
-  embeddingProvider: string;
-  embeddingModel: string;
-}
+type PreparedPassages = PreparedLegacyPassages;
 
 function isSectionAuditResponse(value: unknown): value is SectionAuditResponse {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value));
@@ -842,27 +837,7 @@ async function preparePassages(
   options: RunDocumentProfileOptions,
   sourceMap: Record<string, string> = {},
 ): Promise<PreparedPassages | null> {
-  options.signal?.throwIfAborted();
-  const contentHash = sha1(text);
-  const current = getDb().prepare(
-    'SELECT COUNT(*) count, MIN(content_hash) hash FROM passages WHERE nodus_id=?'
-  ).get(work.nodus_id) as { count: number; hash: string | null };
-  if (current.count > 0 && current.hash === contentHash) return null;
-  const chunks = planRetrievalChunks(text, { sourceMap });
-  const embeddingConfig = currentEmbeddingConfig();
-  const embeddings = await embedMany(chunks.map((chunk) => chunk.text), options.signal, {
-    perf: options.perf,
-    jobId: `${options.jobId}:structure-embeddings`,
-  });
-  options.signal?.throwIfAborted();
-  return {
-    contentHash,
-    embeddingProvider: embeddingConfig.provider,
-    embeddingModel: embeddingConfig.model,
-    rows: chunks.map((chunk, index) => ({
-    ...chunk, embedding: embeddings[index]?.length ? embeddings[index] : null,
-    })),
-  };
+  return prepareLegacyDocumentaryPassages(work.nodus_id, text, sourceMap, 'fulltext', options.signal);
 }
 
 function synthesisPayload(
@@ -1173,6 +1148,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     {
       unpaywallEmail: settings.unpaywallEmail,
       preferZoteroFulltext: settings.preferZoteroFulltext,
+      allowExternalRetrieval: false,
       ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
       signal: options.signal,
     },
@@ -1469,6 +1445,7 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     {
       unpaywallEmail: settings.unpaywallEmail,
       preferZoteroFulltext: settings.preferZoteroFulltext,
+      allowExternalRetrieval: false,
       ocr: { enabled: settings.ocrEnabled, languages: settings.ocrLanguages, maxPages: settings.ocrMaxPages },
       signal: options.signal,
     },
