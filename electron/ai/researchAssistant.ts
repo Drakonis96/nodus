@@ -1,3 +1,5 @@
+import { withResearchActivity, researchActivityStep, startResearchActivity } from './researchActivity';
+import type { ResearchActivity } from '@shared/researchActivity';
 import { runConcilium } from './researchConcilium';
 import { conciliumAssessments, type ConciliumResult } from '@shared/researchConcilium';
 import { prepareResearchAttachments, withResearchAttachmentFallback } from './researchAttachments';
@@ -266,8 +268,18 @@ export async function streamResearchChat(
   onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
   signal?: AbortSignal,
   onConcilium?: (result: ConciliumResult) => void,
+  onActivity?: (activity: ResearchActivity) => void,
 ): Promise<ResearchChatResponse> {
-  request = authorizeNotebookRequest(request);
+  return withResearchActivity(onActivity, signal, () => streamResearchChatInternal(request, onDelta, signal, onConcilium));
+}
+
+async function streamResearchChatInternal(
+  request: ResearchChatRequest,
+  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
+  signal?: AbortSignal,
+  onConcilium?: (result: ConciliumResult) => void,
+): Promise<ResearchChatResponse> {
+  request = await researchActivityStep('scope', 'resolve', () => authorizeNotebookRequest(request));
   if (!request.concilium) return streamResearchChatTurn(request, onDelta, signal);
   const { concilium: config, ...base } = request;
   let stats: ResearchContextStats = { sections: [], works: 0, documents: 0, summaries: 0, passages: 0, contextChars: 0, truncated: false };
@@ -293,9 +305,10 @@ async function streamResearchChatTurn(
   const evidence = JSON.parse(user);
   delete evidence.council_assessments;
   const sourceContext = council?.assessments ? JSON.stringify(evidence) : user;
-  const attachments = await prepareResearchAttachments(request, 'research', request.model);
+  const attachments = request.attachmentIds?.length ? await researchActivityStep('attachments', 'read', () => prepareResearchAttachments(request, 'research', request.model)) : await prepareResearchAttachments(request, 'research', request.model);
   const opts = { corpusContext: !!requestNotebookScope(request) && !attachments.images?.length, system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
-  let answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), local, sourceContext);
+  let answer = await researchActivityStep('response', 'write', () => withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), request.model?.model);
+  answer = await researchActivityStep('response', 'citations', () => finalizeAnswer(answer, local, sourceContext));
   // A user-triggered stop ends the turn with the text that already streamed. Running
   // the citation-recovery resample or the skill tools now would either throw an
   // AbortError or spend another provider call on a reply the user just cancelled.
@@ -306,7 +319,8 @@ async function streamResearchChatTurn(
     // returned answer. Recovery repeats the frozen request without changing any
     // model, prompt, temperature or output-budget parameter.
     try {
-      answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, sourceContext);
+      answer = await researchActivityStep('response', 'write', () => withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), request.model?.model);
+      answer = await researchActivityStep('response', 'citations', () => finalizeAnswer(answer, local, sourceContext));
     } catch (error) {
       if (signal?.aborted) return { answer, stats, aborted: true };
       throw error;
@@ -315,7 +329,7 @@ async function streamResearchChatTurn(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
-  return { answer: council?.member ? answer : rememberNotebookTurn(request, await finalizeWithAudit(answer, execution, signal)), stats };
+  return { answer: council?.member ? answer : rememberNotebookTurn(request, await (execution.skills.length ? researchActivityStep('tools', 'execute', () => finalizeWithAudit(answer, execution, signal)) : finalizeWithAudit(answer, execution, signal))), stats };
 }
 
 /**
@@ -527,7 +541,9 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     if (window) run.budget.constrainToWindow(window, Math.max(Math.ceil(window * 0.75),
       new TextEncoder().encode(system + JSON.stringify(messages)).length + maxTokens + 4096));
     await run.retrieve(question, retrieval.rounds);
+    const finishGraph = startResearchActivity('graph', 'read');
     const snapshot = run.snapshotFromEvidence({ kind: 'research_question', objective: question, language: promptLanguage });
+    finishGraph('completed', snapshot.themes.length + snapshot.gaps.length + snapshot.contradictions.length);
     context = { generated_at: snapshot.generatedAt, note: prompt.context.note,
       obras: snapshot.works,
       ideas_generadas: request.selection.ideas ? snapshot.ideas.map(idea => ({ ...idea, citation: `nodus://idea/${encodeURIComponent(idea.id)}` })) : [],

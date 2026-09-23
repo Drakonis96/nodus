@@ -577,6 +577,10 @@ export const academicApi: AcademicApi = {
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onActivity = (_e: unknown, id: string, activity: import('@shared/researchActivity').ResearchActivity) => {
+      if (id === requestId) handlers.onActivity?.(activity);
+    };
+    ipcRenderer.on('research:chatStream:activity', onActivity);
     const onDelta = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onDelta(delta);
     };
@@ -596,6 +600,7 @@ export const academicApi: AcademicApi = {
       return response;
     } finally {
       if (activeChatRequestId === requestId) activeChatRequestId = null;
+      ipcRenderer.removeListener('research:chatStream:activity', onActivity);
       ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);

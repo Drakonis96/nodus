@@ -1,3 +1,4 @@
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
@@ -80,6 +81,7 @@ export const ZH_CN: Record<string, string> = {
   "Buscar herramientas": "搜索工具",
 
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "选择浅色模式、深色模式，或跟随操作系统。",
+  ...RESEARCH_ACTIVITY_TRANSLATIONS["zh-CN"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-CN'],
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-CN'],
   ...RESEARCH_SOURCE_TRANSLATIONS["zh-CN"],

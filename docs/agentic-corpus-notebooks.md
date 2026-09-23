@@ -711,3 +711,57 @@ Future installer failures retain the bounded application processing log as well.
 The corrected responsiveness fixture passed in
 `/private/tmp/nodus-research-o5YdsW`; focused lint also passed. The native macOS
 matrix now runs the same real PDF check alongside notebook UI assertions.
+
+### Live Research Chat activity, 2026-09-23
+
+Research Chat now exposes actual request-scoped execution events in a floating
+activity panel. Each row names the consulted layer and operation, with a distinct
+icon, active/completed/error/cancelled status and available result counts. Native
+Nodus and Zotero marks distinguish local document/index access from a direct
+scoped Zotero call. Reading a locally indexed Zotero import does not claim an
+upstream call. Source titles, bounded search queries and participating model names
+provide context without copying retrieved passages or model reasoning into events.
+
+The panel expands or minimizes to a circular control, preserves the preference,
+keeps the completed turn available for review and resets for the next request.
+Its position is constrained to the conversation area above the composer. Keyboard
+activation, Escape-to-minimize, focus restoration, polite status announcements,
+reduced motion and all eleven non-Spanish UI translations are supported. It is
+rendered only in academic Research Chat; Deep Research and other vault engines
+retain their interfaces.
+
+An AsyncLocalStorage observer is installed only by streaming Research Chat.
+Shared retrieval helpers remain silent without that observer. Actual operations
+emit events for scope resolution, embedding preparation, Ideas, available profiles,
+lexical/semantic document retrieval, contextual expansion, graph context, explicit
+attachments, response generation and citation checks. The retrieval subprocess
+forwards its own lexical/semantic/expansion events. Simultaneous operations remain
+simultaneous in the list; there are no timers that simulate a staged investigation.
+The per-request preload listener filters IDs and is removed on completion. Failed,
+cancelled and detached work cannot leave a previous request's indicators active.
+An observer failure cannot fail the research itself.
+
+Focused regression scripts passed under verified inherited OS restrictions:
+activity isolation/state, actual corpus retrieval, actual retrieval-worker events,
+hierarchical ranking and prompt translations, plus Concilium, partial cancellation,
+system prompts and model effort. Deterministic provider fixtures verify concurrent
+Concilium model events without adding inference calls. The UI/IPC fixture is
+explicitly separate from live provider/Zotero evidence: it exercises the real
+Electron renderer and preload, with synthetic events injected at the IPC handler.
+No credentials or paid requests are needed for this feature's validation.
+
+The preceding `d40f2c4c` native matrix passed all four targets. Its general CI
+completed 3,815 tests with zero failures and two explicit skips, then passed real
+app smoke; the overall 30-minute job deadline cancelled subsequent GUI checks.
+The job now has 45 minutes while all individual E2E limits remain unchanged.
+This cancellation is not reported as a complete CI pass.
+
+Final activity UI evidence: `/private/tmp/nodus-research-MOEVLi`, with actual
+write/network negative probes before launch, zero model calls and three synthetic
+UI turns covering success, failure and cancellation. Light/dark screenshots at
+1280×800 and 800×640 confirm that the panel stays below the source toolbar and
+above the composer. Nine unique focused scripts passed across `wAhoYZ`, `me570p`
+and `XUWDEV`; the later runs recheck amended activity/worker tests and exercise
+chat compatibility. Final build, both TypeScript projects and focused lint passed.
+See `docs/research-evidence/2026-09-23-research-activity.json` for the exact roots,
+process IDs and test outcomes. Only synthetic screenshots are committed.

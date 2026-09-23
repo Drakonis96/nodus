@@ -1677,7 +1677,8 @@ export function registerAcademicIpc(context: IpcContext): void {
           e.sender.send(channel, requestId, delta);
         },
         controller.signal,
-        result => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:concilium', requestId, result); }
+        result => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:concilium', requestId, result); },
+        activity => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:activity', requestId, activity); }
       );
     } finally {
       chatAborters.delete(requestId);

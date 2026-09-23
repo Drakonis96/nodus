@@ -1,3 +1,4 @@
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
@@ -74,6 +75,7 @@ export const TR: Record<string, string> = {
   "Buscar herramientas": "Araç ara",
 
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Açık veya koyu modu seçin ya da işletim sistemini takip edin.',
+  ...RESEARCH_ACTIVITY_TRANSLATIONS["tr"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['tr'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "En az bir veritabanı seçin.",

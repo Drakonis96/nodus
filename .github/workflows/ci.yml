@@ -22,7 +22,9 @@ concurrency:
 jobs:
   test:
     runs-on: macos-latest
-    timeout-minutes: 30
+    # Build + two-worker regression suite can exceed 30 minutes before GUI checks.
+    # Keep the existing per-E2E timeouts; allow the complete job to finish.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7

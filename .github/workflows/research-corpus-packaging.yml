@@ -9,6 +9,7 @@ on:
       - 'electron/bootstrap.ts'
       - 'electron/qa/isolatedProfile.ts'
       - 'electron/workers/background*.ts'
+      - 'electron/workers/documentary*.ts'
       - 'runtime/zotero-mcp/**'
       - 'build/**'
 permissions:

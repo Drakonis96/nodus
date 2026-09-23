@@ -1,3 +1,4 @@
+import { researchActivityStep, startResearchActivity } from './researchActivity';
 import type { DocumentSearchHit } from '@shared/types';
 import { findSimilarIdeasPaged } from '../db/ideasRepo';
 import { findSimilarPassagesPaged, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
@@ -230,12 +231,15 @@ export async function retrieveHierarchical(
   const routedPassageLimit = Math.max(0, options.routedPassageLimit ?? passageLimit);
   const supportPassageLimit = Math.max(0, options.supportPassageLimit ?? routedPassageLimit);
   const vector = options.embedding === undefined ? await embed(clean) : options.embedding;
+  const finishProfiles = options.lexicalDocuments !== false && clean && documentLimit > 0 ? startResearchActivity('profiles', 'lexical') : undefined;
   const lexical = options.lexicalDocuments === false || !clean || documentLimit === 0
     ? []
     : lexicalDocumentSearch(clean, documentLimit * 2, corpus);
+  finishProfiles?.('completed', lexical.length);
   const literalProbes = [...new Set((options.lexicalPassageQueries?.length
     ? options.lexicalPassageQueries
     : [clean]).map((probe) => probe.trim()).filter(Boolean))].slice(0, MAX_LITERAL_PROBES);
+  const finishPassages = options.lexicalPassages !== false && passageLimit > 0 && literalProbes.length ? startResearchActivity('nodus', 'lexical') : undefined;
   const lexicalLists = options.lexicalPassages === false || passageLimit === 0
     ? []
     : literalProbes.map((probe) => lexicalPassageSearch(probe, passageLimit, corpus));
@@ -245,6 +249,7 @@ export async function retrieveHierarchical(
       .map(({ retrievalScore: _retrievalScore, ...hit }) => hit)
     : [];
   let lexicalPassages = fuseLexical(lexicalLists);
+  finishPassages?.('completed', lexicalPassages.length);
 
   if (!vector?.length) {
     return {
@@ -258,13 +263,13 @@ export async function retrieveHierarchical(
 
   const [semanticDocuments, ideas, globalPassages] = await Promise.all([
     documentLimit > 0
-      ? findSimilarDocuments(vector, options.minDocumentSimilarity ?? 0.2, documentLimit * 2, corpus)
+      ? researchActivityStep('profiles', 'semantic', () => findSimilarDocuments(vector, options.minDocumentSimilarity ?? 0.2, documentLimit * 2, corpus))
       : Promise.resolve([]),
     ideaLimit > 0
-      ? findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit, { ...corpus, ideaIds: options.ideaIds })
+      ? researchActivityStep('ideas', 'semantic', () => findSimilarIdeasPaged(vector, options.minIdeaSimilarity ?? -1, ideaLimit, { ...corpus, ideaIds: options.ideaIds }))
       : Promise.resolve([]),
     passageLimit > 0
-      ? findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, passageLimit, corpus)
+      ? researchActivityStep('nodus', 'semantic', () => findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, passageLimit, corpus))
       : Promise.resolve([]),
   ]);
   const documents = fuseDocuments(semanticDocuments, lexical, documentLimit);
@@ -286,7 +291,7 @@ export async function retrieveHierarchical(
     ? findDocumentSupportPassages(documents.slice(0, routedWorkLimit), supportPassageLimit)
     : [];
   const routedPassages = routedWorkIds.length && routedPassageLimit > 0
-    ? await findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, routedPassageLimit, { nodusIds: routedWorkIds })
+    ? await researchActivityStep('context', 'expand', () => findSimilarPassagesPaged(vector, options.minPassageSimilarity ?? -1, routedPassageLimit, { nodusIds: routedWorkIds }))
     : [];
 
   return {

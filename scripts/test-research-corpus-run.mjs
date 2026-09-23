@@ -54,7 +54,13 @@ try {
   const { ResearchCorpusRun, bindAcademicCorpusRun } = load('electron/ai/researchCorpusRun.ts');
   const { RETRIEVAL_PRESETS } = load('shared/researchCorpus.ts');
   const run = new ResearchCorpusRun(scope, RETRIEVAL_PRESETS.balanced);
-  const snapshot = await run.snapshot({ kind: 'deep_research', objective: 'measure', language: 'en' });
+  const { withResearchActivity } = load('electron/ai/researchActivity.ts');
+  const activity = [];
+  const snapshot = await withResearchActivity(event => activity.push(event), undefined, () => run.snapshot({ kind: 'deep_research', objective: 'measure', language: 'en' }));
+  for (const layer of ['scope', 'ideas', 'profiles', 'nodus']) assert.ok(activity.some(event => event.layer === layer && event.status === 'completed'), `real ${layer} retrieval is observable`);
+  assert.ok(!activity.some(event => event.layer === 'zotero'), 'local Zotero-derived passages must not claim a live Zotero call');
+  assert.equal(activity.filter(event => event.status === 'active').length, activity.filter(event => event.status !== 'active').length);
+  const activityCount = activity.length;
   assert.equal(snapshot.works.length, 1);
   assert.deepEqual(snapshot.ideas.map(idea => idea.id), ['selected']);
   assert.ok(snapshot.passages.length > 0, 'lexical legacy evidence works without embeddings or profiles');
@@ -88,6 +94,7 @@ try {
   assert.equal(deps.preparePlanEvidence, undefined);
   await deps.buildSnapshot({ kind: 'deep_research', objective: 'measure' });
   assert.equal(legacyDiscovery, 0);
+  assert.equal(activity.length, activityCount, 'subsequent Deep Research retrieval stays outside chat telemetry');
   const coverage = await deps.researchTraversal();
   assert.equal(coverage.scopeId, scope.id);
   assert.equal(coverage.queries.length, 1);

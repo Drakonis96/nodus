@@ -61,7 +61,13 @@ try {
       attachments: [{ id: attachmentId, revision: `hash-${attachmentId}` }] }, `Independent ${attachmentId} evidence`));
   }
   const scope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
-  const found = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
+  const activity = [];
+  const { withResearchActivity } = load('electron/ai/researchActivity.ts');
+  const found = await withResearchActivity(event => activity.push(event), undefined, () => preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null));
+  assert.ok(activity.some(event => event.layer === 'nodus' && event.operation === 'lexical' && event.status === 'completed' && event.count === 2), 'real worker lexical progress crosses IPC');
+  assert.ok(activity.some(event => event.layer === 'context' && event.operation === 'expand' && event.status === 'completed'), 'real Auto Expand rounds emit progress');
+  assert.equal(activity.filter(event => event.status === 'active').length, activity.filter(event => event.status === 'completed').length);
+  assert.ok(!activity.some(event => event.layer === 'zotero'), 'shared index access never pretends to contact Zotero');
   assert.deepEqual([...new Set(found.evidence.map(item => item.attachmentId))].sort(), ['appendix-a', 'appendix-b']);
   const incompleteScope = { ...scope, documents: scope.documents.map(document => document.id === doc.id ? { ...document,
     attachments: ['appendix-a', 'appendix-b', 'pending-scan'].map(id => ({ id, revision: `hash-${id}` })) } : document) };

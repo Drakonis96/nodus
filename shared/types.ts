@@ -5880,6 +5880,7 @@ export interface ResearchChatResponse {
 }
 
 export interface ResearchChatStreamHandlers {
+  onActivity?(activity: import('./researchActivity').ResearchActivity): void;
   onConcilium?(result: import('./researchConcilium').ConciliumResult): void;
   onDelta(delta: string): void;
   /** Reasoning/thinking trace, streamed for live display only. */

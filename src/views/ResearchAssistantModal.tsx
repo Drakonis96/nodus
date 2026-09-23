@@ -1,3 +1,5 @@
+import { ResearchActivityPanel } from '../components/ResearchActivityPanel';
+import { settleResearchActivities, updateResearchActivities, type ResearchActivity, type ResearchActivityStatus } from '@shared/researchActivity';
 import { ResearchConciliumControl, ConciliumResponses } from '../components/ResearchConcilium';
 import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium';
 import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
@@ -261,6 +263,7 @@ export function ResearchAssistantModal({
   const [concilium, setConcilium] = useState<ConciliumConfig | null>(null);
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
+  const [activityRun, setActivityRun] = useState<{ conversationId: string; turnId: string; activities: ResearchActivity[]; outcome: ResearchActivityStatus } | null>(null);
   const [thinkingEffort, setThinkingEffort] = useState<ResearchEffort>('standard');
   useEffect(() => { setThinkingEffort('standard'); }, [selectedModel?.provider, selectedModel?.model]);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
@@ -600,6 +603,7 @@ export function ResearchAssistantModal({
     setStoppedMessageId(null);
     setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
+    setActivityRun({ conversationId, turnId: assistantId, activities: [], outcome: 'active' });
     setStreamingId(assistantId);
     // Reveal the question and the beginning of the answer once. Streaming
     // deltas must not chase the bottom: keeping this position stable lets the
@@ -614,6 +618,7 @@ export function ResearchAssistantModal({
       const response = await api.researchChatStream(
         { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined },
         {
+          onActivity: event => setActivityRun(current => current?.turnId === assistantId && current.outcome === 'active' ? { ...current, activities: updateResearchActivities(current.activities, event) } : current),
           onConcilium: (result) => {
             councilResult = result;
             if (activeIdRef.current !== conversationId) return;
@@ -642,6 +647,7 @@ export function ResearchAssistantModal({
       // A user-triggered stop resolves with the partial answer; treat an empty
       // partial as "nothing generated" and drop the placeholder bubble.
       const aborted = stopRequestedRef.current || Boolean(response.aborted);
+      setActivityRun(current => current?.turnId === assistantId ? { ...current, activities: settleResearchActivities(current.activities, aborted ? 'cancelled' : 'completed'), outcome: aborted ? 'cancelled' : 'completed' } : current);
       if ('concilium' in response && response.concilium) councilResult = response.concilium;
       const answer = response.answer.trim();
       const finalMessages: UiMessage[] = answer || councilResult
@@ -658,6 +664,7 @@ export function ResearchAssistantModal({
       }
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
+      setActivityRun(current => current?.turnId === assistantId ? { ...current, activities: settleResearchActivities(current.activities, stopRequestedRef.current ? 'cancelled' : 'failed'), outcome: stopRequestedRef.current ? 'cancelled' : 'failed' } : current);
       if (stopRequestedRef.current) {
         // The user stopped the stream: keep the text that already arrived and mark
         // the message as aborted instead of replacing everything with the error.
@@ -950,6 +957,7 @@ export function ResearchAssistantModal({
 
           <section className="flex-1 min-w-0 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
+              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} onDismiss={() => inputRef.current?.focus()} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {conversationNotice && (
                   <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
@@ -1097,7 +1105,7 @@ export function ResearchAssistantModal({
               </div>
               {showJumpToBottom && (
                 <button
-                  className="absolute bottom-4 right-4 h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800"
+                  className={`absolute bottom-4 ${!adapter && !isGenealogy && activityRun?.conversationId === activeId ? 'left-4' : 'right-4'} h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800`}
                   title={t('Bajar al final')}
                   onClick={() => scrollToBottom()}
                 >

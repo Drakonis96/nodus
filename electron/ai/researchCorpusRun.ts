@@ -1,3 +1,4 @@
+import { researchActivityStep, startResearchActivity } from './researchActivity';
 import type { ResearchDocumentRead, ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { RETRIEVAL_PRESETS, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
@@ -64,7 +65,7 @@ export class ResearchCorpusRun {
     }
     const settings = this.budget.settings;
     if (!this.scope.documents.length) return;
-    const vector = await embed(query, this.signal).catch(() => null);
+    const vector = await researchActivityStep('scope', 'embed', () => embed(query, this.signal)).catch(() => null);
     this.validate();
     const current = researchCorpusInventory().documents;
     const stableWorks = this.pinRevisions ? this.scope.documents.filter(document => (!document.indexedSource || document.indexedSource.revision === document.revision) && current.find(item => item.id === document.id)?.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []) : this.workIds;
@@ -95,6 +96,7 @@ export class ResearchCorpusRun {
       if (selected >= settings.passagesPerRound * shared.traversal.rounds) { this.budget.partial = true; break; }
       if (this.budget.accept(key, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
     }
+    const finishIdeas = startResearchActivity('ideas', 'lexical');
     const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(stableIdeas)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
     const ordered = [...hierarchy.ideas, ...lexical.map(idea => ({ ...idea, similarity: words.reduce((score, word) => score + Number(`${idea.label} ${idea.statement}`.toLocaleLowerCase().includes(word)), 0) })).filter(idea => idea.similarity > 0).sort((a, b) => b.similarity - a.similarity)];
@@ -107,6 +109,7 @@ export class ResearchCorpusRun {
         works: documents.map(document => ({ nodus_id: document.workId!, title: document.title, authors: document.authors, year: document.year,
           zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' })) });
     }
+    finishIdeas('completed', this.ideas.size);
     this.budget.candidates += hierarchy.passages.length + separable.length + shared.traversal.candidates;
     this.budget.partial ||= shared.traversal.partial;
     this.traversal.push({ query, sources: this.scope.documents.map(document => document.id), candidates: hierarchy.passages.length + separable.length + shared.traversal.candidates, partial: this.budget.partial });

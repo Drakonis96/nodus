@@ -3,16 +3,24 @@ import { DocumentaryStore } from '../db/documentaryStore';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import { validateResearchDocumentRead, type ResearchDocumentRead, type RetrievalSettings } from '@shared/researchCorpus';
 
-parentPort?.once('message', (input: { filename: string; query: string; lexicalKeys: string[]; vectorKeys: string[]; vector: number[] | null; settings: RetrievalSettings; threshold: number; read?: ResearchDocumentRead }) => {
+parentPort?.once('message', (input: { filename: string; query: string; lexicalKeys: string[]; vectorKeys: string[]; vector: number[] | null; settings: RetrievalSettings; threshold: number; activity?: boolean; read?: ResearchDocumentRead }) => {
   const store = new DocumentaryStore(input.filename, true);
   try {
+    const activity = (key: string, operation: 'lexical' | 'semantic' | 'expand' | 'pages' | 'references', status: 'active' | 'completed', count?: number) => {
+      if (input.activity) parentPort!.postMessage({ type: 'activity', key, operation, status, count });
+    };
     const budget = new ResearchRetrievalBudget(input.settings);
     budget.nextRound();
     const read = input.read ? validateResearchDocumentRead(input.read) : null;
+    const operation = read?.kind === 'pages' ? 'pages' : read?.kind === 'context' ? 'expand' : read?.kind === 'references' ? 'references' : 'lexical';
+    activity('lexical', operation, 'active');
     const lexical = read?.kind === 'pages' ? store.physicalPages(input.lexicalKeys, read.from, read.to ?? read.from, input.settings.candidates, read.attachmentId)
       : read?.kind === 'context' ? store.adjacentPassages(read.passageId, input.lexicalKeys, read.radius ?? 1)
       : store.lexicalSearch(input.query, input.lexicalKeys, input.settings.candidates);
+    activity('lexical', operation, 'completed', lexical.length);
+    if (input.vector) activity('semantic', 'semantic', 'active');
     const semantic = input.vector ? store.semanticSearch(input.vector, input.vectorKeys, input.settings.candidates, input.threshold) : [];
+    if (input.vector) activity('semantic', 'semantic', 'completed', semantic.length);
     const fused = new Map<string, { score: number; passage: typeof lexical[number] }>();
     for (const lane of [lexical, semantic]) lane.forEach((passage, index) => {
       // The same text can have separate lexical/vector index keys. Deduplicate
@@ -33,6 +41,7 @@ parentPort?.once('message', (input: { filename: string; query: string; lexicalKe
     }
     let frontier = chosen.slice();
     while (!read && input.settings.autoExpand && frontier.length && budget.rounds < input.settings.rounds && budget.nextRound()) {
+      activity(`expand-${budget.rounds}`, 'expand', 'active');
       const next: typeof lexical = [];
       for (const passage of frontier) {
         for (const adjacent of store.adjacentPassages(passage.id, [...input.lexicalKeys, ...input.vectorKeys])) {
@@ -40,6 +49,7 @@ parentPort?.once('message', (input: { filename: string; query: string; lexicalKe
           if (budget.accept(adjacent.id, adjacent.text)) next.push(adjacent);
         }
       }
+      activity(`expand-${budget.rounds}`, 'expand', 'completed', next.length);
       chosen.push(...next);
       frontier = next;
     }

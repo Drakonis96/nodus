@@ -40,11 +40,17 @@ try {
   };
   const research = load('electron/ai/researchAssistant.ts');
   const request = { messages: [{ role: 'user', content: 'Compare the evidence.' }], selection, model: models[0], concilium: { models, chairman: 1 } };
-  const snapshots = [], chat = [];
-  const response = await research.streamResearchChat(request, delta => chat.push(delta), undefined, update => snapshots.push(update));
+  const snapshots = [], chat = [], activity = [];
+  const response = await research.streamResearchChat(request, delta => chat.push(delta), undefined, update => snapshots.push(update), event => activity.push(event));
   assert.equal(response.concilium.status, 'complete');
   assert.equal(response.concilium.members.length, 3);
   assert.equal(calls.length, 4);
+  const writes = activity.filter(event => event.layer === 'response' && event.operation === 'write');
+  assert.equal(writes.filter(event => event.status === 'active').length, 4);
+  assert.equal(writes.filter(event => event.status === 'completed').length, 4);
+  assert.ok(models.every(model => writes.some(event => event.subject === model.model)), 'concurrent model operations identify the participating model');
+  assert.equal(activity.filter(event => event.status === 'active').length, activity.filter(event => event.status !== 'active').length);
+  const activityCount = activity.length;
   assert.deepEqual(chat, ['Verified consensus.'], 'member answers and reasoning never enter the main chat');
   assert.equal(executions.length, 1, 'only the chairman executes skills');
   assert.deepEqual(executions[0].model, models[1]);
@@ -78,6 +84,7 @@ try {
   assert.equal(failedUpdates.at(-1).status, 'error');
   calls.length = 0; executions.length = 0;
   await research.streamResearchChat({ ...request, concilium: undefined }, () => {});
+  assert.equal(activity.length, activityCount, 'a subsequent request without an observer cannot reach the previous observer');
   assert.equal(calls.length, 1, 'ordinary chat still makes one model call');
   assert.equal(executions.length, 1);
   const { academicApi } = load('electron/preload/academic.ts');

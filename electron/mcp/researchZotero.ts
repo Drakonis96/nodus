@@ -1,3 +1,4 @@
+import { researchActivityStep } from '../ai/researchActivity';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -133,9 +134,10 @@ export async function readResearchZotero(input: { notebookId?: string | null; do
   validateScope(expected);
   const document = expected.documents.find(document => document.id === input.documentId);
   if (!document || document.origin.kind !== 'zotero') throw new Error('research_source_not_authorized');
+  const origin = document.origin;
   const tool: ManagedZoteroTool = input.operation === 'metadata' ? 'zotero_get_item_metadata' : input.operation === 'fulltext' ? 'zotero_get_item_fulltext' : (() => { throw new Error('research_invalid_mcp_operation'); })();
-  const result = await connection.call(tool, { library_type: document.origin.libraryType, library_id: document.origin.libraryId,
-    item_key: document.origin.itemKey, attachment_key: input.attachmentKey });
+  const result = await researchActivityStep('zotero', input.operation, () => connection.call(tool, { library_type: origin.libraryType, library_id: origin.libraryId,
+    item_key: origin.itemKey, attachment_key: input.attachmentKey }), document.title);
   validateScope(expected);
   return result;
 }

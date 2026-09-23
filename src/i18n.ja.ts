@@ -1,3 +1,4 @@
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
@@ -78,6 +79,7 @@ export const JA: Record<string, string> = {
   "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus を離れずに情報源を探し、最新情報を追跡し、ファイルを操作できます。",
   "Buscar herramientas": "ツールを検索",
 
+  ...RESEARCH_ACTIVITY_TRANSLATIONS.ja,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ja,
   ...DOCUMENT_SKILLS_TRANSLATIONS.ja,
   ...RESEARCH_PROMPT_TRANSLATIONS.ja,

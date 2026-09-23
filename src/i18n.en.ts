@@ -1,3 +1,4 @@
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
@@ -78,6 +79,7 @@ export const EN: Record<string, string> = {
   "Buscar herramientas": "Search tools",
 
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Choose light mode, dark mode, or follow the operating system.',
+  ...RESEARCH_ACTIVITY_TRANSLATIONS["en"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['en'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "Choose at least one database.",

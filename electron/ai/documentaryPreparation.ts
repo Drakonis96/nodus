@@ -1,3 +1,4 @@
+import { researchActivityEnabled, startResearchActivity } from './researchActivity';
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -423,22 +424,35 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
   if (!keys.length && !vectorKeys.length) return { evidence: [], traversal: { partial: scope.documents.length > 0, rounds: 1, candidates: 0, evidenceTokens: 0, visited: [] } };
   const packagedWorker = path.join(__dirname, 'documentaryRetrievalWorker.js');
   const worker = backgroundProcess(fs.existsSync(packagedWorker) ? packagedWorker : path.join(app.getAppPath(), 'dist-electron/documentaryRetrievalWorker.js'), 'Nodus documentary retrieval');
+  const finishSearch = startResearchActivity('nodus', read?.kind === 'search' ? 'search' : read?.kind === 'pages' ? 'pages' : read?.kind === 'context' ? 'expand' : read?.kind === 'references' ? 'references' : 'search', scope.documents.length === 1 ? scope.documents[0].title : query);
+  const activities = new Map<string, ReturnType<typeof startResearchActivity>>();
   const result = await new Promise<{ passages: ReturnType<DocumentaryStore['lexicalSearch']>; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }>((resolve, reject) => {
     let settled = false;
-    const finish = (error: Error | null, value?: Parameters<typeof resolve>[0]) => {
+    const finish = (error: Error | null, value?: { passages: ReturnType<DocumentaryStore['lexicalSearch']>; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }) => {
       if (settled) return;
       settled = true;
       clearTimeout(deadline);
+      finishSearch(error ? 'failed' : 'completed', value?.passages.length);
+      for (const finishActivity of activities.values()) finishActivity(error ? 'failed' : 'completed');
+      activities.clear();
       signal?.removeEventListener('abort', abort);
       void worker.terminate().finally(() => { if (error) reject(error); else resolve(value!); });
     };
     const abort = () => finish(new Error('documentary_retrieval_cancelled'));
     const deadline = setTimeout(() => finish(new Error('documentary_retrieval_timeout')), 30000);
     signal?.addEventListener('abort', abort, { once: true });
-    worker.once('message', message => finish(message.error ? new Error(message.error) : null, message));
+    worker.on('message', message => {
+      if (settled) return;
+      if (message.type === 'activity') {
+        if (message.status === 'active') activities.set(message.key, startResearchActivity(message.operation === 'expand' ? 'context' : 'nodus', message.operation));
+        else { activities.get(message.key)?.('completed', message.count); activities.delete(message.key); }
+        return;
+      }
+      finish(message.error ? new Error(message.error) : null, message);
+    });
     worker.once('error', error => finish(error));
     worker.once('exit', () => { if (!settled) finish(new Error('documentary_retrieval_worker_stopped')); });
-    worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold, read });
+    worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold, read, activity: researchActivityEnabled() });
   });
   const latest = researchCorpusInventory().documents;
   for (const document of scope.documents) assertResearchDocumentPermission(scope, document.id, latest.find(item => item.id === document.id));
