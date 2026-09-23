@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { createHash } from 'node:crypto';
 import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
+import { unpreparedResearchAttachmentIds } from '@shared/researchCorpus';
 import type { DocumentaryIndexIdentity, ResearchCorpusDocument, ResearchDocumentRead, ResearchEvidence, ResearchPreparationInventory, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { DocumentaryRequests } from '../db/documentaryRequests';
 import { DocumentaryStore, type DocumentaryChunk } from '../db/documentaryStore';
@@ -183,7 +184,8 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     return { ...document, preparation: { documentId: document.id, revision: document.revision, text: coverage === 'abstract' ? 'abstract' : passages ? 'available' : 'missing',
       lexical: revision ? stale ? 'stale' : 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? 'ready' : embedded > 0 ? 'partial' : request?.error ? 'failed' : 'missing',
       status: request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
-      reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded } };
+      reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded,
+      unpreparedAttachmentIds: unpreparedResearchAttachmentIds(document, revisions.map(row => JSON.parse(row.identity_json) as DocumentaryIndexIdentity)) } };
   }) };
 }
 
@@ -327,7 +329,7 @@ export async function drainDocumentaryRequests(): Promise<void> {
         checkLease();
         const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
         if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');
-        store.publishDocument({ ...document, coverage }, prepared.map(result => result.indexKey));
+        store.publishDocument({ ...document, coverage: parts.length ? 'fulltext' : coverage }, prepared.map(result => result.indexKey));
         // Publish every lexical attachment before any optional vector request.
         for (const result of prepared) {
           checkLease();
@@ -398,9 +400,13 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
   const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
   const vectorKeys: string[] = [];
   const indexedDocuments = new Set<string>();
+  const incompleteAttachments = new Set<string>();
   const keys = scope.documents.flatMap(document => {
     assertResearchDocumentPermission(scope, document.id, inventory.documents.find(item => item.id === document.id));
-    return attachmentRevisions(document).flatMap(revisions => {
+    const groups = attachmentRevisions(document);
+    const identities = groups.flatMap(group => group.filter(row => row.lexical_ready).map(row => JSON.parse(row.identity_json) as DocumentaryIndexIdentity));
+    if (unpreparedResearchAttachmentIds(document, identities).length) incompleteAttachments.add(document.id);
+    return groups.flatMap(revisions => {
     const semantic = revisions.find(row => {
       const identity: DocumentaryIndexIdentity = JSON.parse(row.identity_json);
       return row.embedding_ready && identity.embedding?.model === config.model && identity.embedding?.provider === config.provider && identity.embedding?.dimensions === vector?.length && JSON.stringify(identity.embedding.parameters) === JSON.stringify(parameters);
@@ -444,7 +450,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     return { id: passage.id, documentId: document.id, workId: document.workId, attachmentId: identity.attachmentId, attachmentRevision: identity.attachmentRevision,
       revision: identity.revision, text: passage.text, locator: JSON.parse(passage.locator_json),
       provenance: document.authoredKind ?? (coverage === 'abstract' ? 'abstract' as const : 'source' as const),
-      limitations: [...(identity.revision !== document.revision ? ['previous_indexed_revision'] : []), ...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : []), ...(read?.kind === 'references' ? ['reference_candidates_require_source_review'] : [])] };
+      limitations: [...(incompleteAttachments.has(document.id) ? ['attachments_partially_prepared'] : []), ...(identity.revision !== document.revision ? ['previous_indexed_revision'] : []), ...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : []), ...(read?.kind === 'references' ? ['reference_candidates_require_source_review'] : [])] };
   });
-  return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || indexedDocuments.size < scope.documents.length || scope.documents.some(document => document.indexedSource && document.indexedSource.revision !== document.revision) } };
+  return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || incompleteAttachments.size > 0 || indexedDocuments.size < scope.documents.length || scope.documents.some(document => document.indexedSource && document.indexedSource.revision !== document.revision) } };
 }

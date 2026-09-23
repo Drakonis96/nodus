@@ -151,6 +151,15 @@ export function validateResearchDocumentRead(input: ResearchDocumentRead): Resea
   return { ...input };
 }
 
+/** A partial or merged derivative cannot prove coverage of independent files. */
+export function unpreparedResearchAttachmentIds(document: ResearchCorpusDocument, indexes: DocumentaryIndexIdentity[]): string[] {
+  const expected = document.indexedSource?.attachments ?? document.attachments ?? [];
+  const revision = document.indexedSource?.revision ?? document.revision;
+  return expected.filter(attachment => !indexes.some(index => index.revision === revision
+    && index.attachmentId === attachment.id && index.attachmentRevision === attachment.revision
+    && (index.coverage ?? document.coverage) === 'fulltext')).map(attachment => attachment.id);
+}
+
 export interface DocumentPreparationState {
   documentId: string;
   revision: string;
@@ -162,6 +171,8 @@ export interface DocumentPreparationState {
   error: string | null;
   passages: number;
   embedded: number;
+  /** Known source files lacking a complete compatible text index. */
+  unpreparedAttachmentIds?: string[];
 }
 
 export interface ZoteroMcpStatus {

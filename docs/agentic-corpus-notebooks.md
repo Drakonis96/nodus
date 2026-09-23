@@ -605,3 +605,25 @@ the packaged private Python server, checks retained notebooks and removes the
 application while preserving the isolated profile and an unrelated fixture.
 This does not claim an upgrade between different application versions. Syntax,
 lint and workflow parsing passed locally; native results are pending.
+
+### Incomplete attachment coverage
+
+A ready text index for one attachment no longer implies that every file in the
+work was prepared. Inventory reports the known unprepared attachment identities;
+notebook source rows display the existing translated partial-coverage label.
+Shared retrieval preserves the available passages, adds an explicit limitation,
+and marks traversal partial. Matching requires the pinned attachment revision and
+full text; an abstract, an old hash or a merged derivative cannot attest coverage
+of an independent file. Old publications are evaluated against their own pinned
+attachment list. This is conservative coverage accounting, not OCR completion.
+
+Two focused scripts passed at `/private/tmp/nodus-research-TsjTHL`; the subsequent
+`attachment-coverage-integration.log` also checks a synthetic authorized inventory
+with two indexed files and one pending file through the real shared store and
+retrieval worker. Lint, renderer/main type checks and the full application build
+passed (`artifacts/research-attachment-coverage-build.log`).
+
+The runtime SHA-256 inventory describes the locked payload before application
+code signing. macOS signing changes Mach-O signature bytes; installer identity is
+therefore established separately by Developer ID/code-signature/notarization
+verification and the installer hash. License text files themselves are retained.

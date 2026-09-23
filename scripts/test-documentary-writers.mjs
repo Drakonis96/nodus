@@ -11,6 +11,13 @@ installRuntimeHooks(root);
 const require = createRequire(import.meta.url);
 const load = file => require(path.join(repoRoot, file));
 try {
+  const { unpreparedResearchAttachmentIds } = load('shared/researchCorpus.ts');
+  const multi = { revision: 'r1', coverage: 'fulltext', attachments: [{ id: 'a', revision: 'hash-a' }, { id: 'b', revision: 'hash-b' }] };
+  const a = { revision: 'r1', attachmentId: 'a', attachmentRevision: 'hash-a', coverage: 'fulltext' };
+  assert.deepEqual(unpreparedResearchAttachmentIds(multi, [a]), ['b'], 'one indexed file cannot hide an unsupported or pending attachment');
+  assert.deepEqual(unpreparedResearchAttachmentIds(multi, [{ ...a, attachmentRevision: 'old-hash' }]), ['a', 'b']);
+  assert.deepEqual(unpreparedResearchAttachmentIds(multi, [{ ...a, coverage: 'abstract' }]), ['a', 'b'], 'abstract availability is not attachment preparation');
+  assert.deepEqual(unpreparedResearchAttachmentIds({ ...multi, indexedSource: { revision: 'r0', attachments: [multi.attachments[0]] } }, [{ ...a, revision: 'r0' }]), [], 'old publication coverage is evaluated against its pinned files');
   const db = load('electron/db/database.ts').getDb();
   assert.equal(db.pragma('user_version', { simple: true }), load('electron/db/migrations.ts').SCHEMA_VERSION);
   db.prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES('inside','inside','Synthetic','[]','book','text')").run();
@@ -56,6 +63,18 @@ try {
   const scope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
   const found = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
   assert.deepEqual([...new Set(found.evidence.map(item => item.attachmentId))].sort(), ['appendix-a', 'appendix-b']);
+  const incompleteScope = { ...scope, documents: scope.documents.map(document => document.id === doc.id ? { ...document,
+    attachments: ['appendix-a', 'appendix-b', 'pending-scan'].map(id => ({ id, revision: `hash-${id}` })) } : document) };
+  const corpusInventory = load('electron/ai/researchCorpusInventory.ts');
+  const originalInventory = corpusInventory.researchCorpusInventory;
+  corpusInventory.researchCorpusInventory = () => ({ ...originalInventory(), documents: incompleteScope.documents });
+  try {
+    const incomplete = await preparation.retrieveSharedDocumentaryEvidence(incompleteScope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
+    assert.equal(incomplete.evidence.length, 2, 'available files remain searchable');
+    assert.equal(incomplete.traversal.partial, true, 'missing attachment coverage reaches the shared traversal');
+    assert.ok(incomplete.evidence.every(item => item.limitations.includes('attachments_partially_prepared')));
+  } finally { corpusInventory.researchCorpusInventory = originalInventory; }
+
   assert.equal(preparation.getResearchPreparationInventory().documents.find(item => item.id === doc.id).preparation.passages, 2);
   const citations = load('electron/citations/documentaryCitations.ts');
   const citationId = citations.documentaryCitationId(scope.id, found.evidence[0].id);
