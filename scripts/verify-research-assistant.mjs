@@ -85,6 +85,19 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Máximo', exact: true }).count(), 1, 'every model keeps its own remembered level');
   await restoredModels.selectOption('gemini::gemini-3-pro-preview');
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'and a model with no memory still opens on Standard');
+  // A remembered level the model no longer publishes — a catalogue that changed under the
+  // memory — is dropped instead of sent, and dropped from the store, not just hidden here.
+  await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'codex:gpt-6-astra': 'minimal' }))}`);
+  const staleModels = page.locator('select').first();
+  await staleModels.selectOption('codex::gpt-6-astra');
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  assert.equal(await slider.getAttribute('max'), '5', 'the subscription catalogue loaded, so the level was judged against the live ladder');
+  await slider.press('Escape');
+  assert.deepEqual(
+    await page.evaluate(() => window.updates.filter(patch => 'researchEffortByModel' in patch).at(-1).researchEffortByModel),
+    {},
+    'a level the model no longer offers is removed from the remembered map'
+  );
   assert.deepEqual(errors, []);
-  console.log('Research Assistant UI: keyboard, slider, remembered effort per model, exact request, theme/accent, context and compact layout passed.');
+  console.log('Research Assistant UI: keyboard, slider, remembered effort per model, stale level dropped, exact request, theme/accent, context and compact layout passed.');
 } finally { await browser.close(); }
