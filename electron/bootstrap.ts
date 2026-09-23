@@ -1,18 +1,19 @@
 // The application dependency graph must not execute until the profile is fixed.
 import { app } from 'electron';
 import path from 'node:path';
-import { isolatedPath, validateIsolatedRoot } from './qa/isolatedProfile';
+import os from 'node:os';
+import { assertIsolatedProductionSeparation, isolatedPath, validateIsolatedRoot } from './qa/isolatedProfile';
 
 const requestedRoot = process.env.NODUS_ISOLATED_ROOT;
 if (requestedRoot) {
   const root = validateIsolatedRoot(requestedRoot);
-  const production = path.resolve(app.getPath('appData'), 'Nodus');
-  if (root === production || root.startsWith(`${production}${path.sep}`)
-      || production.startsWith(`${root}${path.sep}`)) throw new Error('Test root overlaps production');
+  assertIsolatedProductionSeparation(root, app.getPath('appData'), os.userInfo().homedir, process.platform);
   if (process.env.NODUS_USERDATA && path.resolve(process.env.NODUS_USERDATA) !== path.join(root, 'profile')) {
     throw new Error('Conflicting isolated userData');
   }
   process.env.NODUS_USERDATA = isolatedPath(root, 'profile');
+  process.env.XDG_CONFIG_HOME = isolatedPath(root, 'profile/config');
+  process.env.XDG_CACHE_HOME = isolatedPath(root, 'profile/cache');
   process.env.NODUS_QA_ROOT = root;
   process.env.NODUS_QA_DATABASE_AUDIT_LOG = path.join(process.env.NODUS_USERDATA, 'database-access.jsonl');
   process.env.NODUS_DISABLE_AUTO_UPDATE = '1';

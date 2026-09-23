@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/research-corpus-packaging.yml'
       - 'scripts/verify-research-installer.mjs'
+      - 'electron/bootstrap.ts'
+      - 'electron/qa/isolatedProfile.ts'
       - 'runtime/zotero-mcp/**'
       - 'build/**'
 permissions:
@@ -19,6 +21,9 @@ jobs:
       max-parallel: 2
       matrix:
         include:
+          - os: ubuntu-latest
+            platform: '--linux deb --x64'
+            arch: x64
           - os: macos-latest
             platform: '--mac --arm64'
             arch: arm64
@@ -27,9 +32,6 @@ jobs:
             arch: x64
           - os: windows-latest
             platform: '--win --x64'
-            arch: x64
-          - os: ubuntu-latest
-            platform: '--linux deb --x64'
             arch: x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90

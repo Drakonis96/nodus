@@ -82,6 +82,8 @@ async function launch() {
   const app = await _electron.launch({ executablePath: launchExecutable,
     args: ['--no-sandbox', '--disable-gpu'], cwd: root, env: environment, timeout: 60000 });
   const pid = app.process().pid;
+  const diagnostics = { stdout: '', stderr: '' };
+  for (const stream of ['stdout', 'stderr']) app.process()[stream]?.on('data', data => { diagnostics[stream] = (diagnostics[stream] + data.toString()).slice(-64000); });
   try {
     const page = await app.firstWindow();
     await page.waitForFunction(() => Boolean(window.nodus && document.getElementById('root')?.children.length), { timeout: 60000 });
@@ -97,6 +99,10 @@ async function launch() {
     });
     assert.ok(notebooks.some(notebook => notebook.name === 'Native installer retained notebook'));
     report.launches.push({ ...actual, pid, retainedNotebook: true });
+  } catch (error) {
+    report.bootFailure = { error: String(error), ...diagnostics,
+      state: await app.evaluate(({ app, BrowserWindow }) => ({ ready: app.isReady(), windows: BrowserWindow.getAllWindows().length, userData: app.getPath('userData') })).catch(() => null) };
+    throw error;
   } finally { await app.close(); }
   assert.throws(() => process.kill(pid, 0), error => error.code === 'ESRCH', 'installed application exits before replacement/removal');
 }

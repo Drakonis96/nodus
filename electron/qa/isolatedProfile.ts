@@ -15,6 +15,22 @@ export function validateIsolatedRoot(root: string): string {
   return resolved;
 }
 
+/** Electron honors XDG_CONFIG_HOME on Linux before our bootstrap runs. The
+ * harness's exact private config path is already isolated, not production.
+ * Check the OS account home independently of the overridden HOME variable. */
+export function assertIsolatedProductionSeparation(root: string, appData: string, systemHome: string, platform: NodeJS.Platform): void {
+  const dataRoots = [appData];
+  if (platform === 'linux') {
+    if (path.resolve(appData) === path.join(root, 'profile', 'config')) dataRoots.length = 0;
+    dataRoots.push(path.join(systemHome, '.config'));
+  }
+  for (const dataRoot of dataRoots) for (const name of ['Nodus', 'nodus']) {
+    const production = path.resolve(dataRoot, name);
+    if (root === production || root.startsWith(`${production}${path.sep}`)
+      || production.startsWith(`${root}${path.sep}`)) throw new Error('Test root overlaps production');
+  }
+}
+
 export function isolatedPath(root: string, relative: string): string {
   const destination = path.resolve(root, relative);
   if (!destination.startsWith(`${root}${path.sep}`)) throw new Error('Path leaves isolated profile');

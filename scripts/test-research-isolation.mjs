@@ -11,7 +11,7 @@ import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, ve
 const root = createResearchTestRoot();
 const outfile = path.join(root, 'paths.mjs');
 await build({ entryPoints: ['electron/qa/isolatedProfile.ts'], outfile, bundle: true, platform: 'node', format: 'esm' });
-const { isolatedPath, validateIsolatedRoot, claimIsolatedProfile } = await import(pathToFileURL(outfile).href);
+const { assertIsolatedProductionSeparation, isolatedPath, validateIsolatedRoot, claimIsolatedProfile } = await import(pathToFileURL(outfile).href);
 test.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
 test('requires a matching manifest and forbids traversal and symlinks before writes', () => {
@@ -22,6 +22,20 @@ test('requires a matching manifest and forbids traversal and symlinks before wri
   fs.symlinkSync(path.dirname(root), path.join(root, 'escape'));
   assert.throws(() => isolatedPath(root, 'escape/new'), /Symlinks/);
   assert.equal(isolatedPath(root, 'profile/nested'), path.join(root, 'profile/nested'));
+});
+
+test('Linux private XDG config is not mistaken for production, whose default and custom paths remain forbidden', () => {
+  const home = path.join(root, 'os-account-home');
+  const isolated = path.join(root, 'test-instance');
+  assert.doesNotThrow(() => assertIsolatedProductionSeparation(isolated, path.join(isolated, 'profile/config'), home, 'linux'));
+  for (const name of ['Nodus', 'nodus']) {
+    const production = path.join(home, '.config', name);
+    assert.throws(() => assertIsolatedProductionSeparation(production, path.join(production, 'profile/config'), home, 'linux'), /overlaps production/);
+  }
+  assert.throws(() => assertIsolatedProductionSeparation(home, path.join(home, 'profile/config'), home, 'linux'), /overlaps production/);
+  const custom = path.join(root, 'custom-config');
+  assert.throws(() => assertIsolatedProductionSeparation(path.join(custom, 'Nodus'), custom, home, 'linux'), /overlaps production/);
+  assert.throws(() => assertIsolatedProductionSeparation(isolated, path.join(isolated, 'unexpected-config'), home, 'linux'), /overlaps production/);
 });
 
 test('environment does not inherit credentials or execution injection', () => {

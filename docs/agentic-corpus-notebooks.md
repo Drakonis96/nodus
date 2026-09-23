@@ -627,3 +627,25 @@ The runtime SHA-256 inventory describes the locked payload before application
 code signing. macOS signing changes Mach-O signature bytes; installer identity is
 therefore established separately by Developer ID/code-signature/notarization
 verification and the installer hash. License text files themselves are retained.
+
+### Full native verification and Linux installer correction
+
+At `49a927f0`, general CI [35857600969](https://github.com/Drakonis96/nodus/actions/runs/35857600969)
+passed 3,812 tests with zero failures and two explicit skips (CompassStore's
+standalone Node/Electron ABI case and a missing sibling marketplace checkout).
+It also passed the real application smoke, Stellar, tab and argument-map E2Es.
+Native matrix [35857600938](https://github.com/Drakonis96/nodus/actions/runs/35857600938)
+passed macOS ARM64/x64, Windows x64 and Linux x64.
+
+Installer campaign [35856767251](https://github.com/Drakonis96/nodus/actions/runs/35856767251)
+built `e2d7f202`. Both signed/notarized macOS packages and Windows NSIS passed real
+installation, two packaged launches across same-version reinstallation, private
+Python loading and removal with retained profiles/notebooks and foreign fixtures.
+The Debian package installed, but its first application window never opened.
+The Linux bootstrap incorrectly treated the harness's private XDG config root as
+production. The corrected guard recognizes only that exact private XDG path and
+independently checks the OS account's real home, plus custom production config
+roots and both application-name casings. Private XDG paths are also validated for
+symlink escapes before any application module import. Six isolation tests and lint
+pass; the native installer campaign is being repeated. Startup failures now retain
+bounded diagnostics in the evidence JSON instead of only a window timeout.
