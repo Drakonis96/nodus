@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -70,13 +71,23 @@ export class ManagedZoteroConnection {
     this.client = client;
     client.onclose = () => { if (this.status.state === 'connected') this.status = { ...this.status, state: 'stopped', error: 'managed_zotero_connection_closed' }; };
     try {
-      await client.connect(transport, { timeout: 20000 });
+      const pending = client.connect(transport, { timeout: 20000 });
       if (transport instanceof StdioClientTransport) transport.stderr?.on('data', () => undefined);
+      await pending;
       const version = client.getServerVersion();
       const capabilities = await client.listTools({}, { timeout: 10000 });
       const names = capabilities.tools.map(tool => tool.name).sort();
       if (version?.name !== 'nodus-zotero-mcp' || version.version !== '0.13.0+nodus.1'
         || JSON.stringify(names) !== JSON.stringify(READ_TOOLS)) throw new Error('managed_zotero_capabilities_incompatible');
+      const declared = await client.readResource({ uri: 'nodus://zotero/scope' }, { timeout: 10000 });
+      const content = declared.contents[0];
+      if (!content || !('text' in content) || typeof content.text !== 'string') throw new Error('managed_zotero_scope_unverifiable');
+      const capabilitiesScope = JSON.parse(content.text);
+      const items = this.scope!.items.map(item => [item.libraryType, String(item.libraryId), item.itemKey, item.version, item.revision,
+        item.attachments.map(attachment => [attachment.key, attachment.version]).sort((a, b) => String(a[0]).localeCompare(String(b[0])))])
+        .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      const fingerprint = createHash('sha256').update(JSON.stringify([this.scope!.serverId, items])).digest('hex');
+      if (capabilitiesScope.format !== 'nodus.zotero-scope-capabilities/1' || capabilitiesScope.readOnly !== true || capabilitiesScope.fingerprint !== fingerprint) throw new Error('managed_zotero_scope_mismatch');
       this.status = { ...this.status, state: 'connected', version: version.version };
       this.restarts = 0;
       return { ...this.status };

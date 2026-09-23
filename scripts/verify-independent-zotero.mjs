@@ -47,7 +47,8 @@ for (let index = 0; index < 3; index++) {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const page = pdf.addPage([612, 792]);
-  page.drawText(text, { x: 40, y: 700, size: 10, font });
+  const body = `${text}\n\nThis synthetic report documents an isolated research fixture. The observation belongs\nto the named field only. The measurement was recorded after a controlled inspection.\nThe report contains no evidence about other fields beyond its explicit statements.\nThese records are invented for software validation and do not describe real research.\nThe source identity and original page must remain attached to any retrieved evidence.`;
+  page.drawText(body, { x: 40, y: 700, size: 10, lineHeight: 16, font });
   const bytes = await pdf.save();
   const file = path.join(root, 'fixtures', `source-${index + 1}.pdf`);
   fs.writeFileSync(file, bytes);
@@ -128,6 +129,10 @@ try {
     assert.equal((await client.callTool({ name: 'zotero_get_item_metadata', arguments: { ...args, item_key: corpus.items[1].key } })).isError, true);
     Object.assign(report, { mcp: { version: client.getServerVersion(), transport: 'stdio', physicalPage: 1, evidenceMarker: 'NORTH23', unauthorizedSourceRejected: true } });
   } finally { await client.close(); }
+  if (process.argv.includes('--nodus')) {
+    const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
+    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus);
+  }
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {
   if (child.exitCode === null) child.kill('SIGTERM');

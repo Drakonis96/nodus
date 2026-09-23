@@ -7,8 +7,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
 
 const root = createResearchTestRoot();
-const policy = macResearchSandbox(root);
-const isolation = verifyResearchSandbox(root, policy);
+const disposableCI = process.argv.includes('--disposable-ci') && process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted';
+if (process.platform !== 'darwin' && !disposableCI) throw new Error('Non-macOS runtime tests require a disposable hosted CI runner');
+const policy = process.platform === 'darwin' ? macResearchSandbox(root) : null;
+const isolation = policy ? verifyResearchSandbox(root, policy) : { environment: 'disposable-hosted-ci', osWriteBoundaryVerified: false };
 const calls = [];
 let version = 3;
 const fixture = http.createServer((request, response) => {
@@ -29,8 +31,9 @@ const scope = { format: 'nodus.zotero-mcp-scope/1', root,
 const manifest = path.join(root, 'mcp/scope.json');
 fs.writeFileSync(manifest, JSON.stringify(scope));
 const runtime = path.resolve(import.meta.dirname, '../build/zotero-mcp');
-const transport = new StdioClientTransport({ command: '/usr/bin/sandbox-exec', args: ['-p', policy,
-  path.join(runtime, 'python/bin/python3'), '-I', '-B', path.join(runtime, 'serve.py'), manifest],
+const python = path.join(runtime, process.platform === 'win32' ? 'python/python.exe' : 'python/bin/python3');
+const runtimeArgs = ['-I', '-B', path.join(runtime, 'serve.py'), manifest];
+const transport = new StdioClientTransport({ command: policy ? '/usr/bin/sandbox-exec' : python, args: policy ? ['-p', policy, python, ...runtimeArgs] : runtimeArgs,
   env: { ...researchTestEnvironment(root), HOME: root, XDG_CACHE_HOME: path.join(root, 'mcp/cache'),
     XDG_CONFIG_HOME: path.join(root, 'mcp/config'), FASTMCP_CHECK_FOR_UPDATES: 'off' }, stderr: 'pipe' });
 const client = new Client({ name: 'nodus-scoped-integration-test', version: '1' });

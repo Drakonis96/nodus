@@ -15,11 +15,11 @@ const cache = path.join(repo, 'artifacts/zotero-mcp-downloads');
 fs.mkdirSync(cache, { recursive: true });
 fs.mkdirSync(output, { recursive: true });
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const inputFingerprint = digest(Buffer.concat(['manifest.json', 'requirements.lock', 'build-requirements.lock', 'serve.py'].map(name => fs.readFileSync(path.join(source, name)))));
+const inputFingerprint = digest(Buffer.concat([fs.readFileSync(import.meta.filename), ...['manifest.json', 'requirements.lock', 'build-requirements.lock', 'serve.py', 'license_inventory.py', 'license_overrides.json', ...fs.readdirSync(path.join(source, 'licenses')).sort().map(name => `licenses/${name}`)].map(name => fs.readFileSync(path.join(source, name)))]));
 const ready = path.join(output, 'runtime.json');
 if (fs.existsSync(ready) && JSON.parse(fs.readFileSync(ready, 'utf8')).inputFingerprint === inputFingerprint
     && JSON.parse(fs.readFileSync(ready, 'utf8')).platform === platform
-    && JSON.parse(fs.readFileSync(ready, 'utf8')).files.every(file => fs.existsSync(path.join(output, file.path)) && digest(fs.readFileSync(path.join(output, file.path))) === file.sha256)) {
+    && JSON.parse(fs.readFileSync(ready, 'utf8')).files.every(file => fs.existsSync(path.join(output, file.path)) && (file.target ? fs.lstatSync(path.join(output, file.path)).isSymbolicLink() && fs.readlinkSync(path.join(output, file.path)) === file.target : digest(fs.readFileSync(path.join(output, file.path))) === file.sha256))) {
   console.log(`[zotero-mcp] verified build inputs unchanged (${platform})`);
   process.exit(0);
 }
@@ -36,6 +36,8 @@ async function archive(url, expected, name) {
   return file;
 }
 
+fs.rmSync(output, { recursive: true, force: true });
+fs.mkdirSync(output, { recursive: true });
 const pythonName = `cpython-${manifest.python}+${manifest.pythonBuild}-${target.triple}-install_only_stripped.tar.gz`;
 const pythonArchive = await archive(`https://github.com/astral-sh/python-build-standalone/releases/download/${manifest.pythonBuild}/${encodeURIComponent(pythonName)}`, target.sha256, pythonName);
 execFileSync('tar', ['-xzf', pythonArchive, '-C', output], { stdio: 'inherit' });
@@ -60,6 +62,22 @@ const legal = path.join(output, 'legal');
 fs.mkdirSync(legal, { recursive: true });
 fs.copyFileSync(path.join(upstreamRoot, 'LICENSE'), path.join(legal, 'ZOTERO_MCP_LICENSE.txt'));
 fs.copyFileSync(path.join(source, 'requirements.lock'), path.join(legal, 'requirements.lock'));
+const fullName = `cpython-${manifest.python}+${manifest.pythonBuild}-${target.triple}-${target.fullBuild}-full.tar.zst`;
+const fullArchive = await archive(`https://github.com/astral-sh/python-build-standalone/releases/download/${manifest.pythonBuild}/${encodeURIComponent(fullName)}`, target.fullSha256, fullName);
+const licenseEntries = execFileSync('tar', ['-tf', fullArchive], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).split('\n')
+  .filter(name => name === 'python/PYTHON.json' || name.startsWith('python/licenses/'));
+if (!licenseEntries.includes('python/PYTHON.json') || licenseEntries.some(name => name.includes('..'))) throw new Error('Invalid Python license archive');
+execFileSync('tar', ['-xf', fullArchive, '-C', legal, ...licenseEntries]);
+fs.cpSync(path.join(source, 'licenses'), path.join(legal, 'supplemental'), { recursive: true });
+// The pinned standalone archive references zlib-ng's notice but omits the file.
+fs.copyFileSync(path.join(source, 'licenses/LICENSE.zlib-ng.txt'), path.join(legal, 'python/licenses/LICENSE.zlib-ng.txt'));
+fs.copyFileSync(path.join(source, 'license_overrides.json'), path.join(legal, 'license_overrides.json'));
+execFileSync(python, ['-I', path.join(source, 'license_inventory.py'), output], { stdio: 'inherit' });
+fs.rmSync(upstream, { recursive: true, force: true });
+// Build tools are not runtime dependencies. Keep the private interpreter free of
+// pip, setuptools and wheel after the hash-locked installation has completed.
+const sitePackages = process.platform === 'win32' ? path.join(output, 'python/Lib/site-packages') : path.join(output, 'python/lib/python3.12/site-packages');
+fs.rmSync(sitePackages, { recursive: true, force: true });
 // Keep every installed wheel's .dist-info license and provenance in the shipped
 // tree. CPython's own license tree is retained verbatim as part of python/.
 const files = [];
@@ -67,6 +85,10 @@ function inventory(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) inventory(file);
+    else if (entry.isSymbolicLink()) {
+      if (!fs.realpathSync(file).startsWith(`${fs.realpathSync(output)}${path.sep}`)) throw new Error('Runtime symlink escapes bundle');
+      files.push({ path: path.relative(output, file), target: fs.readlinkSync(file) });
+    }
     else if (entry.isFile() && file !== ready) files.push({ path: path.relative(output, file), sha256: digest(fs.readFileSync(file)) });
   }
 }

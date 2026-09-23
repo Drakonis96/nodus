@@ -160,7 +160,8 @@
     "verify:capability-migration": "node scripts/verify-capability-migration-e2e.mjs",
     "verify:capability-packages": "node scripts/verify-capability-package-install.mjs chemistry-studio && node scripts/verify-capability-package-install.mjs legalize && node scripts/verify-capability-package-install.mjs alphagenome && node scripts/verify-capability-package-install.mjs research-visuals",
     "verify:maps": "node scripts/verify-maps.mjs",
-    "verify:historical-maps": "node scripts/verify-historical-maps.mjs"
+    "verify:historical-maps": "node scripts/verify-historical-maps.mjs",
+    "research:runtime": "node scripts/prepare-zotero-mcp.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -326,6 +327,10 @@
       {
         "from": "build/capability-bootstrap",
         "to": "capability-bootstrap"
+      },
+      {
+        "from": "build/zotero-mcp",
+        "to": "zotero-mcp"
       }
     ],
     "files": [

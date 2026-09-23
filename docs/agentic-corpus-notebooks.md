@@ -136,3 +136,36 @@ Three additional regression scripts pass for scope/history/budget enforcement,
 source-job recovery and notebook persistence. The traditional native PDF worker
 path, full report generation, platform packaging and provider comparison still
 need integration evidence. No claim of full acceptance is made at this milestone.
+
+### Managed and external Zotero connector milestone
+
+The private runtime is now included in packaging resources. Its build verifies
+both runtime archives and installed bytes, inventories Python native-library
+licenses and every installed distribution, and removes build-only packages.
+Two wheel license omissions and one missing upstream zlib-ng license are filled
+from pinned source artifacts; their origins and hashes are recorded. The native
+CI matrix builds each platform separately. These workflows do not constitute
+completed signing, notarization or installer/uninstaller acceptance.
+
+The notebook editor exposes managed stdio and explicit external Streamable HTTP.
+Only the backend constructs a manifest from authorized source revisions. Both
+transports must declare the exact scope fingerprint and the four expected read
+operations. Closing a managed connection removes its private configuration;
+closing an external connection does not own or terminate its server.
+
+`verify-independent-zotero.mjs --nodus` passed in
+`/private/tmp/nodus-research-K1kvIv`: Zotero 10.0.3 with separate profile and data,
+three synthetic collections and PDFs, real Nodus import, managed MCP metadata
+and full-text reads, lexical PDF retrieval with physical page 1, excluded-source
+rejection, and connection revocation after a manual selection change. The same
+run passed external Streamable HTTP, rejected a mismatched server scope, and
+verified that disconnect and rejection preserved the external fixture process.
+The fixture owner subsequently stopped that process. The OS write-boundary
+negative probe passed before either application started. No paid models were
+called. Short single-sentence PDFs in an earlier fixture correctly fell back to
+abstracts after the existing extraction-quality threshold rejected them; the
+full-text acceptance fixture now contains a complete synthetic paragraph.
+
+The shared cost ledger additionally has regression coverage for durable unknown
+usage, the strict combined five-dollar boundary, invalid numbers, corrupt state
+and idempotent settlement. It is not yet wired to a live inference campaign.

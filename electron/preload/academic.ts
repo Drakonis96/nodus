@@ -16,6 +16,10 @@ let activeStudySttRequestId: string | null = null;
 
 export const academicApi: AcademicApi = {
   getResearchCorpusSources: () => ipcRenderer.invoke('research:corpus:sources'),
+  getZoteroMcpStatus: () => ipcRenderer.invoke('research:zotero:status'),
+  connectResearchZotero: input => ipcRenderer.invoke('research:zotero:connect', input),
+  disconnectResearchZotero: () => ipcRenderer.invoke('research:zotero:disconnect'),
+  readResearchZotero: input => ipcRenderer.invoke('research:zotero:read', input),
   listResearchNotebooks: () => ipcRenderer.invoke('research:notebooks:list'),
   saveResearchNotebook: input => ipcRenderer.invoke('research:notebooks:save', input),
   deleteResearchNotebook: id => ipcRenderer.invoke('research:notebooks:delete', id),

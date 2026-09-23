@@ -1,0 +1,55 @@
+name: Research corpus native integration
+on:
+  pull_request:
+    paths:
+      - 'runtime/zotero-mcp/**'
+      - 'scripts/*research*'
+      - 'scripts/*zotero-mcp*'
+      - 'electron/ai/*research*'
+      - 'electron/ai/documentary*'
+      - 'electron/db/documentary*'
+      - '.github/workflows/research-corpus-native.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: research-native-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        os: [macos-latest, macos-15-intel, windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx electron-builder install-app-deps
+      - name: Hash-locked private runtime and installed-byte license inventory
+        run: npm run research:runtime
+      - name: Native stdio against synthetic local API
+        run: node scripts/verify-managed-zotero-mcp.mjs --disposable-ci
+      - name: Compile renderer and native entry points
+        run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+      - name: Synthetic scope and durable queue regressions
+        run: node --test --test-concurrency=2 scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs
+      - name: Isolated real Electron notebooks on macOS
+        if: runner.os == 'macOS'
+        run: node scripts/e2e-research-isolated.mjs --notebooks
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: research-runtime-${{ matrix.os }}
+          path: |
+            build/zotero-mcp/runtime.json
+            build/zotero-mcp/legal/**
+          if-no-files-found: warn

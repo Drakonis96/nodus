@@ -16,6 +16,20 @@ resources with:
 - the GNU GPL/LGPL and Creative Commons license texts; and
 - instructions and source references for replacing/rebuilding LGPL components.
 
+## Managed Zotero MCP and private CPython
+
+The application includes Zotero MCP 0.13.0 (MIT), the Nodus read-only adapter
+(AGPL-3.0-only), and CPython 3.12.14 build 20260901. Their runtime is private to
+Nodus and does not replace an installed Python or Zotero MCP.
+
+`resources/zotero-mcp/legal/THIRD_PARTY_NOTICES.md` and `inventory.json` describe
+the exact installed distributions, including every transitive dependency. The
+referenced license texts, Python build metadata and native-library notices are
+included alongside them. The runtime carries the Python sources for Unidecode
+(GPL) and certifi (MPL); bibtexparser's BSD alternative is retained. Rebuild
+instructions and pinned hashes are in `runtime/zotero-mcp/` in the corresponding
+Nodus source tree. No semantic model weights are included.
+
 ## AlphaGenome — Apache 2.0 client; separate service/output terms
 
 AlphaGenome interoperates with Google DeepMind's AlphaGenome through a

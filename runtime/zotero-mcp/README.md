@@ -29,3 +29,20 @@ Upstream MIT license, dependency license files and CPython's license files are
 retained in the runtime. `runtime.json` inventories the exact distributed files
 and their SHA-256 hashes. Licensing review and native installer/signing checks
 remain release gates; the development bundle is not a signed distribution.
+
+## Installed-byte notices
+
+The build collects each wheel's actual license files and rejects missing evidence.
+The matching full python-build-standalone archive supplies `PYTHON.json` and native
+library notices, with a SHA-256 pin for each supported platform. Build-only pip,
+setuptools and wheel are removed before inventorying the shipped interpreter.
+
+Two 0.3.0 py-key-value wheels omit their Apache notice. `license_overrides.json`
+records the release commit and exact copied text. The standalone 20260901 archive
+also references but omits `LICENSE.zlib-ng.txt`; the supplement comes from the
+CPython source-deps zlib-ng 2.2.4 archive pinned by that build's download manifest:
+SHA-256 `00bbd88709bc416cb96160ab61d3e1c8f76e106799af7328d0fe434dc7dd5004`.
+Its license file hashes to
+`6c9f0d975b41afaa34d22f55bb8986ce69e5cb7ad327cb2b28820cd425edf5ee`.
+Native tests on a disposable hosted runner are identified separately from the
+macOS OS write-boundary test; they are not installation/uninstallation evidence.

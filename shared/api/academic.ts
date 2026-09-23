@@ -225,7 +225,8 @@ import type {
 
 export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCorpusApi,
   'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook'
-  | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'> {
+  | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'
+  | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {
   // Dictionary: persistent evidence-backed concept syntheses
   listDictionaryEntries(request: DictionaryListRequest): Promise<DictionaryEntryPage>;
   listDictionaryFacets(): Promise<DictionaryFacets>;

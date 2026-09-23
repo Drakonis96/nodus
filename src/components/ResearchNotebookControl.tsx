@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RETRIEVAL_PRESETS, type ResearchCorpusCollection, type ResearchCorpusDocument, type ResearchNotebook, type ResearchNotebookInput, type ResearchPreparationInventory, type ResearchSourceReference } from '@shared/researchCorpus';
+import { ResearchZoteroControl } from './ResearchZoteroControl';
 import { t } from '../i18n';
 
 export function ResearchNotebookControl({ value, onChange }: { value?: string | null; onChange: (id: string | null) => void }) {
@@ -113,6 +114,7 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
           <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(async () => setInventory(await window.nodus.getResearchPreparationInventory()))}>{t('Actualizar')}</button>
         </div>
       </div>
+      {notebook && <ResearchZoteroControl notebookId={notebook.id} />}
       {error && <p role="alert" className="text-red-400 mb-3">{error}</p>}
       <div className="flex gap-2 justify-end">
         {notebook && <button type="button" className="btn btn-ghost mr-auto" disabled={busy} title={t('Las conversaciones y las fuentes se conservarán.')} onClick={() => void act(async () => { await window.nodus.deleteResearchNotebook(notebook.id); await onSaved(null); })}>{t('Eliminar')}</button>}

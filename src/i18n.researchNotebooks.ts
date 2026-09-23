@@ -17,7 +17,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "Preparing sources makes them searchable without generating Ideas or profiles.",
     "Preparar nuevas incorporaciones": "Prepare newly added sources",
     "Preparar fuentes": "Prepare sources",
-    "Las conversaciones y las fuentes se conservarán.": "Conversations and sources will be preserved."
+    "Las conversaciones y las fuentes se conservarán.": "Conversations and sources will be preserved.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Read-only connection restricted to this notebook’s sources.",
+    "Modalidad": "Mode",
+    "Zotero MCP gestionado": "Managed Zotero MCP",
+    "Conexión externa avanzada": "Advanced external connection",
+    "Endpoint MCP": "MCP endpoint",
+    "Conectar": "Connect",
+    "Desconectar": "Disconnect",
+    "Conectando…": "Connecting…",
+    "Conectado": "Connected",
+    "Desconectado": "Disconnected"
   },
   "fr": {
     "Cuaderno de investigación": "Carnet de recherche",
@@ -37,7 +47,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "La préparation permet de consulter les sources sans générer d’Idées ni de profils.",
     "Preparar nuevas incorporaciones": "Préparer les nouvelles sources",
     "Preparar fuentes": "Préparer les sources",
-    "Las conversaciones y las fuentes se conservarán.": "Les conversations et les sources seront conservées."
+    "Las conversaciones y las fuentes se conservarán.": "Les conversations et les sources seront conservées.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Connexion en lecture seule limitée aux sources de ce carnet.",
+    "Modalidad": "Mode",
+    "Zotero MCP gestionado": "Zotero MCP géré",
+    "Conexión externa avanzada": "Connexion externe avancée",
+    "Endpoint MCP": "Point de terminaison MCP",
+    "Conectar": "Connecter",
+    "Desconectar": "Déconnecter",
+    "Conectando…": "Connexion…",
+    "Conectado": "Connecté",
+    "Desconectado": "Déconnecté"
   },
   "de": {
     "Cuaderno de investigación": "Forschungsnotizbuch",
@@ -57,7 +77,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "Die Vorbereitung macht Quellen durchsuchbar, ohne Ideen oder Profile zu erzeugen.",
     "Preparar nuevas incorporaciones": "Neue Quellen vorbereiten",
     "Preparar fuentes": "Quellen vorbereiten",
-    "Las conversaciones y las fuentes se conservarán.": "Gespräche und Quellen bleiben erhalten."
+    "Las conversaciones y las fuentes se conservarán.": "Gespräche und Quellen bleiben erhalten.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Schreibgeschützte Verbindung, beschränkt auf die Quellen dieses Notizbuchs.",
+    "Modalidad": "Modus",
+    "Zotero MCP gestionado": "Verwaltetes Zotero MCP",
+    "Conexión externa avanzada": "Erweiterte externe Verbindung",
+    "Endpoint MCP": "MCP-Endpunkt",
+    "Conectar": "Verbinden",
+    "Desconectar": "Trennen",
+    "Conectando…": "Verbindung wird hergestellt…",
+    "Conectado": "Verbunden",
+    "Desconectado": "Getrennt"
   },
   "it": {
     "Cuaderno de investigación": "Quaderno di ricerca",
@@ -77,7 +107,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "La preparazione rende consultabili le fonti senza generare Idee o profili.",
     "Preparar nuevas incorporaciones": "Prepara le nuove fonti",
     "Preparar fuentes": "Prepara le fonti",
-    "Las conversaciones y las fuentes se conservarán.": "Le conversazioni e le fonti verranno conservate."
+    "Las conversaciones y las fuentes se conservarán.": "Le conversazioni e le fonti verranno conservate.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Connessione in sola lettura limitata alle fonti di questo quaderno.",
+    "Modalidad": "Modalità",
+    "Zotero MCP gestionado": "Zotero MCP gestito",
+    "Conexión externa avanzada": "Connessione esterna avanzata",
+    "Endpoint MCP": "Endpoint MCP",
+    "Conectar": "Connetti",
+    "Desconectar": "Disconnetti",
+    "Conectando…": "Connessione…",
+    "Conectado": "Connesso",
+    "Desconectado": "Disconnesso"
   },
   "pt": {
     "Cuaderno de investigación": "Caderno de investigação",
@@ -97,7 +137,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "A preparação permite consultar as fontes sem gerar Ideias nem perfis.",
     "Preparar nuevas incorporaciones": "Preparar novas fontes",
     "Preparar fuentes": "Preparar fontes",
-    "Las conversaciones y las fuentes se conservarán.": "As conversas e as fontes serão preservadas."
+    "Las conversaciones y las fuentes se conservarán.": "As conversas e as fontes serão preservadas.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Ligação só de leitura limitada às fontes deste caderno.",
+    "Modalidad": "Modo",
+    "Zotero MCP gestionado": "Zotero MCP gerido",
+    "Conexión externa avanzada": "Ligação externa avançada",
+    "Endpoint MCP": "Endpoint MCP",
+    "Conectar": "Ligar",
+    "Desconectar": "Desligar",
+    "Conectando…": "A ligar…",
+    "Conectado": "Ligado",
+    "Desconectado": "Desligado"
   },
   "pt-BR": {
     "Cuaderno de investigación": "Caderno de pesquisa",
@@ -117,7 +167,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "A preparação permite consultar as fontes sem gerar Ideias nem perfis.",
     "Preparar nuevas incorporaciones": "Preparar novas fontes",
     "Preparar fuentes": "Preparar fontes",
-    "Las conversaciones y las fuentes se conservarán.": "As conversas e as fontes serão preservadas."
+    "Las conversaciones y las fuentes se conservarán.": "As conversas e as fontes serão preservadas.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Conexão somente de leitura limitada às fontes deste caderno.",
+    "Modalidad": "Modo",
+    "Zotero MCP gestionado": "Zotero MCP gerenciado",
+    "Conexión externa avanzada": "Conexão externa avançada",
+    "Endpoint MCP": "Endpoint MCP",
+    "Conectar": "Conectar",
+    "Desconectar": "Desconectar",
+    "Conectando…": "Conectando…",
+    "Conectado": "Conectado",
+    "Desconectado": "Desconectado"
   },
   "tr": {
     "Cuaderno de investigación": "Araştırma defteri",
@@ -137,7 +197,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "Kaynakları hazırlamak, Fikir veya profil oluşturmadan sorgulamayı sağlar.",
     "Preparar nuevas incorporaciones": "Yeni eklenen kaynakları hazırla",
     "Preparar fuentes": "Kaynakları hazırla",
-    "Las conversaciones y las fuentes se conservarán.": "Sohbetler ve kaynaklar korunacaktır."
+    "Las conversaciones y las fuentes se conservarán.": "Sohbetler ve kaynaklar korunacaktır.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "Bu defterin kaynaklarıyla sınırlı salt okunur bağlantı.",
+    "Modalidad": "Mod",
+    "Zotero MCP gestionado": "Yönetilen Zotero MCP",
+    "Conexión externa avanzada": "Gelişmiş harici bağlantı",
+    "Endpoint MCP": "MCP uç noktası",
+    "Conectar": "Bağlan",
+    "Desconectar": "Bağlantıyı kes",
+    "Conectando…": "Bağlanıyor…",
+    "Conectado": "Bağlı",
+    "Desconectado": "Bağlı değil"
   },
   "zh-CN": {
     "Cuaderno de investigación": "研究笔记本",
@@ -157,7 +227,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "准备来源后即可查询，无需生成观点或文档概况。",
     "Preparar nuevas incorporaciones": "准备新添加的来源",
     "Preparar fuentes": "准备来源",
-    "Las conversaciones y las fuentes se conservarán.": "将保留对话和来源。"
+    "Las conversaciones y las fuentes se conservarán.": "将保留对话和来源。",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "只读连接，仅限此笔记本的来源。",
+    "Modalidad": "模式",
+    "Zotero MCP gestionado": "托管 Zotero MCP",
+    "Conexión externa avanzada": "高级外部连接",
+    "Endpoint MCP": "MCP 端点",
+    "Conectar": "连接",
+    "Desconectar": "断开连接",
+    "Conectando…": "正在连接…",
+    "Conectado": "已连接",
+    "Desconectado": "未连接"
   },
   "zh-TW": {
     "Cuaderno de investigación": "研究筆記本",
@@ -177,7 +257,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "準備來源後即可查詢，無需產生觀點或文件概況。",
     "Preparar nuevas incorporaciones": "準備新加入的來源",
     "Preparar fuentes": "準備來源",
-    "Las conversaciones y las fuentes se conservarán.": "將保留對話和來源。"
+    "Las conversaciones y las fuentes se conservarán.": "將保留對話和來源。",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "唯讀連線，僅限此筆記本的來源。",
+    "Modalidad": "模式",
+    "Zotero MCP gestionado": "受管理的 Zotero MCP",
+    "Conexión externa avanzada": "進階外部連線",
+    "Endpoint MCP": "MCP 端點",
+    "Conectar": "連線",
+    "Desconectar": "中斷連線",
+    "Conectando…": "正在連線…",
+    "Conectado": "已連線",
+    "Desconectado": "未連線"
   },
   "ja": {
     "Cuaderno de investigación": "研究ノートブック",
@@ -197,7 +287,17 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "資料を準備すると、アイデアやプロファイルを生成せずに検索できます。",
     "Preparar nuevas incorporaciones": "新しい資料を準備",
     "Preparar fuentes": "資料を準備",
-    "Las conversaciones y las fuentes se conservarán.": "会話と資料は保持されます。"
+    "Las conversaciones y las fuentes se conservarán.": "会話と資料は保持されます。",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "このノートブックの資料に限定した読み取り専用接続です。",
+    "Modalidad": "モード",
+    "Zotero MCP gestionado": "管理対象 Zotero MCP",
+    "Conexión externa avanzada": "高度な外部接続",
+    "Endpoint MCP": "MCP エンドポイント",
+    "Conectar": "接続",
+    "Desconectar": "切断",
+    "Conectando…": "接続中…",
+    "Conectado": "接続済み",
+    "Desconectado": "未接続"
   },
   "ko": {
     "Cuaderno de investigación": "연구 노트북",
@@ -217,6 +317,16 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.": "자료를 준비하면 아이디어나 프로필을 생성하지 않고 검색할 수 있습니다.",
     "Preparar nuevas incorporaciones": "새로 추가된 자료 준비",
     "Preparar fuentes": "자료 준비",
-    "Las conversaciones y las fuentes se conservarán.": "대화와 자료는 유지됩니다."
+    "Las conversaciones y las fuentes se conservarán.": "대화와 자료는 유지됩니다.",
+    "Conexión de solo lectura limitada a las fuentes de este cuaderno.": "이 노트북의 자료로 제한된 읽기 전용 연결입니다.",
+    "Modalidad": "모드",
+    "Zotero MCP gestionado": "관리형 Zotero MCP",
+    "Conexión externa avanzada": "고급 외부 연결",
+    "Endpoint MCP": "MCP 엔드포인트",
+    "Conectar": "연결",
+    "Desconectar": "연결 해제",
+    "Conectando…": "연결 중…",
+    "Conectado": "연결됨",
+    "Desconectado": "연결 안 됨"
   }
 };

@@ -128,6 +128,8 @@ export interface DocumentPreparationState {
 }
 
 export interface ZoteroMcpStatus {
+  notebookId?: string | null;
+  scopeId?: string | null;
   installed: boolean;
   mode: 'managed' | 'external';
   state: 'disabled' | 'stopped' | 'starting' | 'connected' | 'zotero_unavailable' | 'incompatible' | 'startup_error' | 'endpoint_error';
@@ -153,4 +155,7 @@ export interface ResearchCorpusApi {
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;
   setResearchPreparationPaused(paused: boolean): Promise<void>;
   getZoteroMcpStatus(): Promise<ZoteroMcpStatus>;
+  connectResearchZotero(input: { notebookId?: string | null; mode: 'managed' | 'external'; externalUrl?: string }): Promise<ZoteroMcpStatus>;
+  disconnectResearchZotero(): Promise<void>;
+  readResearchZotero(input: { notebookId?: string | null; documentId: string; operation: 'metadata' | 'fulltext'; attachmentKey?: string }): Promise<unknown>;
 }

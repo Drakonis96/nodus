@@ -259,6 +259,7 @@ import { reprocessConnections } from '../ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
 import { getPassageDetail } from '../db/passagesRepo';
+import * as researchZotero from '../mcp/researchZotero';
 import { getDocumentaryPassageDetail } from '../citations/documentaryCitations';
 import {
   deleteDocumentProfileOverride,
@@ -1621,6 +1622,10 @@ export function registerAcademicIpc(context: IpcContext): void {
 
   // research assistant
   h('research:corpus:sources', async () => researchCorpusInventory());
+  h('research:zotero:status', async () => researchZotero.getResearchZoteroStatus());
+  h('research:zotero:connect', async (_e, input: Parameters<typeof researchZotero.connectResearchZotero>[0]) => researchZotero.connectResearchZotero(input));
+  h('research:zotero:disconnect', async () => researchZotero.closeResearchZotero());
+  h('research:zotero:read', async (_e, input: Parameters<typeof researchZotero.readResearchZotero>[0]) => researchZotero.readResearchZotero(input));
   h('research:notebooks:list', async () => researchNotebooks.listResearchNotebooks());
   h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));
   h('research:notebooks:delete', async (_e, id: string) => researchNotebooks.deleteResearchNotebook(id));

@@ -60,6 +60,15 @@ def load_scope(filename: str) -> dict:
 
 def build_server(scope: dict) -> FastMCP:
     server = FastMCP("nodus-zotero-mcp", version="0.13.0+nodus.1")
+    @server.resource("nodus://zotero/scope")
+    def authorized_scope() -> str:
+        items = sorted([[item['libraryType'], str(item['libraryId']), item['itemKey'], item['version'], item['revision'],
+                         sorted([[attachment['key'], attachment['version']] for attachment in item.get('attachments', [])])]
+                        for item in scope['items']])
+        encoded = json.dumps([scope['serverId'], items], separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+        return json.dumps({'format': 'nodus.zotero-scope-capabilities/1', 'readOnly': True,
+                           'fingerprint': hashlib.sha256(encoded).hexdigest()})
+
     allowed = {(str(item["libraryType"]), str(item["libraryId"]), str(item["itemKey"])): item for item in scope["items"]}
     client = httpx.Client(timeout=20, trust_env=False, follow_redirects=False,
                          headers={'Zotero-Server-ID': scope['serverId'], 'Zotero-API-Version': '3', 'Zotero-Allowed-Request': '1'})
