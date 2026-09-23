@@ -6,7 +6,7 @@ try{
 const page=await app.firstWindow();page.setDefaultTimeout(30000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
 await page.waitForFunction(()=>typeof window.nodus?.stellarPage==='function');
 await page.evaluate(async(version)=>{sessionStorage.setItem('nodus.startupUpdateChecked','1');localStorage.setItem('nodus.lastSeenVersion',version);localStorage.setItem('nodus.mobileTeaserSeen.5.3.1','1');for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:5,recoverySetupVersion:1,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});},appVersion);
-await page.evaluate(()=>window.nodus.seedDemoData());await page.reload();await page.waitForTimeout(1800);
+await page.evaluate(async()=>{await window.nodus.seedDemoData();/* Same as the welcome's Later: the demonstration profile has seen it. */await window.nodus.setResearchPreparationPolicy({welcomeVersion:1});});await page.reload();await page.waitForTimeout(1800);
 // Exercise the short viewport available on CI and smaller laptop displays.
 await app.evaluate(({BrowserWindow})=>{const w=BrowserWindow.getAllWindows()[0];w.setContentSize(1500,700);});
 await page.locator('[data-tour="nav-graph"]').click();await page.getByTestId('stellar-canvas').waitFor();
