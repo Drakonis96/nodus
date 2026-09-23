@@ -69,7 +69,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Queue current library",
     "Ver en Queue": "View in Queue",
     "Completar embeddings pendientes": "Complete pending embeddings",
-    "Actualizar índice": "Update index"
+    "Actualizar índice": "Update index",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Local OCR resources are missing. Configure the installed languages in Settings, then retry.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR could not read every scanned page. Check the original, then retry.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "The embeddings model is unavailable. Check its configuration, then retry.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "The local text extraction process is unavailable. Restart Nodus, then retry."
   },
   "fr": {
     "Disponible: revisión anterior": "Disponible : révision précédente",
@@ -141,7 +145,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Mettre la bibliothèque actuelle en attente",
     "Ver en Queue": "Voir dans Queue",
     "Completar embeddings pendientes": "Compléter les embeddings manquants",
-    "Actualizar índice": "Actualiser l’index"
+    "Actualizar índice": "Actualiser l’index",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Les ressources OCR locales manquent. Configurez les langues installées dans les paramètres, puis réessayez.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "L’OCR n’a pas pu lire toutes les pages numérisées. Vérifiez l’original, puis réessayez.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "Le modèle d’embeddings est indisponible. Vérifiez sa configuration, puis réessayez.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "Le processus local d’extraction de texte est indisponible. Redémarrez Nodus, puis réessayez."
   },
   "de": {
     "Disponible: revisión anterior": "Verfügbar: vorherige Revision",
@@ -213,7 +221,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Aktuelle Bibliothek einreihen",
     "Ver en Queue": "In Queue anzeigen",
     "Completar embeddings pendientes": "Ausstehende Embeddings ergänzen",
-    "Actualizar índice": "Index aktualisieren"
+    "Actualizar índice": "Index aktualisieren",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Lokale OCR-Ressourcen fehlen. Konfigurieren Sie die installierten Sprachen in den Einstellungen und versuchen Sie es erneut.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR konnte nicht alle gescannten Seiten lesen. Prüfen Sie das Original und versuchen Sie es erneut.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "Das Embedding-Modell ist nicht verfügbar. Prüfen Sie die Konfiguration und versuchen Sie es erneut.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "Der lokale Textextraktionsprozess ist nicht verfügbar. Starten Sie Nodus neu und versuchen Sie es erneut."
   },
   "it": {
     "Disponible: revisión anterior": "Disponibile: revisione precedente",
@@ -285,7 +297,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Accoda biblioteca attuale",
     "Ver en Queue": "Visualizza in Queue",
     "Completar embeddings pendientes": "Completa embedding in sospeso",
-    "Actualizar índice": "Aggiorna indice"
+    "Actualizar índice": "Aggiorna indice",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Mancano le risorse OCR locali. Configura le lingue installate nelle impostazioni, poi riprova.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "L’OCR non ha letto tutte le pagine scansionate. Controlla l’originale, poi riprova.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "Il modello di embedding non è disponibile. Controlla la configurazione, poi riprova.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "Il processo locale di estrazione del testo non è disponibile. Riavvia Nodus, poi riprova."
   },
   "pt": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -357,7 +373,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Colocar biblioteca atual em fila",
     "Ver en Queue": "Ver em Queue",
     "Completar embeddings pendientes": "Completar embeddings pendentes",
-    "Actualizar índice": "Atualizar índice"
+    "Actualizar índice": "Atualizar índice",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Faltam recursos locais de OCR. Configure os idiomas instalados nas definições e tente novamente.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "O OCR não conseguiu ler todas as páginas digitalizadas. Verifique o original e tente novamente.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "O modelo de embeddings não está disponível. Verifique a configuração e tente novamente.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "O processo local de extração de texto não está disponível. Reinicie o Nodus e tente novamente."
   },
   "pt-BR": {
     "Disponible: revisión anterior": "Disponível: revisão anterior",
@@ -429,7 +449,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Enfileirar biblioteca atual",
     "Ver en Queue": "Ver em Queue",
     "Completar embeddings pendientes": "Completar embeddings pendentes",
-    "Actualizar índice": "Atualizar índice"
+    "Actualizar índice": "Atualizar índice",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Faltam recursos locais de OCR. Configure os idiomas instalados nas configurações e tente novamente.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "O OCR não conseguiu ler todas as páginas digitalizadas. Verifique o original e tente novamente.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "O modelo de embeddings está indisponível. Verifique a configuração e tente novamente.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "O processo local de extração de texto está indisponível. Reinicie o Nodus e tente novamente."
   },
   "tr": {
     "Disponible: revisión anterior": "Kullanılabilir: önceki sürüm",
@@ -501,7 +525,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "Mevcut kütüphaneyi kuyruğa ekle",
     "Ver en Queue": "Queue içinde göster",
     "Completar embeddings pendientes": "Bekleyen gömmeleri tamamla",
-    "Actualizar índice": "Dizini güncelle"
+    "Actualizar índice": "Dizini güncelle",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "Yerel OCR kaynakları eksik. Ayarlarda kurulu dilleri yapılandırıp yeniden deneyin.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR tüm taranmış sayfaları okuyamadı. Orijinali kontrol edip yeniden deneyin.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "Gömme modeli kullanılamıyor. Yapılandırmasını kontrol edip yeniden deneyin.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "Yerel metin çıkarma işlemi kullanılamıyor. Nodus’u yeniden başlatıp tekrar deneyin."
   },
   "zh-CN": {
     "Disponible: revisión anterior": "可查询：先前版本",
@@ -573,7 +601,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "将当前文献库加入队列",
     "Ver en Queue": "在 Queue 中查看",
     "Completar embeddings pendientes": "完成待处理的嵌入",
-    "Actualizar índice": "更新索引"
+    "Actualizar índice": "更新索引",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "缺少本地 OCR 资源。请在设置中配置已安装的语言，然后重试。",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR 无法读取所有扫描页。请检查原文，然后重试。",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "嵌入模型不可用。请检查配置，然后重试。",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "本地文本提取进程不可用。请重启 Nodus，然后重试。"
   },
   "zh-TW": {
     "Disponible: revisión anterior": "可查詢：先前版本",
@@ -645,7 +677,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "將目前文獻庫加入佇列",
     "Ver en Queue": "在 Queue 中檢視",
     "Completar embeddings pendientes": "完成待處理的嵌入",
-    "Actualizar índice": "更新索引"
+    "Actualizar índice": "更新索引",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "缺少本機 OCR 資源。請在設定中配置已安裝的語言，然後重試。",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR 無法讀取所有掃描頁。請檢查原文，然後重試。",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "嵌入模型無法使用。請檢查設定，然後重試。",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "本機文字擷取程序無法使用。請重新啟動 Nodus，然後重試。"
   },
   "ja": {
     "Disponible: revisión anterior": "利用可能：以前の版",
@@ -717,7 +753,11 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "現在のライブラリをキューに追加",
     "Ver en Queue": "Queue で表示",
     "Completar embeddings pendientes": "保留中の埋め込みを完了",
-    "Actualizar índice": "索引を更新"
+    "Actualizar índice": "索引を更新",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "ローカル OCR リソースがありません。設定でインストール済み言語を設定して再試行してください。",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR ですべてのスキャンページを読み取れませんでした。原本を確認して再試行してください。",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "埋め込みモデルが利用できません。設定を確認して再試行してください。",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "ローカルのテキスト抽出プロセスが利用できません。Nodus を再起動して再試行してください。"
   },
   "ko": {
     "Disponible: revisión anterior": "사용 가능: 이전 버전",
@@ -789,6 +829,10 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Encolar biblioteca actual": "현재 라이브러리를 대기열에 추가",
     "Ver en Queue": "Queue에서 보기",
     "Completar embeddings pendientes": "대기 중인 임베딩 완료",
-    "Actualizar índice": "색인 업데이트"
+    "Actualizar índice": "색인 업데이트",
+    "Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.": "로컬 OCR 리소스가 없습니다. 설정에서 설치된 언어를 구성한 후 다시 시도하세요.",
+    "El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.": "OCR이 모든 스캔 페이지를 읽지 못했습니다. 원본을 확인한 후 다시 시도하세요.",
+    "El modelo de embeddings no está disponible. Revisa su configuración y reintenta.": "임베딩 모델을 사용할 수 없습니다. 설정을 확인한 후 다시 시도하세요.",
+    "El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.": "로컬 텍스트 추출 프로세스를 사용할 수 없습니다. Nodus를 다시 시작한 후 다시 시도하세요."
   }
-};
+} as const;

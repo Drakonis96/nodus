@@ -66,6 +66,9 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build:server-web
 
+      - name: Prepare hash-verified local OCR test resource
+        run: node scripts/prepare-research-ocr-fixture.mjs
+
       - name: Unit and integration tests
         # Two files at a time: the heavy tail (Zotero, world databases, Chromium
         # and Electron-backed suites) already saturates a 3-vCPU/7 GB macOS

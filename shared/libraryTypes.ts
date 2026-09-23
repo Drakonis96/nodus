@@ -523,6 +523,8 @@ export interface ZoteroSyncSession {
 }
 
 export interface LibraryExtractionOptions {
+  /** Documentary preparation may only reuse installed language resources. */
+  localOcrOnly?: boolean;
   ocrMode: 'off' | 'local' | 'remote';
   ocrLanguages: string;
   maxOcrPages: number;

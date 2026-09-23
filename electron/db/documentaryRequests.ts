@@ -14,7 +14,7 @@ export class DocumentaryRequests {
     )`);
     const columns = new Set((db.prepare('PRAGMA table_info(documentary_requests)').all() as { name: string }[]).map(column => column.name));
     for (const [name, sql] of Object.entries({ vault_id: "TEXT NOT NULL DEFAULT ''", lease_token: 'TEXT', lease_until: 'INTEGER',
-      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT', source_id: 'TEXT', stage: "TEXT NOT NULL DEFAULT 'extraction'", completed_passages: 'INTEGER NOT NULL DEFAULT 0', total_passages: 'INTEGER', unknown_requests: 'INTEGER NOT NULL DEFAULT 0' })) {
+      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT', source_id: 'TEXT', stage: "TEXT NOT NULL DEFAULT 'extraction'", completed_passages: 'INTEGER NOT NULL DEFAULT 0', total_passages: 'INTEGER', unknown_requests: 'INTEGER NOT NULL DEFAULT 0', current_page: 'INTEGER', total_pages: 'INTEGER' })) {
       if (!columns.has(name)) db.exec(`ALTER TABLE documentary_requests ADD COLUMN ${name} ${sql}`);
     }
   }
@@ -55,6 +55,12 @@ export class DocumentaryRequests {
     const result = this.db.prepare(`UPDATE documentary_requests SET state=?,error=?,lease_token=NULL,lease_until=NULL,updated_at=?,
       available_at=?,attempts=attempts-? WHERE document_id=? AND revision=? AND lease_token=? AND state='running'`)
       .run(state, error, now, paused ? now : now + 1000 * 2 ** job.attempts, Number(paused), job.document_id, job.revision, job.lease_token);
+    if (!result.changes) throw new Error('documentary_request_lease_lost');
+  }
+  block(job: DocumentaryRequest, reason: string, now = Date.now()): void {
+    const result = this.db.prepare(`UPDATE documentary_requests SET state='blocked',error=?,lease_token=NULL,lease_until=NULL,
+      attempts=MAX(0,attempts-1),updated_at=? WHERE document_id=? AND lease_token=? AND state='running'`)
+      .run(reason, now, job.document_id, job.lease_token);
     if (!result.changes) throw new Error('documentary_request_lease_lost');
   }
   nextDelay(vaultId: string | string[], now = Date.now()): number | null {

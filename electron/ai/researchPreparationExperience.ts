@@ -10,7 +10,7 @@ import { notifyDocumentaryPreparation } from './documentaryPreparationEvents';
 
 interface PreviewRecord {
   preview: ResearchPreparationPreview;
-  configuration: { embedding: EmbeddingExecutionConfig | null; processingVersion: string };
+  configuration: { embedding: EmbeddingExecutionConfig | null; processingVersion: string; ocrLanguages?: string };
 }
 function campaigns() { return new DocumentaryCampaigns(documentaryStore().db); }
 function academicVault() {
@@ -50,7 +50,7 @@ export function previewResearchPreparation(input: { scope: 'vault' | 'selection'
   const preview: ResearchPreparationPreview = { id: randomUUID(), vaultId: vault.id, createdAt: Date.now(), documents,
     embedding: config ? { provider: config.provider, model: config.modelId, external: !local } : null,
     embeddingAvailable: available, block: available ? null : 'no_model' };
-  const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/1' } };
+  const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' } };
   repo.db.prepare('INSERT INTO documentary_preparation_previews VALUES(?,?,?,?)').run(preview.id, vault.id, JSON.stringify(payload), preview.createdAt);
   // Unconfirmed previews carry no authority and can be reconstructed safely.
   repo.db.prepare('DELETE FROM documentary_preparation_previews WHERE created_at<?').run(Date.now() - 7 * 86400000);
@@ -82,17 +82,17 @@ export function getResearchPreparationProgress(): ResearchPreparationProgress {
   const repo = campaigns();
   const results = repo.list().map(campaign => {
     const configuration = JSON.parse(campaign.configuration_json) as PreviewRecord['configuration'];
-    const rows = repo.db.prepare(`SELECT m.*,r.state request_state,r.stage,r.completed_passages,r.total_passages,r.unknown_requests,r.error
+    const rows = repo.db.prepare(`SELECT m.*,r.state request_state,r.stage,r.completed_passages,r.total_passages,r.unknown_requests,r.current_page,r.total_pages,r.error
       FROM documentary_campaign_members m JOIN documentary_requests r ON r.document_id=m.job_id WHERE m.campaign_id=? ORDER BY m.title,m.document_id`).all(campaign.id) as Array<{
         job_id: string; document_id: string; title: string; state: string; request_state: ResearchPreparationCampaign['jobs'][number]['state'];
-        stage: ResearchPreparationCampaign['jobs'][number]['stage']; completed_passages: number; total_passages: number | null; unknown_requests: number; error: string | null;
+        stage: ResearchPreparationCampaign['jobs'][number]['stage']; completed_passages: number; total_passages: number | null; unknown_requests: number; current_page: number | null; total_pages: number | null; error: string | null;
       }>;
     return { id: campaign.id, vaultId: campaign.vault_id, vaultName: getVault(campaign.vault_id)?.name ?? campaign.vault_name,
       createdAt: campaign.created_at, updatedAt: campaign.updated_at, state: campaign.state,
       embedding: configuration.embedding ? { provider: configuration.embedding.provider, model: configuration.embedding.modelId, external: !['ollama', 'lmstudio', 'nodus'].includes(configuration.embedding.provider) } : null,
       jobs: rows.map(row => ({ id: row.job_id, documentId: row.document_id, title: row.title,
         state: row.state !== 'active' ? row.state as ResearchPreparationCampaign['jobs'][number]['state'] : campaign.state !== 'active' ? campaign.state : row.request_state,
-        stage: row.stage, completedPassages: row.completed_passages, totalPassages: row.total_passages, unknownRequests: row.unknown_requests, error: row.error })) };
+        stage: row.stage, completedPassages: row.completed_passages, totalPassages: row.total_passages, unknownRequests: row.unknown_requests, currentPage: row.current_page, totalPages: row.total_pages, error: row.error })) };
   });
   return { paused: documentaryStore().preference('paused'), campaigns: results };
 }

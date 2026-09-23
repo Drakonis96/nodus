@@ -88,7 +88,9 @@ export class DocumentaryCampaigns {
   }
   synchronizeOwners(vaultIds: string[]): void {
     const allowed = new Set(vaultIds);
-    for (const job of this.db.prepare("SELECT document_id FROM documentary_requests WHERE source_id IS NOT NULL AND state IN ('queued','blocked')").all() as { document_id: string }[]) {
+    // Missing local resources or credentials require an explicit retry. Only
+    // ownership blocks can be recovered by discovering another active interest.
+    for (const job of this.db.prepare("SELECT document_id FROM documentary_requests WHERE source_id IS NOT NULL AND (state='queued' OR (state='blocked' AND error='research_source_not_authorized'))").all() as { document_id: string }[]) {
       const candidates = this.db.prepare(`SELECT c.vault_id FROM documentary_campaign_members m JOIN documentary_campaigns c ON c.id=m.campaign_id
         WHERE m.job_id=? AND m.state='active' AND c.state='active' ORDER BY c.created_at,c.id`).all(job.document_id) as { vault_id: string }[];
       const owner = candidates.find(candidate => allowed.has(candidate.vault_id));

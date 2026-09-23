@@ -51,11 +51,11 @@ export function closeDocumentaryPreparation(): void {
 }
 
 /** Shared text writer used once extraction has supplied a real source revision. */
-export async function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
+export async function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
   const store = documentaryStore();
   const identity: DocumentaryIndexIdentity = { documentId: document.id, attachmentId: document.attachmentId, revision: document.revision,
     attachmentRevision: document.attachments?.find(attachment => attachment.id === document.attachmentId)?.revision,
-    coverage: document.coverage, textFingerprint: createHash('sha256').update(text).digest('hex'), chunkerVersion: RETRIEVAL_CHUNKER_VERSION, processingVersion: 'nodus-documentary/1', embedding: null };
+    coverage: document.coverage, textFingerprint: createHash('sha256').update(text).digest('hex'), chunkerVersion: RETRIEVAL_CHUNKER_VERSION, processingVersion, embedding: null };
   const indexKey = store.enqueue(identity, { text, sourceMap });
   const existing = store.revision(indexKey);
   if (existing?.lexical_ready) return { indexKey, chunks: JSON.parse(existing.chunks_json!) };
@@ -230,8 +230,8 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     return { ...document, preparation: { documentId: document.id, revision: document.revision, text: coverage === 'abstract' ? 'abstract' : passages ? 'available' : 'missing',
       lexical: revision ? stale ? 'stale' : 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? stale ? 'stale' : 'ready' : embedded > 0 ? 'partial' : incompatible ? 'stale' : request?.error ? 'failed' : 'missing',
-      status: request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
-      reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded,
+      status: request?.state === 'blocked' ? 'blocked' : request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
+      reason: request?.error?.startsWith('documentary_ocr_') ? 'ocr_required' : request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded,
       unpreparedAttachmentIds: unpreparedResearchAttachmentIds(document, revisions.map(row => JSON.parse(row.identity_json) as DocumentaryIndexIdentity)) } };
   }) };
 }
@@ -249,7 +249,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
   const store = documentaryStore();
   const inventory = researchCorpusInventory();
-  const configuration = { embedding: mode === 'text' ? null : effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
+  const configuration = { embedding: mode === 'text' ? null : effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' };
   const wanted = new Set(documentIds);
   const documents = inventory.documents.filter(document => wanted.has(document.id));
   if (documents.length !== wanted.size) throw new Error('research_source_not_authorized');
@@ -317,10 +317,10 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         await withOwningVault(request.vault_id, () => withVaultDatabase(request.vault_id, async () => {
         // Legacy authorized jobs capture their existing provider once at first
         // dispatch; new jobs already carry the enqueue-time configuration.
-        const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string }
+        const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string; ocrLanguages?: string }
           : { embedding: effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
         if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
-        if (configuration.processingVersion !== 'nodus-documentary/1') throw new Error('documentary_processing_version_unavailable');
+        if (!['nodus-documentary/1', 'nodus-documentary/2'].includes(configuration.processingVersion)) throw new Error('documentary_processing_version_unavailable');
         const document = researchCorpusInventory().documents.find(item => item.id === (request.source_id ?? request.document_id));
         if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
         validateSource = () => {
@@ -328,6 +328,14 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision) throw new Error('research_source_not_authorized');
         };
         checkLease();
+        const extractionOptions = configuration.processingVersion === 'nodus-documentary/2'
+          ? { ocrMode: 'local' as const, localOcrOnly: true, ocrLanguages: configuration.ocrLanguages || 'spa+eng', maxOcrPages: 1000000 }
+          : { ocrMode: 'off' as const, maxOcrPages: 0 };
+        const onExtractionProgress = (progress: { phase: string; page?: number; totalPages?: number }) => {
+          checkLease();
+          store.db.prepare('UPDATE documentary_requests SET stage=?,current_page=?,total_pages=?,updated_at=? WHERE document_id=? AND lease_token=?').run(progress.phase === 'ocr' ? 'ocr' : 'extraction', progress.page ?? null, progress.totalPages ?? null, Date.now(), request.document_id, request.lease_token);
+          notifyDocumentaryPreparation();
+        };
         let text = '';
         let coverage = document.coverage;
         let sourceMap: Record<string, string> = {};
@@ -379,7 +387,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           } else {
             // Use a private staging worker, not the active-vault Library queue.
             // Every compatible attachment keeps its own revision and locators.
-            if (item?.attachments.length) parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal);
+            if (item?.attachments.length) parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal, extractionOptions, onExtractionProgress);
             if (!parts.length) { text = item?.metadata.abstract ?? ''; coverage = 'abstract'; }
           }
         }
@@ -389,7 +397,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           const settings = getSettings();
           const userId = settings.zoteroUserId || LOCAL_USER_ID;
           const item = await getItem(userId, work.zotero_key).catch(() => null);
-          const resolved = await extractTraditionalResearchWork(userId, work.zotero_key, work.item_type, controller.signal);
+          const resolved = await extractTraditionalResearchWork(userId, work.zotero_key, work.item_type, controller.signal, extractionOptions, onExtractionProgress);
           text = resolved.text || item?.abstract || '';
           coverage = resolved.text ? 'fulltext' : 'abstract';
           sourceMap = resolved.sourceMap;
@@ -404,9 +412,9 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
           for (const part of parts) {
             checkLease();
             prepared.push(await prepareDocumentaryText({ ...document, coverage: 'fulltext', attachmentId: part.attachmentId,
-              attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal));
+              attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal, configuration.processingVersion));
           }
-        } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal));
+        } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal, configuration.processingVersion));
         }
         checkLease();
         const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
@@ -433,7 +441,11 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && request.source_id) {
           new DocumentaryCampaigns(store.db).blockOwner(request.document_id, request.vault_id);
         }
-        try { requests.finish(request, error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed', store.preference('paused') || stopping || controller.signal.aborted); } catch { /* A newer request owns publication. */ }
+        try {
+          const code = error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed';
+          if (/^documentary_(ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
+          else requests.finish(request, code, store.preference('paused') || stopping || controller.signal.aborted);
+        } catch { /* A newer request owns publication. */ }
       } finally { notifyDocumentaryPreparation(); clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; activePreparationRequest = null; } }
     }
   } finally {

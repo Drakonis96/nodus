@@ -2,8 +2,9 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import type { LibrarySourceMap } from '@shared/libraryTypes';
+import type { LibraryExtractionOptions, LibrarySourceMap } from '@shared/libraryTypes';
 import { LibraryDiskStore } from '../library/libraryStorage';
+import type { LibraryExtractionProgressHandler } from '../library/libraryExtractionEngine';
 import { extractLibraryItemInWorker, libraryExtractionWorkerAvailable } from '../library/libraryExtractionWorkerHost';
 import { itemChildren, attachmentFilePath, itemAsAttachment } from '../zotero/zoteroClient';
 import { researchFingerprint } from './researchCorpusScope';
@@ -46,7 +47,7 @@ async function fileHash(filename: string): Promise<string> {
 /** Use the existing clean-document worker in a disposable staging store. This
  * creates no Global Library item or vault migration and never discovers storage
  * directories: every input path comes from an authorized Zotero attachment. */
-export async function extractTraditionalResearchWork(userId: string, key: string, itemType: string, signal?: AbortSignal): Promise<{ text: string; sourceMap: Record<string, string>; parts: DocumentarySourcePart[] }> {
+export async function extractTraditionalResearchWork(userId: string, key: string, itemType: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = { ocrMode: 'off', maxOcrPages: 0 }, onProgress?: LibraryExtractionProgressHandler): Promise<{ text: string; sourceMap: Record<string, string>; parts: DocumentarySourcePart[] }> {
   if (!libraryExtractionWorkerAvailable()) throw new Error('documentary_extraction_worker_unavailable');
   signal?.throwIfAborted();
   const attachments = itemType === 'attachment' ? [await itemAsAttachment(userId, key)].filter(item => item != null) : await itemChildren(userId, key, signal);
@@ -76,7 +77,7 @@ export async function extractTraditionalResearchWork(userId: string, key: string
       const item = store.upsertItem({ id, storageId: id, source: 'nodus', metadata: { title: attachment.title, itemType: 'document', creators: [] }, collectionIds: [],
         attachments: [{ id: attachment.key, title: attachment.title, fileName: relativePath, relativePath, mimeType: attachment.contentType,
           byteSize: stat.size, sha256: before, role: 'original', sourceKey: attachment.key, sourceVersion: attachment.version }] });
-      const result = await extractLibraryItemInWorker({ item, store, signal, extractionOptions: { ocrMode: 'off', maxOcrPages: 0 } });
+      const result = await extractLibraryItemInWorker({ item, store, signal, extractionOptions, onProgress });
       if (before !== await fileHash(source)) throw new Error('research_source_revision_changed');
       const markdown = await fs.promises.readFile(path.join(folder, result.item.files?.reader ?? 'reader.md'), 'utf8');
       const marker = `attachment-${texts.length}`;
@@ -93,7 +94,7 @@ export async function extractTraditionalResearchWork(userId: string, key: string
 /** Extract each authorized Global attachment independently. The clean-document
  * worker normally chooses a primary attachment; a research corpus needs every
  * eligible attachment, with its own fingerprint and original source locator. */
-export async function extractGlobalResearchAttachments(itemId: string, signal?: AbortSignal): Promise<DocumentarySourcePart[]> {
+export async function extractGlobalResearchAttachments(itemId: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = { ocrMode: 'off', maxOcrPages: 0 }, onProgress?: LibraryExtractionProgressHandler): Promise<DocumentarySourcePart[]> {
   const item = getGlobalLibraryItem(itemId);
   if (!item || item.deletedAt) throw new Error('research_source_not_authorized');
   const parts: DocumentarySourcePart[] = [];
@@ -118,7 +119,7 @@ export async function extractGlobalResearchAttachments(itemId: string, signal?: 
       if (hash !== await fileHash(path.join(folder, relativePath))) throw new Error('research_source_revision_changed');
       const staged = store.upsertItem({ id, storageId: id, source: 'nodus', metadata: item.metadata, collectionIds: [],
         attachments: [{ ...attachment, relativePath, role: 'original' }] });
-      const extracted = await extractLibraryItemInWorker({ item: staged, store, signal, extractionOptions: { ocrMode: 'off', maxOcrPages: 0 } });
+      const extracted = await extractLibraryItemInWorker({ item: staged, store, signal, extractionOptions, onProgress });
       if (hash !== await fileHash(source)) throw new Error('research_source_revision_changed');
       const markdown = await fs.promises.readFile(path.join(folder, extracted.item.files?.reader ?? 'reader.md'), 'utf8');
       const marker = `attachment-${parts.length}`;

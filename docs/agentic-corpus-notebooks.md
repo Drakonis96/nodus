@@ -898,3 +898,9 @@ snapshots and requires all three jobs to complete before checking readiness.
 This run used no model or Zotero calls. It does not validate full-text OCR, live MCP,
 agent-directed original reads, factual report quality or the remaining platform and
 upgrade acceptance. Those criteria remain open.
+
+### Installed-only OCR and recoverable preparation blocks (2026-09-23)
+
+New preparation campaigns freeze OCR languages and processing version `nodus-documentary/2`. They run the existing clean-text extractor in its owned worker, with local-only OCR and page progress. Missing traineddata is a recoverable Queue block, never a CDN download or generative/remote OCR fallback. Already queued v1 jobs retain their original behavior. Incomplete scanned text does not replace the last valid publication. Queue displays translated recovery instructions and supports explicit retry; owner reconciliation cannot silently restart a missing-resource block.
+
+Validation: typecheck, ESLint, translation coverage (`/private/tmp/nodus-research-HKjUja`) and two isolated native suites (`/private/tmp/nodus-research-ZEptV0`) pass. Real Tesseract recognized both synthetic scanned pages with physical page anchors using copied installed English traineddata; cancellation published nothing; absent resources blocked without a remote callback; resource symlink escapes were rejected. Seatbelt negative write/descendant/network probes passed. No paid calls. CI fixture provisioning is an explicit hash-verified setup step, separate from the application; native platform acceptance remains pending. Partial unreadable scans remain blocked rather than being mislabeled complete.

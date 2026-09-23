@@ -166,7 +166,7 @@ export interface DocumentPreparationState {
   text: 'missing' | 'available' | 'abstract';
   lexical: 'missing' | 'ready' | 'stale';
   embeddings: 'missing' | 'queued' | 'running' | 'ready' | 'partial' | 'stale' | 'failed';
-  status: 'catalogued' | 'queued' | 'running' | 'paused' | 'ready' | 'failed' | 'cancelled';
+  status: 'blocked' | 'catalogued' | 'queued' | 'running' | 'paused' | 'ready' | 'failed' | 'cancelled';
   reason: 'no_attachment' | 'not_downloaded' | 'inaccessible' | 'extraction_failed' | 'ocr_required' | 'no_model' | 'provider_failed' | null;
   error: string | null;
   passages: number;
@@ -240,10 +240,12 @@ export interface ResearchPreparationJob {
   documentId: string;
   title: string;
   state: 'queued' | 'running' | 'paused' | 'complete' | 'failed' | 'cancelled' | 'blocked';
-  stage: 'extraction' | 'lexical' | 'embeddings' | 'complete';
+  stage: 'ocr' | 'extraction' | 'lexical' | 'embeddings' | 'complete';
   completedPassages: number;
   totalPassages: number | null;
   unknownRequests: number;
+  currentPage?: number | null;
+  totalPages?: number | null;
   error: string | null;
 }
 export interface ResearchPreparationCampaign {

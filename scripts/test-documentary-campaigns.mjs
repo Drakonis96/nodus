@@ -52,7 +52,7 @@ try {
   try { await preparation.prepareDocumentaryText(doc, 'First attachment, not yet published'); }
   finally { preparation.documentaryStore().setPreference('paused', true); }
   assert.deepEqual(preparation.pinPublishedResearchDocument(doc).indexedSource.indexKeys, [], 'a campaign cannot expose its first partial attachment before atomic source publication');
-  const configuration = { embedding: null, processingVersion: 'nodus-documentary/1' };
+  const configuration = JSON.parse(repo.list().find(row => row.id === campaign).configuration_json);
   const shared = repo.create(other.id, other.name, [doc], configuration);
   const job = repo.db.prepare('SELECT job_id FROM documentary_campaign_members WHERE campaign_id=?').get(shared).job_id;
   assert.equal(repo.db.prepare('SELECT COUNT(*) n FROM documentary_campaign_members WHERE job_id=?').get(job).n, 2);
@@ -73,6 +73,15 @@ try {
   repo.control(shared, 'cancel');
   assert.equal(repo.db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(job).state, 'cancelled');
   repo.control(campaign, 'resume', doc.id);
+  assert.equal(repo.db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(job).state, 'queued');
+  const blockedLease = repo.requests.claim(vault.id);
+  assert.equal(blockedLease.document_id, job);
+  repo.requests.block(blockedLease, 'documentary_ocr_resources_missing');
+  repo.synchronizeOwners([vault.id, other.id]);
+  const blocked = repo.db.prepare('SELECT state,attempts FROM documentary_requests WHERE document_id=?').get(job);
+  assert.equal(blocked.state, 'blocked', 'missing OCR resources must not spin on owner reconciliation');
+  assert.equal(blocked.attempts, 0, 'a recoverable resource block is not a provider failure');
+  repo.control(campaign, 'retry', doc.id);
   assert.equal(repo.db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(job).state, 'queued');
   const reopened = new (load('electron/db/documentaryCampaigns.ts').DocumentaryCampaigns)(repo.db);
   assert.equal(reopened.policy(vault.id).decision, 'declined');
