@@ -2193,7 +2193,23 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   };
 }
 
-interface EmbeddingRequestOptions {
+export interface EmbeddingExecutionConfig {
+  provider: EmbeddingProvider;
+  modelId: string;
+  endpoint: string;
+}
+
+/** Capture before dispatch; never persist credentials in a job. */
+export function effectiveEmbeddingConfig(): EmbeddingExecutionConfig {
+  const config = embeddingConfig();
+  const endpoint = config.provider === 'nodus' ? 'nodus-local-runtime'
+    : config.provider === 'gemini' ? geminiBatchEmbeddingEndpoint(config.modelId) : openAiCompatBase(config.provider);
+  if (!endpoint) throw new AiError('Falta el endpoint del proveedor de embeddings.', false, true);
+  return { ...config, endpoint };
+}
+
+export interface EmbeddingRequestOptions {
+  config?: EmbeddingExecutionConfig;
   perf?: PerfContext;
   jobId?: string;
 }
@@ -2212,11 +2228,12 @@ async function requestEmbeddings(
     catch (error) { throw new AiError(error instanceof Error ? error.message : String(error), false); }
   };
   signal?.throwIfAborted();
-  const endpoint = provider === 'nodus'
+  const endpoint = options.config?.endpoint ?? (provider === 'nodus'
     ? 'nodus-local-runtime'
     : provider === 'gemini'
       ? geminiBatchEmbeddingEndpoint(modelId)
-      : openAiCompatBase(provider) ?? undefined;
+      : openAiCompatBase(provider) ?? undefined);
+  if (!endpoint) throw new AiError('Falta el endpoint del proveedor de embeddings.', false, true);
   const descriptor: AiRequestDescriptor = {
     provider,
     model: modelId,
@@ -2326,7 +2343,9 @@ async function requestEmbeddings(
  */
 export async function embed(text: string, signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<number[] | null> {
   signal?.throwIfAborted();
-  const { provider, modelId } = embeddingConfig();
+  const config = options.config ?? effectiveEmbeddingConfig();
+  options = { ...options, config };
+  const { provider, modelId } = config;
   const key = resolveProviderKey(provider);
   if (!key) return null;
   const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000), signal, options);
@@ -2361,7 +2380,9 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
   signal?.throwIfAborted();
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
-  const { provider, modelId } = embeddingConfig();
+  const config = options.config ?? effectiveEmbeddingConfig();
+  options = { ...options, config };
+  const { provider, modelId } = config;
   const key = resolveProviderKey(provider);
   if (!key) throw new AiError(`Falta la clave de IA para embeddings (${provider}). Configúrala en Ajustes o usa el modo léxico.`, false, true);
 
@@ -2392,7 +2413,7 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
 export async function embedMany(texts: string[], signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<(number[] | null)[]> {
   signal?.throwIfAborted();
   if (texts.length === 0) return [];
-  const { provider } = embeddingConfig();
+  const { provider } = options.config ?? effectiveEmbeddingConfig();
   if (!resolveProviderKey(provider)) return texts.map(() => null);
   return embedManyStrict(texts, signal, options);
 }

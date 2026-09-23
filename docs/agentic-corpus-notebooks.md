@@ -776,3 +776,27 @@ Both affected scripts passed in the isolated harness at
 outside-write, descendant-write, external-network and loopback negative probes.
 This fixes the single test failure in CI run 35885655558; it does not imply that
 the remaining closing-plan acceptance criteria have passed.
+
+## Closing delivery: persistent embedding batches
+
+Preparation requests now snapshot provider, model, endpoint and processing version
+when queued; the embedding client accepts that explicit configuration. Changing
+settings cannot mix spaces within a queued job. A text-only internal preparation
+mode does not resolve or call an embedding provider. Existing request rows adopt
+configuration on their first dispatch; completed indices remain intact.
+
+Embedding preparation saves at most 32 passages per durable batch before issuing
+the next batch. Working vectors are separate from searchable publications and
+keyed by the leased operation, source revision, processing identity and effective
+space. Recovery verifies text hashes and vector dimensions and reuses completed
+batches. Attempt records preserve unknown outcomes after interrupted calls; a
+retry may incur another provider charge. Expired leases and deliberate aborts do
+not consume provider-error retries. Late/fenced writers cannot save checkpoints.
+
+Five focused scripts passed under the verified isolation harness at
+`/private/tmp/nodus-research-FcdAzx`: source leases, concurrent writers and actual
+partial-batch recovery, strict vector validation, Gemini batching and corpus-run
+regressions. The new 70-passage fixture fails its second batch and resumes without
+requesting the first 32 vectors again. Both TypeScript projects passed. No paid
+calls were made. Campaign sharing, cross-vault execution and the new preparation
+UI remain separate, unfinished acceptance items.

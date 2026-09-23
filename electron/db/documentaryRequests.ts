@@ -2,7 +2,7 @@ import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 
 export interface DocumentaryRequest {
-  document_id: string; revision: string; vault_id: string; lease_token: string; attempts: number;
+  document_id: string; revision: string; vault_id: string; lease_token: string; attempts: number; configuration_json: string | null;
 }
 
 /** Source discovery/extraction needs a lease before a textual fingerprint exists.
@@ -14,24 +14,24 @@ export class DocumentaryRequests {
     )`);
     const columns = new Set((db.prepare('PRAGMA table_info(documentary_requests)').all() as { name: string }[]).map(column => column.name));
     for (const [name, sql] of Object.entries({ vault_id: "TEXT NOT NULL DEFAULT ''", lease_token: 'TEXT', lease_until: 'INTEGER',
-      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0' })) {
+      attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT' })) {
       if (!columns.has(name)) db.exec(`ALTER TABLE documentary_requests ADD COLUMN ${name} ${sql}`);
     }
   }
-  enqueue(documentId: string, revision: string, vaultId: string, now = Date.now(), priority = 0): void {
-    this.db.prepare(`INSERT INTO documentary_requests(document_id,revision,vault_id,state,error,updated_at,available_at,priority,created_at)
-      VALUES (?,?,?,'queued',NULL,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,vault_id=excluded.vault_id,
-      state=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision THEN 'running' ELSE 'queued' END,
-      lease_token=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision THEN documentary_requests.lease_token ELSE NULL END,
-      lease_until=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision THEN documentary_requests.lease_until ELSE NULL END,
-      attempts=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision THEN documentary_requests.attempts ELSE 0 END,
-      error=NULL,updated_at=excluded.updated_at,available_at=excluded.available_at,priority=excluded.priority`).run(documentId, revision, vaultId, now, now, priority, now);
+  enqueue(documentId: string, revision: string, vaultId: string, now = Date.now(), priority = 0, configuration: unknown = null): void {
+    this.db.prepare(`INSERT INTO documentary_requests(document_id,revision,vault_id,state,error,updated_at,available_at,priority,created_at,configuration_json)
+      VALUES (?,?,?,'queued',NULL,?,?,?,?,?) ON CONFLICT(document_id) DO UPDATE SET revision=excluded.revision,vault_id=excluded.vault_id,
+      state=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision AND documentary_requests.configuration_json IS excluded.configuration_json THEN 'running' ELSE 'queued' END,
+      lease_token=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision AND documentary_requests.configuration_json IS excluded.configuration_json THEN documentary_requests.lease_token ELSE NULL END,
+      lease_until=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision AND documentary_requests.configuration_json IS excluded.configuration_json THEN documentary_requests.lease_until ELSE NULL END,
+      attempts=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision AND documentary_requests.configuration_json IS excluded.configuration_json THEN documentary_requests.attempts ELSE 0 END,
+      configuration_json=excluded.configuration_json,error=NULL,updated_at=excluded.updated_at,available_at=excluded.available_at,priority=excluded.priority`).run(documentId, revision, vaultId, now, now, priority, now, configuration == null ? null : JSON.stringify(configuration));
   }
   claim(vaultId: string, now = Date.now(), leaseMs = 60000, exactOwner = false): DocumentaryRequest | null {
     return this.db.transaction(() => {
-      this.db.prepare(`UPDATE documentary_requests SET state=CASE WHEN attempts>=3 THEN 'failed' ELSE 'queued' END,
+      this.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=MAX(0,attempts-1),
         lease_token=NULL,lease_until=NULL WHERE state='running' AND (lease_until IS NULL OR lease_until<=?)`).run(now);
-      const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts FROM documentary_requests
+      const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts,configuration_json FROM documentary_requests
         WHERE state='queued' AND available_at<=? AND attempts<3 AND (vault_id=? OR (?=0 AND vault_id=''))
         ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, vaultId, Number(exactOwner), now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
       if (!row) return null;

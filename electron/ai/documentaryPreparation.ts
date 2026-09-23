@@ -14,9 +14,9 @@ import { researchCorpusInventory } from './researchCorpusInventory';
 import { assertResearchDocumentPermission, researchFingerprint } from './researchCorpusScope';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { getGlobalLibraryItem, enqueueLibraryExtraction, listLibraryExtractionJobs } from '../library/libraryService';
-import { openAiCompatBase } from './providers';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
-import { embedMany } from './aiClient';
+import { embedMany, effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
+import { DocumentaryEmbeddingBatches } from '../db/documentaryEmbeddingBatches';
 import { getWork } from '../db/worksRepo';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
 import { getNote } from '../db/notesRepo';
@@ -75,11 +75,15 @@ export async function prepareDocumentaryText(document: ResearchCorpusDocument, t
   } finally { clearInterval(heartbeat); }
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+function embeddingIdentityParameters(config: EmbeddingExecutionConfig) {
+  return { endpoint: createHash('sha256').update(config.endpoint).digest('hex'), inputPolicy: 'utf8-4096/2' };
+}
+
+export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig()): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
-  const config = currentEmbeddingConfig();
-  const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
+  const config = { provider: execution.provider, model: execution.modelId };
+  const parameters = embeddingIdentityParameters(execution);
   const cached = store.db.prepare(`SELECT index_key FROM documentary_revisions WHERE document_id=? AND embedding_ready=1
     AND json_extract(identity_json,'$.textFingerprint')=? AND json_extract(identity_json,'$.revision')=?
     AND json_extract(identity_json,'$.chunkerVersion')=? AND json_extract(identity_json,'$.embedding.provider')=?
@@ -107,12 +111,33 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
   let job: ReturnType<DocumentaryStore['claim']> = null;
   try {
     signal?.throwIfAborted();
-    const vectors = await embedMany(chunks.map(chunk => chunk.text), controller.signal);
+    const checkpoints = new DocumentaryEmbeddingBatches(store.db);
+    checkpoints.recover(operation);
+    const texts = chunks.map(chunk => chunk.text);
+    const vectors = checkpoints.read(operation, texts);
+    // Sequential bounded batches checkpoint before the next paid request. The
+    // persistent operation lease fences concurrent writers and late responses.
+    for (let start = 0; start < texts.length;) {
+      if (vectors[start]) { start++; continue; }
+      let end = start + 1;
+      while (end < texts.length && end - start < 32 && !vectors[end]) end++;
+      controller.signal.throwIfAborted();
+      requests.renew(lease);
+      const batch = texts.slice(start, end);
+      const attempt = checkpoints.begin(operation, start, batch.length);
+      try {
+        const received = await embedMany(batch, controller.signal, { config: execution, jobId: operation });
+        controller.signal.throwIfAborted();
+        if (received.some(vector => !vector?.length)) throw new Error('documentary_embeddings_unavailable');
+        checkpoints.complete(attempt, batch, received as number[][], () => requests.renew(lease));
+        vectors.splice(start, batch.length, ...received);
+      } catch (error) { checkpoints.uncertain(attempt); throw error; }
+      start = end;
+    }
     signal?.throwIfAborted();
     requests.renew(lease);
     if (store.preference('paused')) throw new Error('documentary_paused');
     if (vectors.some(vector => !vector?.length) || !vectors.length) throw new Error('documentary_embeddings_unavailable');
-    if (JSON.stringify(currentEmbeddingConfig()) !== JSON.stringify(config)) throw new Error('documentary_embedding_configuration_changed');
     const identity: DocumentaryIndexIdentity = { ...base, embedding: { ...config, dimensions: vectors[0]!.length, metric: 'cosine', parameters } };
     const id = store.enqueue(identity, {});
     job = store.claim(Date.now(), 60000, id);
@@ -124,7 +149,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     return { indexKey: id, vectors: vectors as number[][], ...config };
   } catch (error) {
     if (job && store.getJob(job.id)?.state === 'running') store.fail(job, 'documentary_embedding_publication_failed');
-    try { requests.finish(lease, 'documentary_embedding_failed', store.preference('paused')); } catch { /* Lease was fenced. */ }
+    try { requests.finish(lease, 'documentary_embedding_failed', store.preference('paused') || stopping || !!signal?.aborted); } catch { /* Lease was fenced. */ }
     throw error;
   } finally { clearInterval(heartbeat); signal?.removeEventListener('abort', abort); }
 }
@@ -194,15 +219,16 @@ let draining = false;
 let activePreparation: AbortController | null = null;
 let activePreparationDocument: string | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
-export async function prepareResearchDocuments(documentIds: string[]): Promise<void> {
+export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
   const store = documentaryStore();
   const inventory = researchCorpusInventory();
+  const configuration = { embedding: mode === 'text' ? null : effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
   const wanted = new Set(documentIds);
   const documents = inventory.documents.filter(document => wanted.has(document.id));
   if (documents.length !== wanted.size) throw new Error('research_source_not_authorized');
   const requests = new DocumentaryRequests(store.db);
   for (const document of documents) {
-    requests.enqueue(document.id, document.revision, getActiveVault().id);
+    requests.enqueue(document.id, document.revision, getActiveVault().id, Date.now(), 0, configuration);
     for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state IN ('failed','cancelled')").all(document.id) as { id: string }[]) store.retry(row.id);
     const prefix = `embedding:${document.id}:`;
     store.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=0,error=NULL,available_at=?
@@ -245,6 +271,12 @@ export async function drainDocumentaryRequests(): Promise<void> {
       const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
       const checkLease = () => { controller.signal.throwIfAborted(); if (getActiveVault().id !== vaultId) throw new Error('research_scope_changed'); requests.renew(request); };
       try {
+        // Legacy authorized jobs capture their existing provider once at first
+        // dispatch; new jobs already carry the enqueue-time configuration.
+        const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string }
+          : { embedding: effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
+        if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
+        if (configuration.processingVersion !== 'nodus-documentary/1') throw new Error('documentary_processing_version_unavailable');
         const document = researchCorpusInventory().documents.find(item => item.id === request.document_id);
         if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
         checkLease();
@@ -334,7 +366,7 @@ export async function drainDocumentaryRequests(): Promise<void> {
         // Publish every lexical attachment before any optional vector request.
         for (const result of prepared) {
           checkLease();
-          await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal);
+          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding);
         }
         checkLease();
         requests.finish(request, null);
@@ -398,7 +430,8 @@ export function initializeDocumentaryPreparation(): void {
 export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal, read?: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {
   const inventory = researchCorpusInventory();
   const config = currentEmbeddingConfig();
-  const parameters = { endpoint: createHash('sha256').update(openAiCompatBase(config.provider) ?? config.provider).digest('hex'), inputPolicy: 'utf8-4096/2' };
+  let parameters: ReturnType<typeof embeddingIdentityParameters> | null = null;
+  try { parameters = embeddingIdentityParameters(effectiveEmbeddingConfig()); } catch { /* Lexical retrieval remains available without an endpoint. */ }
   const vectorKeys: string[] = [];
   const indexedDocuments = new Set<string>();
   const incompleteAttachments = new Set<string>();

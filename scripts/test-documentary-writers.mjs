@@ -123,7 +123,29 @@ try {
   db.prepare('UPDATE works SET archived=1 WHERE nodus_id=?').run('inside');
   assert.equal(citations.getDocumentaryPassageDetail(fallbackId), null);
   assert.equal(citations.getDocumentaryPassageDetail(citationId), null, 'revocation still blocks historical source reads');
-  console.log('Legacy fencing, lexical-first shared preparation, pre-dispatch embedding lease and compatible vector reuse passed.');
+  const manyChunks = Array.from({ length: 70 }, (_, i) => ({ text: `Known fragment ${i}`, pageLabel: String(i + 1), pageNumber: i + 1, sourceRef: 'fixture' }));
+  chunks.documentaryChunks = async () => manyChunks;
+  const checkpointText = await preparation.prepareDocumentaryText({ ...doc, id: 'checkpoint-fixture' }, 'Checkpoint source');
+  const captured = { provider: 'openrouter', modelId: 'baai/bge-m3', endpoint: 'http://127.0.0.1:9999/v1' };
+  const batches = [];
+  let failSecond = true;
+  ai.embedMany = async (texts, _signal, options) => {
+    assert.deepEqual(options.config, captured, 'each dispatch keeps the explicit model and endpoint');
+    batches.push([...texts]);
+    if (texts[0] === 'Known fragment 32' && failSecond) { failSecond = false; throw new Error('fixture-provider-unavailable'); }
+    return texts.map(text => [Number(text.split(' ').at(-1)) + 1, 1, 0]);
+  };
+  await assert.rejects(() => preparation.prepareDocumentaryEmbeddings(checkpointText.indexKey, manyChunks, undefined, captured), /fixture-provider/);
+  const workingDb = preparation.documentaryStore().db;
+  assert.equal(workingDb.prepare('SELECT COUNT(*) n FROM documentary_embedding_chunks WHERE operation LIKE ?').get('embedding:checkpoint-fixture:%').n, 32);
+  assert.equal(preparation.documentaryStore().revision(checkpointText.indexKey).embedding_ready, 0, 'partial vectors are never published');
+  assert.equal(workingDb.prepare("SELECT COUNT(*) n FROM documentary_embedding_attempts WHERE state='unknown'").get().n, 1, 'ambiguous provider outcomes remain recorded');
+  workingDb.prepare("UPDATE documentary_requests SET available_at=0 WHERE document_id LIKE 'embedding:checkpoint-fixture:%'").run();
+  const resumed = await preparation.prepareDocumentaryEmbeddings(checkpointText.indexKey, manyChunks, undefined, captured);
+  assert.equal(resumed.vectors.length, 70);
+  assert.deepEqual(batches.map(batch => batch[0]), ['Known fragment 0', 'Known fragment 32', 'Known fragment 32', 'Known fragment 64'], 'recovery never re-embeds the committed first batch');
+  assert.equal(preparation.documentaryStore().revision(resumed.indexKey).embedding_ready, 1);
+  console.log('Legacy fencing, lexical-first preparation, frozen model dispatch, durable batches and compatible vector reuse passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
   load('electron/db/database.ts').closeDb();
