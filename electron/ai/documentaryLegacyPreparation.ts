@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { PassageInsert } from '../db/passagesRepo';
 import { beginPassagePublication, assertPassagePublication, type PassagePublication } from '../db/passagePublications';
-import { prepareDocumentaryText, prepareDocumentaryEmbeddings } from './documentaryPreparation';
+import { prepareDocumentaryText, prepareDocumentaryEmbeddings, documentaryStore } from './documentaryPreparation';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { assertResearchDocument, resolveNotebookScope } from './researchCorpusScope';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -30,6 +30,10 @@ export async function prepareLegacyDocumentaryPassages(nodusId: string, text: st
   const scope = resolveNotebookScope(getActiveVault().id, { id: 'legacy-preparation', revision: 1, name: '', mode: 'fixed', sources: [], exclusions: [],
     resolvedDocumentIds: [document.id], createdAt: '', updatedAt: '' }, inventory.documents, []);
   const prepared = await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, signal);
+  assertResearchDocument(scope, document.id, researchCorpusInventory().documents.find(item => item.id === document.id));
+  assertPassagePublication(nodusId, publication);
+  // A merged legacy derivative must not displace independent attachment indexes.
+  if (!document.attachments || document.attachments.length <= 1) documentaryStore().publishDocument(document, [prepared.indexKey]);
   const embedded = await prepareDocumentaryEmbeddings(prepared.indexKey, prepared.chunks, signal);
   signal?.throwIfAborted();
   assertResearchDocument(scope, document.id, researchCorpusInventory().documents.find(item => item.id === document.id));

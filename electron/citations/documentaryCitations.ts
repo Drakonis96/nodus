@@ -31,11 +31,18 @@ export function getDocumentaryPassageDetail(id: string): PassageDetail | null {
     if (scope.notebookId && getResearchNotebook(scope.notebookId)
       && !resolveResearchNotebook(scope.notebookId).documents.some(item => item.id === document.id)) return null;
     const identity: DocumentaryIndexIdentity = JSON.parse(passage.identity_json);
-    if (identity.revision !== document.revision) return null;
-    if (document.attachments?.length && identity.attachmentId !== null
-        && !document.attachments.some(attachment => attachment.id === identity.attachmentId
+    const indexed = document.indexedSource ?? document;
+    if (document.indexedSource && !document.indexedSource.indexKeys.some(key => {
+      const job = documentaryStore().getJob(key);
+      const base: DocumentaryIndexIdentity | undefined = job && JSON.parse(job.identity_json);
+      return base && base.attachmentId === identity.attachmentId && base.textFingerprint === identity.textFingerprint
+        && base.chunkerVersion === identity.chunkerVersion && base.processingVersion === identity.processingVersion;
+    })) return null;
+    if (identity.revision !== indexed.revision) return null;
+    if (indexed.attachments?.length && identity.attachmentId !== null
+        && !indexed.attachments.some(attachment => attachment.id === identity.attachmentId
           && (!identity.attachmentRevision || attachment.revision === identity.attachmentRevision))) return null;
-    if (!document.attachments?.length && document.attachmentId !== null && identity.attachmentId !== document.attachmentId) return null;
+    if (!indexed.attachments?.length && indexed.attachmentId !== null && identity.attachmentId !== indexed.attachmentId) return null;
     const locator = JSON.parse(passage.locator_json);
     return { passage_id: id, nodus_id: document.workId ?? document.id, libraryItemId: document.libraryItemId,
       attachmentId: identity.attachmentId,

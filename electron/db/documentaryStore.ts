@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
-import type { DocumentaryIndexIdentity } from '@shared/researchCorpus';
+import type { DocumentaryIndexIdentity, ResearchCorpusDocument } from '@shared/researchCorpus';
 import { documentaryIndexKey } from '../ai/researchCorpusScope';
 
 export interface DocumentaryChunk {
@@ -36,6 +36,9 @@ export class DocumentaryStore {
         index_key TEXT PRIMARY KEY, document_id TEXT NOT NULL, identity_json TEXT NOT NULL,
         text TEXT, chunks_json TEXT, lexical_ready INTEGER NOT NULL DEFAULT 0,
         embedding_ready INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS documentary_publications (
+        document_id TEXT PRIMARY KEY, document_json TEXT NOT NULL, index_keys_json TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS documentary_current (document_id TEXT PRIMARY KEY, index_key TEXT NOT NULL REFERENCES documentary_revisions(index_key));
       CREATE TABLE IF NOT EXISTS documentary_desired (document_id TEXT PRIMARY KEY, index_key TEXT NOT NULL REFERENCES documentary_revisions(index_key));
@@ -180,6 +183,30 @@ export class DocumentaryStore {
   getJob(id: string): DocumentaryJob | null { return this.db.prepare('SELECT * FROM documentary_jobs WHERE id=?').get(id) as DocumentaryJob ?? null; }
   revision(id: string): { text: string | null; chunks_json: string | null; lexical_ready: number; embedding_ready: number } | null {
     return this.db.prepare('SELECT text,chunks_json,lexical_ready,embedding_ready FROM documentary_revisions WHERE index_key=?').get(id) as ReturnType<DocumentaryStore['revision']> ?? null;
+  }
+  /** Switch the whole document only after all selected attachment chunks exist. */
+  publishDocument(document: ResearchCorpusDocument, indexKeys: string[]): void {
+    this.db.transaction(() => {
+      if (!indexKeys.length || new Set(indexKeys).size !== indexKeys.length) throw new Error('documentary_publication_incomplete');
+      for (const key of indexKeys) {
+        const row = this.db.prepare('SELECT identity_json,lexical_ready FROM documentary_revisions WHERE index_key=?').get(key) as { identity_json: string; lexical_ready: number } | undefined;
+        const identity: DocumentaryIndexIdentity | undefined = row && JSON.parse(row.identity_json);
+        if (!row?.lexical_ready || identity?.documentId !== document.id || identity.revision !== document.revision) throw new Error('documentary_publication_incomplete');
+      }
+      this.db.prepare(`INSERT INTO documentary_publications VALUES (?,?,?) ON CONFLICT(document_id)
+        DO UPDATE SET document_json=excluded.document_json,index_keys_json=excluded.index_keys_json`)
+        .run(document.id, JSON.stringify(document), JSON.stringify(indexKeys));
+    }).immediate();
+  }
+  publishedDocument(document: ResearchCorpusDocument): ResearchCorpusDocument | null {
+    const row = this.db.prepare('SELECT document_json,index_keys_json FROM documentary_publications WHERE document_id=?').get(document.id) as { document_json: string; index_keys_json: string } | undefined;
+    if (!row) return null;
+    const published: ResearchCorpusDocument = JSON.parse(row.document_json);
+    // An old revision may survive replacement, but never permission revocation
+    // or removal of any file contributing to that revision.
+    if (published.permissionRevision !== document.permissionRevision || published.attachments?.some(attachment => !document.attachments?.some(current => current.id === attachment.id))) return null;
+    return { ...document, indexedSource: { revision: published.revision, attachmentId: published.attachmentId,
+      attachments: published.attachments, indexKeys: JSON.parse(row.index_keys_json) } };
   }
   lexicalSearch(query: string, indexKeys: string[], limit: number): Array<{ id: string; document_id: string; index_key: string; text: string; locator_json: string }> {
     if (!indexKeys.length || limit <= 0) return [];

@@ -57,7 +57,7 @@ export function resolveNotebookScope(vaultId: string, notebook: ResearchNotebook
   const current = new Set(permitted.map(document => document.id));
   const permissionFingerprint = researchFingerprint(permitted.map(document => [document.id, document.permissionRevision]));
   const id = researchFingerprint({ vaultId, notebookId: notebook.id, notebookRevision: notebook.revision, permissionFingerprint,
-    documents: permitted.map(document => [document.id, document.attachmentId, document.revision]) });
+    documents: permitted.map(document => [document.id, document.attachmentId, document.revision, document.indexedSource ?? null]) });
   return { id, vaultId, notebookId: notebook.id, notebookRevision: notebook.revision, documents: permitted,
     permissionFingerprint, resolvedAt: new Date().toISOString(),
     changes: { added: [...current].filter(id => !old.has(id)), removed: [...old].filter(id => !current.has(id)) } };

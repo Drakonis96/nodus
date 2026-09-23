@@ -107,7 +107,7 @@ function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNote
           return <label key={document.id} className="flex items-start gap-2 py-1 text-sm"><input type="checkbox" checked={selected.has(document.id)} onChange={event => setDraft({ ...draft,
             sources: event.target.checked && !draft.sources.some(item => referenceKey(item) === referenceKey(reference)) ? [...draft.sources, reference] : draft.sources,
             exclusions: event.target.checked ? draft.exclusions.filter(id => id !== document.id) : [...new Set([...draft.exclusions, document.id])],
-          })} /><span>{document.title}{document.noteId && <small className="ml-2">· {t(document.authoredKind === 'generated-report' ? 'Informe' : 'Nota')}</small>}<small className="block text-neutral-400">{state?.lexical === 'ready' ? t('Disponible para consultar') : t('Preparación pendiente')}</small></span></label>;
+          })} /><span>{document.title}{document.noteId && <small className="ml-2">· {t(document.authoredKind === 'generated-report' ? 'Informe' : 'Nota')}</small>}<small className="block text-neutral-400">{state?.lexical === 'stale' ? t('Disponible: revisión anterior') : state?.lexical === 'ready' ? t('Disponible para consultar') : t('Preparación pendiente')}</small></span></label>;
         })}
       </fieldset>
       <div className="flex flex-wrap items-center gap-3 mb-3">

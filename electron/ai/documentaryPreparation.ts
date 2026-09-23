@@ -129,14 +129,21 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
 
 function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number; chunks_json: string }> {
   return documentaryStore().db.prepare(`SELECT * FROM documentary_revisions WHERE document_id=? AND json_extract(identity_json,'$.revision')=? ORDER BY embedding_ready DESC,created_at DESC`)
-    .all(document.id, document.revision) as ReturnType<typeof revisionsFor>;
+    .all(document.id, document.indexedSource?.revision ?? document.revision) as ReturnType<typeof revisionsFor>;
 }
 function attachmentRevisions(document: ResearchCorpusDocument): Array<ReturnType<typeof revisionsFor>> {
   const groups = new Map<string | null, ReturnType<typeof revisionsFor>>();
+  const attachments = document.indexedSource ? document.indexedSource.attachments : document.attachments;
+  const published = document.indexedSource?.indexKeys.flatMap(key => {
+    const job = documentaryStore().getJob(key);
+    return job ? [JSON.parse(job.identity_json) as DocumentaryIndexIdentity] : [];
+  });
   for (const row of revisionsFor(document)) {
     const identity: DocumentaryIndexIdentity = JSON.parse(row.identity_json);
-    if (document.attachments?.length && identity.attachmentId !== null
-        && !document.attachments.some(attachment => attachment.id === identity.attachmentId
+    if (published && !published.some(base => base.attachmentId === identity.attachmentId && base.textFingerprint === identity.textFingerprint
+      && base.chunkerVersion === identity.chunkerVersion && base.processingVersion === identity.processingVersion)) continue;
+    if (attachments?.length && identity.attachmentId !== null
+        && !attachments.some(attachment => attachment.id === identity.attachmentId
           && (!identity.attachmentRevision || attachment.revision === identity.attachmentRevision))) continue;
     const group = groups.get(identity.attachmentId) ?? [];
     group.push(row); groups.set(identity.attachmentId, group);
@@ -145,6 +152,15 @@ function attachmentRevisions(document: ResearchCorpusDocument): Array<ReturnType
   if (groups.size > 1) groups.delete(null);
   return [...groups.values()];
 }
+export function pinPublishedResearchDocument(document: ResearchCorpusDocument): ResearchCorpusDocument {
+  const store = documentaryStore();
+  const published = store.publishedDocument(document);
+  if (published) return published;
+  // No partially built first revision may leak before the all-attachment switch.
+  const preparing = store.db.prepare('SELECT 1 FROM documentary_requests WHERE document_id=?').get(document.id);
+  return preparing ? { ...document, indexedSource: { revision: document.revision, attachmentId: document.attachmentId, attachments: document.attachments, indexKeys: [] } } : document;
+}
+
 export function getResearchPreparationInventory(): ResearchPreparationInventory {
   const store = documentaryStore();
   const embeddingSpaces = new Map<string, NonNullable<ResearchPreparationInventory['embeddingSpaces']>[number]>();
@@ -155,7 +171,9 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
       embeddingSpaces.set(id, { id, provider: embedding.provider, model: embedding.model, dimensions: embedding.dimensions, metric: embedding.metric });
     }
   }
-  return { enabled: store.preference('enabled'), embeddingSpaces: [...embeddingSpaces.values()], documents: researchCorpusInventory().documents.map(document => {
+  return { enabled: store.preference('enabled'), embeddingSpaces: [...embeddingSpaces.values()], documents: researchCorpusInventory().documents.map(current => {
+    const document = pinPublishedResearchDocument(current);
+    const stale = document.indexedSource && document.indexedSource.revision !== document.revision;
     const revisions = attachmentRevisions(document).flatMap(group => group.find(row => row.lexical_ready) ?? []);
     const revision = revisions[0];
     const request = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=?').get(document.id) as { state: string; error: string | null } | undefined;
@@ -163,7 +181,7 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     const embedded = revisions.reduce((sum, row) => sum + (row.embedding_ready ? (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length : 0), 0);
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     return { ...document, preparation: { documentId: document.id, revision: document.revision, text: coverage === 'abstract' ? 'abstract' : passages ? 'available' : 'missing',
-      lexical: revision ? 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? 'ready' : embedded > 0 ? 'partial' : request?.error ? 'failed' : 'missing',
+      lexical: revision ? stale ? 'stale' : 'ready' : 'missing', embeddings: embedded === passages && passages > 0 ? 'ready' : embedded > 0 ? 'partial' : request?.error ? 'failed' : 'missing',
       status: request?.state === 'cancelled' ? 'cancelled' : store.preference('paused') ? 'paused' : revision ? 'ready' : request?.state === 'running' ? 'running' : request?.state === 'queued' ? 'queued' : request?.error ? 'failed' : 'catalogued',
       reason: request?.error === 'documentary_embeddings_unavailable' ? 'no_model' : request?.error?.includes('embedding') ? 'provider_failed' : request?.error ? 'extraction_failed' : null, error: request?.error ?? null, passages, embedded } };
   }) };
@@ -306,6 +324,10 @@ export async function drainDocumentaryRequests(): Promise<void> {
               attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal));
           }
         } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal));
+        checkLease();
+        const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
+        if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');
+        store.publishDocument({ ...document, coverage }, prepared.map(result => result.indexKey));
         // Publish every lexical attachment before any optional vector request.
         for (const result of prepared) {
           checkLease();
@@ -420,9 +442,9 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
     const identity = JSON.parse(documentaryStore().getJob(passage.index_key)!.identity_json) as DocumentaryIndexIdentity;
     const coverage = identity.coverage ?? document.coverage;
     return { id: passage.id, documentId: document.id, workId: document.workId, attachmentId: identity.attachmentId, attachmentRevision: identity.attachmentRevision,
-      revision: document.revision, text: passage.text, locator: JSON.parse(passage.locator_json),
+      revision: identity.revision, text: passage.text, locator: JSON.parse(passage.locator_json),
       provenance: document.authoredKind ?? (coverage === 'abstract' ? 'abstract' as const : 'source' as const),
-      limitations: [...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : []), ...(read?.kind === 'references' ? ['reference_candidates_require_source_review'] : [])] };
+      limitations: [...(identity.revision !== document.revision ? ['previous_indexed_revision'] : []), ...(document.authoredKind ? [document.authoredKind, 'not_primary_evidence'] : coverage === 'abstract' ? ['abstract_only'] : []), ...(document.sourceWarning ? [document.sourceWarning] : []), ...(read?.kind === 'references' ? ['reference_candidates_require_source_review'] : [])] };
   });
-  return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || indexedDocuments.size < scope.documents.length } };
+  return { evidence, traversal: { ...result.traversal, partial: result.traversal.partial || indexedDocuments.size < scope.documents.length || scope.documents.some(document => document.indexedSource && document.indexedSource.revision !== document.revision) } };
 }

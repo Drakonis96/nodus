@@ -72,13 +72,31 @@ try {
   await assert.rejects(() => readRun.readDocument('foreign-document', { kind: 'search', query: 'Independent' }), /not_authorized/);
   await assert.rejects(() => readRun.readDocument(doc.id, { kind: 'pages', from: 1, to: 9 }), /Invalid physical page/);
   await assert.rejects(() => readRun.readDocument(doc.id, { kind: 'context', passageId: '../../outside' }), /Invalid context/);
+  preparation.documentaryStore().publishDocument(doc, files.map(file => file.indexKey));
   db.prepare('UPDATE works SET resolved_text_hash=? WHERE nodus_id=?').run('changed-content', 'inside');
+  const freshScope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
+  assert.equal(freshScope.documents[0].indexedSource.revision, doc.revision, 'new run explicitly pins the last complete publication');
+  assert.notEqual(freshScope.documents[0].revision, doc.revision);
+  const fallback = await preparation.retrieveSharedDocumentaryEvidence(freshScope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
+  assert.equal(fallback.evidence.length, 2, 'failed or pending rebuild remains queryable');
+  assert.ok(fallback.evidence.every(item => item.revision === doc.revision && item.limitations.includes('previous_indexed_revision')));
+  assert.equal(fallback.traversal.partial, true);
+  assert.equal(preparation.getResearchPreparationInventory().documents.find(item => item.id === doc.id).preparation.lexical, 'stale');
+  const fallbackId = citations.documentaryCitationId(freshScope.id, fallback.evidence[0].id);
+  assert.equal(citations.getDocumentaryPassageDetail(fallbackId).historical, true);
+  const partial = await preparation.prepareDocumentaryText({ ...freshScope.documents[0], indexedSource: undefined, attachmentId: 'appendix-a' }, 'New revision unpublished half');
+  const stillOld = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
+  assert.equal(stillOld.id, freshScope.id, 'an incomplete rebuild cannot change the published scope');
+  assert.throws(() => preparation.documentaryStore().publishDocument(freshScope.documents[0], [partial.indexKey, 'missing']), /publication_incomplete/);
+  assert.equal(load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope().id, freshScope.id);
+
   const pinnedRead = await preparation.retrieveSharedDocumentaryEvidence(scope, 'Independent', load('shared/researchCorpus.ts').RETRIEVAL_PRESETS.balanced, null);
   assert.deepEqual(pinnedRead.evidence.map(item => item.text), found.evidence.map(item => item.text), 'frozen executions keep original indexed revisions after content changes');
   const historical = citations.getDocumentaryPassageDetail(citationId);
   assert.equal(historical.historical, true);
   assert.equal(historical.text, before.text, 'immutable citation keeps its exact original text after a content edit');
   db.prepare('UPDATE works SET archived=1 WHERE nodus_id=?').run('inside');
+  assert.equal(citations.getDocumentaryPassageDetail(fallbackId), null);
   assert.equal(citations.getDocumentaryPassageDetail(citationId), null, 'revocation still blocks historical source reads');
   console.log('Legacy fencing, lexical-first shared preparation, pre-dispatch embedding lease and compatible vector reuse passed.');
 } finally {

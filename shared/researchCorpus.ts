@@ -75,6 +75,8 @@ export interface ResearchCorpusDocument {
   attachments?: Array<{ id: string; revision: string }>;
   coverage: 'metadata' | 'abstract' | 'fulltext';
   permissionRevision: string;
+  /** Backend-pinned published content; source revision above remains the live identity. */
+  indexedSource?: { revision: string; attachmentId: string | null; attachments?: Array<{ id: string; revision: string }>; indexKeys: string[] };
 }
 
 export interface ResolvedResearchScope {

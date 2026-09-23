@@ -1,5 +1,6 @@
 export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
   "en": {
+    "Disponible: revisión anterior": "Available: previous revision",
     "Cuaderno de investigación": "Research notebook",
     "Chat general": "General chat",
     "Nuevo cuaderno": "New notebook",
@@ -49,6 +50,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "This citation preserves an earlier source revision."
   },
   "fr": {
+    "Disponible: revisión anterior": "Disponible : révision précédente",
     "Cuaderno de investigación": "Carnet de recherche",
     "Chat general": "Discussion générale",
     "Nuevo cuaderno": "Nouveau carnet",
@@ -98,6 +100,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Cette citation conserve une version antérieure de la source."
   },
   "de": {
+    "Disponible: revisión anterior": "Verfügbar: vorherige Revision",
     "Cuaderno de investigación": "Forschungsnotizbuch",
     "Chat general": "Allgemeiner Chat",
     "Nuevo cuaderno": "Neues Notizbuch",
@@ -147,6 +150,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Dieses Zitat bewahrt eine frühere Version der Quelle."
   },
   "it": {
+    "Disponible: revisión anterior": "Disponibile: revisione precedente",
     "Cuaderno de investigación": "Quaderno di ricerca",
     "Chat general": "Chat generale",
     "Nuevo cuaderno": "Nuovo quaderno",
@@ -196,6 +200,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Questa citazione conserva una versione precedente della fonte."
   },
   "pt": {
+    "Disponible: revisión anterior": "Disponível: revisão anterior",
     "Cuaderno de investigación": "Caderno de investigação",
     "Chat general": "Conversa geral",
     "Nuevo cuaderno": "Novo caderno",
@@ -245,6 +250,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Esta citação conserva uma revisão anterior da fonte."
   },
   "pt-BR": {
+    "Disponible: revisión anterior": "Disponível: revisão anterior",
     "Cuaderno de investigación": "Caderno de pesquisa",
     "Chat general": "Chat geral",
     "Nuevo cuaderno": "Novo caderno",
@@ -294,6 +300,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Esta citação preserva uma revisão anterior da fonte."
   },
   "tr": {
+    "Disponible: revisión anterior": "Kullanılabilir: önceki sürüm",
     "Cuaderno de investigación": "Araştırma defteri",
     "Chat general": "Genel sohbet",
     "Nuevo cuaderno": "Yeni defter",
@@ -343,6 +350,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "Bu alıntı, kaynağın önceki bir sürümünü korur."
   },
   "zh-CN": {
+    "Disponible: revisión anterior": "可查询：先前版本",
     "Cuaderno de investigación": "研究笔记本",
     "Chat general": "常规聊天",
     "Nuevo cuaderno": "新建笔记本",
@@ -392,6 +400,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了来源的早期版本。"
   },
   "zh-TW": {
+    "Disponible: revisión anterior": "可查詢：先前版本",
     "Cuaderno de investigación": "研究筆記本",
     "Chat general": "一般聊天",
     "Nuevo cuaderno": "新增筆記本",
@@ -441,6 +450,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "此引用保留了來源的早期版本。"
   },
   "ja": {
+    "Disponible: revisión anterior": "利用可能：以前の版",
     "Cuaderno de investigación": "研究ノートブック",
     "Chat general": "一般チャット",
     "Nuevo cuaderno": "新しいノートブック",
@@ -490,6 +500,7 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "Esta cita conserva una revisión anterior de la fuente.": "この引用は出典の以前の版を保持しています。"
   },
   "ko": {
+    "Disponible: revisión anterior": "사용 가능: 이전 버전",
     "Cuaderno de investigación": "연구 노트북",
     "Chat general": "일반 채팅",
     "Nuevo cuaderno": "새 노트북",

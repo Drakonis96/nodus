@@ -409,3 +409,22 @@ Native CI run 35848154546 passed all four targets: Windows x64, Linux x64,
 macOS ARM64 and macOS x64. It validates the private runtime, build and focused
 native tests, with isolated Electron checks on macOS. Signing, notarization and
 disposable native installation/update/uninstallation remain unverified.
+
+### Last valid document publication
+
+A profile-local `documentary_publications` table now atomically switches the set
+of prepared attachments for a document after every lexical part is available,
+before optional embeddings. Failed or incomplete replacements retain the previous
+publication. New backend scopes explicitly pin its indexed revision and keys,
+include them in their fingerprint and label returned evidence
+`previous_indexed_revision`; the notebook UI translates its previous-revision
+availability state in all 11 locales. Stale revisions do not mix with mutable
+legacy passage/Idea/graph retrieval. Permission changes or removal of a contributing
+attachment still prohibit access. Existing immutable citation identities remain
+compatible.
+
+Five isolated scripts passed at `/private/tmp/nodus-research-34oGrl`, including
+new-run fallback, incomplete publication rejection, unchanged scope during a
+partial rebuild, exact historical citation reads and revocation. Type checking
+and full lint passed. The complete application build and new real-app publication
+check are pending; the current paid campaign deliberately retains the prior build.

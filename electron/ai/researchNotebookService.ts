@@ -8,6 +8,7 @@ import { researchCorpusInventory } from './researchCorpusInventory';
 import { researchFingerprint, resolveNotebookScope, selectResearchDocuments } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { notifyAuthoredResearchSourceChanged } from './researchCorpusEvents';
+import { pinPublishedResearchDocument } from './documentaryPreparation';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
 
 const active = new Map<string, Set<AbortController>>();
@@ -36,7 +37,7 @@ export function resolveResearchNotebook(id: string): ResolvedResearchScope {
   const inventory = researchCorpusInventory();
   const notebook = notebooks.getResearchNotebook(id);
   if (!notebook) throw new Error('Notebook not found');
-  const scope = resolveNotebookScope(getActiveVault().id, notebook, inventory.documents, inventory.collections);
+  const scope = resolveNotebookScope(getActiveVault().id, notebook, inventory.documents.map(pinPublishedResearchDocument), inventory.collections);
   notebooks.recordResearchScope(scope);
   return scope;
 }
@@ -55,7 +56,7 @@ export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selec
   if (attachments?.attachmentIds !== undefined && (!Array.isArray(attachments.attachmentIds) || attachments.attachmentIds.length > 20)) throw new Error('Invalid research attachments');
   const vault = getActiveVault();
   const allowed = filter?.enabled ? resolveResearchSourceScope(filter, true) : null;
-  const documents = researchCorpusInventory().documents.filter(document => document.workId && (!allowed || allowed.workIds.has(document.workId))).sort((a, b) => a.id.localeCompare(b.id));
+  const documents = researchCorpusInventory().documents.filter(document => document.workId && (!allowed || allowed.workIds.has(document.workId))).map(pinPublishedResearchDocument).sort((a, b) => a.id.localeCompare(b.id));
   const permissionFingerprint = researchFingerprint(documents.map(document => [document.id, document.permissionRevision]));
   const conversationAttachments = [...new Set(attachments?.attachmentIds ?? [])].map(attachmentId => {
     const conversationId = attachments?.conversationId;

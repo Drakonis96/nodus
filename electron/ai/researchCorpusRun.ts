@@ -35,7 +35,7 @@ export class ResearchCorpusRun {
   private graphSnapshot: Pick<WritingWorkshopSnapshot, 'gaps' | 'contradictions' | 'themes'> | null = null;
   constructor(readonly scope: ResolvedResearchScope, settings: RetrievalSettings, readonly signal?: AbortSignal, readonly pinRevisions = false) {
     this.budget = new ResearchRetrievalBudget(settings);
-    this.workIds = scope.documents.flatMap(document => document.workId ? [document.workId] : []);
+    this.workIds = scope.documents.filter(document => !document.indexedSource || document.indexedSource.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []);
     const manual = getSettings().academicMode === 'manual' ? activeManualIdeaIds(getDb()) : null;
     this.ideaIds = [...resolveResearchSourceScope({ enabled: true, authorIds: [], workIds: this.workIds }, true)!.ideaIds].filter(id => !manual || manual.has(id));
   }
@@ -65,7 +65,7 @@ export class ResearchCorpusRun {
     const vector = await embed(query, this.signal).catch(() => null);
     this.validate();
     const current = researchCorpusInventory().documents;
-    const stableWorks = this.pinRevisions ? this.scope.documents.filter(document => current.find(item => item.id === document.id)?.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []) : this.workIds;
+    const stableWorks = this.pinRevisions ? this.scope.documents.filter(document => (!document.indexedSource || document.indexedSource.revision === document.revision) && current.find(item => item.id === document.id)?.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []) : this.workIds;
     const stableIdeas = stableWorks.length === this.workIds.length ? this.ideaIds : [];
     const hierarchy = await retrieveHierarchical(query, { embedding: vector, nodusIds: stableWorks, ideaIds: stableIdeas,
       documentLimit: settings.candidates, ideaLimit: settings.passagesPerRound, passageLimit: settings.candidates,
