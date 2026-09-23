@@ -70,17 +70,24 @@ const CITATION = /\[[^\]]*\]\(nodus:\/\/[^)]+\)/gu;
 const PARENTHESIZED_CITATIONS = new RegExp(`[ \\t]*\\(\\s*(?:${CITATION.source})(?:\\s*[,;]?\\s*(?:${CITATION.source}))*\\s*\\)`, 'gu');
 /** Same-length masking protects author initials and URL punctuation. A sentence
  * boundary may sit after citations appended to the sentence's final punctuation,
- * so audited prose can be segmented again exactly like freshly written prose. */
+ * so audited prose can be segmented again exactly like freshly written prose.
+ * The look-back is a linear scan: a nested-quantifier lookbehind over citation
+ * masks backtracked exponentially and froze the main process in a live run. */
 export function researchProseSpans(markdown: string): Array<{ start: number; end: number; text: string }> {
   const spans: Array<{ start: number; end: number; text: string }> = [];
   const masked = markdown.replace(CITATION, match => '·'.repeat(match.length));
-  const split = /\n+|(?<=[.!?。！？](?:[ \t]*·+)*)[ \t]+(?=[\p{Lu}¿¡“«])/gu;
+  const boundaries: Array<{ index: number; length: number }> = [];
+  for (const match of masked.matchAll(/\n+|[ \t]+(?=[\p{Lu}¿¡“«])/gu)) {
+    if (match[0].startsWith('\n')) { boundaries.push({ index: match.index!, length: match[0].length }); continue; }
+    let before = match.index! - 1;
+    while (before >= 0 && (masked[before] === '·' || masked[before] === ' ' || masked[before] === '\t')) before--;
+    if (before >= 0 && '.!?。！？'.includes(masked[before])) boundaries.push({ index: match.index!, length: match[0].length });
+  }
   let start = 0;
-  for (const match of [...masked.matchAll(split), { index: masked.length, 0: '' }]) {
-    const end = match.index!;
-    const text = markdown.slice(start, end);
-    if (text.trim()) spans.push({ start, end, text });
-    start = end + match[0].length;
+  for (const boundary of [...boundaries, { index: masked.length, length: 0 }]) {
+    const text = markdown.slice(start, boundary.index);
+    if (text.trim()) spans.push({ start, end: boundary.index, text });
+    start = boundary.index + boundary.length;
   }
   return spans;
 }

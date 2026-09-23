@@ -52,6 +52,11 @@ try {
   assert.equal(researchProseSpans('A fact [Doe, N. (2020)](nodus://passage/inside). Another fact.').length, 2, 'author initials cannot bypass sentence auditing');
   assert.equal(researchProseSpans('A fact. [Doe, N. (2020)](nodus://passage/inside) [Roe](nodus://passage/x) Another fact.').length, 2,
     'citations appended after final punctuation still end the sentence, so audited prose can be segmented again');
+  // Live regression: a nested-quantifier lookbehind backtracked exponentially over
+  // a long citation mask that did not follow terminal punctuation.
+  const longCitation = `[${'Synthetic research source, p. 1'.repeat(4)}](nodus://passage/${'a'.repeat(200)})`;
+  assert.equal(researchProseSpans(`A claim ${longCitation} ${longCitation} Next claim. ${longCitation} Final claim.`).length, 2,
+    'segmentation stays linear and splits only after terminal punctuation');
 
   // ── Failures observed in the 23 September live review ─────────────────────
   // The fixtures use the reviewed sentences, but every decision below depends only
