@@ -919,3 +919,72 @@ Validation evidence:
 - `/private/tmp/nodus-research-A8WH1k`: real private MCP `0.13.0+nodus.1`, stdio, synthetic HTTP Zotero fixture; original PDF text/pages, scope rejection and live revision rejection pass. This is not a real Zotero application integration.
 - `/private/tmp/nodus-research-XWlgUu`: real isolated Electron, native original reading before indexing, immutable citation lookup, no campaign created by reading, subsequent lexical preparation, notebook regressions and activity UI layouts pass. Activity events in this UI test are deterministic IPC fixtures, not live model decisions.
 - Production build, typecheck and ESLint pass. No new paid calls. Final factual grounding, live agent/Zotero integration, final cross-platform distribution/upgrade and quality acceptance remain open.
+
+### Factual ledger and evidence-free abstention (2026-09-23)
+
+The academic adapter now adds a final factual-prose audit after editorial changes, including sentences without citations and the abstract. It records facts, attributed interpretations, explicitly qualified inferences and nonfactual transitions. A semantic verdict is insufficient on its own: each factual source ID must be authorized and each quoted anchor must actually occur in supplied evidence. Unsupported or unavailable judgements remove the affected sentence; any remaining retrieval allowance permits one focused recovery search before reconsideration. Source-less supported sentences acquire canonical citations from backend evidence. Reports retain a claim ledger and aggregate audit counts, and automatic checks cannot promote their quality grade beyond `needs_review`.
+
+A corpus without Ideas or passages returns a short localized explanation before planning/writing. A passage-only fallback plan uses the actual passages rather than manufacturing empty Idea sections. Old report fields remain valid; ledger/count fields are additive JSON data.
+
+Validation: typecheck, ESLint and four isolated suites pass at `/private/tmp/nodus-research-WJSu0r` (new factual-audit cases plus Deep Research core, quality and versions). Cases cover uncited claims, wrong source IDs, fabricated quoted anchors, absence claims, unqualified inferences, unavailable verification, citation labels containing initials, zero-evidence abstention and passage-only fallback planning. These are behavioral/synthetic checks; semantic reliability and live comparative quality remain pending and are not accepted on the strength of a model verdict.
+
+### Closure implementation and OCR scope change (2026-09-23)
+
+The user deferred OCR for this release. Documentary preparation now always uses
+OCR-off extraction with scanned-page detection. A scanned source is skipped with
+`documentary_ocr_deferred`, keeps the last valid publication, and does not stop
+other queued documents. Bounded original reads also never invoke OCR. Existing
+OCR features outside documentary Research remain available. Previously extracted
+text is adopted only with compatible source maps and a quality record reporting
+no unread pages. The earlier installed-only OCR evidence is historical and does
+not describe the final Research preparation policy.
+
+Preparation previews now inspect authorized This-vault attachments in an owned
+worker and distinguish inaccessible files, abstracts, OCR-pending documents and
+unknown availability. A failed inspection remains explicitly unknown. Inspection
+does not create an index or invoke a model; confirmation still authorizes the
+frozen inventory and configuration only.
+
+The final grounding audit covers headings, uncited factual statements, abstract,
+limitations and recommendations. Source IDs, literal excerpts and semantic support
+are separate gates. Unsupported or unverifiable prose is removed; an empty result
+returns a brief limitation without manufactured sections. Published outline claims
+come from the audited text rather than the plan. Automated checking never upgrades
+a report to accepted quality.
+
+Chat and Deep Research expose searched/matched/contextually-read coverage and
+source-specific limitations. Initial retrieval reserves room for structured
+follow-up decisions; compact source menus avoid consuming that allowance by
+repeating the whole traversal. Original evidence preserves attachment revision
+and stable citation receipts. Managed sessions clean up on revocation, can recover
+one dead transport, and keep permission/identity/revision failures closed. Explicit
+external endpoints persist per vault/notebook. Nodus-owned Zotero bridge and MCP
+listeners fall back to an OS-selected loopback port and publish the effective
+address; Zotero's endpoint is never reassigned.
+
+Disposable installer CI now builds a higher private `5.6.1-research.<run>` candidate
+without changing public version metadata or publishing artifacts. It downloads
+hash-verified v5.6.0 release bytes, launches the actual older package on a disposable
+host (without relying on the new bootstrap), creates a synthetic note, replaces it
+with the candidate, and checks retained data and removal. This is a prepared
+verification path, not a completed upgrade result.
+
+Verification of this closure batch is intentionally deferred until implementation
+is finished, as requested. Its new behaviors must not be inferred as accepted from
+older CI results. No additional paid inference has been performed in this batch.
+
+### Concise cinematic welcome
+
+The first-entry welcome now presents one explanation, the effective embedding
+provider/model, the current vault count, and three decisions. Start authorizes the
+frozen inventory; Later marks this version seen without authorizing a campaign;
+No requires a second confirmation and records a declined decision. Closing or
+Escape behaves like Later (Escape returns from the confirmation first). Users can
+reopen preparation from Library. Missing embedding configuration routes to
+configuration rather than choosing a provider silently.
+
+Manual management in Settings, and explicit work selections from Library, retain
+the detailed inventory, text-only preparation, selection and independent future
+additions setting. The welcome does not enable future additions. All new copy is
+translated into the eleven additional UI languages. The decorative cinematic
+surface contains no remote media; reduced motion disables its animation.

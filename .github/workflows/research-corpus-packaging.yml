@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/research-corpus-packaging.yml'
       - 'scripts/verify-research-installer.mjs'
+      - 'scripts/download-research-upgrade-base.mjs'
       - 'scripts/verify-research-pdf.mjs'
       - 'electron/bootstrap.ts'
       - 'electron/qa/isolatedProfile.ts'
@@ -40,6 +41,7 @@ jobs:
     timeout-minutes: 90
     env:
       NODUS_RELEASE_CHANNEL: beta
+      NODUS_RESEARCH_CANDIDATE_VERSION: 5.6.1-research.${{ github.run_number }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -154,13 +156,13 @@ jobs:
           NODUS_REQUIRE_MACOS_SIGNING: true
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.research.cjs
       - name: Verify signed and notarized macOS artifacts
         if: startsWith(matrix.os, 'macos')
         run: node scripts/verify-macos-release.cjs release ${{ matrix.arch }}
       - name: Package native Windows or Linux installer without publishing
         if: runner.os != 'macOS'
-        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
+        run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.research.cjs
       - name: Remove temporary macOS credentials
         if: always() && startsWith(matrix.os, 'macos')
         shell: bash
@@ -174,18 +176,23 @@ jobs:
           security delete-keychain "$keychain_path" >/dev/null 2>&1
           rm -f "$certificate_path" "$api_key_path" "$keychain_path" "$signing_probe"
 
-      - name: Native installation, same-version replacement and removal
+      - name: Fetch hash-verified v5.6.0 installer on disposable host
+        run: node scripts/download-research-upgrade-base.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Native installation, real v5.6.0 upgrade and removal
         if: runner.os != 'Linux'
-        run: node scripts/verify-research-installer.mjs release
-      - name: Native Linux installation, same-version replacement and removal
+        run: node scripts/verify-research-installer.mjs release --upgrade-base=release-base
+      - name: Native Linux installation, real v5.6.0 upgrade and removal
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum node scripts/verify-research-installer.mjs release
+        run: xvfb-run --auto-servernum node scripts/verify-research-installer.mjs release --upgrade-base=release-base
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: research-installer-evidence-${{ matrix.os }}
           path: |
             research-installer-evidence.json
+            release-base/upgrade-base.json
             build/zotero-mcp/runtime.json
             build/zotero-mcp/legal/**
           if-no-files-found: warn

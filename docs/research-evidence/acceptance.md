@@ -46,3 +46,40 @@ upgrade between different released versions in disposable hosts. Expand the
 robustness matrix, especially OCR-pending combinations, all malformed document
 formats and combinations of simultaneous revision, permission and process changes.
 No automated test count or citation-support score closes these gaps by itself.
+
+## Closure implementation checkpoint (23 September, before final verification)
+
+The user explicitly deferred OCR and paused final verification while the welcome
+was redesigned. Scanned documents now remain recoverably blocked with
+`documentary_ocr_deferred`; this route never starts OCR. The remaining acceptance
+matrix must not be inferred from this implementation checkpoint.
+
+Work completed before that pause:
+
+- Build, both TypeScript targets and lint passed before the cinematic UI change.
+- Twelve targeted isolated suites passed in `/private/tmp/nodus-research-i1JZj9`;
+  nine additional suites already running when the pause arrived finished with
+  nine passes in `/private/tmp/nodus-research-TeRGME` (two workers each).
+- Queue/log browser fixtures passed in `/private/tmp/nodus-research-aCnaFC`.
+  The Logs fixture supplies the new preparation snapshot, addressing the old
+  general CI renderer timeout.
+- The no-paid real Zotero run in `/private/tmp/nodus-research-jHLxyh` **failed**.
+  Automatic original reading without manual connection or indexing returned the
+  expected first-page evidence (saved in `nodus-automatic-original.json`), but a
+  subsequent manual metadata call failed. Its adapter supplied an attachment
+  argument to the metadata-only tool. The adapter now sends operation-specific
+  arguments; rerunning that fix remains pending.
+- The private runtime was rebuilt (5,816 inventoried files). No paid calls were
+  made and the shared cost ledger was not reset.
+
+Screenshot-only run `/private/tmp/nodus-research-crYtxW` rendered the new welcome
+and decline confirmation in real Electron, with synthetic metadata and a dummy
+embedding credential. Actual write/descendant/network denials were checked before
+launch. No indexing or inference was started. `welcome-cinematic.png` and
+`welcome-confirmation.png` are presentation evidence, not acceptance tests.
+
+Still pending: final-head CI/native/installer runs, the newly implemented actual
+v5.6.0-to-private-higher-version upgrade harness, final UI behavior and accessibility
+checks, the rerun of real Zotero integration, live grounded-report review and the
+same-corpus comparison. Keep the PR draft and acceptance open. Do not run these
+final checks until the user resumes verification.
