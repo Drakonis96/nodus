@@ -332,6 +332,20 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         let coverage = document.coverage;
         let sourceMap: Record<string, string> = {};
         let parts: DocumentarySourcePart[] = [];
+        const publication = store.publishedDocument(document)?.indexedSource;
+        const prepared: Array<{ indexKey: string; chunks: DocumentaryChunk[] }> = [];
+        if (publication?.revision === document.revision && publication.indexKeys.length) {
+          const identities = publication.indexKeys.map(key => JSON.parse(store.getJob(key)!.identity_json) as DocumentaryIndexIdentity);
+          if (!unpreparedResearchAttachmentIds(document, identities).length && identities.every(identity => identity.chunkerVersion === RETRIEVAL_CHUNKER_VERSION && identity.processingVersion === configuration.processingVersion)) {
+            for (const key of publication.indexKeys) {
+              const revision = store.revision(key);
+              if (revision?.lexical_ready && revision.chunks_json) prepared.push({ indexKey: key, chunks: JSON.parse(revision.chunks_json) });
+            }
+            if (prepared.length !== publication.indexKeys.length) prepared.length = 0;
+            else coverage = identities.every(identity => identity.coverage === 'fulltext') ? 'fulltext' : identities.some(identity => identity.coverage === 'abstract') ? 'abstract' : document.coverage;
+          }
+        }
+        if (!prepared.length) {
         if (document.conversationAttachment) {
           const { conversationId, attachmentId } = document.conversationAttachment;
           const source = readResearchAttachmentSource(conversationId, attachmentId);
@@ -386,7 +400,6 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         if (!current || current.revision !== document.revision) throw new Error('research_source_revision_changed');
         checkLease();
         store.db.prepare("UPDATE documentary_requests SET stage='lexical' WHERE document_id=? AND lease_token=?").run(request.document_id, request.lease_token);
-        const prepared = [];
         if (parts.length) {
           for (const part of parts) {
             checkLease();
@@ -394,6 +407,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
               attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal));
           }
         } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal));
+        }
         checkLease();
         const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
         if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');

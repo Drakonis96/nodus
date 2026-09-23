@@ -37,7 +37,8 @@ try {
   await page.screenshot({ path: path.join(root, 'artifacts/startup.png') });
   if (process.argv.includes('--notebooks')) {
     const corpus = await page.evaluate(async (root) => {
-      await window.nodus.updateSettings({ autoBackupFolder: `${root}/library`, onboardingComplete: true,
+      await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined' });
+      await window.nodus.updateSettings({ autoLightScan: false, autoDeepScanOnReadTag: false, autoSummaryAfterDeep: false, autoBridgeAfterQueue: false, autoBackupFolder: `${root}/library`, onboardingComplete: true,
         basicsTutorialVersion: 99, recoverySetupVersion: 999, tourComplete: true, advancedTourComplete: true,
         uiLanguage: 'es', mascotStyle: 'orb', mascotStyleChosen: true, mascotEnabled: false, reduceMotion: true,
         chatModel: { provider: 'deepseek', model: 'deepseek-flash' } });
@@ -90,7 +91,15 @@ try {
       for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07',
         'nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA', 'nodus.toolkitBetaGuideSeen.2.4.0']) localStorage.setItem(key, '1');
     }, JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')).version);
+    if (process.argv.includes('--preparation')) {
+      await page.evaluate(async ids => {
+        const vault = await window.nodus.getActiveVault();
+        await window.nodus.linkGlobalLibraryItemsToVault(ids, vault.id);
+        await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 0, decision: 'pending' });
+      }, corpus.items.map(item => item.id));
+    }
     await page.reload();
+    if (process.argv.includes('--preparation')) report.preparation = await (await import('./verify-research-preparation-ui.mjs')).verifyResearchPreparationUi(page, root);
     await page.getByRole('button', { name: 'Research chat', exact: true }).first().click({ timeout: 20000 });
     const control = page.getByTestId('research-notebooks');
     await control.waitFor();

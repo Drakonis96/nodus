@@ -861,3 +861,40 @@ UI run used the existing Playwright Chromium headless shell 1228 with disposable
 browser data inside the root; filesystem, descendant and network negative probes
 passed before either run. No paid calls were made. Welcome/Library presentation,
 OCR recovery, agent tool orchestration and the remaining acceptance matrix are open.
+
+## Closing delivery: welcome and Library preparation
+
+Academic vaults have a versioned preparation welcome on idle entry, with three
+translated explanation cards, a frozen This-vault inventory, the effective model,
+external-provider disclosure, independent future-addition consent, work selection,
+refusal and local-text-only preparation when embedding credentials are absent.
+Library exposes entry points for the current vault, selected works and individual
+works, together with completion/update actions and Queue access. Settings can reopen
+the flow. Source readiness is displayed separately from the existing analysis modal
+and Ideas/profile actions. No image asset is required for the explanatory cards.
+
+Compatible published lexical revisions can now complete embeddings without repeating
+source extraction or contacting Zotero. Compatibility includes the current source
+revision, every attachment, chunker and processing version; incomplete or stale
+publications still require preparation.
+
+The dedicated welcome browser fixture, Library status regressions and translation
+coverage passed at `/private/tmp/nodus-research-nG0IyJ`. The owning-vault integration
+also proves completing embeddings reuses text without calling its extractor. Both
+TypeScript projects, focused lint and the complete production build passed.
+
+Real Electron validation passed at `/private/tmp/nodus-research-bGZ9b4`: the actual
+renderer, preload, persistent campaigns and queue prepared all three linked synthetic
+works using only local text, retained their abstract-only status and remembered the
+accepted welcome without enabling future additions. Light/dark layouts at 1280 and
+800 pixels kept keyboard focus inside the native dialog. Existing notebook selection,
+exclusion, citations and layout checks also passed in the same isolated instance.
+Actual OS denial probes and effective paths are recorded in
+`docs/research-evidence/2026-09-23-preparation-ui.json`; only synthetic screenshots
+are committed. The first E2E attempt used an asynchronous browser polling predicate
+that returned before queue completion; the final verifier explicitly awaits queue
+snapshots and requires all three jobs to complete before checking readiness.
+
+This run used no model or Zotero calls. It does not validate full-text OCR, live MCP,
+agent-directed original reads, factual report quality or the remaining platform and
+upgrade acceptance. Those criteria remain open.

@@ -60,6 +60,13 @@ try {
   assert.equal(store.db.prepare('SELECT COUNT(*) n FROM documentary_revisions WHERE lexical_ready=1 AND embedding_ready=0').get().n, 2);
   assert.equal(registry.getActiveVault().id, nonAcademic.id);
   assert.equal(database.getDb().prepare('SELECT COUNT(*) n FROM works').get().n, 0, 'background work did not write the open vault');
+  let embeddingCalls = 0;
+  ai.embedMany = async texts => { embeddingCalls++; return texts.map(() => [1, 0, 1]); };
+  extraction.extractTraditionalResearchWork = async () => { throw new Error('compatible text should be reused without contacting Zotero'); };
+  await registry.withOwningVault(first.id, () => database.withVaultDatabase(first.id, () => preparation.prepareResearchDocuments([firstDoc.id])));
+  for (let i = 0; i < 100 && store.db.prepare("SELECT COUNT(*) n FROM documentary_requests WHERE source_id IS NOT NULL AND state='complete'").get().n < 3; i++) await new Promise(resolve => setImmediate(resolve));
+  assert.equal(embeddingCalls, 1, 'completing embeddings reuses the published lexical revision');
+  assert.equal(store.db.prepare('SELECT COUNT(*) n FROM documentary_revisions WHERE embedding_ready=1').get().n, 1);
   const detached = await registry.withOwningVault(first.id, () => database.withVaultDatabase(first.id, () => new Promise(resolve => {
     registry.withoutOwningVault(() => database.withoutDatabaseContext(() => setImmediate(() => resolve(registry.getActiveVault().id))));
   })));

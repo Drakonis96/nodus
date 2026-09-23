@@ -1,3 +1,4 @@
+import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
 import type { AnnouncementRefreshResult } from '@shared/announcements';
@@ -2000,6 +2001,9 @@ export function App() {
         </ContinuityProvider>
       </div>
 
+      {isAcademic && activeVault && settings.onboardingComplete && <ResearchPreparationWelcome key={activeVault.id} vaultId={activeVault.id}
+        allowAutomatic={queueLive === 0 && settings.basicsTutorialVersion > 0 && settings.tourComplete && ['home', 'library'].includes(view) && !queueAnchor && !paletteOpen && !collectionsOpen && !feedbackOpen && !roadmapOpen}
+        onConfigure={() => setView('settings')} />}
       <FeedbackHost />
       <PrivacyRequestHost />
       <BrowserConnectorPairingRequestHost />

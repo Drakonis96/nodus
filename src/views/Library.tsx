@@ -1,3 +1,5 @@
+import type { DocumentPreparationState } from '@shared/researchCorpus';
+import { openResearchPreparation, openResearchPreparationQueue } from '../components/ResearchPreparationWelcome';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
@@ -466,6 +468,26 @@ export function Library({
   // for records; primary documents live in the Archive.
   const isRecordsVault = vaultType === 'genealogy' || vaultType === 'primary_sources';
   const [works, setWorks] = useState<WorkView[]>([]);
+  const [preparationByWork, setPreparationByWork] = useState<Map<string, DocumentPreparationState>>(new Map());
+  useEffect(() => {
+    if (vaultType !== 'academic') return;
+    let current = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let generation = 0;
+    const refresh = async () => {
+      const version = ++generation;
+      try {
+        const inventory = await window.nodus.getResearchPreparationInventory();
+        if (current && version === generation) setPreparationByWork(new Map(inventory.documents.filter(document => document.workId).map(document => [document.workId!, document.preparation])));
+      } catch { /* Keep the last readiness snapshot and existing analysis actions. */ }
+    };
+    void refresh();
+    const release = window.nodus.onResearchPreparationProgress(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; void refresh(); }, 300);
+    });
+    return () => { current = false; if (timer) clearTimeout(timer); release(); };
+  }, [vaultId, vaultType]);
   const [totalWorks, setTotalWorks] = useState(0);
   // The page and the row that was at the top are one restored value.
   const [pageOffset, setPageOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
@@ -1248,6 +1270,10 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
+          {vaultType === 'academic' && <>
+            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => openResearchPreparation(selected.size ? [...selected] : undefined)}>{t('Preparar fuentes')}</button>
+            <button className="btn btn-ghost" onClick={openResearchPreparationQueue}>{t('Ver en Queue')}</button>
+          </>}
           {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
             data-testid="document-index-manager-button"
             className="btn btn-ghost border border-neutral-700 gap-1.5"
@@ -1908,6 +1934,10 @@ export function Library({
                   )}
                 </div>
                 <div className="min-w-0 p-1">
+                  {vaultType === 'academic' && <button className="mb-1 block max-w-full truncate text-[10px] text-indigo-400" onClick={() => openResearchPreparation([w.nodus_id])}
+                    title={`${t('Búsqueda léxica')}: ${t(preparationByWork.get(w.nodus_id)?.lexical === 'ready' ? 'Disponible para consultar' : 'Preparación pendiente')} · ${t('Embeddings')}: ${t(preparationByWork.get(w.nodus_id)?.embeddings === 'ready' ? 'Completado' : 'Preparación pendiente')}`}>
+                    {t(preparationByWork.get(w.nodus_id)?.text === 'abstract' ? 'Solo abstract' : preparationByWork.get(w.nodus_id)?.lexical === 'ready' ? 'Disponible para consultar' : 'Preparación pendiente')}
+                  </button>}
                   {academicMode === 'manual' ? <span className="text-xs text-neutral-500">{t('Modo Manual')}</span> : status && <StatusPill status={status} work={w} onClick={() => setStatusWork(w)} />}
                   {academicMode !== 'manual' && vaultType === 'academic' && <button
                     className={`mt-1 block max-w-full truncate text-[10px] ${documentStatuses.get(w.nodus_id) === 'current' ? 'text-cyan-400' : documentStatuses.get(w.nodus_id) === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}
@@ -1951,6 +1981,12 @@ export function Library({
                     <RowMenu
                       label={t('Más acciones')}
                       items={[
+                        ...(vaultType === 'academic' ? [
+                          { label: t('Preparar fuentes'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
+                          { label: t('Completar embeddings pendientes'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
+                          { label: t('Actualizar índice'), icon: 'refresh', onClick: () => openResearchPreparation([w.nodus_id]) },
+                          { label: t('Ver en Queue'), icon: 'list', onClick: openResearchPreparationQueue },
+                        ] : []),
                         {
                           label: t('Abrir lector limpio'),
                           icon: 'book',

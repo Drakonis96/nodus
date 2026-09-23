@@ -1,3 +1,4 @@
+import { openResearchPreparation } from '../components/ResearchPreparationWelcome';
 // SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
@@ -1066,6 +1067,12 @@ export function Settings({
               />
             </Row>
           </Section>
+      )}
+
+      {activeVault?.type === 'academic' && visibleSettingsSection('library', 'Preparar fuentes', 'documentos embeddings biblioteca consentimiento') && (
+        <Section title={t('Preparar fuentes')}>
+          <button className="btn" onClick={() => openResearchPreparation()}>{t('Preparar fuentes')}</button>
+        </Section>
       )}
 
       {settings.academicMode !== 'manual' && visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar') && (
