@@ -81,8 +81,7 @@ launch. No indexing or inference was started. `welcome-cinematic.png` and
 Still pending: final-head CI/native/installer runs, the newly implemented actual
 v5.6.0-to-private-higher-version upgrade harness, final UI behavior and accessibility
 checks, the rerun of real Zotero integration, live grounded-report review and the
-same-corpus comparison. Keep the PR draft and acceptance open. Do not run these
-final checks until the user resumes verification.
+same-corpus comparison. Keep the PR draft and acceptance open. Final verification was subsequently authorized by the user; results are recorded below.
 
 ### Academic-only Library follow-up
 
@@ -109,3 +108,41 @@ Focused runs (not the final acceptance campaign):
 Final native/app/MCP/model/installer validation remains pending. The local focused
 runs use inherited OS write/network denials and at most two workers. No production
 source or credential was used and no paid call was made.
+
+
+## Final verification in progress (23 September)
+
+The user authorized the final campaign. Scope remains academic only; OCR remains
+explicitly deferred. The acceptance decision is still open while live report review
+and final-commit platform/upgrade jobs run.
+
+- Production build and both TypeScript targets passed after the evidence-free
+  report contract fix (`7a43eac4`).
+- 37 distinct focused scripts passed after targeted reruns, plus the standalone
+  OS-isolation suite. The complete run history, including initial failures, is
+  retained in `2026-09-23-final-regressions.json`. Initial failures exposed missing
+  abstention metadata, a fixture without simulated credentials, and loopback
+  fixture ports denied by Seatbelt. Fixture-specific permitted ports now preserve
+  external-network and unrelated-loopback denials.
+- `/private/tmp/nodus-research-NR89Lv`: private MCP 0.13.0+nodus.1 over stdio
+  passed with a synthetic HTTP endpoint; unauthorized item/library/attachment
+  identities and changed revisions were rejected before returning evidence.
+- `/private/tmp/nodus-research-bS1yLv`: real Zotero 10.0.3 with explicit disposable
+  profile/data/endpoint and three identical-corpus PDFs passed. Actual Electron
+  verified automatic original reading without indexing or manual connection,
+  distinct attachments, citations, selection revocation, managed stdio and explicit
+  external Streamable HTTP. All recorded owned workers closed. Zero model calls.
+- `/private/tmp/nodus-research-cvBDDL`: actual Electron passed notebooks, welcome,
+  text-only preparation through Queue, PDF citations and original reads. Keyboard
+  focus and bounds were checked at 1280 and 800 pixels in both themes. Activity
+  events are explicitly a deterministic IPC fixture, not live agent behavior.
+  The combined fixture now compares campaign IDs before/after Later, preserving
+  earlier notebook preparation rather than incorrectly expecting an empty queue.
+- Each local app run first passed actual inside-write, outside-write, descendant,
+  external-network and forbidden-loopback probes. Paths and process ownership are
+  retained in the respective artifacts. This is stronger evidence than an absence
+  of application errors, but not a claim about exhaustive OS auditing.
+
+Paid evaluation continues the original ledger and isolated secret copies. Before
+this rerun it contained 646 calls, USD 1.17735043 accounted including conservative
+reservations, and two unresolved calls. The USD 5 cap has not been reset.

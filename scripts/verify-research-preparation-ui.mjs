@@ -3,6 +3,7 @@ import path from 'node:path';
 
 /** Real renderer/preload/campaign queue with synthetic metadata, no provider calls. */
 export async function verifyResearchPreparationUi(page, root) {
+  const existingCampaignIds = await page.evaluate(async () => (await window.nodus.getResearchPreparationProgress()).campaigns.map(campaign => campaign.id).sort());
   const dialog = page.getByTestId('research-preparation-welcome');
   await dialog.getByText('Tus documentos también tienen respuestas.', { exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await dialog.locator('section').count(), 0);
@@ -25,7 +26,7 @@ export async function verifyResearchPreparationUi(page, root) {
     layouts.push({ theme, width, box, keyboardFocusContained: true });
   }
   await dialog.getByRole('button', { name: 'Más tarde', exact: true }).click();
-  assert.equal((await page.evaluate(() => window.nodus.getResearchPreparationProgress())).campaigns.length, 0);
+  assert.deepEqual(await page.evaluate(async () => (await window.nodus.getResearchPreparationProgress()).campaigns.map(campaign => campaign.id).sort()), existingCampaignIds, 'Later creates no campaign and preserves earlier notebook preparation');
   // Manual management retains text-only preparation and the independent future policy.
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('nodus:research-preparation', { detail: { manage: true } })));
   await dialog.getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).waitFor();
