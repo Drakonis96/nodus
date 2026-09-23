@@ -690,3 +690,24 @@ UI evidence from the corrected isolation campaign (synthetic content only):
 
 ![Notebook preparation controls, light theme, 1280px](research-evidence/notebook-light-1280.png)
 ![Notebook preparation controls, dark theme, 800px](research-evidence/notebook-dark-800.png)
+
+### Installer fixture and responsiveness regression correction
+
+All four native integration targets passed at documentation head `6aec41cc`
+([35877174580](https://github.com/Drakonis96/nodus/actions/runs/35877174580)). General
+CI found one failure in the old responsiveness fixture: it still implemented
+worker-thread IPC while extraction now uses child-process IPC. The fixture keeps
+its event-loop latency assertions and additionally requires a distinct OS PID.
+
+The new installed-PDF test failed on macOS ARM64 and Linux after successful native
+installation and application startup. Its 55-character PDF fell below the existing
+extractor's 100-character quality floor. The shared test fixture now contains a
+complete synthetic paragraph and is reused by source and installed application
+harnesses. It passed locally with physical-page evidence at
+`/private/tmp/nodus-research-eUMBjf` under verified OS restrictions, with zero
+model calls. No extraction quality rule or evidence assertion was weakened. The
+superseded installer campaign was cancelled before rerunning its corrected fixture.
+Future installer failures retain the bounded application processing log as well.
+The corrected responsiveness fixture passed in
+`/private/tmp/nodus-research-o5YdsW`; focused lint also passed. The native macOS
+matrix now runs the same real PDF check alongside notebook UI assertions.

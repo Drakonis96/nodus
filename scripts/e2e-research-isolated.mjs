@@ -120,6 +120,7 @@ try {
     }
     report.notebooks.layouts = layouts;
   }
+  if (process.argv.includes('--pdf')) report.pdf = await (await import('./verify-research-pdf.mjs')).verifyResearchPdf(page, app, root);
   Object.assign(report, { completed: true, paths, databaseOpens: audit.length });
 } finally {
   if (app) await app.close();

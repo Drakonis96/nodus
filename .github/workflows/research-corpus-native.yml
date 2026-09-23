@@ -55,7 +55,7 @@ jobs:
         run: node --test --test-concurrency=2 scripts/test-research-background-process.mjs scripts/test-documentary-store.mjs scripts/test-documentary-requests.mjs scripts/test-research-notebooks.mjs scripts/test-research-corpus-run.mjs scripts/test-research-request-budget.mjs scripts/test-documentary-writers.mjs
       - name: Isolated real Electron notebooks on macOS
         if: runner.os == 'macOS'
-        run: node scripts/e2e-research-isolated.mjs --notebooks
+        run: node scripts/e2e-research-isolated.mjs --notebooks --pdf
       - uses: actions/upload-artifact@v7
         if: always()
         with:

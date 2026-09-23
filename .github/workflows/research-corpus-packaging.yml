@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/research-corpus-packaging.yml'
       - 'scripts/verify-research-installer.mjs'
+      - 'scripts/verify-research-pdf.mjs'
       - 'electron/bootstrap.ts'
       - 'electron/qa/isolatedProfile.ts'
       - 'electron/workers/background*.ts'
