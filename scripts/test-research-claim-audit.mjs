@@ -136,7 +136,9 @@ try {
   let asked = [];
   const reconciled = await reconcileResearchReport(structuredClone(parts), ledger, async statements => {
     asked = statements;
-    return [{ a: statements.indexOf(researchPlain(noSeries)), b: statements.indexOf(series), reason: 'absence asserted and declared unknowable' }];
+    return [{ a: statements.indexOf(researchPlain(noSeries)), b: statements.indexOf(series), incompatible: true, quoteA: 'no existen series temporales', quoteB: 'no puede afirmarse', reason: 'absence asserted and declared unknowable' },
+      // Observed live: a listed pair whose own verdict says the statements are compatible.
+      { a: 0, b: 1, incompatible: false, quoteA: '', quoteB: '', reason: 'No hay contradicción literal.' }];
   });
   function researchPlain(sentence) { return shared.researchPlainSentence(sentence); }
   assert.ok(!asked.some(statement => /asimétrico|protocolo/.test(statement)), 'retired propositions are removed before the consistency check');
@@ -169,6 +171,22 @@ try {
   assert.deepEqual(structured.parts.nextSteps, ['Conviene distinguir dos situaciones que suelen confundirse.'], 'next steps are directives, not transitions');
   assert.equal(structured.pruned, 3);
   assert.ok(structureLedger.every(claim => claim.status === 'supported'), 'structural pruning never records a factual removal');
+  // A sentence that needs its predecessor goes when the predecessor goes.
+  const orphan = applyResearchProseVerdicts('South field measured 99 units. This value is documented by the source.', live,
+    [verdict(0, [premise('south 99', 'South field measured 99 units.', { id: 'south' })]), verdict(1, [south], { dependsOnContext: true })]);
+  assert.deepEqual(orphan.claims.map(claim => claim.failure), ['premise_without_literal_evidence', 'orphaned_reference']);
+  assert.equal(orphan.markdown, '');
+  const contextLedger = [{ sentence: 'This value is documented by the source.', kind: 'attributed', status: 'supported', evidence: [], reason: 'x',
+    contextKey: shared.researchSentenceKey('South field measured 41 units.') }];
+  const contextual = await reconcileResearchReport({ sections: ['## A\n\nSouth field measured 41 units. This value is documented by the source.', '## B\n\nNorth field measured 23 units. This value is documented by the source.'],
+    abstract: '', limitations: [], nextSteps: [] }, contextLedger, async () => []);
+  assert.deepEqual(contextual.parts.sections, ['## A\n\nSouth field measured 41 units. This value is documented by the source.', '## B\n\nNorth field measured 23 units.'],
+    'a dependent sentence survives only after the sentence it was audited against');
+  assert.equal(applyResearchProseVerdicts('Measured 41 units ([S](nodus://passage/south)]).', live, [verdict(0, [south])]).markdown, 'Measured 41 units. [Source 2](nodus://passage/south)',
+    'malformed writer wrappers leave no bracket debris');
+  const diagnosed = normalizeResearchProseVerdicts({ claims: [verdict(0, [premise('x', 'The north field measured 23 units.', { type: 'attributed' })])] }, 1);
+  assert.equal(applyResearchProseVerdicts('A claim.', sources, diagnosed).claims[0].reason, 'malformed_verdict:premise_type:attributed', 'malformed verdicts say why');
+  assert.ok(normalizeResearchProseVerdicts({ claims: [verdict(0, [{ ...north, from: undefined }])] }, 1)[0], 'a missing from on a literal premise is harmless');
   assert.equal(dropResearchSentences('A. [S](nodus://passage/a)  B follows.', plain => plain === 'A.').markdown, 'B follows.', 'a dropped sentence takes its citations and spacing');
 
   // ── Orchestrator: summaries, limitations and next steps are reconciled too ─
@@ -223,7 +241,7 @@ try {
       limitations: ['Whether temporal series exist cannot be established from these sources.'], nextSteps: [] }) });
   const report = await run(async statements => {
     const a = statements.indexOf('No temporal series exist in these sources.'), b = statements.indexOf('Whether temporal series exist cannot be established from these sources.');
-    return a >= 0 && b >= 0 ? [{ a, b, reason: 'contradiction' }] : [];
+    return a >= 0 && b >= 0 ? [{ a, b, incompatible: true, quoteA: 'No temporal series exist', quoteB: 'cannot be established', reason: 'contradiction' }] : [];
   });
   const whole = [report.draft.draftMarkdown, report.draft.abstract, ...report.draft.limitations, ...report.draft.nextSteps].join('\n');
   assert.doesNotMatch(whole, /independent/, 'the finalizer cannot reintroduce a premise retired in the body, even when a lenient verdict approves it');

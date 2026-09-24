@@ -10,16 +10,18 @@ export interface ResearchClaimRecord {
    * only and never decides acceptance. */
   failure?: ResearchClaimFailure;
   premises?: ResearchClaimPremise[];
+  /** Key of the preceding sentence this one needs to be understood. */
+  contextKey?: string;
 }
 export type ResearchClaimFailure = 'judge_rejected' | 'no_premises' | 'premise_not_entailed' | 'premise_without_literal_evidence'
   | 'inference_without_supported_premises' | 'unqualified_inference' | 'unsupported_parts' | 'inconsistent_verdict'
-  | 'nonfactual_with_content' | 'restates_rejected_claim' | 'internal_contradiction';
+  | 'nonfactual_with_content' | 'restates_rejected_claim' | 'internal_contradiction' | 'orphaned_reference';
 export interface ResearchProseAudit { markdown: string; claims: ResearchClaimRecord[] }
 export interface ResearchAuditSource { id: string; text: string; label: string; citation: string }
 interface Premise { text: string; type: ResearchPremiseType; entailed: boolean; evidence: Array<{ id: string; quote: string }>; from: number[] }
 interface Verdict {
   index: number; kind: ResearchClaimRecord['kind']; premises: Premise[]; unsupportedParts: string[];
-  explicitInference: boolean; supported: boolean; reason: string;
+  explicitInference: boolean; supported: boolean; reason: string; dependsOnContext?: boolean;
 }
 export interface ResearchProseVerdicts { claims: Verdict[] }
 export const RESEARCH_AUDIT_BATCH = 8;
@@ -49,22 +51,43 @@ function validClaim(item: unknown): item is Verdict {
     && Array.isArray(claim.unsupportedParts) && claim.unsupportedParts.length <= 12 && claim.unsupportedParts.every(part => typeof part === 'string');
 }
 /** Sanitizing may only make acceptance harder: over-short quotes are dropped (so a
- * premise may lose its evidence), long diagnostics are clipped, and any other
- * malformed claim, or an index claimed twice, yields no verdict at all. */
-export function normalizeResearchProseVerdicts(input: { claims: unknown[] }, size: number): Array<Verdict | undefined> {
-  const verdicts: Array<Verdict | undefined> = [];
+ * premise may lose its evidence), a missing `from` becomes empty (an inference
+ * then fails; other premise types never read it), a missing explicitInference
+ * becomes false, long diagnostics are clipped. Any other malformed claim, or an
+ * index claimed twice, yields no verdict; `malformed` says why, for review. */
+export function normalizeResearchProseVerdicts(input: { claims: unknown[] }, size: number): Array<Verdict | undefined> & { malformed?: Map<number, string> } {
+  const verdicts: Array<Verdict | undefined> & { malformed?: Map<number, string> } = [];
+  const malformed = new Map<number, string>();
   const seen = new Map<number, number>();
   for (const raw of input.claims) {
     if (!raw || typeof raw !== 'object') continue;
     const item = raw as Verdict;
-    const premises = Array.isArray(item.premises) ? item.premises.map(premise => premise && typeof premise === 'object' && Array.isArray(premise.evidence)
-      ? { ...premise, evidence: premise.evidence.filter(evidence => typeof evidence?.quote !== 'string' || evidence.quote.length >= 12) } : premise) : item.premises;
-    const claim = { ...item, premises, reason: typeof item.reason === 'string' ? item.reason.slice(0, 600) : item.reason };
+    const premises = Array.isArray(item.premises) ? item.premises.map(premise => premise && typeof premise === 'object' ? {
+      ...premise, from: premise.from === undefined ? [] : premise.from,
+      evidence: premise.evidence === undefined ? [] : Array.isArray(premise.evidence) ? premise.evidence.filter(evidence => typeof evidence?.quote !== 'string' || evidence.quote.length >= 12) : premise.evidence,
+    } : premise) : item.premises;
+    const claim = { ...item, premises, explicitInference: item.explicitInference ?? false, reason: typeof item.reason === 'string' ? item.reason.slice(0, 600) : item.reason,
+      dependsOnContext: item.dependsOnContext === true };
     if (Number.isInteger(item.index)) seen.set(item.index, (seen.get(item.index) ?? 0) + 1);
     if (validClaim(claim) && claim.index < size) verdicts[claim.index] = claim;
+    else if (Number.isInteger(item.index) && item.index >= 0 && item.index < size) malformed.set(item.index, malformedField(claim));
   }
-  for (const [index, count] of seen) if (count > 1) verdicts[index] = undefined;
+  for (const [index, count] of seen) if (count > 1) { verdicts[index] = undefined; malformed.set(index, 'duplicate_index'); }
+  verdicts.malformed = malformed;
   return verdicts;
+}
+function malformedField(claim: Partial<Verdict>): string {
+  if (!['fact', 'attributed', 'inference', 'nonfactual'].includes(claim.kind as string)) return `kind:${String(claim.kind).slice(0, 40)}`;
+  if (typeof claim.supported !== 'boolean') return 'supported';
+  if (typeof claim.reason !== 'string') return 'reason';
+  if (!Array.isArray(claim.unsupportedParts)) return 'unsupportedParts';
+  if (!Array.isArray(claim.premises)) return 'premises';
+  const position = claim.premises.findIndex((premise, index) => !validPremise(premise, index));
+  if (position < 0) return 'unknown';
+  const premise = claim.premises[position] as Partial<Premise>;
+  if (!PREMISE_TYPES.includes(premise?.type as ResearchPremiseType)) return `premise_type:${String(premise?.type).slice(0, 40)}`;
+  if (!Array.isArray(premise.from) || premise.from.some(index => !Number.isInteger(index) || index < 0 || index >= position)) return 'premise_from';
+  return 'premise';
 }
 const CITATION = /\[[^\]]*\]\(nodus:\/\/[^)]+\)/gu;
 const PARENTHESIZED_CITATIONS = new RegExp(`[ \\t]*\\(\\s*(?:${CITATION.source})(?:\\s*[,;]?\\s*(?:${CITATION.source}))*\\s*\\)`, 'gu');
@@ -104,7 +127,7 @@ export function researchProseSpans(markdown: string): Array<{ start: number; end
 const normalize = (text: string) => text.normalize('NFC').replace(/\s+/gu, ' ').trim();
 /** Prose without citation links or the empty wrappers they leave. */
 export function researchPlainSentence(text: string): string {
-  return normalize(text.replace(PARENTHESIZED_CITATIONS, '').replace(CITATION, '').replace(/\(\s*\)/gu, '').replace(/^#{1,6}\s+/u, '').replace(/^\s*[-*+]\s+/u, ''));
+  return normalize(text.replace(PARENTHESIZED_CITATIONS, '').replace(CITATION, '').replace(EMPTY_WRAPPER, '').replace(/^#{1,6}\s+/u, '').replace(/^\s*[-*+]\s+/u, ''));
 }
 const tokens = (text: string) => new Set(researchPlainSentence(text).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase()
   .match(/[\p{L}\p{N}]+/gu)?.filter(token => token.length >= 3 || /\p{N}/u.test(token)) ?? []);
@@ -124,8 +147,11 @@ export function restatesRejectedClaim(sentence: string, rejected: readonly strin
     return shared / other.size >= 0.8 && shared / own.size >= 0.6;
   });
 }
+/** Parentheses left holding only brackets or punctuation after citation removal,
+ * including writer output such as `([label](link)])`. */
+const EMPTY_WRAPPER = /[ \t]*\([\s[\],;.]*\)/gu;
 function tidy(markdown: string): string {
-  return markdown.replace(/\(\s*\)/gu, '').replace(/(?<=\S)[ \t]{2,}(?=\S)/gu, ' ').replace(/[ \t]+$/gmu, '')
+  return markdown.replace(EMPTY_WRAPPER, '').replace(/(?<=\S)[ \t]{2,}(?=\S)/gu, ' ').replace(/[ \t]+$/gmu, '')
     .replace(/^[ \t]+(?=[^\s\-*+>|\d])/gmu, '').replace(/\n{3,}/g, '\n\n').trim();
 }
 /** Removes whole sentences (with the citations attached to them). */
@@ -185,21 +211,25 @@ export function decideResearchVerdict(span: string, verdict: Verdict, sources: R
 }
 /** Existence of an evidence ID and literal supporting text are separate gates
  * from the semantic judgement. Neither gate alone constitutes quality acceptance. */
-export function applyResearchProseVerdicts(markdown: string, sources: ResearchAuditSource[], verdicts: Array<Verdict | undefined>, rejected: readonly string[] = []): ResearchProseAudit {
+export function applyResearchProseVerdicts(markdown: string, sources: ResearchAuditSource[], verdicts: Array<Verdict | undefined> & { malformed?: Map<number, string> }, rejected: readonly string[] = []): ResearchProseAudit {
   const spans = researchProseSpans(markdown);
   const claims: ResearchClaimRecord[] = [];
   const edits: Array<{ start: number; end: number; text: string }> = [];
   for (let index = 0; index < spans.length; index++) {
     const span = spans[index], verdict = verdicts[index];
     if (!verdict) {
-      claims.push({ sentence: span.text, kind: 'fact', status: 'unverified', evidence: [], reason: 'verification_unavailable' });
+      const malformed = verdicts.malformed?.get(index);
+      claims.push({ sentence: span.text, kind: 'fact', status: 'unverified', evidence: [], reason: malformed ? `malformed_verdict:${malformed}` : 'verification_unavailable' });
       edits.push({ ...span, text: '' });
       continue;
     }
     let decision = decideResearchVerdict(span.text, verdict, sources);
     if (decision.valid && verdict.kind !== 'nonfactual' && restatesRejectedClaim(span.text, rejected)) decision = { valid: false, failure: 'restates_rejected_claim', evidence: [] };
+    // A sentence that needs its predecessor cannot outlive it.
+    const contextKey = verdict.dependsOnContext && index > 0 ? researchSentenceKey(spans[index - 1].text) : undefined;
+    if (decision.valid && verdict.dependsOnContext && (index === 0 || claims[index - 1].status !== 'supported')) decision = { valid: false, failure: 'orphaned_reference', evidence: [] };
     claims.push({ sentence: span.text, kind: verdict.kind, status: decision.valid ? 'supported' : 'removed', evidence: decision.evidence, reason: verdict.reason,
-      ...(decision.failure ? { failure: decision.failure } : {}),
+      ...(decision.failure ? { failure: decision.failure } : {}), ...(contextKey ? { contextKey } : {}),
       premises: verdict.premises.map(premise => ({ text: premise.text, type: premise.type, entailed: premise.entailed })) });
     if (!decision.valid) { edits.push({ ...span, text: '' }); continue; }
     if (verdict.kind === 'nonfactual') continue;
@@ -218,11 +248,12 @@ export function applyResearchProseVerdicts(markdown: string, sources: ResearchAu
 }
 
 export interface ResearchReportParts { sections: string[]; abstract: string; limitations: string[]; nextSteps: string[] }
-export interface ResearchConflict { a: number; b: number; reason: string }
+export interface ResearchConflict { a: number; b: number; incompatible: boolean; quoteA: string; quoteB: string; reason: string }
 export function validResearchConflicts(input: unknown): input is { conflicts: ResearchConflict[] } {
   if (!input || typeof input !== 'object' || !Array.isArray((input as { conflicts?: unknown }).conflicts)) return false;
   return (input as { conflicts: unknown[] }).conflicts.length <= 40 && (input as { conflicts: ResearchConflict[] }).conflicts.every(item => item
-    && Number.isInteger(item.a) && Number.isInteger(item.b) && item.a >= 0 && item.b >= 0 && item.a !== item.b && typeof item.reason === 'string' && item.reason.length <= 600);
+    && Number.isInteger(item.a) && Number.isInteger(item.b) && item.a >= 0 && item.b >= 0 && item.a !== item.b && typeof item.incompatible === 'boolean'
+    && typeof item.quoteA === 'string' && typeof item.quoteB === 'string' && typeof item.reason === 'string');
 }
 /**
  * Whole-report reconciliation after every part has been audited separately.
@@ -261,6 +292,8 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
         if (!plain || heading(span.text)) return;
         const key = researchSentenceKey(plain);
         if (seen && tokens(plain).size >= 5 && (seen.has(key) || keys.has(key))) { drop.add(index); return; }
+        const needs = (byKey.get(key) ?? []).find(claim => claim.status === 'supported' && claim.contextKey)?.contextKey;
+        if (needs && (index === 0 || researchSentenceKey(spans[index - 1].text) !== needs)) { drop.add(index); return; }
         keys.add(key);
         if (!transition(plain)) return;
         const next = spans[index + 1];
@@ -305,7 +338,9 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
   }
   if (statements.length < 2) return finish(0, true);
   let conflicts: ResearchConflict[];
-  try { conflicts = (await findConflicts(statements.slice(0, 160))).filter(item => item.a < statements.length && item.b < statements.length); }
+  // A listed pair the judge itself calls compatible is not a finding; any other
+  // listed pair is removed even when its quotes are imperfect (fail closed).
+  try { conflicts = (await findConflicts(statements.slice(0, 160))).filter(item => item.a < statements.length && item.b < statements.length && item.incompatible); }
   catch { return finish(0, false); }
   // Kept for manual review: an over-eager consistency judge must be visible.
   conflictPairs = conflicts.slice(0, 20).map(item => ({ a: statements[item.a].slice(0, 400), b: statements[item.b].slice(0, 400), reason: item.reason.slice(0, 400) }));
