@@ -113,8 +113,19 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
   store.db.transaction(() => {
     if (!store.db.prepare('SELECT 1 FROM documentary_requests WHERE document_id=?').get(operation)) requests.enqueue(operation, base.revision, operation);
   }).immediate();
-  const lease = requests.claim(operation, Date.now(), 60000, true);
-  if (!lease) throw new Error('documentary_embedding_job_unavailable');
+  let lease = requests.claim(operation, Date.now(), 60000, true);
+  if (!lease) {
+    // The operation is shared by every request for these vectors. One that failed, was
+    // cancelled or is waiting out a retry backoff is taken over by the request that is
+    // here to run it now; one another request is computing right now is left to it.
+    const existing = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=?').get(operation) as { state: string; error: string | null } | undefined;
+    if (existing && ['failed', 'cancelled', 'queued'].includes(existing.state)) {
+      store.db.prepare(`UPDATE documentary_requests SET state='queued',attempts=0,error=NULL,available_at=?,lease_token=NULL,lease_until=NULL
+        WHERE document_id=? AND state IN ('failed','cancelled','queued')`).run(Date.now(), operation);
+      lease = requests.claim(operation, Date.now(), 60000, true);
+    }
+    if (!lease) throw new Error(existing?.state === 'running' ? 'documentary_embedding_busy' : existing?.error || 'documentary_embedding_job_unavailable');
+  }
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal?.addEventListener('abort', abort, { once: true });

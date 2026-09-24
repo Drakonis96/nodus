@@ -44,7 +44,7 @@ try {
   const text = await preparation.prepareDocumentaryText({ ...doc, coverage: 'fulltext' }, 'Known evidence');
   assert.equal(preparation.documentaryStore().lexicalSearch('Known', [text.indexKey], 3).length, 1);
   const pending = preparation.prepareDocumentaryEmbeddings(text.indexKey, text.chunks);
-  await assert.rejects(() => preparation.prepareDocumentaryEmbeddings(text.indexKey, text.chunks), /job_unavailable/);
+  await assert.rejects(() => preparation.prepareDocumentaryEmbeddings(text.indexKey, text.chunks), /embedding_busy/, 'a producer already computing these vectors is named, not reported as missing');
   assert.equal(calls, 1, 'concurrent producer is fenced before a provider request');
   unblock();
   const result = await pending;
@@ -145,7 +145,9 @@ try {
   assert.equal(workingDb.prepare('SELECT COUNT(*) n FROM documentary_embedding_chunks WHERE operation LIKE ?').get('embedding:checkpoint-fixture:%').n, 32);
   assert.equal(preparation.documentaryStore().revision(checkpointText.indexKey).embedding_ready, 0, 'partial vectors are never published');
   assert.equal(workingDb.prepare("SELECT COUNT(*) n FROM documentary_embedding_attempts WHERE state='unknown'").get().n, 1, 'ambiguous provider outcomes remain recorded');
-  workingDb.prepare("UPDATE documentary_requests SET available_at=0 WHERE document_id LIKE 'embedding:checkpoint-fixture:%'").run();
+  // Live finding: the failed operation waits out a retry backoff, and a second request
+  // for the same document could not take it over ("documentary_embedding_job_unavailable").
+  assert.ok(workingDb.prepare("SELECT available_at FROM documentary_requests WHERE document_id LIKE 'embedding:checkpoint-fixture:%'").get().available_at > Date.now(), 'the failed operation is in backoff');
   const resumed = await preparation.prepareDocumentaryEmbeddings(checkpointText.indexKey, manyChunks, undefined, captured);
   assert.equal(resumed.vectors.length, 70);
   assert.deepEqual(batches.map(batch => batch[0]), ['Known fragment 0', 'Known fragment 32', 'Known fragment 32', 'Known fragment 64'], 'recovery never re-embeds the committed first batch');
