@@ -135,6 +135,12 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
     await page.evaluate(notebook => window.nodus.saveResearchNotebook({ ...notebook, exclusions: notebook.resolvedDocumentIds }), notebook);
     await assert.rejects(page.evaluate(input => window.nodus.readResearchZotero(input), { notebookId: notebook.id, documentId: source.id, operation: 'metadata' }), /scope_mismatch|unavailable/);
     await page.screenshot({ path: path.join(root, 'artifacts/nodus-zotero.png') });
+    let replacement;
+    if (process.argv.includes('--replace-attachment')) {
+      await page.evaluate(() => window.nodus.disconnectResearchZotero());
+      replacement = await (await import('./verify-research-zotero-replacement.mjs')).verifyZoteroAttachmentReplacement(page, root, corpus, imported.inventory.documents);
+      await page.evaluate(() => window.nodus.disconnectResearchZotero());
+    }
     let live;
     if (providerProxy) {
       const { runResearchLiveCampaign } = await import('./research-live-campaign.mjs');
@@ -146,7 +152,7 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
       assert.ok(ownedWorkers.some(worker => worker.service === name && worker.pid !== app.process().pid), `${name} must run outside the main OS process`);
     }
     return { passed: true, ownedWorkers, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
-      attachmentReads, automaticOriginalWithoutConnect: true, automaticReadCreatedNoCampaign: true,
+      attachmentReads, ...(replacement ? { replacement } : {}), automaticOriginalWithoutConnect: true, automaticReadCreatedNoCampaign: true,
       ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {
