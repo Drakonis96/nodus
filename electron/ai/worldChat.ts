@@ -3,7 +3,7 @@ import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
 import { executeChatSkills } from './chatSkillExecution';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getWorldChatConversation } from '../db/worldChatRepo';
@@ -91,7 +91,7 @@ export function buildWorldChatFacts(request: WorldChatRequest, language: PromptL
     .slice(-MAX_HISTORY_TURNS)
     .map((turn) => ({
       role: turn.role,
-      content: clip(turn.content.trim()).slice(0, MAX_HISTORY_TURN_CHARS),
+      content: clip((turn.role === 'assistant' ? chatProseForHistory(turn.content) : turn.content).trim()).slice(0, MAX_HISTORY_TURN_CHARS),
     }));
 
   // Nothing anchored, nothing computed — and that is the design, not an optimisation.

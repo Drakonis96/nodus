@@ -5,7 +5,7 @@ import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { resolveResearchSourceScope, type ResearchSourceScope } from './researchSourceScope';
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
@@ -438,6 +438,11 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
 
   let messages = request.messages
     .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim())
+    // Replay only the model's prose: the rendered route-fix chips, drawings and package
+    // results are the app's blocks, and sending them back as assistant text makes the
+    // conversation read as a stack of injected instructions (a safety-classifier refusal).
+    .map((m) => (m.role === 'assistant' ? { ...m, content: chatProseForHistory(m.content) } : m))
+    .filter((m) => m.content.trim())
     .slice(-MAX_HISTORY_MESSAGES);
 
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
