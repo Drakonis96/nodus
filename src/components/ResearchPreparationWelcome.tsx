@@ -143,7 +143,7 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
           [t('Disponibilidad sin comprobar'), preflight.filter(entry => entry.status === 'unknown').length],
         ].map(([label, count]) => <div key={label} className="rounded border border-neutral-800 p-2"><dt className="text-neutral-400">{label}</dt><dd>{count}</dd></div>)}
       </dl>
-      <p className="my-2 text-xs text-neutral-400">{t('Los documentos que necesiten OCR se omitirán por ahora.')}</p>
+      <p className="my-2 text-xs text-neutral-400">{t('Los documentos que necesiten OCR se omitirán.')}</p>
       <p className="text-xs text-neutral-400">{t('Esta campaña incluye la selección mostrada. Las incorporaciones posteriores no se añadirán a ella.')}</p>
       <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" disabled={busy || !policy} checked={policy?.futureAdditions ?? false} onChange={event => {
         const futureAdditions = event.target.checked;

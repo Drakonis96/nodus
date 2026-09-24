@@ -144,14 +144,14 @@ function AnalysisTab({ academic }: { academic: boolean }) {
         </div>
       </Step>
 
-      <Step number={3} title={t('Extraer ideas')}>
-        <p>{t('Extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas. Este análisis utiliza modelos generativos.')}</p>
-      </Step>
-      <Step number={4} title={t('Indexar biblioteca')}>
-        <p>{t('Indexa el texto completo con el modelo de embeddings configurado, sin extraer Ideas. También puedes indexar solo una selección.')}</p>
-        <p>{t('Los documentos nuevos se indexarán automáticamente.')}</p>
+      <Step number={3} title={t('Indexar biblioteca')}>
+        <p>{t('Nada más añadir una obra, Nodus indexa su texto completo con el modelo de embeddings configurado, sin extraer Ideas.')}</p>
+        <p>{t('También puedes indexar toda la biblioteca o solo una selección desde «Indexar biblioteca».')}</p>
         <p>{t('Controla el progreso, la pausa y la reanudación desde Queue. Puedes desactivar la preparación automática en Ajustes → Preparar fuentes.')}</p>
-        <p>{t('Los documentos que necesiten OCR se omitirán por ahora.')}</p>
+        <p>{t('Los documentos que necesiten OCR se omitirán.')}</p>
+      </Step>
+      <Step number={4} title={t('Extraer ideas')}>
+        <p>{t('La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.')}</p>
       </Step>
       <Step number={5} title={t('Investigación con evidencias')}>
         <p>{t('Chat y Deep Research combinan las Ideas disponibles con pasajes de tus documentos y consultas a originales. Si falta una capa, utilizan las demás y explican los límites.')}</p>
