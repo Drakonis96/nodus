@@ -17,6 +17,11 @@ export const VERIFY_DEBOUNCE_MS = 400;
 
 const CITATION_RE = /nodus:\/\/(idea|work|gap|contradiction|passage)\/([^\s)"'<>]+)/g;
 
+/** The id of a `nodus://` link, or null while its percent escapes are incomplete. */
+export function decodeCitationId(encoded: string): string | null {
+  try { return decodeURIComponent(encoded); } catch { return null; }
+}
+
 /** Every distinct `nodus://` citation in render order. */
 export function collectCitations(content: string): CitationRef[] {
   const refs: CitationRef[] = [];
@@ -27,7 +32,10 @@ export function collectCitations(content: string): CitationRef[] {
   let match: RegExpExecArray | null;
   while ((match = re.exec(content)) !== null) {
     const kind = match[1] as CitationRef['kind'];
-    const id = decodeURIComponent(match[2]);
+    const id = decodeCitationId(match[2]);
+    // A streamed answer can stop between `%` and its hex digits; that link is not
+    // complete yet, and the next delta will bring the rest.
+    if (id === null) continue;
     const key = `${kind}:${id}`;
     if (seen.has(key)) continue;
     seen.add(key);

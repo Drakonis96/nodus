@@ -217,6 +217,20 @@ try {
     assert.ok(VERIFY_DEBOUNCE_MS <= 1000, 'debounce must be short enough to feel immediate once settled');
   }
 
+  // --- A stream cut inside a percent escape must not throw ---------------
+  // Research passage ids are percent-encoded (`documentary%3A…%3A0`). A delta can end
+  // between `%` and its two hex digits, and collecting citations on that partial text
+  // threw `URI malformed`, which took the whole Research Chat view down mid-answer.
+  {
+    const id = 'documentary:7edccd43:30d7ec93:0';
+    const full = `Evidencia ([Informe](nodus://passage/${encodeURIComponent(id)})).`;
+    for (let end = 1; end <= full.length; end++) {
+      assert.doesNotThrow(() => collectCitations(full.slice(0, end)), `prefix of ${end} characters`);
+    }
+    assert.deepEqual(collectCitations(full), [{ kind: 'passage', id }], 'the complete link still resolves');
+    assert.deepEqual(collectCitations('[x](nodus://passage/documentary%3)'), [], 'an incomplete escape is not a citation yet');
+  }
+
   console.log('# citation verification tests passed');
 } finally {
   rmSync(dir, { recursive: true, force: true });
