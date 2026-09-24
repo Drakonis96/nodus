@@ -51,6 +51,7 @@ export const libraryApi: LibraryApi = {
   auditGlobalLibraryRecovery: () => ipcRenderer.invoke('library:auditRecovery'),
   importGlobalLibraryFiles: (collectionId) => ipcRenderer.invoke('library:importFiles', collectionId),
   importDroppedGlobalLibraryFiles: (filePaths, collectionId) => ipcRenderer.invoke('library:importDroppedFiles', filePaths, collectionId),
+  importDroppedFilesIntoVault: (filePaths, vaultId) => ipcRenderer.invoke('library:importDroppedFilesToVault', filePaths, vaultId),
   importGlobalBibliographyFiles: (collectionId) => ipcRenderer.invoke('library:importBibliography', collectionId),
   createGlobalLibraryItem: (metadata, collectionIds) => ipcRenderer.invoke('library:createItem', metadata, collectionIds),
   importGlobalLibraryIdentifier: (kind, value, collectionIds) => ipcRenderer.invoke('library:importIdentifier', kind, value, collectionIds),

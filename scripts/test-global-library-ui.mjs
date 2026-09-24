@@ -198,6 +198,14 @@ test('the Library accepts external files at the root or inside an editable colle
   assert.match(api, /importDroppedGlobalLibraryFiles\(filePaths: string\[\], collectionId\?: string \| null\)/);
   assert.match(preload, /library:importDroppedFiles/);
   assert.match(ipc, /library:importDroppedFiles/);
+  const vaultLibrary = await readSource('src/views/Library.tsx');
+  assert.match(vaultLibrary, /data-testid="library-vault-file-drop-surface"/, 'a vault Library also accepts dropped files');
+  assert.match(vaultLibrary, /data-testid="library-vault-file-drop-overlay"/);
+  assert.match(vaultLibrary, /getPathForDroppedFile[\s\S]*importDroppedFilesIntoVault/,
+    'files dropped on a vault go to the Global Library and are used in that vault in one step');
+  assert.match(api, /importDroppedFilesIntoVault\(filePaths: string\[\], vaultId: string\)/);
+  assert.match(preload, /library:importDroppedFilesToVault/);
+  assert.match(ipc, /library:importDroppedFilesToVault/);
   assert.match(operations, /inferredLocalFileMetadata[\s\S]*yearMatch[\s\S]*isbnMatch[\s\S]*doiMatch/,
     'filename inference supplies editable title, date, ISBN, and DOI candidates without network blocking');
 });
@@ -413,7 +421,7 @@ test('the typed bridge covers every global management operation', async () => {
   const methods = [
     'listGlobalLibraryCollections', 'getGlobalLibraryItem', 'createGlobalLibraryCollection',
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
-    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles',
+    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles', 'importDroppedFilesIntoVault',
     'prepareGlobalLibraryReading',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
     'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
@@ -438,7 +446,7 @@ test('the typed bridge covers every global management operation', async () => {
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
-    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles',
+    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles', 'library:importDroppedFilesToVault',
     'library:prepareReading',
     'library:createItem', 'library:duplicateItem', 'library:convertItemToNodus',
     'library:addAttachments', 'library:updateAttachment', 'library:replaceAttachment', 'library:removeAttachment',

@@ -36,7 +36,7 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
-import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import { getVaultQueryCache, invalidateVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 import { vaultTypeColor } from '@shared/vaultTypes';
 
 import { DOCUMENT_INDEX_MANAGER_VISIBLE } from '@shared/documentIndexPolicy';
@@ -546,6 +546,7 @@ export function Library({
   // Only the works list depends on the active filter, so typing in the search
   // box must reload nothing else. Keeping this isolated is what stops each
   // keystroke from firing five IPC round-trips against SQLite.
+  const [fileDrop, setFileDrop] = useState(false);
   const load = useCallback(async (force = true) => {
     const requestId = ++loadRequestRef.current;
     const cacheKey = `library:${JSON.stringify({ filter, pageOffset, sort })}`;
@@ -1261,8 +1262,48 @@ export function Library({
   });
   const openVaultWorkAnalysis = (work: WorkView) => setIdeasWork({ nodus_id: work.nodus_id, title: work.title });
 
+  // Files dropped here go to the Global Library and are used in this vault in one step,
+  // so this vault's automatic preparation indexes them like any other addition.
+  const importDroppedIntoVault = async (fileList: FileList) => {
+    setFileDrop(false);
+    const filePaths = [...new Set(Array.from(fileList)
+      .map((file) => window.nodus.getPathForDroppedFile(file))
+      .filter((entry): entry is string => !!entry))];
+    if (!filePaths.length) return;
+    try {
+      const targetVaultId = vaultId ?? (await window.nodus.getActiveVault()).id;
+      const report = await window.nodus.importDroppedFilesIntoVault(filePaths, targetVaultId);
+      if (report.linked) {
+        const automatic = vaultType === 'academic' ? (await window.nodus.getResearchPreparationPolicy().catch(() => null))?.futureAdditions : false;
+        toast(automatic
+          ? tx('{n} documento(s) añadido(s) a este vault y a la Biblioteca global. Se indexarán automáticamente.', { n: report.linked })
+          : tx('{n} documento(s) añadido(s) a este vault y a la Biblioteca global. La indexación automática está desactivada.', { n: report.linked }));
+      } else if (report.alreadyInVault) toast(t('Esos documentos ya estaban en este vault.'), { tone: 'info' });
+      else if (report.warnings.length) toast(report.warnings[0], { tone: 'error' });
+      invalidateVaultQueryCache(targetVaultId);
+      notifyDataChanged();
+      await load(true);
+    } catch (error) { toast(error instanceof Error ? error.message : String(error), { tone: 'error' }); }
+  };
+
   return (
-    <div className="h-full flex flex-col p-6 min-h-0">
+    <div data-testid="library-vault-file-drop-surface" className="relative h-full flex flex-col p-6 min-h-0"
+      onDragEnter={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setFileDrop(true); } }}
+      onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDrop(false); }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.files.length) return;
+        event.preventDefault();
+        void importDroppedIntoVault(event.dataTransfer.files);
+      }}
+    >
+      {fileDrop && <div data-testid="library-vault-file-drop-overlay" className="pointer-events-none absolute inset-3 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-500/10 backdrop-blur-sm">
+        <div className="rounded-2xl border border-indigo-400/35 bg-white/95 px-7 py-5 text-center shadow-2xl dark:bg-neutral-950/95">
+          <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-indigo-500"><Icon name="upload" size={22} /></span>
+          <b className="mt-3 block text-sm">{t('Suelta para añadir')}</b>
+          <span className="mt-1 block max-w-xs text-xs text-neutral-500">{t('Se añadirá a la Biblioteca global y a este vault.')}</span>
+        </div>
+      </div>}
       <header data-testid="library-vault-header" className="library-header-bar -mx-6 -mt-6 mb-4 min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3">
         <div className="library-header-title min-w-0">
           <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1>

@@ -833,6 +833,12 @@ export class LibraryCatalog {
     return rows.map((row) => row.citation_key);
   }
 
+  /** Live items holding an attachment with exactly these bytes. */
+  itemIdsForAttachmentHash(sha256: string): string[] {
+    return (this.handle.prepare(`SELECT DISTINCT i.id FROM library_attachments a JOIN library_items i ON i.id=a.item_id
+      WHERE a.sha256=? AND i.deleted_at IS NULL ORDER BY i.id`).all(sha256) as Array<{ id: string }>).map((row) => row.id);
+  }
+
   attachmentHashes(): string[] {
     return (this.handle.prepare('SELECT DISTINCT sha256 FROM library_attachments').all() as Array<{ sha256: string }>).map((row) => row.sha256);
   }

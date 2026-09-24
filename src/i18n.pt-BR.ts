@@ -4,6 +4,7 @@ import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -82,6 +83,7 @@ export const PT_BR: Record<string, string> = {
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Escolha o modo claro, escuro ou siga o sistema operacional.',
   ...RESEARCH_ACTIVITY_TRANSLATIONS["pt-BR"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['pt-BR'],
+  ...VAULT_FILE_DROP_TRANSLATIONS['pt-BR'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "Escolha pelo menos um banco de dados.",
   ...RESEARCH_PROMPT_TRANSLATIONS["pt-BR"],

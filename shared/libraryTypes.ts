@@ -753,6 +753,15 @@ export interface LibraryLocalImportReport {
   skipped: number;
   itemIds: string[];
   warnings: string[];
+  /** Items already in the library holding a skipped file's exact bytes. */
+  existingItemIds?: string[];
+}
+
+/** Files dropped on a vault's Library: imported to the Global Library, then used in the vault. */
+export interface LibraryVaultFileImportReport extends LibraryLocalImportReport {
+  vaultId: string;
+  linked: number;
+  alreadyInVault: number;
 }
 
 export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn' | 'pmid' | 'pmcid' | 'arxiv';

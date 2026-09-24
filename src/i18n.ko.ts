@@ -4,6 +4,7 @@ import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -81,6 +82,7 @@ export const KO: Record<string, string> = {
 
   ...RESEARCH_ACTIVITY_TRANSLATIONS.ko,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
+  ...VAULT_FILE_DROP_TRANSLATIONS['ko'],
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
   ...RESEARCH_PROMPT_TRANSLATIONS.ko,
   ...RESEARCH_SOURCE_TRANSLATIONS.ko,
