@@ -53,11 +53,9 @@ export function ResearchActivityPanel({ activities, outcome, onDismiss }: { acti
   }}>
     <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
     {minimized ? <button ref={toggleRef} className="research-activity-orb" onClick={toggle} aria-label={t('Ampliar actividad')} aria-expanded={false} title={announcement}>
-      <span className={outcome === 'active' ? 'research-activity-orb-scan' : undefined} aria-hidden="true"><Icon name="radar" size={20} /></span>
-      {/* The request's state, as in the rows: turning while it runs, then green, red or grey. */}
-      {outcome === 'active'
-        ? <span className="research-activity-orb-badge research-activity-spinner" aria-hidden="true"><Icon name="rotateCw" size={11} /></span>
-        : <span className={`research-activity-orb-badge research-activity-indicator ${outcome}`} aria-hidden="true" />}
+      {/* The radar itself carries the request's state: it sweeps while the request runs,
+          then turns green when it completed, red when it failed and grey when cancelled. */}
+      <span className={`research-activity-radar ${outcome}`} aria-hidden="true"><Icon name="radar" size={20} /></span>
     </button> : <>
       <header><div><h2>{t('Actividad del Research chat')}</h2><p>{status}</p></div>
         <button ref={toggleRef} onClick={toggle} aria-label={t('Minimizar actividad')} aria-expanded={true} title={t('Minimizar actividad')}><Icon name="minus" size={16} /></button>
