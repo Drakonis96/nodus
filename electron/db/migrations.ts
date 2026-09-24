@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 178;
+export const SCHEMA_VERSION = 179;
 
 export const migrations: Migration[] = [
   {
@@ -9313,6 +9313,48 @@ export const migrations: Migration[] = [
   // Rows written before this column read as 'model', which is what they were.
   { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
   { version: 178, up: `ALTER TABLE chat_messages ADD COLUMN concilium_json TEXT;` },
+  // Conversation folders. Purely additive: the folder tree lives in one shared table keyed by
+  // `surface`, and each SQLite-backed chat names its folder through a membership table with a
+  // real foreign key. Study chats live in a JSON store (no table) and carry their folder id on
+  // the record instead, so they have no membership table here. `ON DELETE SET NULL` means
+  // deleting a folder unfiles its conversations (never deletes them); `ON DELETE CASCADE` on
+  // the self-reference drops subfolders, whose own memberships then unfile too. Existing
+  // conversations have no row, so they read as unfiled.
+  {
+    version: 179,
+    up: /* sql */ `
+      CREATE TABLE IF NOT EXISTS chat_folders (
+        folder_id  TEXT PRIMARY KEY,
+        surface    TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        parent_id  TEXT REFERENCES chat_folders(folder_id) ON DELETE CASCADE,
+        position   INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_folders_surface ON chat_folders(surface, parent_id, position);
+
+      CREATE TABLE IF NOT EXISTS chat_conversation_folders (
+        conversation_id TEXT PRIMARY KEY REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        folder_id       TEXT REFERENCES chat_folders(folder_id) ON DELETE SET NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_chat_conversation_folders_folder ON chat_conversation_folders(folder_id);
+
+      CREATE TABLE IF NOT EXISTS database_conversation_folders (
+        conversation_id TEXT PRIMARY KEY REFERENCES database_chat_conversations(id) ON DELETE CASCADE,
+        folder_id       TEXT REFERENCES chat_folders(folder_id) ON DELETE SET NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_database_conversation_folders_folder ON database_conversation_folders(folder_id);
+
+      CREATE TABLE IF NOT EXISTS world_conversation_folders (
+        conversation_id TEXT PRIMARY KEY REFERENCES world_chat_conversations(id) ON DELETE CASCADE,
+        folder_id       TEXT REFERENCES chat_folders(folder_id) ON DELETE SET NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_world_conversation_folders_folder ON world_conversation_folders(folder_id);
+    `,
+  },
 ];
 
 /**

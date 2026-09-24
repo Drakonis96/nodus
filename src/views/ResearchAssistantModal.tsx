@@ -10,11 +10,13 @@ import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   ChatConversationSummary,
+  ChatFolder,
+  ChatFolderSurface,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
@@ -241,7 +243,7 @@ export function ResearchAssistantModal({
   const panelKey = adapter?.id ?? 'research';
   const [historyOpen, setHistoryOpen] = useState(() => !embedded || localStorage.getItem(`nodus.${panelKey}ChatHistoryOpen`) === '1');
   const [contextOpen, setContextOpen] = useState(() => embedded && !!adapter && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
-  const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
+  const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); setFolderMenuId(null); return !open; });
   const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
   const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
@@ -269,6 +271,17 @@ export function ResearchAssistantModal({
   const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
+  const [folders, setFolders] = useState<ChatFolder[]>([]);
+  // Folder filter: 'all' | 'unfiled' | <folderId>.
+  const [folderFilter, setFolderFilter] = useState<string>('all');
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  // undefined = closed, null = a new root folder, string = a new subfolder of that folder.
+  const [newFolderParent, setNewFolderParent] = useState<string | null | undefined>(undefined);
+  const [folderMenuId, setFolderMenuId] = useState<string | null>(null);
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
+  // Anchored "Move to folder…" popover for a conversation row (portaled so the virtualized
+  // list cannot clip it).
+  const [moveMenu, setMoveMenu] = useState<{ conversationId: string; x: number; y: number } | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
   const [conversationNotice, setConversationNotice] = useState<string | null>(null);
@@ -318,9 +331,18 @@ export function ResearchAssistantModal({
     return sortModelRefs(models);
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
+  // The folder tree and membership store are keyed by chat surface; the native research chat
+  // has no adapter, so its surface is 'research'.
+  const surface = panelKey as ChatFolderSurface;
   const refreshConversations = useCallback(async () => {
-    setConversations(await apiRef.current.listConversations(true));
-  }, []);
+    const [list, folderList, memberships] = await Promise.all([
+      apiRef.current.listConversations(true),
+      window.nodus.listChatFolders(surface),
+      window.nodus.chatFolderMemberships(surface),
+    ]);
+    setConversations(list.map((conversation) => ({ ...conversation, folderId: memberships[conversation.id] ?? null })));
+    setFolders(folderList);
+  }, [surface]);
 
   useEffect(() => {
     void refreshConversations();
@@ -547,6 +569,60 @@ export function ResearchAssistantModal({
     await api.archiveConversation?.(conversation.id, !conversation.archived);
     await refreshConversations();
   };
+
+  const createFolder = async (parentId: string | null, name: string) => {
+    // An empty name becomes "New folder" (localized) rather than a fabricated Spanish default.
+    const clean = name.trim() || t('Nueva carpeta');
+    await window.nodus.createChatFolder(surface, clean, parentId);
+    setNewFolderParent(undefined);
+    if (parentId) setExpandedFolders((prev) => new Set(prev).add(parentId));
+    await refreshConversations();
+  };
+
+  const renameFolder = async (folderId: string, name: string) => {
+    if (name.trim()) await window.nodus.renameChatFolder(folderId, name);
+    await refreshConversations();
+  };
+
+  const deleteFolder = async (folderId: string) => {
+    await window.nodus.deleteChatFolder(folderId);
+    setFolderFilter((current) => (current === folderId ? 'all' : current));
+    setFolderMenuId(null);
+    await refreshConversations();
+  };
+
+  const fileConversation = async (conversationId: string, folderId: string | null) => {
+    await window.nodus.setConversationFolder(surface, conversationId, folderId);
+    setMoveMenu(null);
+    await refreshConversations();
+  };
+
+  const moveFolder = async (folderId: string, parentId: string | null, position?: number) => {
+    if (folderId === parentId) return;
+    await window.nodus.moveChatFolder(folderId, parentId, position);
+    if (parentId) setExpandedFolders((prev) => new Set(prev).add(parentId));
+    await refreshConversations();
+  };
+
+  const toggleFolderExpanded = (folderId: string) =>
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folderId)) next.delete(folderId); else next.add(folderId);
+      return next;
+    });
+
+  // A folder's actions menu closes when the click lands anywhere outside it (or on its toggle,
+  // which flips itself) — otherwise it lingers after the user moves on.
+  useEffect(() => {
+    if (!folderMenuId) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-folder-menu]') || target?.closest('[data-folder-menu-toggle]')) return;
+      setFolderMenuId(null);
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, [folderMenuId]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -808,8 +884,123 @@ export function ResearchAssistantModal({
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
-  const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
+  // Selecting a folder shows its own conversations and every subfolder's, computed once.
+  const folderSubtree = useMemo(() => {
+    if (folderFilter === 'all' || folderFilter === 'unfiled') return null;
+    const ids = new Set<string>([folderFilter]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const folder of folders) {
+        if (folder.parentId && ids.has(folder.parentId) && !ids.has(folder.folderId)) { ids.add(folder.folderId); grew = true; }
+      }
+    }
+    return ids;
+  }, [folderFilter, folders]);
+  // Subtree conversation counts, so a parent folder's badge matches what it will show.
+  const folderCounts = useMemo(() => {
+    const direct = new Map<string, number>();
+    for (const conversation of conversations) if (conversation.folderId) direct.set(conversation.folderId, (direct.get(conversation.folderId) ?? 0) + 1);
+    const byParent = new Map<string | null, ChatFolder[]>();
+    for (const folder of folders) byParent.set(folder.parentId, [...(byParent.get(folder.parentId) ?? []), folder]);
+    const counts = new Map<string, number>();
+    const count = (folderId: string): number => {
+      if (counts.has(folderId)) return counts.get(folderId)!;
+      let total = direct.get(folderId) ?? 0;
+      for (const child of byParent.get(folderId) ?? []) total += count(child.folderId);
+      counts.set(folderId, total);
+      return total;
+    };
+    for (const folder of folders) count(folder.folderId);
+    return counts;
+  }, [conversations, folders]);
+  const childFolders = (parentId: string | null) => folders.filter((folder) => folder.parentId === parentId);
+  const activeConversations = conversations.filter((c) => showArchived || !c.archived);
+  const visibleConversations = activeConversations.filter((c) => {
+    if (folderFilter === 'all') return true;
+    if (folderFilter === 'unfiled') return !c.folderId;
+    return c.folderId ? folderSubtree!.has(c.folderId) : false;
+  });
+  const unfiledCount = activeConversations.filter((c) => !c.folderId).length;
+  const folderConversationDragType = 'application/x-nodus-conversation';
+  const folderDragType = 'application/x-nodus-folder';
+
+  // Nested folder rows, indented by depth. A row selects the filter; dropping a conversation
+  // files it, dropping a folder nests it. The caret expands; the kebab opens the actions.
+  const renderFolderBranch = (parentId: string | null, depth: number): ReactNode => childFolders(parentId).map((folder) => {
+    const children = childFolders(folder.folderId);
+    const expanded = expandedFolders.has(folder.folderId);
+    const selected = folderFilter === folder.folderId;
+    return (
+      <div key={folder.folderId}>
+        <div
+          className={`group flex items-center gap-1 rounded px-2 py-1 text-sm cursor-pointer ${selected ? 'research-accent-soft research-accent-text' : 'text-neutral-300 hover:bg-neutral-900'}`}
+          style={{ paddingLeft: 6 + depth * 12 }}
+          onClick={() => { setFolderMenuId(null); setFolderFilter(folder.folderId); }}
+          onDoubleClick={(event) => { event.stopPropagation(); setFolderMenuId(null); setRenamingFolder(folder.folderId); }}
+          onContextMenu={(event) => { event.preventDefault(); setFolderMenuId(folder.folderId); }}
+          title={t('Doble clic para renombrar')}
+          draggable
+          onDragStart={(event) => event.dataTransfer.setData(folderDragType, folder.folderId)}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes(folderConversationDragType) || event.dataTransfer.types.includes(folderDragType)) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const conversationId = event.dataTransfer.getData(folderConversationDragType);
+            if (conversationId) { void fileConversation(conversationId, folder.folderId); return; }
+            const draggedFolder = event.dataTransfer.getData(folderDragType);
+            if (draggedFolder && draggedFolder !== folder.folderId) void moveFolder(draggedFolder, folder.folderId);
+          }}
+        >
+          <button
+            type="button"
+            className="grid h-4 w-4 shrink-0 place-items-center text-neutral-500"
+            aria-label={expanded ? t('Contraer') : t('Expandir')}
+            onClick={(event) => { event.stopPropagation(); toggleFolderExpanded(folder.folderId); }}
+          >
+            {children.length ? <Icon name={expanded ? 'chevronDown' : 'chevronRight'} size={11} /> : null}
+          </button>
+          <Icon name="folder" size={13} className="shrink-0 text-neutral-500" />
+          {renamingFolder === folder.folderId ? (
+            <input
+              autoFocus
+              defaultValue={folder.name}
+              className="input min-w-0 flex-1 py-0.5 text-xs"
+              onClick={(event) => event.stopPropagation()}
+              onBlur={(event) => { setRenamingFolder(null); void renameFolder(folder.folderId, event.target.value); }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') { event.currentTarget.blur(); }
+                else if (event.key === 'Escape') { setRenamingFolder(null); }
+              }}
+            />
+          ) : (
+            <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+          )}
+          <span className="text-[10px] text-neutral-600">{folderCounts.get(folder.folderId) ?? 0}</span>
+          <button
+            type="button"
+            data-folder-menu-toggle
+            className="p-0.5 rounded text-neutral-500 opacity-60 transition-opacity group-hover:opacity-100 hover:bg-neutral-800"
+            aria-label={t('Acciones de carpeta')}
+            onClick={(event) => { event.stopPropagation(); setFolderMenuId(folderMenuId === folder.folderId ? null : folder.folderId); }}
+          >
+            <Icon name="menu" size={13} />
+          </button>
+        </div>
+        {folderMenuId === folder.folderId && (
+          <div data-folder-menu className="mb-1 ml-6 rounded border border-neutral-800 bg-neutral-900 py-1 text-xs" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="block w-full px-3 py-1 text-left hover:bg-neutral-800" onClick={() => { setNewFolderParent(folder.folderId); setFolderMenuId(null); }}>{t('Nueva subcarpeta')}</button>
+            <button type="button" className="block w-full px-3 py-1 text-left hover:bg-neutral-800" onClick={() => { setRenamingFolder(folder.folderId); setFolderMenuId(null); }}>{t('Renombrar')}</button>
+            <button type="button" className="block w-full px-3 py-1 text-left text-red-400 hover:bg-neutral-800" onClick={() => void deleteFolder(folder.folderId)}>{t('Eliminar carpeta')}</button>
+          </div>
+        )}
+        {expanded && children.length ? renderFolderBranch(folder.folderId, depth + 1) : null}
+      </div>
+    );
+  });
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   // Citations open their evidence workspace without replacing the conversation.
@@ -902,11 +1093,56 @@ export function ResearchAssistantModal({
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
           <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
-            <div className="p-3 border-b border-neutral-800">
+            <div className="space-y-1.5 border-b border-neutral-800 p-3">
               <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
                 <Icon name="plus" /> {t('Nueva conversación')}
               </button>
+              <button className="btn btn-ghost w-full justify-start gap-1.5 text-xs" onClick={() => setNewFolderParent(null)} disabled={sending}>
+                <Icon name="folderPlus" size={13} /> {t('Nueva carpeta')}
+              </button>
+              {newFolderParent !== undefined && (
+                <form
+                  className="flex items-center gap-1"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const value = new FormData(event.currentTarget).get('folderName');
+                    void createFolder(newFolderParent, typeof value === 'string' ? value : '');
+                  }}
+                >
+                  <input
+                    name="folderName"
+                    autoFocus
+                    className="input min-w-0 flex-1 py-1 text-xs"
+                    placeholder={newFolderParent ? t('Nueva subcarpeta') : t('Nombre de la carpeta')}
+                    onKeyDown={(event) => { if (event.key === 'Escape') setNewFolderParent(undefined); }}
+                  />
+                  <button type="submit" className="btn btn-ghost px-2 py-1 text-xs">{t('Crear')}</button>
+                </form>
+              )}
             </div>
+
+            <div className="max-h-48 shrink-0 overflow-y-auto border-b border-neutral-800 px-2 py-2">
+              <button
+                type="button"
+                className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm ${folderFilter === 'all' ? 'research-accent-soft research-accent-text' : 'text-neutral-300 hover:bg-neutral-900'}`}
+                onClick={() => setFolderFilter('all')}
+              >
+                <Icon name="chat" size={13} className="shrink-0 text-neutral-500" />
+                <span className="min-w-0 flex-1 truncate text-left">{t('Todas las conversaciones')}</span>
+                <span className="text-[10px] text-neutral-600">{activeConversations.length}</span>
+              </button>
+              <button
+                type="button"
+                className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-sm ${folderFilter === 'unfiled' ? 'research-accent-soft research-accent-text' : 'text-neutral-300 hover:bg-neutral-900'}`}
+                onClick={() => setFolderFilter('unfiled')}
+              >
+                <Icon name="inbox" size={13} className="shrink-0 text-neutral-500" />
+                <span className="min-w-0 flex-1 truncate text-left">{t('Sin carpeta')}</span>
+                <span className="text-[10px] text-neutral-600">{unfiledCount}</span>
+              </button>
+              {renderFolderBranch(null, 0)}
+            </div>
+
             <VirtualList
               items={visibleConversations}
               itemHeight={58}
@@ -925,6 +1161,7 @@ export function ResearchAssistantModal({
                     onOpen={() => { if (!sending) void loadConversation(conversation.id); }}
                     onArchive={api.archiveConversation ? () => void archiveConversation(conversation) : undefined}
                     onDelete={() => setPendingDelete(conversation)}
+                    onMove={(anchor) => { const rect = anchor.getBoundingClientRect(); setMoveMenu({ conversationId: conversation.id, x: rect.left, y: rect.bottom }); }}
                   />
                 </div>
               )}
@@ -1300,6 +1537,29 @@ export function ResearchAssistantModal({
         />
       )}
 
+      {moveMenu && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMoveMenu(null)} />
+          <div
+            role="menu"
+            className="fixed z-50 max-h-72 min-w-44 overflow-y-auto rounded-lg border border-neutral-800 bg-neutral-900 py-1 text-xs shadow-xl"
+            style={{ left: Math.min(moveMenu.x, window.innerWidth - 200), top: moveMenu.y }}
+          >
+            <div className="px-3 py-1 text-[10px] uppercase tracking-wide text-neutral-600">{t('Mover a carpeta')}</div>
+            <button type="button" role="menuitem" className="block w-full px-3 py-1 text-left hover:bg-neutral-800" onClick={() => void fileConversation(moveMenu.conversationId, null)}>
+              {t('Sin carpeta')}
+            </button>
+            {folders.map((folder) => (
+              <button key={folder.folderId} type="button" role="menuitem" className="block w-full px-3 py-1 text-left hover:bg-neutral-800" onClick={() => void fileConversation(moveMenu.conversationId, folder.folderId)}>
+                {folder.name}
+              </button>
+            ))}
+            {folders.length === 0 && <div className="px-3 py-1 text-neutral-600">{t('No hay carpetas todavía')}</div>}
+          </div>
+        </>,
+        document.body,
+      )}
+
       {citation && (
         <SourceCitationModal
           target={citation}
@@ -1339,12 +1599,14 @@ function ConversationRow({
   onOpen,
   onArchive,
   onDelete,
+  onMove,
 }: {
   conversation: ChatConversationSummary;
   active: boolean;
   onOpen: () => void;
   onArchive?: () => void;
   onDelete: () => void;
+  onMove?: (anchor: HTMLElement) => void;
 }) {
   return (
     <div
@@ -1352,6 +1614,8 @@ function ConversationRow({
         active ? 'research-accent-soft' : 'border-transparent hover:bg-neutral-900'
       }`}
       onClick={onOpen}
+      draggable
+      onDragStart={(event) => event.dataTransfer.setData('application/x-nodus-conversation', conversation.id)}
     >
       <div className="flex items-center gap-1.5">
         <Icon name="chat" size={13} className={`shrink-0 ${active ? 'research-accent-text' : 'text-neutral-500'}`} />
@@ -1359,6 +1623,16 @@ function ConversationRow({
           {conversation.title}
         </span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onMove && <button
+            className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
+            title={t('Mover a carpeta…')}
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove(e.currentTarget);
+            }}
+          >
+            <Icon name="folderMove" size={13} />
+          </button>}
           {onArchive && <button
             className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
             title={conversation.archived ? t('Desarchivar') : t('Archivar')}

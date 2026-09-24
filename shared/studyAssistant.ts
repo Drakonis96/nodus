@@ -70,6 +70,8 @@ export interface StudyAssistantConversationSummary {
   selection: StudyAssistantSelection;
   model: ModelRef | null;
   messageCount: number;
+  /** The conversation folder this chat is filed under, or null when unfiled. */
+  folderId?: string | null;
 }
 
 export interface StudyAssistantConversation extends StudyAssistantConversationSummary {
@@ -98,6 +100,7 @@ export interface StudyAssistantConversationPatch {
   language?: StudyAssistantLanguage;
   allowExternalKnowledge?: boolean;
   messages?: StudyAssistantMessage[];
+  folderId?: string | null;
 }
 
 export interface StudyAssistantRequest {

@@ -293,6 +293,8 @@ import { getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { isSemanticBridgeRunning } from '../ai/semanticBridges';
 import * as chat from '../db/chatRepo';
+import * as chatFolders from '../db/chatFoldersRepo';
+import type { ChatFolderSurface } from '@shared/types';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
 import { getDb } from '../db/database';
@@ -1638,6 +1640,33 @@ export function registerAcademicIpc(context: IpcContext): void {
   });
   h('research:chatStream:cancel', async (_e, requestId: string) => {
     chatAborters.get(requestId)?.abort();
+  });
+
+  // Conversation folders, shared by every chat surface. `surface` selects which tree and which
+  // membership store; study keeps its chats in JSON and carries the folder on the record.
+  const CHAT_FOLDER_SURFACES = new Set(['research', 'study', 'database', 'world']);
+  const asFolderSurface = (surface: unknown): ChatFolderSurface => {
+    if (typeof surface !== 'string' || !CHAT_FOLDER_SURFACES.has(surface)) throw new Error('Superficie de carpetas no válida.');
+    return surface as ChatFolderSurface;
+  };
+  h('chat:folders:list', async (_e, surface: string) => chatFolders.listChatFolders(asFolderSurface(surface)));
+  h('chat:folders:create', async (_e, surface: string, name: string, parentId?: string | null) => chatFolders.createChatFolder(asFolderSurface(surface), name, parentId ?? null));
+  h('chat:folders:rename', async (_e, folderId: string, name: string) => chatFolders.renameChatFolder(folderId, name));
+  h('chat:folders:move', async (_e, folderId: string, parentId: string | null, position?: number) => chatFolders.moveChatFolder(folderId, parentId, position));
+  h('chat:folders:delete', async (_e, folderId: string) => {
+    const folder = chatFolders.getChatFolder(folderId);
+    chatFolders.deleteChatFolder(folderId);
+    // Study's JSON store has no FK, so clear any folder id the delete just orphaned.
+    if (folder?.surface === 'study') studyAssistant.unfileMissingStudyFolders(chatFolders.chatFolderIds('study'));
+  });
+  h('chat:folders:memberships', async (_e, surface: string) => {
+    const target = asFolderSurface(surface);
+    return target === 'study' ? studyAssistant.listStudyConversationFolders() : chatFolders.conversationFolderMap(target);
+  });
+  h('chat:folders:set', async (_e, surface: string, conversationId: string, folderId: string | null) => {
+    const target = asFolderSurface(surface);
+    if (target === 'study') studyAssistant.setStudyConversationFolder(conversationId, folderId);
+    else chatFolders.setConversationFolder(target, conversationId, folderId);
   });
 
   // writing workshop
