@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { RETRIEVAL_PRESETS, type ResearchCorpusCollection, type ResearchCorpusDocument, type ResearchNotebook, type ResearchNotebookInput, type ResearchPreparationInventory, type ResearchSourceReference } from '@shared/researchCorpus';
 import { ResearchZoteroControl } from './ResearchZoteroControl';
@@ -7,41 +7,52 @@ import type { ResearchSystemPrompt } from '@shared/researchSystemPrompts';
 import { Icon } from './ui';
 import { t } from '../i18n';
 
-/** The top of the chat history: icon actions (new conversation, new notebook, new
- * folder) and, in an academic vault, the notebook the conversation reads from. */
-export function ResearchNotebookControl({ value, onChange, enabled = true, leading, trailing }: {
-  value?: string | null; onChange: (id: string | null) => void; enabled?: boolean; leading?: ReactNode; trailing?: ReactNode;
-}) {
+/** The vault's research notebooks (academic vaults only) and a way to refresh them. */
+export function useResearchNotebooks(enabled = true) {
   const [academic, setAcademic] = useState(false);
   const [notebooks, setNotebooks] = useState<ResearchNotebook[]>([]);
-  const [editing, setEditing] = useState<ResearchNotebook | 'new' | null>(null);
   const [error, setError] = useState('');
+  const refresh = useCallback(() => window.nodus.listResearchNotebooks().then(setNotebooks).catch(reason => setError(String(reason))), []);
+  useEffect(() => {
+    let active = true;
+    if (enabled) void window.nodus.getActiveVault().then(vault => { if (active) { setAcademic(vault.type === 'academic'); if (vault.type === 'academic') void refresh(); } });
+    return () => { active = false; };
+  }, [enabled, refresh]);
+  return { available: enabled && academic, notebooks, refresh, error };
+}
+
+/** Notebook picker with edit and create (Deep Research's toolbar). */
+export function ResearchNotebookControl({ value, onChange }: { value?: string | null; onChange: (id: string | null) => void }) {
+  const { available, notebooks, refresh, error } = useResearchNotebooks();
+  const [editing, setEditing] = useState<ResearchNotebook | 'new' | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const refresh = () => window.nodus.listResearchNotebooks().then(setNotebooks).catch(reason => setError(String(reason)));
-  useEffect(() => { let active = true; void window.nodus.getActiveVault().then(vault => { if (active) { setAcademic(vault.type === 'academic'); if (vault.type === 'academic') void refresh(); } }); return () => { active = false; }; }, []);
-  const notebooksOn = academic && enabled;
+  if (!available) return null;
   const selected = notebooks.find(notebook => notebook.id === value);
   const close = () => { setEditing(null); trigger.current?.focus(); };
-  return <div className="research-chat-history-tools" data-testid={notebooksOn ? 'research-notebooks' : undefined}>
-    <div className="flex items-center gap-1">
-      {leading}
-      {notebooksOn && <button ref={trigger} type="button" className="research-chat-history-tool" aria-label={t('Nuevo cuaderno')} title={t('Nuevo cuaderno')} onClick={() => setEditing('new')}><Icon name="notebook" size={16} /></button>}
-      {trailing}
-    </div>
-    {notebooksOn && <div className="flex items-center gap-1">
-      <select aria-label={t('Cuaderno de investigación')} className="input min-w-0 flex-1 text-xs" value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
-        <option value="">{t('Chat general')}</option>
-        {notebooks.map(notebook => <option key={notebook.id} value={notebook.id}>{notebook.name}</option>)}
-      </select>
-      {selected && <button type="button" className="research-chat-history-tool" aria-label={t('Editar')} title={t('Editar')} onClick={() => setEditing(selected)}><Icon name="edit" size={15} /></button>}
-    </div>}
+  return <div className="flex items-center gap-1" data-testid="research-notebooks">
+    <select aria-label={t('Cuaderno de investigación')} className="input min-w-0 max-w-48 text-xs" value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
+      <option value="">{t('Chat general')}</option>
+      {notebooks.map(notebook => <option key={notebook.id} value={notebook.id}>{notebook.name}</option>)}
+    </select>
+    <button ref={trigger} type="button" className="btn btn-ghost text-xs" onClick={() => setEditing(selected ?? 'new')}>{selected ? t('Editar') : t('Nuevo cuaderno')}</button>
+    {selected && <button type="button" className="btn btn-ghost text-xs" aria-label={t('Nuevo cuaderno')} onClick={() => setEditing('new')}>+</button>}
     {error && <span role="alert" className="text-xs text-red-400">{error}</span>}
     {editing && <NotebookDialog notebook={editing === 'new' ? null : editing} onClose={close} onSaved={async id => { await refresh(); onChange(id); close(); }} />}
   </div>;
 }
 
+/** The notebook a conversation reads from, in the header: its name, edit and leave. */
+export function ResearchNotebookChip({ notebook, onEdit, onClear, disabled }: { notebook: ResearchNotebook; onEdit: () => void; onClear: () => void; disabled?: boolean }) {
+  return <div className="research-notebook-chip" data-testid="research-notebook-chip">
+    <button type="button" className="research-notebook-chip-name" onClick={onEdit} disabled={disabled} aria-label={`${t('Editar cuaderno')}: ${notebook.name}`} title={t('Editar cuaderno')}>
+      <Icon name="notebook" size={15} /><span className="truncate">{notebook.name}</span>
+    </button>
+    <button type="button" className="research-notebook-chip-clear" onClick={onClear} disabled={disabled} aria-label={t('Volver al chat general')} title={t('Volver al chat general')}><Icon name="x" size={13} /></button>
+  </div>;
+}
+
 const referenceKey = (source: ResearchSourceReference) => JSON.stringify([source.kind, source.id, source.libraryType, source.libraryId]);
-function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNotebook | null; onClose: () => void; onSaved: (id: string | null) => Promise<void> }) {
+export function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNotebook | null; onClose: () => void; onSaved: (id: string | null) => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<ResearchNotebookInput>(notebook ?? { name: '', description: '', sources: [], exclusions: [], mode: 'fixed', settings: { ...RETRIEVAL_PRESETS.balanced } });
   const [documents, setDocuments] = useState<ResearchCorpusDocument[]>([]);

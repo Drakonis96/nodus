@@ -104,10 +104,9 @@ try {
     // Notebooks live at the top of the chat history.
     await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
     if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
-    const control = page.getByTestId('research-notebooks');
-    await control.waitFor();
-    await control.getByRole('combobox').selectOption(corpus.notebook.id);
-    await control.getByRole('button', { name: /Editar|Edit/ }).click();
+    await page.getByTestId('research-chat-search').fill(corpus.notebook.name);
+    await page.getByTestId(`research-search-notebook-${corpus.notebook.id}`).click();
+    await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
     await page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') }).waitFor();
     await page.screenshot({ path: path.join(root, 'artifacts/notebook-editor.png') });
     await page.keyboard.press('Escape');

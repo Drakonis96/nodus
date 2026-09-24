@@ -1,3 +1,4 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
@@ -77,6 +78,7 @@ export const IT: Record<string, string> = {
 
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Scegli la modalità chiara, scura o segui il sistema operativo.',
   ...RESEARCH_ACTIVITY_TRANSLATIONS["it"],
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS["it"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['it'],
   ...VAULT_FILE_DROP_TRANSLATIONS['it'],
   "Research chat": "Research chat",

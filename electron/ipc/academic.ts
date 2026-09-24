@@ -304,6 +304,7 @@ import { getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { isSemanticBridgeRunning } from '../ai/semanticBridges';
 import * as chat from '../db/chatRepo';
+import * as chatProjects from '../db/researchChatProjectsRepo';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
 import { getDb, withVaultDatabase } from '../db/database';
@@ -1824,7 +1825,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
-  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
+  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null; title?: string; projectId?: string | null }) =>
     chat.createConversation(input ?? {})
   );
   h(
@@ -1846,6 +1847,12 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('chat:rename', async (_e, id: string, title: string) => chat.renameConversation(id, title));
   h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
+  h('chat:projects:list', async () => chatProjects.listChatProjects());
+  h('chat:projects:create', async (_e, input: { name: string; icon?: string | null; color?: string | null }) => chatProjects.createChatProject(input));
+  h('chat:projects:update', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => chatProjects.updateChatProject(id, patch));
+  h('chat:projects:delete', async (_e, id: string) => chatProjects.deleteChatProject(id));
+  h('chat:setProject', async (_e, id: string, projectId: string | null) => chatProjects.setConversationProject(id, projectId));
+  h('chat:setPinned', async (_e, id: string, pinned: boolean) => chatProjects.setConversationPinned(id, pinned));
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   h('notes:tree', async (_e, includeTrashed?: boolean) => notes.getNotesTree(includeTrashed ?? false));

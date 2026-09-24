@@ -328,9 +328,7 @@ try {
   // Notebooks live at the top of the chat history.
   await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
   if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
-  const control = page.getByTestId('research-notebooks');
-  await control.waitFor({ timeout: 30000 });
-  await control.getByRole('button', { name: /Nuevo cuaderno/ }).click();
+  await page.getByTestId('research-new-notebook').click({ timeout: 30000 });
   const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
   await editor.waitFor();
   await editor.getByRole('textbox', { name: 'Nombre', exact: true }).fill('Regadío del Tormeral');

@@ -717,6 +717,12 @@ export const academicApi: AcademicApi = {
   renameConversation: (id, title) => ipcRenderer.invoke('chat:rename', id, title).then(() => undefined),
   archiveConversation: (id, archived) => ipcRenderer.invoke('chat:archive', id, archived).then(() => undefined),
   deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
+  listChatProjects: () => ipcRenderer.invoke('chat:projects:list'),
+  createChatProject: (input) => ipcRenderer.invoke('chat:projects:create', input),
+  updateChatProject: (id, patch) => ipcRenderer.invoke('chat:projects:update', id, patch),
+  deleteChatProject: (id) => ipcRenderer.invoke('chat:projects:delete', id).then(() => undefined),
+  setConversationProject: (id, projectId) => ipcRenderer.invoke('chat:setProject', id, projectId).then(() => undefined),
+  setConversationPinned: (id, pinned) => ipcRenderer.invoke('chat:setPinned', id, pinned).then(() => undefined),
 
   getNotesTree: (includeTrashed) => ipcRenderer.invoke('notes:tree', includeTrashed),
   createNoteFolder: (input) => ipcRenderer.invoke('notes:folders:create', input),

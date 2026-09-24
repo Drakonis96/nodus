@@ -61,6 +61,7 @@ import type {
   ChapterSuggestionStatus,
   ChatConversation,
   ChatConversationSummary,
+  ResearchChatProject,
   ChatMessageRecord,
   CitationPreview,
   CitationRef,
@@ -787,6 +788,9 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   createConversation(input: {
     model?: ModelRef | null;
     selection?: ResearchContextSelection | null;
+    title?: string;
+    /** Research chat project the new conversation starts in. */
+    projectId?: string | null;
   }): Promise<ChatConversation>;
   saveConversationMessages(
     id: string,
@@ -798,6 +802,15 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   renameConversation(id: string, title: string): Promise<void>;
   archiveConversation(id: string, archived: boolean): Promise<void>;
   deleteConversation(id: string): Promise<void>;
+  /** Research chat projects, alphabetical. Optional: surfaces without projects omit them. */
+  listChatProjects?(): Promise<ResearchChatProject[]>;
+  createChatProject?(input: { name: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  updateChatProject?(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  /** The project's chats return to the general history; none is deleted. */
+  deleteChatProject?(id: string): Promise<void>;
+  setConversationProject?(id: string, projectId: string | null): Promise<void>;
+  /** Refused with research_chat_pin_limit beyond RESEARCH_CHAT_PIN_LIMIT pinned chats. */
+  setConversationPinned?(id: string, pinned: boolean): Promise<void>;
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   /** Load every folder and note in one payload; the renderer builds the tree. */

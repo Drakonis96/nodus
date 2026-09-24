@@ -1,3 +1,4 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
@@ -81,6 +82,7 @@ export const JA: Record<string, string> = {
   "Buscar herramientas": "ツールを検索",
 
   ...RESEARCH_ACTIVITY_TRANSLATIONS.ja,
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS.ja,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ja,
   ...VAULT_FILE_DROP_TRANSLATIONS['ja'],
   ...DOCUMENT_SKILLS_TRANSLATIONS.ja,

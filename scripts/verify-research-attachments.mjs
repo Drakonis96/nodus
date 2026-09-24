@@ -58,14 +58,14 @@ try {
     await page.getByRole('button',{name:'Nueva conversación',exact:true}).last().click();
     assert.equal(await page.locator('.research-attachment').count(),0);
     const history=page.getByTestId('research-history-sidebar');
-    await history.locator('[title="Eliminar"]').first().locator('..').locator('..').click();
+    await history.locator('[data-testid^="research-conversation-"]').first().click();
     await page.waitForFunction(()=>document.querySelectorAll('[data-message-id] .research-attachment').length===4);
     assert.equal(await page.locator('.research-composer-shell .research-attachment').count(),0,'saved files are not re-added as drafts');
     await page.getByRole('button',{name:/Informe de investigación.docx/}).click();assert.equal(await page.evaluate(()=>window.attachmentSaves[0].id),'docx');
     await input.fill('Continúa con los mismos archivos.');await input.press('Enter');
     await page.waitForFunction(()=>window.requests.length===3 && !document.querySelector('.research-composer-stop'));
     assert.deepEqual(await page.evaluate(()=>window.requests[2].attachmentIds),request.attachmentIds,'reopened conversation resends original file references');
-    await history.locator('[title="Eliminar"]').first().click();await page.getByRole('dialog').getByRole('button',{name:'Eliminar',exact:true}).click();
+    await history.locator('[data-testid^="research-conversation-"]').first().getByRole('button',{name:'Más acciones'}).click();await page.getByRole('menuitem',{name:'Eliminar',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Eliminar',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('[data-message-id]').length===0);
   }
   // Native File paths are resolved by the existing Electron preload bridge.

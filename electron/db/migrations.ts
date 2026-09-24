@@ -9344,6 +9344,19 @@ export const migrations: Migration[] = [
       token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
     );
   ` },
+  // Research chat projects and where each conversation sits (a project, pinned). Create-only
+  // and without foreign keys on purpose, so both repair paths keep this body: the repo's
+  // transactions release a project's chats and drop a conversation's placement.
+  { version: 182, up: `
+    CREATE TABLE IF NOT EXISTS research_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS research_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
+  ` },
 ];
 
 /**

@@ -1,3 +1,4 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
@@ -83,6 +84,7 @@ export const ZH_TW: Record<string, string> = {
 
   "Elige entre modo claro, oscuro o seguir el sistema operativo.": "選擇淺色模式、深色模式，或跟隨作業系統。",
   ...RESEARCH_ACTIVITY_TRANSLATIONS["zh-TW"],
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS["zh-TW"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['zh-TW'],
   ...VAULT_FILE_DROP_TRANSLATIONS['zh-TW'],
   ...RESEARCH_PROMPT_TRANSLATIONS['zh-TW'],

@@ -171,7 +171,7 @@ async function openConversation(page, title) {
     await page.waitForTimeout(1500);
   }
   await sidebar.waitFor({ state: 'visible', timeout: 20_000 });
-  const row = sidebar.locator('div.cursor-pointer').filter({ hasText: title }).first();
+  const row = sidebar.locator('.research-history-row').filter({ hasText: title }).first();
   await row.waitFor({ state: 'attached', timeout: 20_000 });
   await row.scrollIntoViewIfNeeded();
   await row.click({ force: true });

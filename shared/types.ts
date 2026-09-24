@@ -6075,6 +6075,10 @@ export interface ChatMessageRecord {
 /** Conversation list entry (no messages) for the history sidebar. */
 export interface ChatConversationSummary {
   notebookId?: string | null;
+  /** Research chat project holding this conversation, if any. */
+  projectId?: string | null;
+  /** Set while the conversation is one of the (at most five) pinned chats. */
+  pinnedAt?: string | null;
   id: string;
   title: string;
   created_at: string;
@@ -6083,6 +6087,19 @@ export interface ChatConversationSummary {
   model: ModelRef | null;
   messageCount: number;
 }
+
+/** A research chat project: a named, iconed group of conversations. */
+export interface ResearchChatProject {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** How many conversations may be pinned at once. */
+export const RESEARCH_CHAT_PIN_LIMIT = 5;
 
 /** A full conversation with its messages and the context selection it was using. */
 export interface ChatConversation extends ChatConversationSummary {

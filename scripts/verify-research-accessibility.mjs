@@ -50,11 +50,12 @@ try {
     // Notebooks live at the top of the chat history.
     await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
     if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
-    const control = page.getByTestId('research-notebooks');
-    await control.waitFor({ timeout: 15000 }).catch(async error => { await page.screenshot({ path: path.join(harness.root, `artifacts/a11y-${theme}-no-control.png`) }); throw error; });
-    await control.getByRole('combobox').selectOption(notebook.id);
+    const search = page.getByTestId('research-chat-search');
+    await search.waitFor({ timeout: 15000 }).catch(async error => { await page.screenshot({ path: path.join(harness.root, `artifacts/a11y-${theme}-no-control.png`) }); throw error; });
+    await search.fill(notebook.name);
+    await page.getByTestId(`research-search-notebook-${notebook.id}`).click();
     await audit(page, 'research-chat', theme, null);
-    await control.getByRole('button', { name: /Editar|Edit/ }).click();
+    await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
     const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
     await editor.waitFor();
     await audit(page, 'notebook-editor', theme, 'closest:#research-notebook-title');

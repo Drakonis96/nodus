@@ -7,7 +7,9 @@ import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptC
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
-import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
+import { NotebookDialog, ResearchNotebookChip, useResearchNotebooks } from '../components/ResearchNotebookControl';
+import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
+import type { ResearchNotebook } from '@shared/researchCorpus';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
 import { ResearchCoverage } from '../components/ResearchCoverage';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
@@ -19,6 +21,7 @@ import { createPortal } from 'react-dom';
 import type {
   AppSettings,
   ChatConversationSummary,
+  ResearchChatProject,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
@@ -31,7 +34,6 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal, type StudyNoteDestination } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
-import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
@@ -273,6 +275,16 @@ export function ResearchAssistantModal({
   const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
   const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
+  // Projects and pinned chats exist where the transport stores them: the vault's research chat.
+  const supportsProjects = !adapter && typeof window.nodus.listChatProjects === 'function';
+  const [projects, setProjects] = useState<ResearchChatProject[]>([]);
+  // A project's page: shown while it is open and no conversation has started in it.
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [editingNotebook, setEditingNotebook] = useState<ResearchNotebook | 'new' | null>(null);
+  const projectHome = supportsProjects && !!activeProjectId && !activeId;
+  const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
+  const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
+  const activeNotebook = researchNotebooks.notebooks.find(notebook => notebook.id === selection.notebookId) ?? null;
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
@@ -324,8 +336,13 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
   const refreshConversations = useCallback(async () => {
-    setConversations(await apiRef.current.listConversations(true));
-  }, []);
+    const [list, projectList] = await Promise.all([
+      apiRef.current.listConversations(true),
+      supportsProjects ? window.nodus.listChatProjects!() : Promise.resolve([] as ResearchChatProject[]),
+    ]);
+    setConversations(list);
+    setProjects(projectList);
+  }, [supportsProjects]);
 
   useEffect(() => {
     void refreshConversations();
@@ -472,6 +489,7 @@ export function ResearchAssistantModal({
     setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
     adapter?.reset?.();
     if (!activeId) void systemPrompts.select(null);
+    setActiveProjectId(null);
     setActiveId(null);
     setMessages([]);
     setInput('');
@@ -547,6 +565,57 @@ export function ResearchAssistantModal({
     lastConversationTargetRef.current = target.nonce;
     void loadConversation(target.conversationId, target.messageId, target.messageIndex);
   }, [initialConversationTarget?.nonce]);
+
+  const openProject = (projectId: string) => {
+    if (sending) return;
+    startNewConversation();
+    setActiveProjectId(projectId);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const createProject = async (): Promise<ResearchChatProject | null> => {
+    if (!supportsProjects) return null;
+    const base = t('Nuevo proyecto');
+    const taken = new Set(projects.map(project => project.name));
+    let name = base;
+    for (let index = 2; taken.has(name); index++) name = `${base} ${index}`;
+    const created = await window.nodus.createChatProject!({ name });
+    await refreshConversations();
+    return created;
+  };
+  const updateProject = async (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+    await window.nodus.updateChatProject!(project.id, patch);
+    await refreshConversations();
+  };
+  const deleteProject = async (project: ResearchChatProject) => {
+    await window.nodus.deleteChatProject!(project.id);
+    if (activeProjectId === project.id) setActiveProjectId(null);
+    await refreshConversations();
+  };
+  const renameConversation = async (conversation: ChatConversationSummary, title: string) => {
+    await window.nodus.renameConversation(conversation.id, title);
+    if (conversation.id === activeId) setContextTitle(title);
+    await refreshConversations();
+  };
+  const pinConversation = async (conversation: ChatConversationSummary, pinned: boolean) => {
+    await window.nodus.setConversationPinned!(conversation.id, pinned);
+    await refreshConversations();
+  };
+  const moveConversation = async (conversation: ChatConversationSummary, projectId: string | null) => {
+    await window.nodus.setConversationProject!(conversation.id, projectId);
+    await refreshConversations();
+  };
+  const changeNotebook = (notebookId: string | null) => {
+    if (sending) void api.cancelResearchChat();
+    const next = { ...selection, notebookId };
+    setSelection(next);
+    if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+  };
+  // A notebook chosen from the history search starts a conversation that reads from it.
+  const selectNotebook = (notebookId: string) => {
+    if (sending) return;
+    startNewConversation();
+    setSelection(current => ({ ...current, notebookId }));
+  };
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
     await api.archiveConversation?.(conversation.id, !conversation.archived);
@@ -707,7 +776,7 @@ export function ResearchAssistantModal({
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80) });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...(projectHome ? { projectId: activeProjectId } : {}) });
       conversationId = created.id;
       await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
       activeIdRef.current = created.id;
@@ -754,7 +823,7 @@ export function ResearchAssistantModal({
     try {
       let id = activeIdRef.current;
       if (!id) {
-        const created = await api.createConversation({ model: selectedModel, selection });
+        const created = await api.createConversation({ model: selectedModel, selection, ...(projectHome ? { projectId: activeProjectId } : {}) });
         id = created.id; activeIdRef.current = id; setActiveId(id);
         await window.nodus.selectResearchSystemPrompt(`${attachmentSurface}:${id}`, systemPrompts.selectedId);
       }
@@ -817,7 +886,7 @@ export function ResearchAssistantModal({
   };
 
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
-  const visibleConversations = conversations.filter((c) => (showArchived || !c.archived) && (!selection.notebookId || c.notebookId === selection.notebookId));
+  const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
   const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
@@ -888,6 +957,7 @@ export function ResearchAssistantModal({
               <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
+          {!adapter && !isGenealogy && activeNotebook && <ResearchNotebookChip notebook={activeNotebook} disabled={sending} onEdit={() => setEditingNotebook(activeNotebook)} onClear={() => changeNotebook(null)} />}
           {!adapter && !isGenealogy && !selection.notebookId && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
             const next = { ...selection, sourceFilter };
             if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
@@ -911,52 +981,39 @@ export function ResearchAssistantModal({
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
           <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
-            <ResearchNotebookControl
-              value={selection.notebookId}
-              enabled={!adapter && !isGenealogy}
-              leading={<button type="button" className="research-chat-history-tool" onClick={startNewConversation} disabled={sending} aria-label={t('Nueva conversación')} title={t('Nueva conversación')}><Icon name="plus" size={16} /></button>}
-              trailing={<button type="button" className="research-chat-history-tool" disabled aria-label={t('Nueva carpeta')} title={t('Nueva carpeta')}><Icon name="folderPlus" size={16} /></button>}
-              onChange={notebookId => {
-                if (sending) void api.cancelResearchChat();
-                const next = { ...selection, notebookId };
-                setSelection(next);
-                if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
-              }}
+            <ResearchChatSidebar
+              conversations={visibleConversations}
+              projects={projects}
+              notebooks={researchNotebooks.notebooks}
+              supportsProjects={supportsProjects}
+              notebooksOn={researchNotebooks.available}
+              activeId={activeId}
+              activeProjectId={activeProjectId}
+              sending={sending}
+              archivedCount={archivedCount}
+              showArchived={showArchived}
+              onToggleArchived={() => setShowArchived((value) => !value)}
+              onNewConversation={startNewConversation}
+              onNewNotebook={() => setEditingNotebook('new')}
+              onNewProject={createProject}
+              onOpenConversation={(id) => void loadConversation(id)}
+              onOpenProject={openProject}
+              onSelectNotebook={selectNotebook}
+              onRenameConversation={!adapter ? renameConversation : undefined}
+              onPinConversation={pinConversation}
+              onArchiveConversation={api.archiveConversation ? archiveConversation : undefined}
+              onDeleteConversation={setPendingDelete}
+              onMoveConversation={moveConversation}
+              onUpdateProject={updateProject}
+              onDeleteProject={deleteProject}
             />
-            <VirtualList
-              items={visibleConversations}
-              itemHeight={58}
-              getKey={(conversation) => conversation.id}
-              className="flex-1 min-h-0 p-2"
-              empty={
-                <div className="text-xs text-neutral-600 text-center py-6 px-2">
-                  {t('Aún no hay conversaciones. Escribe abajo para empezar.')}
-                </div>
-              }
-              renderItem={(conversation) => (
-                <div className="h-[52px]">
-                  <ConversationRow
-                    conversation={conversation}
-                    active={conversation.id === activeId}
-                    onOpen={() => { if (!sending) void loadConversation(conversation.id); }}
-                    onArchive={api.archiveConversation ? () => void archiveConversation(conversation) : undefined}
-                    onDelete={() => setPendingDelete(conversation)}
-                  />
-                </div>
-              )}
-            />
-            {archivedCount > 0 && (
-              <button
-                className="text-xs text-neutral-500 hover:text-neutral-300 px-3 py-2 border-t border-neutral-800 text-left flex items-center gap-1.5"
-                onClick={() => setShowArchived((v) => !v)}
-              >
-                <Icon name="archive" size={13} />
-                {showArchived ? t('Ocultar archivadas') : tx('Ver archivadas ({n})', { n: archivedCount })}
-              </button>
-            )}
           </aside>
 
-          <section className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${projectHome ? 'research-project-home' : ''}`} data-testid={projectHome ? 'research-project-home' : undefined}>
+            {projectHome && activeProject && <header className="research-project-title">
+              <span style={{ color: activeProject.color ?? undefined }}><Icon name={activeProject.icon ?? 'folder'} size={30} /></span>
+              <h2>{activeProject.name}</h2>
+            </header>}
             <div className="relative flex-1 min-h-0">
               {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
@@ -965,7 +1022,11 @@ export function ResearchAssistantModal({
                     {conversationNotice}
                   </div>
                 )}
-                {messages.length === 0 && (
+                {projectHome && messages.length === 0 && <ProjectChatList
+                  conversations={visibleConversations.filter(conversation => conversation.projectId === activeProjectId)}
+                  onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                />}
+                {!projectHome && messages.length === 0 && (
                   <div className="research-empty-state h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
@@ -1131,7 +1192,7 @@ export function ResearchAssistantModal({
                   aria-label={t('Pregunta al asistente...')}
                   rows={1}
                   value={input}
-                  placeholder={!adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -1303,6 +1364,9 @@ export function ResearchAssistantModal({
           document.body
         )}
 
+      {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}
+        onClose={() => setEditingNotebook(null)}
+        onSaved={async (id) => { await researchNotebooks.refresh(); setEditingNotebook(null); if (id) { if (editingNotebook === 'new') selectNotebook(id); else changeNotebook(id); } else changeNotebook(null); }} />}
       {pendingDelete && (
         <ConfirmModal
           title={t('Eliminar conversación')}
@@ -1351,59 +1415,17 @@ function deriveNoteTitle(content: string, contextTitle: string | null): string {
   return base.length > 80 ? `${base.slice(0, 77)}…` : base;
 }
 
-function ConversationRow({
-  conversation,
-  active,
-  onOpen,
-  onArchive,
-  onDelete,
-}: {
-  conversation: ChatConversationSummary;
-  active: boolean;
-  onOpen: () => void;
-  onArchive?: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div
-      className={`group rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-        active ? 'research-accent-soft' : 'border-transparent hover:bg-neutral-900'
-      }`}
-      onClick={onOpen}
-    >
-      <div className="flex items-center gap-1.5">
-        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'research-accent-text' : 'text-neutral-500'}`} />
-        <span className={`flex-1 min-w-0 truncate text-sm ${conversation.archived ? 'text-neutral-500 italic' : ''}`}>
-          {conversation.title}
-        </span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onArchive && <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
-            title={conversation.archived ? t('Desarchivar') : t('Archivar')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onArchive();
-            }}
-          >
-            <Icon name="archive" size={13} />
-          </button>}
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
-            title={t('Eliminar')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Icon name="trash" size={13} />
-          </button>
-        </div>
-      </div>
-      <div className="text-[10px] text-neutral-600 mt-0.5 pl-5">
-        {formatRelative(conversation.updated_at)} · {tx('{n} mensaje(s)', { n: conversation.messageCount })}
-      </div>
-    </div>
-  );
+/** The chats of an open project, under its composer. */
+function ProjectChatList({ conversations, onOpen }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void }) {
+  if (!conversations.length) return <p className="research-project-empty">{t('Los chats que empieces aquí quedarán en este proyecto.')}</p>;
+  return <ul className="research-project-chats" data-testid="research-project-chats">
+    {conversations.map(conversation => <li key={conversation.id}>
+      <button type="button" onClick={() => onOpen(conversation.id)}>
+        <span className="research-project-chat-title">{conversation.title}</span>
+        <span className="research-project-chat-date">{formatRelative(conversation.updated_at)}</span>
+      </button>
+    </li>)}
+  </ul>;
 }
 
 function ContextCheckbox({
@@ -1456,20 +1478,6 @@ function formatChars(chars: number): string {
   if (chars >= 1_000_000) return `${(chars / 1_000_000).toFixed(1)}M chars`;
   if (chars >= 1000) return `${Math.round(chars / 1000)}k chars`;
   return `${chars} chars`;
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '';
-  const diff = Date.now() - then;
-  const minutes = Math.round(diff / 60000);
-  if (minutes < 1) return t('ahora');
-  if (minutes < 60) return tx('hace {n} min', { n: minutes });
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return tx('hace {n} h', { n: hours });
-  const days = Math.round(hours / 24);
-  if (days < 7) return tx('hace {n} d', { n: days });
-  return new Date(iso).toLocaleDateString();
 }
 
 function serializeSelection(selection: ResearchContextSelection): string {

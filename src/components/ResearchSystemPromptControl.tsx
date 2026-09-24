@@ -16,7 +16,7 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
       data-testid="research-system-prompt-trigger" disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
       aria-label={`${t('System prompt')}: ${selected?.name ?? 'Default'}`}
       title={`${t('System prompt')}: ${selected?.name ?? 'Default'}`} onClick={() => setOpen(true)}>
-      <Icon name="edit" size={14} /><span className="research-system-prompt-name">{selected?.name ?? 'Default'}</span><Icon name="chevronDown" size={13} />
+      <Icon name="edit" size={14} /><span className="research-system-prompt-name">{t('System prompt')}</span><Icon name="chevronDown" size={13} />
     </button>
     {open && <PromptDialog prompts={prompts} selectedId={selectedId} refresh={refresh} onSelect={onSelect}
       accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent').trim() || 'var(--a-500)' : 'var(--a-500)'}

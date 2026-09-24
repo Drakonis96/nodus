@@ -9,6 +9,7 @@ try {
     console.log(`Checking prompt modal: ${view}`);
     await page.goto(`${base}?view=${view}`);
     const trigger = page.getByTestId('research-system-prompt-trigger');
+    assert.equal((await trigger.innerText()).trim(), 'System prompt', 'the trigger keeps its name');
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: 'System prompts', exact: true });
     assert.equal(await dialog.isVisible(), true);
@@ -19,7 +20,7 @@ try {
       await dialog.getByLabel('Nombre del prompt', { exact: true }).fill(name);
       await dialog.getByLabel('Instrucciones personalizadas', { exact: true }).fill(instructions);
       await dialog.getByRole('button', { name: 'Guardar y usar', exact: true }).click();
-      await trigger.getByText(name, { exact: true }).waitFor();
+      await page.locator(`[data-testid=\"research-system-prompt-trigger\"][aria-label=\"System prompt: ${name}\"]`).waitFor();
       await trigger.click();
     }
     const names = await dialog.locator('.research-prompt-item strong').allTextContents();
@@ -36,9 +37,9 @@ try {
     assert.ok(chosenId);
     if (await page.getByTestId('research-history-toggle').getAttribute('aria-expanded') !== 'true') await page.getByTestId('research-history-toggle').click();
     await page.getByRole('button', { name: 'Nueva conversación', exact: true }).last().click();
-    await trigger.getByText('Default', { exact: true }).waitFor();
+    await page.locator(`[data-testid=\"research-system-prompt-trigger\"][aria-label=\"System prompt: ${'Default'}\"]`).waitFor();
     await page.getByTestId('research-history-sidebar').getByText(view === 'embedded' ? 'Conversación de prueba 1' : `Consulta ${view}`, { exact: true }).click();
-    await trigger.getByText('Tutor socrático', { exact: true }).waitFor();
+    await page.locator(`[data-testid=\"research-system-prompt-trigger\"][aria-label=\"System prompt: ${'Tutor socrático'}\"]`).waitFor();
     await trigger.click();
     await dialog.getByRole('listitem').filter({ hasText: 'Default' }).click();
     await dialog.getByRole('button', { name: 'Usar Default', exact: true }).click();
@@ -78,7 +79,7 @@ try {
     await confirmation.getByRole('button', { name: 'Eliminar', exact: true }).click();
     await confirmation.waitFor({ state: 'detached' });
     await dialog.getByRole('button', { name: 'Usar Default', exact: true }).click();
-    await trigger.getByText('Default', { exact: true }).waitFor();
+    await page.locator(`[data-testid=\"research-system-prompt-trigger\"][aria-label=\"System prompt: ${'Default'}\"]`).waitFor();
   }
   assert.deepEqual(errors, []);
   console.log('Five chat variants: create/edit/delete, alphabetical search, Default, per-conversation selection/reload, same conversation, request propagation, vault accent and light/dark/compact prompt modal passed.');

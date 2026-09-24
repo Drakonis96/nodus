@@ -221,7 +221,7 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'dictionary_relations',
     ],
   },
-  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations', 'research_notebooks', 'research_notebook_conversations'] },
+  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations', 'research_notebooks', 'research_notebook_conversations', 'research_chat_projects', 'research_chat_placements'] },
   { key: 'content', tables: ['content_translations', 'decorative_images', 'audio_clips', 'page_block_blobs'] },
 ];
 

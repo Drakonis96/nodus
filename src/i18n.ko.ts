@@ -1,3 +1,4 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
@@ -81,6 +82,7 @@ export const KO: Record<string, string> = {
   "Buscar herramientas": "도구 검색",
 
   ...RESEARCH_ACTIVITY_TRANSLATIONS.ko,
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS.ko,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
   ...VAULT_FILE_DROP_TRANSLATIONS['ko'],
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
