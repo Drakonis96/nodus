@@ -1,0 +1,137 @@
+{
+  "run": "https://github.com/Drakonis96/nodus/actions/runs/35988849000",
+  "commit": "25b45ef9",
+  "note": "Windows x64 first failed in research:runtime when a download connection was closed by the remote side; only that job was re-run on the same commit and passed.",
+  "platforms": [
+    {
+      "runner": "macos-latest",
+      "platform": "darwin",
+      "arch": "arm64",
+      "passed": true,
+      "updateKind": "v5.6.0-to-private-higher-version",
+      "launchVersions": [
+        "5.6.0",
+        "5.6.1-research.13",
+        "5.6.1-research.13"
+      ],
+      "base": {
+        "version": "5.6.0",
+        "assetId": 576727798,
+        "name": "Nodus-mac-arm64.dmg",
+        "sha256": "936c9707a152f42e81c400992b599470c14480a39138cd2b0ed9f25006946a40",
+        "bytes": 782157609,
+        "releaseId": 392409808
+      },
+      "artifact": {
+        "name": "Nodus-mac-arm64.dmg",
+        "sha256": "631864c8ccad501a2a759758b45ce63e592abeaa80e5650dc4ffacf2362c304f"
+      },
+      "legacyNotePreserved": true,
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true,
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      }
+    },
+    {
+      "runner": "macos-15-intel",
+      "platform": "darwin",
+      "arch": "x64",
+      "passed": true,
+      "updateKind": "v5.6.0-to-private-higher-version",
+      "launchVersions": [
+        "5.6.0",
+        "5.6.1-research.13",
+        "5.6.1-research.13"
+      ],
+      "base": {
+        "version": "5.6.0",
+        "assetId": 576739940,
+        "name": "Nodus-mac-x64.dmg",
+        "sha256": "183c292e43e0f55c8ff929e431c2ac716f12982aaccc5e337d26c390abc2b743",
+        "bytes": 818334604,
+        "releaseId": 392409808
+      },
+      "artifact": {
+        "name": "Nodus-mac-x64.dmg",
+        "sha256": "bfb215f65dc52717e19ea3f57230f4e83b502ba5b173297200812064d8f819c3"
+      },
+      "legacyNotePreserved": true,
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true,
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      }
+    },
+    {
+      "runner": "windows-latest",
+      "platform": "win32",
+      "arch": "x64",
+      "passed": true,
+      "updateKind": "v5.6.0-to-private-higher-version",
+      "launchVersions": [
+        "5.6.0",
+        "5.6.1-research.13",
+        "5.6.1-research.13"
+      ],
+      "base": {
+        "version": "5.6.0",
+        "assetId": 576714663,
+        "name": "Nodus-win-x64.exe",
+        "sha256": "fa8ef87315ecdef1abfaf87ef3c51f7bf10d4d6636d939c1971700d7ee0728e3",
+        "bytes": 649497229,
+        "releaseId": 392409808
+      },
+      "artifact": {
+        "name": "Nodus-win-x64.exe",
+        "sha256": "d8a839b161b4a696fbecf0b7964170aec807fb2fbfa7d4811d6d63b99497000c"
+      },
+      "legacyNotePreserved": true,
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true,
+      "proof": {
+        "environment": "disposable-hosted-ci",
+        "osWriteBoundaryVerified": false
+      }
+    },
+    {
+      "runner": "ubuntu-latest",
+      "platform": "linux",
+      "arch": "x64",
+      "passed": true,
+      "updateKind": "v5.6.0-to-private-higher-version",
+      "launchVersions": [
+        "5.6.0",
+        "5.6.1-research.13",
+        "5.6.1-research.13"
+      ],
+      "base": {
+        "version": "5.6.0",
+        "assetId": 576732983,
+        "name": "Nodus-linux-amd64.deb",
+        "sha256": "6a71abc523c4ea33167b8fbb8efedcec1d88cecdb6c08b2a5c9b06eb6584647c",
+        "bytes": 909909812,
+        "releaseId": 392409808
+      },
+      "artifact": {
+        "name": "Nodus-linux-amd64.deb",
+        "sha256": "d7550794676b8b19edf025e4bd84e944dbd452c6b4d15bb841d6efb5b7f75c10"
+      },
+      "legacyNotePreserved": true,
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true,
+      "proof": {
+        "environment": "disposable-hosted-ci",
+        "osWriteBoundaryVerified": false
+      }
+    }
+  ]
+}

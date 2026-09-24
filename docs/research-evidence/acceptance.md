@@ -225,8 +225,8 @@ to about USD 0.57.
 | Page locators | Chunker/store tests for page-crossing passages | Same harness: final-page marker cited as "pp. 249–250" after fix `45665d23` | Other formats' locator semantics |
 | Vault changes | `test-documentary-vault-ownership` (two owning vaults, UI switch across an extraction await), scope revalidation | Selection-change cancellation in the adversarial campaign; **real vault switch** during chat, Deep Research and preparation (`2026-09-24-robustness-scenarios.json`) | Deep Research is protected by refusing the switch, not by aborting |
 | Batches and shared jobs | Persistent embedding batches, multi-source campaigns, shared lease retained by another campaign, withdrawal fencing | Real `bge-m3` preparation of three PDFs in every campaign; **two real vaults** preparing one document concurrently with a withdrawal | Removal of a document from one vault (no unlink API) |
-| Provider failures | Missing key never switches provider, recoverable blocks are not failures, proxy/cost ledger tests | Real app against a **simulated** upstream behind the real proxy: 429, 500, malformed bodies, connection resets and persistent outages | Faults are simulated; real provider behaviour may differ |
-| Revisions | Stale writer fencing, attachment heads, failed rebuild keeps previous revision | **Real Zotero 10.0.3** attachment bytes replaced after import; Global Library attachment replaced mid-extraction | Replacement exactly between pin and read inside one Deep Research run |
+| Provider failures | Missing key never switches provider, recoverable blocks are not failures, proxy/cost ledger tests | Real app against a **simulated** upstream: 429, 500, malformed bodies, resets, persistent outages; **real DeepSeek/OpenRouter 401s** for a revoked credential and recovery with the valid one | Real rate limits and server errors cannot be provoked on demand |
+| Revisions | Stale writer fencing, attachment heads, failed rebuild keeps previous revision | **Real Zotero 10.0.3** attachment bytes replaced after import, and **between a Deep Research run's pin and its read**; Global Library attachment replaced mid-extraction | — |
 | Permissions | Notebook scopes, receipt revocation, forged IDs, promoted notes | Selection revocation in real Zotero; foreign IDs/history in the adversarial campaign | — |
 | Migrations | Synthetic migration fixtures, legacy policy migration | v5.6.0 profile with a legacy note preserved across the actual upgrade | Large production-sized vaults (deliberately not used) |
 | Accessibility | Preparation welcome browser fixture (now also on CI's macOS runner) | Keyboard focus containment and bounds; **axe-core** WCAG A/AA audit of six Research surfaces in both themes, 0 violations after fixes | Screen-reader test with a person |
@@ -320,3 +320,41 @@ from a release asset during capability bootstrap.
 one conflict in `electron/ai/researchAssistant.ts`), so pull-request workflows no
 longer start. CI and the native matrix were dispatched manually on `2c7f1c4a`; the
 conflict is left unresolved pending the owner's decision.
+
+
+### Follow-up after integrating `main` (24 September)
+
+Evidence: `2026-09-24-closure-followup.json`.
+
+- **Merge of `main`** (`535f9a3d`, 17 commits): the single conflict in
+  `electron/ai/researchAssistant.ts` keeps both sides (main's chemistry route-fix
+  handling; this branch's notebook scope, cancellation and activity). The PR is
+  mergeable again and pull-request workflows start.
+- **Real provider faults** (`eb2c0b0f`): DeepSeek and OpenRouter return their own
+  401s for a revoked credential through the shared ledger. Preparation stops after
+  bounded attempts as a provider failure with the invalid-key message, text stays
+  searchable, chat returns the error without retries, Deep Research abstains;
+  replacing the credential recovers vectors and a cited answer. The recovered answer
+  named the page-1 marker for a page-2 question: a real model error, recorded as such.
+- **Pin/read window** (`25b45ef9`): with real Zotero 10.0.3, a Deep Research run's
+  first agent decision is held after the run pinned the original; the bytes are
+  replaced; the read is refused as `original_revision_changed`, the run is partial
+  and abstains, and the replaced text never reaches the report.
+- All eight earlier scenarios and 41/41 focused suites were rerun on the merged code.
+- CI [35988824092](https://github.com/Drakonis96/nodus/actions/runs/35988824092) at
+  `25b45ef9`: test job 3,828 tests, 0 failures, 2 skips, all E2Es; the three
+  cross-repository jobs still fail on the Chemistry Studio pin (below). Native
+  [35988824127](https://github.com/Drakonis96/nodus/actions/runs/35988824127): four
+  targets passed (macOS x64 re-run once after an artifact-upload DNS failure).
+- Installers [35988849000](https://github.com/Drakonis96/nodus/actions/runs/35988849000)
+  at `25b45ef9`: actual v5.6.0 → private test version upgrade, preservation and removal
+  passed on all four targets (`2026-09-24-installers-25b45ef9.json`); Windows x64 was
+  re-run once after a download connection closed during the private runtime build.
+- **Chemistry Studio pin: blocked.** The marketplace catalog advertises tag
+  `chemistry-studio-v2.5.6`, but that release has not been cut (latest release:
+  2.5.1), and the catalog's 2.5.6 asset size equals 2.5.1's. Pinning 2.5.6 without the
+  signed release would break installer builds, and cutting it means dispatching the
+  marketplace's `release-plugin.yml`, which signs in the protected
+  `capability-signing` environment — a release publication reserved for the owner.
+- Ledger: 1,777 calls, USD 3.888697737 accounted, 21 unresolved reservations
+  (authentication failures report no usage and keep their conservative bound).
