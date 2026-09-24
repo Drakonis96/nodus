@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
+import { RESEARCH_INDEX_CONFIRMATION_THRESHOLD, type ResearchIndexRequestResult } from '@shared/researchCorpus';
 import type { ResearchPreparationAction, ResearchPreparationCampaign, ResearchPreparationPolicy, ResearchPreparationPreview, ResearchPreparationProgress } from '@shared/researchCorpus';
 import { DocumentaryCampaigns } from '../db/documentaryCampaigns';
 import { getActiveVault, getVault, withOwningVault } from '../vaults/vaultRegistry';
 import { withVaultDatabase } from '../db/database';
 import { preparationPreflight } from './researchPreparationPreflight';
 import { effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
-import { documentaryStore, drainDocumentaryRequests, embeddingConfigurationUsable, getResearchPreparationInventory, interruptUnusedDocumentaryRequest, setResearchPreparationPaused } from './documentaryPreparation';
+import { documentaryStore, drainDocumentaryRequests, embeddingConfigurationUsable, prepareResearchDocuments, getResearchPreparationInventory, interruptUnusedDocumentaryRequest, setResearchPreparationPaused } from './documentaryPreparation';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { notifyDocumentaryPreparation } from './documentaryPreparationEvents';
 
@@ -83,6 +84,27 @@ export async function startResearchPreparationCampaign(input: { previewId: strin
   notifyDocumentaryPreparation();
   void drainDocumentaryRequests();
   return id;
+}
+/** Index works of the active vault now, without a dialog: the documents that are not
+ * indexed yet are queued for text and embeddings with the configured model. More than
+ * RESEARCH_INDEX_CONFIRMATION_THRESHOLD documents come back unqueued, asking for an
+ * explicit confirmation first. Nothing is queued without a usable embedding model. */
+export async function indexResearchWorks(input: { workIds?: string[]; confirmed?: boolean }): Promise<ResearchIndexRequestResult> {
+  if (!input || (input.workIds !== undefined && (!Array.isArray(input.workIds) || input.workIds.length > 50000 || input.workIds.some(id => typeof id !== 'string')))
+    || (input.confirmed !== undefined && typeof input.confirmed !== 'boolean')) throw new Error('Invalid index request');
+  academicVault();
+  const wanted = input.workIds ? new Set(input.workIds) : null;
+  const documents = getResearchPreparationInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment
+    && (!wanted || wanted.has(document.workId)));
+  const pending = documents.filter(document => !(document.preparation.lexical === 'ready' && document.preparation.embeddings === 'ready'));
+  let config: EmbeddingExecutionConfig | null = null;
+  try { config = effectiveEmbeddingConfig(); } catch { /* reported as unavailable */ }
+  const embeddingAvailable = !!config && embeddingConfigurationUsable(config);
+  const result = { requested: documents.length, queued: 0, alreadyIndexed: documents.length - pending.length, embeddingAvailable };
+  if (!embeddingAvailable || !pending.length) return result;
+  if (pending.length > RESEARCH_INDEX_CONFIRMATION_THRESHOLD && !input.confirmed) return { ...result, confirmationRequired: pending.length };
+  await prepareResearchDocuments(pending.map(document => document.id), 'embeddings');
+  return { ...result, queued: pending.length };
 }
 export function getResearchPreparationProgress(): ResearchPreparationProgress {
   const repo = campaigns();

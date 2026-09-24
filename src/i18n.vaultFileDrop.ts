@@ -34,4 +34,19 @@ const indexActionTranslations: Record<string, string[]> = {
   ja: ['文書を再インデックス化', 'インデックス化を再試行'],
 };
 for (const [language, values] of Object.entries(indexActionTranslations)) translations[language].push(...values);
+keys.push('Indexar documentos', 'Se indexarán {n} documentos con el modelo de embeddings configurado. ¿Continuar?', 'Configura un modelo de embeddings para indexar.', '{n} documento(s) en cola para indexar.', 'Ya está todo indexado.');
+const indexNowTranslations: Record<string, string[]> = {
+  en: ['Index documents', '{n} documents will be indexed with the configured embedding model. Continue?', 'Set up an embedding model to index.', '{n} document(s) queued for indexing.', 'Everything is already indexed.'],
+  fr: ['Indexer les documents', '{n} documents seront indexés avec le modèle d’embeddings configuré. Continuer ?', 'Configurez un modèle d’embeddings pour indexer.', '{n} document(s) en file pour l’indexation.', 'Tout est déjà indexé.'],
+  de: ['Dokumente indexieren', '{n} Dokumente werden mit dem konfigurierten Embedding-Modell indexiert. Fortfahren?', 'Richte ein Embedding-Modell ein, um zu indexieren.', '{n} Dokument(e) zur Indexierung eingereiht.', 'Alles ist bereits indexiert.'],
+  pt: ['Indexar documentos', 'Serão indexados {n} documentos com o modelo de embeddings configurado. Continuar?', 'Configure um modelo de embeddings para indexar.', '{n} documento(s) em fila para indexar.', 'Já está tudo indexado.'],
+  'pt-BR': ['Indexar documentos', 'Serão indexados {n} documentos com o modelo de embeddings configurado. Continuar?', 'Configure um modelo de embeddings para indexar.', '{n} documento(s) na fila para indexar.', 'Já está tudo indexado.'],
+  it: ['Indicizza documenti', 'Verranno indicizzati {n} documenti con il modello di embedding configurato. Continuare?', 'Configura un modello di embedding per indicizzare.', '{n} documento/i in coda per l’indicizzazione.', 'È già tutto indicizzato.'],
+  tr: ['Belgeleri dizinle', '{n} belge yapılandırılmış embedding modeliyle dizinlenecek. Devam edilsin mi?', 'Dizinlemek için bir embedding modeli ayarla.', '{n} belge dizinleme için sıraya alındı.', 'Her şey zaten dizinlenmiş.'],
+  'zh-CN': ['为文档建立索引', '将使用已配置的嵌入模型为 {n} 个文档建立索引。继续吗？', '请先配置嵌入模型再建立索引。', '已将 {n} 个文档加入索引队列。', '已全部建立索引。'],
+  'zh-TW': ['為文件建立索引', '將使用已設定的嵌入模型為 {n} 份文件建立索引。繼續嗎？', '請先設定嵌入模型再建立索引。', '已將 {n} 份文件加入索引佇列。', '已全部建立索引。'],
+  ko: ['문서 색인', '설정된 임베딩 모델로 문서 {n}개를 색인합니다. 계속할까요?', '색인하려면 임베딩 모델을 설정하세요.', '문서 {n}개를 색인 대기열에 추가했습니다.', '이미 모두 색인되었습니다.'],
+  ja: ['文書をインデックス化', '設定済みの埋め込みモデルで {n} 件の文書をインデックス化します。続行しますか？', 'インデックス化するには埋め込みモデルを設定してください。', '{n} 件の文書をインデックス化のキューに追加しました。', 'すべてインデックス化済みです。'],
+};
+for (const [language, values] of Object.entries(indexNowTranslations)) translations[language].push(...values);
 export const VAULT_FILE_DROP_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

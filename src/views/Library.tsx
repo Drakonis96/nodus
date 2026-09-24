@@ -1,5 +1,5 @@
 import type { DocumentPreparationState } from '@shared/researchCorpus';
-import { openResearchPreparation, openResearchPreparationQueue } from '../components/ResearchPreparationWelcome';
+import { openResearchPreparationQueue } from '../components/ResearchPreparationWelcome';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
@@ -1263,6 +1263,26 @@ export function Library({
   });
   const openVaultWorkAnalysis = (work: WorkView) => setIdeasWork({ nodus_id: work.nodus_id, title: work.title });
 
+  // Indexing is one click: documents that are not indexed yet are queued for text and
+  // embeddings at once. Only a request for more than 100 documents asks first.
+  const indexWorks = async (workIds?: string[]) => {
+    try {
+      let result = await window.nodus.indexResearchWorks({ workIds });
+      if (result.confirmationRequired) {
+        const accepted = await confirm({
+          title: t('Indexar documentos'),
+          message: tx('Se indexarán {n} documentos con el modelo de embeddings configurado. ¿Continuar?', { n: result.confirmationRequired }),
+          confirmLabel: t('Indexar'),
+        });
+        if (!accepted) return;
+        result = await window.nodus.indexResearchWorks({ workIds, confirmed: true });
+      }
+      if (!result.embeddingAvailable) toast(t('Configura un modelo de embeddings para indexar.'), { tone: 'error' });
+      else if (result.queued) toast(tx('{n} documento(s) en cola para indexar.', { n: result.queued }));
+      else if (result.alreadyIndexed) toast(t('Ya está todo indexado.'), { tone: 'info' });
+    } catch (error) { toast(error instanceof Error ? error.message : String(error), { tone: 'error' }); }
+  };
+
   // Files dropped here go to the Global Library and are used in this vault in one step,
   // so this vault's automatic preparation indexes them like any other addition.
   const importDroppedIntoVault = async (fileList: FileList) => {
@@ -1313,7 +1333,7 @@ export function Library({
         {scopeControls}
         <div className="library-header-actions">
           {vaultType === 'academic' && <>
-            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => openResearchPreparation()}>{t('Indexar biblioteca')}</button>
+            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => void indexWorks()}>{t('Indexar biblioteca')}</button>
             <button className="btn btn-ghost" onClick={openResearchPreparationQueue}>{t('Ver en Queue')}</button>
           </>}
           {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
@@ -1819,7 +1839,7 @@ export function Library({
           >
             <Icon name="compass" /> {vaultType === 'academic' ? t('Extraer ideas') : tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
           </button>
-          {vaultType === 'academic' && <button className="btn" onClick={() => openResearchPreparation(selectedVisibleIds)}><Icon name="layers" /> {t('Indexar selección')}</button>}
+          {vaultType === 'academic' && <button className="btn" data-testid="library-index-selection" onClick={() => void indexWorks(selectedVisibleIds)}><Icon name="layers" /> {t('Indexar selección')}</button>}
           {/* The repair counterpart of the verb above: it never re-runs a step that is
               already done, so it is offered only while some selected work has something
               left to finish. */}
@@ -2004,7 +2024,7 @@ export function Library({
                       // The colour is this document's index state; the label is what a click does.
                       const index = libraryIndexAction(preparationByWork.get(w.nodus_id));
                       return <RowIconButton title={t(index.label)} icon="layers" tone={index.tone} spinning={index.busy}
-                        testId={`vault-library-index-${w.nodus_id}`} onClick={() => openResearchPreparation([w.nodus_id])} />;
+                        testId={`vault-library-index-${w.nodus_id}`} onClick={() => void indexWorks([w.nodus_id])} />;
                     })()}
                     <RowIconButton
                       title={t('Abrir lector limpio')}
@@ -2026,9 +2046,7 @@ export function Library({
                       label={t('Más acciones')}
                       items={[
                         ...(vaultType === 'academic' ? [
-                          { label: t('Indexar documento'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
-                          { label: t('Completar embeddings pendientes'), icon: 'layers', onClick: () => openResearchPreparation([w.nodus_id]) },
-                          { label: t('Actualizar índice'), icon: 'refresh', onClick: () => openResearchPreparation([w.nodus_id]) },
+                          { label: t('Indexar documento'), icon: 'layers', onClick: () => void indexWorks([w.nodus_id]) },
                           { label: t('Ver en Queue'), icon: 'list', onClick: openResearchPreparationQueue },
                         ] : []),
                         {

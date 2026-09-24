@@ -126,6 +126,28 @@ try {
     await experience.controlAllResearchPreparation('retry');
     assert.equal(frozenEmbedding(runnable).provider, 'openrouter', 'a frozen model that still runs is never swapped behind the user');
   } finally { settingsRepo.getSettings = originalSettings; aiClient.effectiveEmbeddingConfig = originalEmbedding; }
+  // "Indexar" in the Library is one click: no dialog, the pending documents are queued
+  // at once; only more than 100 documents ask for confirmation first.
+  const campaignsBefore = repo.list().length;
+  try {
+    aiClient.effectiveEmbeddingConfig = () => ({ provider: 'openrouter', modelId: 'baai/bge-m3', endpoint: 'https://openrouter.ai/api/v1' });
+    settingsRepo.getSettings = () => ({ ...originalSettings(), providerKeys: {} });
+    seed('index-now');
+    const none = await experience.indexResearchWorks({ workIds: ['index-now'] });
+    assert.deepEqual([none.requested, none.queued, none.embeddingAvailable], [1, 0, false], 'nothing is queued without a usable embedding model');
+    settingsRepo.getSettings = () => ({ ...originalSettings(), providerKeys: { openrouter: 'synthetic-test-only' } });
+    const one = await experience.indexResearchWorks({ workIds: ['index-now'] });
+    assert.deepEqual([one.requested, one.queued, one.confirmationRequired], [1, 1, undefined], 'one click queues the document');
+    assert.equal(repo.list().length, campaignsBefore + 1);
+    const many = Array.from({ length: 101 }, (_, index) => `bulk-${index}`);
+    for (const id of many) seed(id);
+    const asked = await experience.indexResearchWorks({ workIds: many });
+    assert.deepEqual([asked.queued, asked.confirmationRequired], [0, 101], 'more than 100 documents ask first and queue nothing');
+    assert.equal(repo.list().length, campaignsBefore + 1);
+    const confirmed = await experience.indexResearchWorks({ workIds: many, confirmed: true });
+    assert.equal(confirmed.queued, 101);
+    assert.equal(repo.list().length, campaignsBefore + 2);
+  } finally { settingsRepo.getSettings = originalSettings; aiClient.effectiveEmbeddingConfig = originalEmbedding; }
   console.log('Frozen This-vault consent, missing configuration, independent future policy, shared job interests, per-document controls and revoked previews passed.');
 } finally {
   preparation.closeDocumentaryPreparation(); database.closeDb(); fs.rmSync(root, { recursive: true, force: true });

@@ -201,6 +201,20 @@ export interface ResearchPreparationInventory {
   documents: Array<ResearchCorpusDocument & { preparation: DocumentPreparationState }>;
 }
 
+/** Asking to index more documents than this at once asks for confirmation first. */
+export const RESEARCH_INDEX_CONFIRMATION_THRESHOLD = 100;
+export interface ResearchIndexRequestResult {
+  /** Works asked for that are documents of this vault. */
+  requested: number;
+  /** Documents queued now for text and embeddings. */
+  queued: number;
+  /** Documents whose text and embeddings were already ready. */
+  alreadyIndexed: number;
+  embeddingAvailable: boolean;
+  /** Set, with nothing queued, when this many documents need an explicit confirmation. */
+  confirmationRequired?: number;
+}
+
 export interface ResearchCorpusApi {
   getResearchPreparationPolicy(): Promise<ResearchPreparationPolicy>;
   setResearchPreparationPolicy(input: { welcomeVersion?: number; decision?: ResearchPreparationPolicy['decision']; futureAdditions?: boolean }): Promise<ResearchPreparationPolicy>;
@@ -219,6 +233,8 @@ export interface ResearchCorpusApi {
   readResearchDocument(input: { notebookId?: string | null; documentId: string; operation: ResearchDocumentRead }): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   getResearchPreparationInventory(): Promise<ResearchPreparationInventory>;
   prepareResearchDocuments(documentIds: string[]): Promise<void>;
+  /** Index works of the active vault now (all of them without workIds), no dialog. */
+  indexResearchWorks(input: { workIds?: string[]; confirmed?: boolean }): Promise<ResearchIndexRequestResult>;
   cancelResearchDocuments(documentIds: string[]): Promise<void>;
   setResearchPreparationEnabled(enabled: boolean): Promise<void>;
   setResearchPreparationPaused(paused: boolean): Promise<void>;
