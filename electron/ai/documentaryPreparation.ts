@@ -221,7 +221,9 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     const groups = attachmentRevisions(document);
     const revisions = groups.flatMap(group => group.find(row => row.lexical_ready && !row.embedding_ready) ?? group.find(row => row.lexical_ready) ?? []);
     const revision = revisions[0];
-    const request = store.db.prepare('SELECT state,error FROM documentary_requests WHERE document_id=? OR source_id=? ORDER BY updated_at DESC LIMIT 1').get(document.id, document.id) as { state: string; error: string | null } | undefined;
+    const latest = store.db.prepare('SELECT state,error,revision FROM documentary_requests WHERE document_id=? OR source_id=? ORDER BY updated_at DESC LIMIT 1').get(document.id, document.id) as { state: string; error: string | null; revision: string } | undefined;
+    // A request for bytes that have since been replaced says nothing about the current file.
+    const request = latest && latest.revision === current.revision ? latest : undefined;
     const passages = revisions.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
     const compatibleVectors = groups.flatMap(group => group.find(row => {
       const identity = JSON.parse(row.identity_json) as DocumentaryIndexIdentity;
@@ -331,10 +333,13 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
         if (!['nodus-documentary/1', 'nodus-documentary/2'].includes(configuration.processingVersion)) throw new Error('documentary_processing_version_unavailable');
         const document = researchCorpusInventory().documents.find(item => item.id === (request.source_id ?? request.document_id));
-        if (!document || document.revision !== request.revision) throw new Error('research_source_not_authorized');
+        if (!document) throw new Error('research_source_not_authorized');
+        // New bytes are not a revoked permission: the request is simply obsolete.
+        if (document.revision !== request.revision) throw new Error('research_source_revision_changed');
         validateSource = () => {
           const current = researchCorpusInventory().documents.find(item => item.id === document.id);
-          if (!current || current.revision !== document.revision || current.permissionRevision !== document.permissionRevision || (document.workId && current.workId !== document.workId)) throw new Error('research_source_not_authorized');
+          if (!current || current.permissionRevision !== document.permissionRevision || (document.workId && current.workId !== document.workId)) throw new Error('research_source_not_authorized');
+          if (current.revision !== document.revision) throw new Error('research_source_revision_changed');
         };
         checkLease();
         // OCR is deferred for documentary preparation, including already queued
@@ -449,12 +454,17 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         store.db.prepare("UPDATE documentary_requests SET stage='complete' WHERE document_id=?").run(request.document_id);
         }));
       } catch (error) {
-        if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && request.source_id) {
+        const superseded = error instanceof Error && error.message === 'research_source_revision_changed';
+        if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && !superseded && request.source_id) {
           new DocumentaryCampaigns(store.db).blockOwner(request.document_id, request.vault_id);
         }
         try {
           const code = error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed';
-          if (/^documentary_(ocr_deferred|ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
+          // A request for replaced bytes can never succeed; retrying it would only
+          // consume attempts. Close it; the new revision is prepared on its own request.
+          if (superseded) store.db.prepare("UPDATE documentary_requests SET state='cancelled',error=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE document_id=? AND lease_token=?")
+            .run(code, Date.now(), request.document_id, request.lease_token);
+          else if (/^documentary_(ocr_deferred|ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
           else requests.finish(request, code, store.preference('paused') || stopping || controller.signal.aborted);
         } catch { /* A newer request owns publication. */ }
       } finally { notifyDocumentaryPreparation(); clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; activePreparationRequest = null; } }
