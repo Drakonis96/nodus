@@ -49,4 +49,11 @@ const indexNowTranslations: Record<string, string[]> = {
   ja: ['文書をインデックス化', '設定済みの埋め込みモデルで {n} 件の文書をインデックス化します。続行しますか？', 'インデックス化するには埋め込みモデルを設定してください。', '{n} 件の文書をインデックス化のキューに追加しました。', 'すべてインデックス化済みです。'],
 };
 for (const [language, values] of Object.entries(indexNowTranslations)) translations[language].push(...values);
+keys.push('Indiferente', 'Preparación');
+const filterTranslations: Record<string, string[]> = {
+  en: ['Either', 'Preparation'], fr: ['Indifférent', 'Préparation'], de: ['Egal', 'Vorbereitung'], pt: ['Indiferente', 'Preparação'],
+  'pt-BR': ['Indiferente', 'Preparação'], it: ['Indifferente', 'Preparazione'], tr: ['Fark etmez', 'Hazırlık'],
+  'zh-CN': ['不限', '准备'], 'zh-TW': ['不限', '準備'], ko: ['상관없음', '준비'], ja: ['指定なし', '準備'],
+};
+for (const [language, values] of Object.entries(filterTranslations)) translations[language].push(...values);
 export const VAULT_FILE_DROP_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

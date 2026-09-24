@@ -26,6 +26,7 @@ import { WorkStatusModal } from './WorkStatusModal';
 import { DocumentProfileModal } from './DocumentProfileModal';
 import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
+import { TriStateSwitch, type TriState } from '../components/TriStateSwitch';
 import { libraryIndexAction } from '../libraryIndexAction';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { notifyDataChanged, useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
@@ -175,119 +176,6 @@ function dimensionOf(f: StatusFlag): StatusDimension {
 function labelFor(f: StatusFlag): string {
   const meta = STATUS_FLAGS.find((s) => s.dim === dimensionOf(f));
   return meta ? (isNegated(f) ? meta.negLabel : meta.label) : f;
-}
-
-function StatusFlagsPicker({
-  value,
-  setDimension,
-  onClear,
-}: {
-  value: StatusFlag[];
-  setDimension: (dim: StatusDimension, state: 'off' | 'pos' | 'neg') => void;
-  onClear: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissableLayer<HTMLDivElement>({
-    open,
-    onDismiss: () => setOpen(false),
-    group: 'library-filters',
-  });
-
-  const active = value.length > 0;
-
-  const currentFor = (dim: StatusDimension): 'off' | 'pos' | 'neg' => {
-    if (value.includes(dim)) return 'pos';
-    if (value.includes(`!${dim}` as StatusFlag)) return 'neg';
-    return 'off';
-  };
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        className={`library-filter-button tone-indigo btn border gap-1.5 ${active ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <Icon name="list" /> {t('Estado')}
-        {active && (
-          <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{value.length}</span>
-        )}
-        <Icon name="chevronDown" size={13} className="opacity-70" />
-      </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label={t('Filtrar por estado')}
-          className="library-filter-popover absolute left-0 z-30 mt-2 w-[27rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-2 shadow-2xl"
-        >
-          <div className="mb-1 flex items-center justify-between gap-3 px-1.5 py-1">
-            <div>
-              <div className="text-xs font-medium text-neutral-300">{t('Estado de análisis')}</div>
-              <div className="text-[11px] text-neutral-500">{t('Cada fila acepta sí, no o cualquiera.')}</div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost px-2 py-1 text-xs"
-              disabled={!active}
-              onClick={onClear}
-            >
-              {t('Limpiar')}
-            </button>
-          </div>
-          {STATUS_FLAGS.map((s) => {
-            const state = currentFor(s.dim);
-            const stateClass = state === 'pos' ? 'is-pos bg-indigo-600/15' : state === 'neg' ? 'is-neg bg-red-600/15' : 'hover:bg-neutral-900';
-            const borderClass = state === 'pos' ? 'is-pos border-indigo-400 bg-indigo-500' : state === 'neg' ? 'is-neg border-red-400 bg-red-500' : 'border-neutral-600';
-            const textClass = state === 'pos' ? 'text-indigo-200' : state === 'neg' ? 'text-red-200' : 'text-neutral-200';
-            return (
-              <div
-                key={s.dim}
-                className={`library-status-option mb-1.5 flex items-start justify-between gap-3 rounded-md border border-transparent px-2.5 py-2 transition-colors ${stateClass}`}
-              >
-                <div className="min-w-0">
-                  <span className="flex items-center gap-2">
-                    <span
-                      className={`library-status-indicator flex h-4 w-4 shrink-0 items-center justify-center rounded border text-white ${borderClass}`}
-                    >
-                      {state === 'pos' && <Icon name="check" size={12} />}
-                      {state === 'neg' && <Icon name="x" size={12} />}
-                    </span>
-                    <span className={`block text-sm font-medium ${textClass}`}>{t(s.title)}</span>
-                  </span>
-                  <span className="mt-0.5 block text-xs text-neutral-500">{state === 'neg' ? t(s.negDesc) : t(s.desc)}</span>
-                </div>
-                <div className="inline-flex shrink-0 rounded-md border border-neutral-700 bg-neutral-950/50 p-0.5">
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'pos' ? 'is-active is-pos bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'pos')}
-                  >
-                    {t('Sí')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'neg' ? 'is-active is-neg bg-red-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'neg')}
-                  >
-                    {t('No')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'off' ? 'is-active bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'off')}
-                  >
-                    {t('Cualquiera')}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 }
 
 /**
@@ -512,7 +400,8 @@ export function Library({
   const [documentStatuses, setDocumentStatuses] = useState<Map<string, DocumentUnderstandingState>>(new Map());
   const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
   const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
+  // A balloon: it never reopens by itself when the section is shown again.
+  const [filtersOpen, setFiltersOpenState] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpenState] = useState(() => snapshot?.advancedFiltersOpen ?? false);
   const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -537,6 +426,13 @@ export function Library({
     open: collectionFilterOpen,
     onDismiss: () => setCollectionFilterOpen(false),
     group: 'library-filters',
+  });
+  // The filters open as a balloon anchored to their button. A group of its own, so the
+  // tag and collection dropdowns inside it do not close it when they open.
+  const filterBalloonRef = useDismissableLayer<HTMLDivElement>({
+    open: filtersOpen,
+    onDismiss: () => { setFiltersOpenState(false); setTagFilterOpen(false); setCollectionFilterOpen(false); },
+    group: 'library-filter-balloon',
   });
   const collectionsMenuRef = useDismissableLayer<HTMLDivElement>({
     open: collectionsMenuOpen,
@@ -1050,7 +946,6 @@ export function Library({
       else if (state === 'neg') set.add(`!${dim}` as StatusFlag);
       return { ...cur, statusFlags: [...set] };
     });
-  const clearStatusFlags = () => updateFilter((c) => ({ ...c, statusFlags: [] }));
   const clearAllFilters = () => {
     updateFilter({});
     setSearchDraft('');
@@ -1070,11 +965,6 @@ export function Library({
       filtersOpen: nextOpen,
       advancedFiltersOpen: nextOpen ? advancedFiltersOpen : false,
     });
-  };
-  const toggleAdvancedFilterPanel = () => {
-    const nextOpen = !advancedFiltersOpen;
-    setAdvancedFiltersOpenState(nextOpen);
-    reportSnapshot.current?.({ ...snapshotOf.current(), advancedFiltersOpen: nextOpen });
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -1422,21 +1312,265 @@ export function Library({
               onChange={(e) => setSearchDraft(e.target.value)}
             />
           </div>
-          <button
-            data-testid="library-vault-filters-toggle"
-            type="button"
-            className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-            onClick={toggleFilterPanel}
-            aria-expanded={filtersOpen}
-            aria-controls="library-vault-filters-panel"
-          >
-            <Icon name="filter" /> {t('Filtros')}
-            {activeFilterCount > 0 && (
-              <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                {activeFilterCount}
-              </span>
+          <div className="relative" ref={filterBalloonRef}>
+            <button
+              data-testid="library-vault-filters-toggle"
+              type="button"
+              className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+              onClick={toggleFilterPanel}
+              aria-expanded={filtersOpen}
+              aria-controls="library-vault-filters-panel"
+            >
+              <Icon name="filter" /> {t('Filtros')}
+              {activeFilterCount > 0 && (
+                <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {filtersOpen && (
+              <div
+                id="library-vault-filters-panel"
+                data-testid="library-vault-filters-panel"
+                role="dialog"
+                aria-label={t('Filtros')}
+                className="library-filter-balloon absolute right-0 top-full z-40 mt-2 w-[30rem] max-w-[calc(100vw-3rem)] rounded-xl border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+              >
+                {academicMode !== 'manual' && <>
+                <div className="mb-2 text-xs font-medium text-neutral-300">{t('Estado de análisis')}</div>
+                <div className="space-y-1">
+                  {STATUS_FLAGS.map((flag) => {
+                    const state: TriState = selectedStatusFlags.includes(flag.dim) ? 'pos' : selectedStatusFlags.includes(`!${flag.dim}` as StatusFlag) ? 'neg' : 'off';
+                    return (
+                      <div key={flag.dim} data-testid={`library-status-filter-${flag.dim}`} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-neutral-900/60">
+                        <div className="min-w-0">
+                          <div className="text-sm text-neutral-200">{t(flag.title)}</div>
+                          <div className="text-[11px] text-neutral-500">{state === 'pos' ? t(flag.label) : state === 'neg' ? t(flag.negLabel) : t('Indiferente')}</div>
+                        </div>
+                        <TriStateSwitch
+                          value={state}
+                          label={t(flag.title)}
+                          posLabel={t(flag.label)}
+                          negLabel={t(flag.negLabel)}
+                          testId={`library-status-switch-${flag.dim}`}
+                          onChange={(next) => setStatusDimension(flag.dim, next)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mb-2 mt-3 border-t border-neutral-800 pt-3 text-xs font-medium text-neutral-300">{t('Preparación')}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className={`library-preset btn border px-2.5 py-1 text-xs ${
+                      selectedReadiness === null ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'
+                    }`}
+                    onClick={() => setReadiness(null)}
+                  >
+                    {t('Todo')}
+                  </button>
+                  {STATUS_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`library-preset btn border gap-1.5 px-2.5 py-1 text-xs ${
+                        selectedReadiness === preset
+                          ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100'
+                          : 'btn-ghost border-neutral-700'
+                      }`}
+                      onClick={() => setReadiness(selectedReadiness === preset ? null : preset)}
+                    >
+                      <Icon name={READINESS_ICON[preset]} size={12} className="opacity-70" />
+                      {t(READINESS_LABEL[preset])}
+                    </button>
+                  ))}
+                </div>
+                </>}
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
+                  <div className="relative" ref={tagFilterRef}>
+                    <button
+                      type="button"
+                      className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+                      onClick={() => setTagFilterOpen((open) => !open)}
+                      aria-expanded={tagFilterOpen}
+                      aria-haspopup="dialog"
+                    >
+                      <Icon name="tag" /> {t('Etiquetas Zotero')}
+                      {selectedZoteroTags.length > 0 && (
+                        <span className="library-filter-count zotero-tag-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                          {selectedZoteroTags.length}
+                        </span>
+                      )}
+                    </button>
+                    {tagFilterOpen && (
+                      <div
+                        role="dialog"
+                        aria-label={t('Filtrar por etiquetas de Zotero')}
+                        className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            className="input min-w-0 flex-1"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            placeholder={t('Buscar etiqueta…')}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-xs"
+                            disabled={selectedZoteroTags.length === 0}
+                            onClick={clearZoteroTags}
+                          >
+                            {t('Limpiar')}
+                          </button>
+                        </div>
+                        {selectedZoteroTags.length > 1 && (
+                          <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                            {t('Combinar etiquetas')}
+                            <select
+                              className="input py-1 text-xs"
+                              value={filter.zoteroTagMode ?? 'any'}
+                              onChange={(e) => updateFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
+                            >
+                              <option value="any">{t('Cualquiera')}</option>
+                              <option value="all">{t('Todas')}</option>
+                            </select>
+                          </label>
+                        )}
+                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                          {visibleZoteroTags.map((tag) => {
+                            const checked = selectedZoteroTags.some((selected) => selected.toLocaleLowerCase() === tag.label.toLocaleLowerCase());
+                            return (
+                              <button
+                                key={tag.label}
+                                type="button"
+                                className={`zotero-tag-option flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                                  checked ? 'is-selected bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
+                                }`}
+                                onClick={() => toggleZoteroTag(tag.label)}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                    checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
+                                  }`}
+                                >
+                                  {checked && <Icon name="check" size={12} />}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">{tag.label}</span>
+                                <span className="text-xs tabular-nums text-neutral-500">{tag.workCount}</span>
+                              </button>
+                            );
+                          })}
+                          {availableZoteroTags.length === 0 && (
+                            <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                              {t('Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.')}
+                            </p>
+                          )}
+                          {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
+                            <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay etiquetas que coincidan.')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={collectionFilterRef}>
+                    <button
+                      type="button"
+                      className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
+                      onClick={() => setCollectionFilterOpen((open) => !open)}
+                      aria-expanded={collectionFilterOpen}
+                      aria-haspopup="dialog"
+                      disabled={availableCollections.length === 0}
+                      title={availableCollections.length === 0 ? t('Sincroniza para poder filtrar por colección.') : t('Filtrar por colección')}
+                    >
+                      <Icon name="folder" /> {t('Colección')}
+                      {selectedCollections.length > 0 && (
+                        <span className="library-filter-count tone-cyan rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                          {selectedCollections.length}
+                        </span>
+                      )}
+                    </button>
+                    {collectionFilterOpen && (
+                      <div
+                        role="dialog"
+                        aria-label={t('Filtrar por colección')}
+                        className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            className="input min-w-0 flex-1"
+                            value={collectionSearch}
+                            onChange={(e) => setCollectionSearch(e.target.value)}
+                            placeholder={t('Buscar colección…')}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-xs"
+                            disabled={selectedCollections.length === 0}
+                            onClick={clearCollections}
+                          >
+                            {t('Limpiar')}
+                          </button>
+                        </div>
+                        {selectedCollections.length > 1 && (
+                          <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                            {t('Combinar colecciones')}
+                            <select
+                              className="input py-1 text-xs"
+                              value={filter.collectionMode ?? 'any'}
+                              onChange={(e) => updateFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
+                            >
+                              <option value="any">{t('Cualquiera')}</option>
+                              <option value="all">{t('Todas')}</option>
+                            </select>
+                          </label>
+                        )}
+                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                          {visibleCollections.map((collection) => {
+                            const checked = selectedCollections.includes(collection.key);
+                            return (
+                              <button
+                                key={collection.key}
+                                type="button"
+                                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                                  checked ? 'bg-cyan-950/50 text-cyan-100' : 'text-neutral-300'
+                                }`}
+                                style={{ paddingLeft: `${0.5 + collection.depth * 0.85}rem` }}
+                                onClick={() => toggleCollection(collection.key)}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                    checked ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-neutral-600'
+                                  }`}
+                                >
+                                  {checked && <Icon name="check" size={12} />}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+                                <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
+                              </button>
+                            );
+                          })}
+                          {availableCollections.length === 0 && (
+                            <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                              {t('Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.')}
+                            </p>
+                          )}
+                          {availableCollections.length > 0 && visibleCollections.length === 0 && (
+                            <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay colecciones que coincidan.')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1" />
+                  {hasActiveFilters && <button type="button" className="btn btn-ghost px-2 py-1 text-xs" onClick={clearAllFilters}>{t('Limpiar filtros')}</button>}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
           {hasActiveFilters && (
             <button
               type="button"
@@ -1449,249 +1583,6 @@ export function Library({
             </button>
           )}
         </div>
-        {filtersOpen && (
-          <div id="library-vault-filters-panel" data-testid="library-vault-filters-panel" className="library-vault-filter-panel mt-3 rounded-xl border border-neutral-800 bg-neutral-950/35 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-          <div className="relative" ref={tagFilterRef}>
-            <button
-              type="button"
-              className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-              onClick={() => setTagFilterOpen((open) => !open)}
-              aria-expanded={tagFilterOpen}
-              aria-haspopup="dialog"
-            >
-              <Icon name="tag" /> {t('Etiquetas Zotero')}
-              {selectedZoteroTags.length > 0 && (
-                <span className="library-filter-count zotero-tag-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                  {selectedZoteroTags.length}
-                </span>
-              )}
-            </button>
-            {tagFilterOpen && (
-              <div
-                role="dialog"
-                aria-label={t('Filtrar por etiquetas de Zotero')}
-                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    className="input min-w-0 flex-1"
-                    value={tagSearch}
-                    onChange={(e) => setTagSearch(e.target.value)}
-                    placeholder={t('Buscar etiqueta…')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    disabled={selectedZoteroTags.length === 0}
-                    onClick={clearZoteroTags}
-                  >
-                    {t('Limpiar')}
-                  </button>
-                </div>
-                {selectedZoteroTags.length > 1 && (
-                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    {t('Combinar etiquetas')}
-                    <select
-                      className="input py-1 text-xs"
-                      value={filter.zoteroTagMode ?? 'any'}
-                      onChange={(e) => updateFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
-                    >
-                      <option value="any">{t('Cualquiera')}</option>
-                      <option value="all">{t('Todas')}</option>
-                    </select>
-                  </label>
-                )}
-                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {visibleZoteroTags.map((tag) => {
-                    const checked = selectedZoteroTags.some((selected) => selected.toLocaleLowerCase() === tag.label.toLocaleLowerCase());
-                    return (
-                      <button
-                        key={tag.label}
-                        type="button"
-                        className={`zotero-tag-option flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
-                          checked ? 'is-selected bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
-                        }`}
-                        onClick={() => toggleZoteroTag(tag.label)}
-                      >
-                        <span
-                          className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
-                          }`}
-                        >
-                          {checked && <Icon name="check" size={12} />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{tag.label}</span>
-                        <span className="text-xs tabular-nums text-neutral-500">{tag.workCount}</span>
-                      </button>
-                    );
-                  })}
-                  {availableZoteroTags.length === 0 && (
-                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
-                      {t('Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.')}
-                    </p>
-                  )}
-                  {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
-                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay etiquetas que coincidan.')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={collectionFilterRef}>
-            <button
-              type="button"
-              className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
-              onClick={() => setCollectionFilterOpen((open) => !open)}
-              aria-expanded={collectionFilterOpen}
-              aria-haspopup="dialog"
-              disabled={availableCollections.length === 0}
-              title={availableCollections.length === 0 ? t('Sincroniza para poder filtrar por colección.') : t('Filtrar por colección')}
-            >
-              <Icon name="folder" /> {t('Colección')}
-              {selectedCollections.length > 0 && (
-                <span className="library-filter-count tone-cyan rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                  {selectedCollections.length}
-                </span>
-              )}
-            </button>
-            {collectionFilterOpen && (
-              <div
-                role="dialog"
-                aria-label={t('Filtrar por colección')}
-                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    className="input min-w-0 flex-1"
-                    value={collectionSearch}
-                    onChange={(e) => setCollectionSearch(e.target.value)}
-                    placeholder={t('Buscar colección…')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    disabled={selectedCollections.length === 0}
-                    onClick={clearCollections}
-                  >
-                    {t('Limpiar')}
-                  </button>
-                </div>
-                {selectedCollections.length > 1 && (
-                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    {t('Combinar colecciones')}
-                    <select
-                      className="input py-1 text-xs"
-                      value={filter.collectionMode ?? 'any'}
-                      onChange={(e) => updateFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
-                    >
-                      <option value="any">{t('Cualquiera')}</option>
-                      <option value="all">{t('Todas')}</option>
-                    </select>
-                  </label>
-                )}
-                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {visibleCollections.map((collection) => {
-                    const checked = selectedCollections.includes(collection.key);
-                    return (
-                      <button
-                        key={collection.key}
-                        type="button"
-                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
-                          checked ? 'bg-cyan-950/50 text-cyan-100' : 'text-neutral-300'
-                        }`}
-                        style={{ paddingLeft: `${0.5 + collection.depth * 0.85}rem` }}
-                        onClick={() => toggleCollection(collection.key)}
-                      >
-                        <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                            checked ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-neutral-600'
-                          }`}
-                        >
-                          {checked && <Icon name="check" size={12} />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{collection.name}</span>
-                        <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
-                      </button>
-                    );
-                  })}
-                  {availableCollections.length === 0 && (
-                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
-                      {t('Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.')}
-                    </p>
-                  )}
-                  {availableCollections.length > 0 && visibleCollections.length === 0 && (
-                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay colecciones que coincidan.')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex-1" />
-            </div>
-        {/* One-click status filters. These replaced a row of counters that showed
-            the same information but could not be clicked, sitting next to a
-            separate control that filtered by it. */}
-        {academicMode !== 'manual' && <>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`library-preset btn border px-2.5 py-1 text-xs ${
-              selectedReadiness === null ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'
-            }`}
-            onClick={() => setReadiness(null)}
-          >
-            {t('Todo')}
-          </button>
-          {STATUS_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className={`library-preset btn border gap-1.5 px-2.5 py-1 text-xs ${
-                selectedReadiness === preset
-                  ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100'
-                  : 'btn-ghost border-neutral-700'
-              }`}
-              onClick={() => setReadiness(selectedReadiness === preset ? null : preset)}
-            >
-              <Icon name={READINESS_ICON[preset]} size={12} className="opacity-70" />
-              {t(READINESS_LABEL[preset])}
-            </button>
-          ))}
-          <div className="flex-1" />
-          <button
-            type="button"
-            className={`btn border px-2.5 py-1 text-xs ${
-              advancedFiltersOpen || selectedStatusFlags.length > 0
-                ? 'is-active border-neutral-600 bg-neutral-800 text-neutral-100'
-                : 'btn-ghost border-neutral-700'
-            }`}
-            onClick={toggleAdvancedFilterPanel}
-            aria-expanded={advancedFiltersOpen}
-          >
-            {t('Filtros avanzados')}
-            {selectedStatusFlags.length > 0 && (
-              <span className="ml-1.5 tabular-nums opacity-80">{selectedStatusFlags.length}</span>
-            )}
-          </button>
-        </div>
-        {advancedFiltersOpen && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
-            <StatusFlagsPicker
-              value={selectedStatusFlags}
-              setDimension={setStatusDimension}
-              onClear={clearStatusFlags}
-            />
-            <span className="text-xs text-neutral-500">
-              {t('Combina condiciones sueltas de la tubería de análisis. Los presets de arriba cubren los casos habituales.')}
-            </span>
-          </div>
-        )}
-        </>}
-          </div>
-        )}
         {selectedZoteroTags.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
             <span>{t('Etiquetas:')}</span>
