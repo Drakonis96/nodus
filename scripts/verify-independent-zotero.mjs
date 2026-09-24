@@ -21,7 +21,13 @@ if (baselineWorkspace) {
 // Verify a deny-all boundary before fixture/credential preparation.
 verifyResearchSandbox(root);
 let providerProxy;
-if (process.argv.includes('--live')) {
+// --pin-window: a simulated model behind the real proxy, steered by the scenario.
+const simulatedControl = { behaviour: null };
+if (process.argv.includes('--pin-window')) {
+  const { simulatedUpstream } = await import('./lib/research-app-harness.mjs');
+  const { startResearchProviderProxy } = await import('./research-provider-proxy.mjs');
+  providerProxy = await startResearchProviderProxy(root, { dispatch: simulatedUpstream((...args) => simulatedControl.behaviour?.(...args) ?? null).dispatch });
+} else if (process.argv.includes('--live')) {
   const campaignRoot = process.argv.find(argument => argument.startsWith('--campaign-root='))?.slice('--campaign-root='.length);
   if (!campaignRoot) throw new Error('Live runs require the same explicit --campaign-root for the entire $5 campaign');
   const { startResearchProviderProxy } = await import('./research-provider-proxy.mjs');
@@ -154,7 +160,7 @@ try {
   } finally { await client.close(); mcpLog.end(); }
   if (process.argv.includes('--nodus') || providerProxy) {
     const { verifyZoteroNodusProduct } = await import('./verify-zotero-nodus-product.mjs');
-    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, externalMcpPort, baselineWorkspace, chatOnly: process.argv.includes('--chat-only'), adversarial: process.argv.includes('--adversarial') });
+    report.nodus = await verifyZoteroNodusProduct(root, report.endpoint, corpus, { providerProxy: providerProxy?.url, simulatedControl: process.argv.includes('--pin-window') ? simulatedControl : null, externalMcpPort, baselineWorkspace, chatOnly: process.argv.includes('--chat-only'), adversarial: process.argv.includes('--adversarial') });
   }
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {

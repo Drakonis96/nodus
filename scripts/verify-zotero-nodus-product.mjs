@@ -7,7 +7,7 @@ import { _electron } from 'playwright-core';
 import { researchTestEnvironment } from './research-isolation.mjs';
 
 /** Called only after the parent harness has verified the inherited OS boundary. */
-export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy, externalMcpPort, baselineWorkspace, chatOnly = false, adversarial = false } = {}) {
+export async function verifyZoteroNodusProduct(root, endpoint, corpus, { providerProxy, simulatedControl = null, externalMcpPort, baselineWorkspace, chatOnly = false, adversarial = false } = {}) {
   const require = createRequire(import.meta.url);
   const quote = value => `'${value.replaceAll("'", "'\\''")}'`;
   const wrapper = path.join(root, 'electron-isolated');
@@ -141,19 +141,24 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
       replacement = await (await import('./verify-research-zotero-replacement.mjs')).verifyZoteroAttachmentReplacement(page, root, corpus, imported.inventory.documents);
       await page.evaluate(() => window.nodus.disconnectResearchZotero());
     }
+    let pinWindow;
+    if (simulatedControl) {
+      await page.evaluate(() => window.nodus.disconnectResearchZotero());
+      pinWindow = await (await import('./verify-research-zotero-pin-window.mjs')).verifyZoteroPinWindow(page, root, corpus, imported.inventory.documents, simulatedControl);
+    }
     let live;
-    if (providerProxy) {
+    if (providerProxy && !simulatedControl) {
       const { runResearchLiveCampaign } = await import('./research-live-campaign.mjs');
       live = await runResearchLiveCampaign(page, app, root, imported.inventory.documents, { chatOnly, adversarial });
     }
-    const attachmentReads = providerProxy ? undefined : await (await import('./verify-research-attachment-reads.mjs')).verifyResearchAttachmentReads(page, app, root, source.id);
+    const attachmentReads = providerProxy && !simulatedControl ? undefined : await (await import('./verify-research-attachment-reads.mjs')).verifyResearchAttachmentReads(page, app, root, source.id);
     ownedWorkers.push(...await app.evaluate(() => globalThis.researchOwnedWorkers));
     for (const name of ['Nodus document extraction', 'Nodus documentary chunking', 'Nodus documentary retrieval']) {
       assert.ok(ownedWorkers.some(worker => worker.service === name && worker.pid !== app.process().pid), `${name} must run outside the main OS process`);
     }
     return { passed: true, ownedWorkers, status, importedSources: imported.inventory.documents.length, lexicalPhysicalPage: 1,
-      attachmentReads, ...(replacement ? { replacement } : {}), automaticOriginalWithoutConnect: true, automaticReadCreatedNoCampaign: true,
-      ...(providerProxy ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
+      attachmentReads, ...(replacement ? { replacement } : {}), ...(pinWindow ? { pinWindow } : {}), automaticOriginalWithoutConnect: true, automaticReadCreatedNoCampaign: true,
+      ...(providerProxy && !simulatedControl ? { live } : { modelCalls: 0 }), unauthorizedSourceRejected: true, manualSelectionRevokedConnection: true,
       external: { transport: externalStatus.transport, scopeMismatchRejected: true, processPreserved: true } };
   } finally {
     await app.close();
