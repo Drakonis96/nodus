@@ -1,0 +1,944 @@
+[
+  {
+    "label": "premise auditor, first live run",
+    "root": "/private/tmp/nodus-research-Ia0opa",
+    "build": "b2d8174c",
+    "outcome": "completed",
+    "startedAt": "2026-09-23T21:09:57.374Z",
+    "completedAt": "2026-09-23T21:25:11.004Z",
+    "usage": {
+      "calls": 194,
+      "accountedUsd": 0.465619,
+      "unresolvedReservations": 0
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6474
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 8933
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6778
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 9809
+      }
+    ],
+    "deepResearch": [
+      {
+        "route": "v1-general",
+        "latencyMs": 191265,
+        "factualAudit": {
+          "checked": 63,
+          "supported": 12,
+          "removed": 51,
+          "unverified": 0,
+          "consistency": {
+            "checked": true,
+            "conflicts": 2,
+            "removed": 3
+          }
+        },
+        "ledgerOutcomes": {
+          "supported": 12,
+          "removed/premise_not_entailed": 46,
+          "removed/internal_contradiction": 3,
+          "removed/nonfactual_with_content": 2
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "Los dos valores disponibles no convergen.",
+          "La segunda fuente no se limita a ofrecer una cifra distinta, sino que enuncia que ese registro contradice explícitamente un resultado uniforme de 23 unidades.",
+          "Cada observación pertenece solo al campo nombrado, y los informes advierten que no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+          "La primera es que el propio informe reporta controles faltantes, y la segunda es que no existe medición del campo este.",
+          "Cada observación pertenece únicamente al campo nombrado, y el informe no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+          "Cada observación pertenece solo al campo nombrado y los informes advierten que no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas."
+        ]
+      },
+      {
+        "route": "v2-general",
+        "latencyMs": 257531,
+        "factualAudit": {
+          "checked": 57,
+          "supported": 8,
+          "removed": 49,
+          "unverified": 0,
+          "consistency": {
+            "checked": true,
+            "conflicts": 7,
+            "removed": 8
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 39,
+          "supported": 8,
+          "removed/internal_contradiction": 8,
+          "removed/unqualified_inference": 1,
+          "removed/nonfactual_with_content": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente consigna que el campo norte mide 23 unidades y fija el marcador NORTH23 como evidencia exacta de esa observación.",
+          "La segunda registra 41 unidades para el campo sur bajo el marcador SOUTH41."
+        ]
+      },
+      {
+        "route": "v1-comparative",
+        "latencyMs": 144114,
+        "factualAudit": {
+          "checked": 65,
+          "supported": 5,
+          "removed": 36,
+          "unverified": 24,
+          "consistency": {
+            "checked": true,
+            "conflicts": 2,
+            "removed": 5
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 26,
+          "supported": 5,
+          "unverified": 24,
+          "removed/internal_contradiction": 3,
+          "removed/restates_rejected_claim": 1,
+          "removed/unqualified_inference": 1,
+          "removed/inference_without_supported_premises": 1,
+          "removed/unsupported_parts": 4
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente registra que el campo norte fue medido en 23 unidades y que NORTH23 es el marcador exacto de esa evidencia.",
+          "El informe de comparación registra controles ausentes.",
+          "La fuente del sur registra además que SOUTH41 contradice un resultado uniforme de 23 unidades."
+        ]
+      },
+      {
+        "route": "v2-comparative",
+        "latencyMs": 286653,
+        "factualAudit": {
+          "checked": 75,
+          "supported": 17,
+          "removed": 34,
+          "unverified": 24,
+          "consistency": {
+            "checked": true,
+            "conflicts": 0,
+            "removed": 0
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 33,
+          "supported": 17,
+          "unverified": 24,
+          "removed/nonfactual_with_content": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente consigna que el campo norte midió 23 unidades y fija el marcador exacto de esa observación (.",
+          "La segunda fuente hace lo propio con el campo sur, al que asigna 41 unidades y el marcador SOUTH41 (.",
+          "La fuente sintética 3 afirma que no existe medición del campo este y que el informe compara controles faltantes (.",
+          "Las tres fuentes comparten además una misma naturaleza declarada.",
+          "Cada una se presenta como un informe sintético que documenta un fixture de investigación aislado, señala que las mediciones se registraron tras una inspección controlada y advierte que los registros son inventados para validación de software y no describen investigación real.",
+          "La fuente sintética 3 afirma que no existe medición del campo este y que el informe compara controles faltantes.",
+          "La fuente sintética 3 afirma que «No measurement of the east field exists» y añade que la comparación informa de controles faltantes.",
+          "Establece que las tres fuentes son registros sintéticos de un fixture aislado, que cada observación pertenece solo al campo nombrado y que la comparación solo alcanza a los valores declarados.",
+          "Las tres fuentes examinadas se presentan como informes sintéticos de un fixture de investigación aislado, con mediciones registradas tras una inspección controlada, y advierten que sus registros son inventados para validación de software y no describen investigación real.",
+          "La primera fuente consigna 23 unidades para el campo norte y la segunda 41 unidades para el campo sur; la tercera declara que no existe medición del campo este y caracteriza el ejercicio como una comparación de controles faltantes."
+        ]
+      }
+    ]
+  },
+  {
+    "label": "inference semantics and reconciliation pruning",
+    "root": "/private/tmp/nodus-research-NOguMC",
+    "build": "d289bcc0",
+    "outcome": "interrupted: main process froze at 100% CPU (exponential regex backtracking) during V2 general; Electron killed by the operator after 25 minutes without provider calls",
+    "endedAt": "2026-09-23T22:07:00Z",
+    "startedAt": "2026-09-23T21:30:21.190Z",
+    "completedAt": null,
+    "usage": {
+      "calls": 99,
+      "accountedUsd": 0.217944,
+      "unresolvedReservations": 0
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 5866
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 10043
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6523
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 7987
+      }
+    ],
+    "deepResearch": [
+      {
+        "route": "v1-general",
+        "latencyMs": 185524,
+        "factualAudit": {
+          "checked": 57,
+          "supported": 11,
+          "removed": 37,
+          "unverified": 9,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 2,
+            "pruned": 2,
+            "pairs": [
+              {
+                "a": "La fuente 1 restringe su observación al campo nombrado, la fuente 2 hace lo propio y la fuente 3 cierra el cuadro al afirmar que no existe medición del campo este.",
+                "b": "La fuente 3 afirma que no existe medición del campo este y que la comparación reporta controles faltantes.",
+                "reason": "La fuente 2 «hace lo propio» (restringe su observación al campo nombrado) frente a «no existe medición del campo este»"
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "unverified": 9,
+          "removed/premise_not_entailed": 26,
+          "supported": 11,
+          "removed/unqualified_inference": 6,
+          "removed/inference_without_supported_premises": 1,
+          "removed/internal_contradiction": 2,
+          "removed/restates_rejected_claim": 1,
+          "removed/nonfactual_with_content": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La fuente sintética 2 no se limita a consignar una cifra distinta, sino que enuncia explícitamente que la medición del campo sur contradice un resultado uniforme de 23 unidades («South field measured 41 units.",
+          "La contradicción es un dato documentado en el enunciado de la fuente 2.",
+          "La fuente que documenta el campo norte fija su medición en 23 unidades (Synthetic research source 1, p. 1), y la que documenta el campo sur la fija en 41 (Synthetic research source 2, p. 1).",
+          "Entre ambos valores existe una diferencia que la propia fuente del segundo registro formula como contradicción de un resultado uniforme de 23 unidades (Synthetic research source 2, p. 1).",
+          "A esa restricción se añade una cautela que cada uno de los tres informes repite.",
+          "Los tres declaran que no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas (Synthetic research source 1, p. 1; Synthetic research source 2, p. 1; Synthetic research source 3, p. 1).",
+          "La fuente 1 registra que el campo norte midió 23 unidades y la fuente 2 que el campo sur midió 41 unidades."
+        ]
+      }
+    ]
+  },
+  {
+    "label": "linear segmentation",
+    "root": "/private/tmp/nodus-research-WiLeVl",
+    "build": "3f9265c0",
+    "outcome": "aborted by the operator after the chat checks to save budget: newer fixes had been committed; one in-flight reservation retained",
+    "endedAt": "2026-09-23T22:11:00Z",
+    "startedAt": "2026-09-23T22:07:27.811Z",
+    "completedAt": null,
+    "usage": {
+      "calls": 25,
+      "accountedUsd": 0.04007,
+      "unresolvedReservations": 1
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 5478
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 9356
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 5386
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 7200
+      }
+    ],
+    "deepResearch": []
+  },
+  {
+    "label": "quote-aware segmentation and batch retry",
+    "root": "/private/tmp/nodus-research-AgEtMO",
+    "build": "28c2743a",
+    "outcome": "completed",
+    "startedAt": "2026-09-23T22:11:36.177Z",
+    "completedAt": "2026-09-23T22:27:54.709Z",
+    "usage": {
+      "calls": 181,
+      "accountedUsd": 0.447348,
+      "unresolvedReservations": 0
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 7040
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 9924
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 5472
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 8164
+      }
+    ],
+    "deepResearch": [
+      {
+        "route": "v1-general",
+        "latencyMs": 203159,
+        "factualAudit": {
+          "checked": 60,
+          "supported": 7,
+          "removed": 43,
+          "unverified": 10,
+          "consistency": {
+            "checked": true,
+            "conflicts": 6,
+            "removed": 8,
+            "pruned": 2,
+            "pairs": [
+              {
+                "a": "Cada medición pertenece exclusivamente al campo nombrado y se registró tras una inspección controlada",
+                "b": "Con dos mediciones y sin controles, cualquier generalización excedería lo que las fuentes sostienen.",
+                "reason": "\"se registró tras una inspección controlada\" frente a \"sin controles\""
+              },
+              {
+                "a": "Quedan dos campos con una medición explícita cada uno, bajo un protocolo declarado como controlado, y un tercer campo sin medición alguna.",
+                "b": "Con dos mediciones y sin controles, cualquier generalización excedería lo que las fuentes sostienen.",
+                "reason": "\"bajo un protocolo declarado como controlado\" frente a \"sin controles\""
+              },
+              {
+                "a": "La primera registra una medición del campo norte de 23 unidades, identificada como NORTH23, y la segunda una medición del campo sur de 41 unidades, identificada como SOUTH41; ambas adscriben la observación únicamente al campo nombrado y señalan que la medición se realizó tras una inspección controlada.",
+                "b": "Con dos mediciones y sin controles, cualquier generalización excedería lo que las fuentes sostienen.",
+                "reason": "\"tras una inspección controlada\" frente a \"sin controles\""
+              },
+              {
+                "a": "Quedan dos campos con una medición explícita cada uno, bajo un protocolo declarado como controlado, y un tercer campo sin medición alguna.",
+                "b": "El reporte de comparación consigna controles faltantes y afirma que no existe medición del campo este.",
+                "reason": "\"un tercer campo sin medición alguna\" frente a \"no existe medición del campo este\""
+              },
+              {
+                "a": "El corpus disponible se compone de tres fuentes sintéticas que documentan un dispositivo de investigación aislado.",
+                "b": "El corpus se limita a tres fuentes sintéticas que se presentan como registros inventados para validación de software y no describen investigación real, por lo que los valores no pueden tratarse como hallazgos empíricos.",
+                "reason": "\"documentan un dispositivo de investigación aislado\" frente a \"no describen investigación real\""
+              },
+              {
+                "a": "Se trata de una afirmación contenida en una fuente sintética que declara documentar un dispositivo de investigación aislado, sin evidencia sobre otros campos más allá de sus afirmaciones explícitas (Synthetic research source 2, p. 1).",
+                "b": "El corpus se limita a tres fuentes sintéticas que se presentan como registros inventados para validación de software y no describen investigación real, por lo que los valores no pueden tratarse como hallazgos empíricos.",
+                "reason": "\"declara documentar un dispositivo de investigación aislado\" frente a \"no describen investigación real\""
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/internal_contradiction": 8,
+          "unverified": 10,
+          "supported": 7,
+          "removed/unqualified_inference": 7,
+          "removed/premise_not_entailed": 26,
+          "removed/inference_without_supported_premises": 2
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente documenta una medición del campo norte de 23 unidades, cuyo marcador de evidencia es NORTH23, y precisa que la observación pertenece únicamente al campo nombrado.",
+          "La segunda fuente registra una medición del campo sur de 41 unidades, identificada como SOUTH41, y repite esa misma cláusula de pertenencia exclusiva al campo nombrado.",
+          "La cuestión de si la diferencia entre 23 y 41 unidades refleja una variación sistemática o una discrepancia puntual permanece abierta, y cerrarla exigiría mediciones adicionales y los controles que la tercera fuente declara ausentes.",
+          "Se trata de un dato documentado, no de una inferencia de este informe.",
+          "Cada fuente advierte que no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas, de modo que ningún registro puede leerse como representativo de un conjunto mayor."
+        ]
+      },
+      {
+        "route": "v2-general",
+        "latencyMs": 263769,
+        "factualAudit": {
+          "checked": 54,
+          "supported": 17,
+          "removed": 29,
+          "unverified": 8,
+          "consistency": {
+            "checked": true,
+            "conflicts": 0,
+            "removed": 0,
+            "pruned": 2,
+            "pairs": []
+          }
+        },
+        "ledgerOutcomes": {
+          "supported": 17,
+          "removed/unqualified_inference": 6,
+          "removed/premise_not_entailed": 21,
+          "unverified": 8,
+          "removed/inference_without_supported_premises": 1,
+          "removed/restates_rejected_claim": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "## Las tres fuentes sintéticas solo miden campos nombrados y advierten que no hay evidencia más allá de sus enunciados explícitos",
+          "Cada uno declara que documenta un fixture de investigación aislado y que sus registros son inventados para validación de software, sin describir investigación real.",
+          "Sobre esa base, cada documento restringe su contenido a un único campo nombrado.",
+          "El informe del campo norte afirma que la observación pertenece solo al campo nombrado y que el informe no contiene evidencia sobre otros campos más allá de sus enunciados explícitos.",
+          "El primer informe consigna que el campo norte fue medido en 23 unidades y fija NORTH23 como marcador exacto de esa evidencia.",
+          "El segundo consigna que el campo sur fue medido en 41 unidades y que SOUTH41 contradice un resultado uniforme de 23 unidades.",
+          "Cada observación pertenece únicamente al campo nombrado en su documento y los informes no contienen evidencia sobre otros campos más allá de sus enunciados explícitos.",
+          "La fuente que documenta la comparación afirma de forma literal que no existe medición del campo este]).",
+          "El corpus examinado está formado por tres documentos que se presentan a sí mismos como fixtures de investigación aislados, con registros inventados para validación de software y sin correspondencia con investigación real, y cada uno restringe su contenido a un único campo nombrado.",
+          "Sobre esa base, el informe del campo norte consigna una medición de 23 unidades, fijada con el marcador NORTH23, mientras que el informe del campo sur consigna 41 unidades y declara que esa cifra contradice un resultado uniforme de 23.",
+          "La tercera fuente, que documenta la comparación, afirma de forma literal que no existe medición del campo este.",
+          "Cada observación queda adscrita únicamente al campo nombrado en su documento, y los informes declaran no contener evidencia sobre otros campos más allá de sus enunciados explícitos.",
+          "El corpus no aporta un protocolo común que garantice condiciones de registro equivalentes entre campos, por lo que la diferencia entre 23 y 41 no puede leerse como variación medida bajo condiciones equiparables.",
+          "La contradicción con la cifra de 23 se establece entre dos registros de campos distintos y no entre mediciones repetidas de un mismo campo, de modo que el corpus documenta una diferencia entre campos y no una discrepancia interna dentro de uno de ellos.",
+          "La ausencia de medición del campo este se sostiene por el enunciado explícito de la tercera fuente; las otras dos fuentes no aportan dato alguno sobre el este, pero su alcance declarado se limita al campo que cada una nombra, de modo que el silencio documental no debe leerse como confirmación independiente."
+        ]
+      },
+      {
+        "route": "v1-comparative",
+        "latencyMs": 198152,
+        "factualAudit": {
+          "checked": 68,
+          "supported": 11,
+          "removed": 51,
+          "unverified": 6,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 2,
+            "pruned": 2,
+            "pairs": [
+              {
+                "a": "Declara que la comparación reporta controles faltantes y que no existe medición del campo este.",
+                "b": "El informe que lo menciona no aporta medición alguna y sí una advertencia sobre controles faltantes («The comparison reports missing controls. No measurement of the east field exists.»).",
+                "reason": "La afirmación 3 dice «no existe medición del campo este» y la 8 dice «No measurement of the east field exists»; ambas coinciden, pero la 3 atribuye esa declaración al informe, mientras la 8 la presenta como advertencia del informe que lo menciona. No hay contradicción literal."
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/unsupported_parts": 1,
+          "unverified": 6,
+          "removed/premise_not_entailed": 37,
+          "supported": 11,
+          "removed/internal_contradiction": 2,
+          "removed/unqualified_inference": 7,
+          "removed/inference_without_supported_premises": 4
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "El primer informe registra una medición del campo norte de 23 unidades y la identifica con el marcador exacto NORTH23.",
+          "El segundo hace lo propio con el campo sur, al que atribuye 41 unidades bajo el marcador SOUTH41, y añade que ese valor contradice un resultado uniforme de 23 unidades.",
+          "La observación pertenece únicamente al campo nombrado y la medición se registró tras una inspección controlada.",
+          "Cada valor queda confinado a su campo y ningún informe autoriza a trasladar el dato de un campo a otro.",
+          "El informe del sur no se limita a consignar su propia medición, sino que enuncia de forma explícita que ese valor contradice un resultado uniforme de 23 unidades («South field measured 41 units. SOUTH41 contradicts a uniform 23-unit result.»).",
+          "La fuente 3 declara de forma explícita que no existe medición del campo este y que la comparación registra controles faltantes.",
+          "La medición del norte, 23 unidades con el marcador NORTH23, se adscribe exclusivamente al campo nombrado, y la del sur, 41 unidades con SOUTH41, hace lo propio y además contradice un resultado uniforme de 23 unidades.",
+          "El corpus examinado se compone de tres informes sintéticos que se presentan como fixtures de investigación aislados, con registros inventados para validación de software.",
+          "El primer informe registra una medición del campo norte de 23 unidades con el marcador NORTH23, y el segundo atribuye al campo sur 41 unidades bajo el marcador SOUTH41, señalando además que ese valor contradice un resultado uniforme de 23 unidades."
+        ]
+      },
+      {
+        "route": "v2-comparative",
+        "latencyMs": 280742,
+        "factualAudit": {
+          "checked": 58,
+          "supported": 12,
+          "removed": 33,
+          "unverified": 13,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 2,
+            "pruned": 1,
+            "pairs": [
+              {
+                "a": "La fuente que aborda el campo este añade que la comparación reporta controles faltantes y que no existe medición de ese campo.",
+                "b": "La tercera fuente sintética abre su registro con la constatación de que los informes de comparación carecen de controles y que no existe medición del campo este («No measurement of the east field exists»).",
+                "reason": "La declaración 4 dice que la fuente del campo este «añade que la comparación reporta controles faltantes y que no existe medición de ese campo», mientras que la 6 atribuye esa misma constatación a «la tercera fuente sintética», no a la fuente del campo este."
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "unverified": 13,
+          "removed/premise_not_entailed": 26,
+          "supported": 12,
+          "removed/unqualified_inference": 2,
+          "removed/inference_without_supported_premises": 1,
+          "removed/internal_contradiction": 2,
+          "removed/premise_without_literal_evidence": 1,
+          "removed/nonfactual_with_content": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera registra que el campo norte midió 23 unidades y que NORTH23 es el marcador exacto de esa evidencia.",
+          "La segunda atribuye al campo sur una medición de 41 unidades con el marcador SOUTH41.",
+          "La propia fuente del campo sur enmarca su valor como contradictorio respecto de un resultado uniforme de 23 unidades.",
+          "La divergencia no es una inferencia externa que este informe construya al enfrentar ambas cifras, sino un hallazgo enunciado en el propio dispositivo.",
+          "El corpus examinado reúne tres fuentes sintéticas que documentan un dispositivo de investigación aislado cuyos registros son inventados para validación de software.",
+          "La primera fuente registra que el campo norte midió 23 unidades, con el marcador NORTH23 como anclaje exacto de esa evidencia, y la segunda atribuye al campo sur una medición de 41 unidades, con el marcador SOUTH41.",
+          "Las tres fuentes se presentan como informes sintéticos de un dispositivo aislado cuyos registros son inventados para validación de software, por lo que lo establecido se refiere al contenido enunciativo del dispositivo y no a campos reales."
+        ]
+      }
+    ]
+  },
+  {
+    "label": "orphaned-reference rule (later withdrawn)",
+    "root": "/private/tmp/nodus-research-ZRFQnB",
+    "build": "73c21c3a",
+    "outcome": "completed",
+    "startedAt": "2026-09-24T04:28:23.880Z",
+    "completedAt": "2026-09-24T04:48:19.077Z",
+    "usage": {
+      "calls": 189,
+      "accountedUsd": 0.513701,
+      "unresolvedReservations": 1
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6199
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 9298
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6563
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 7019
+      }
+    ],
+    "deepResearch": [
+      {
+        "route": "v1-general",
+        "latencyMs": 398230,
+        "factualAudit": {
+          "checked": 62,
+          "supported": 7,
+          "removed": 47,
+          "unverified": 8,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 3,
+            "pruned": 1,
+            "pairs": [
+              {
+                "a": "El corpus solo contiene dos mediciones, una para el campo norte y otra para el campo sur, y declara que no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas, por lo que el campo este carece de dato y no puede inferirse su ausencia de medición a partir del silencio documental.",
+                "b": "Documentar controles que permitan tratar las mediciones de los campos norte y sur como resultados equiparables.",
+                "reason": "Una afirma que no pueden tratarse como equiparables y la otra pide documentar controles para tratarlas como equiparables."
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/unqualified_inference": 9,
+          "removed/orphaned_reference": 12,
+          "supported": 7,
+          "removed/premise_not_entailed": 19,
+          "unverified": 8,
+          "removed/inference_without_supported_premises": 3,
+          "removed/restates_rejected_claim": 2,
+          "removed/internal_contradiction": 2
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "El campo norte registra 23 unidades, y esa cifra aparece acompañada de una referencia explícita, NORTH23, que el propio registro identifica como su marcador exacto de evidencia.",
+          "El campo sur registra 41 unidades, con SOUTH41 como referencia exacta de esa medición.",
+          "El corpus declara que no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+          "La misma cláusula aparece en el registro del campo sur.",
+          "El corpus reúne dos registros de medición.",
+          "El corpus declara además que no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas, de modo que no hay dato alguno sobre el campo este.",
+          "El registro que documenta el contraste advierte de controles ausentes, de modo que las dos cifras no pueden tratarse como resultados equiparables ni como medición controlada de una misma magnitud."
+        ]
+      },
+      {
+        "route": "v2-general",
+        "latencyMs": 308754,
+        "factualAudit": {
+          "checked": 56,
+          "supported": 5,
+          "removed": 48,
+          "unverified": 3,
+          "consistency": {
+            "checked": true,
+            "conflicts": 0,
+            "removed": 0,
+            "pruned": 1,
+            "pairs": []
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 25,
+          "unverified": 3,
+          "supported": 5,
+          "removed/unqualified_inference": 9,
+          "removed/inference_without_supported_premises": 6,
+          "removed/unsupported_parts": 1,
+          "removed/orphaned_reference": 6,
+          "removed/restates_rejected_claim": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente consigna que el campo norte midió 23 unidades y fija el marcador NORTH23 como evidencia exacta de ese registro.",
+          "Declara que la comparación reporta controles faltantes y que no existe medición del campo este.",
+          "Conviene subrayar que las tres fuentes se presentan como informes sintéticos que documentan un dispositivo de investigación aislado y que, según su propio texto, no describen investigación real, sino que fueron inventadas para validación de software.",
+          "El corpus examinado se compone de tres fuentes que se presentan como informes sintéticos de un dispositivo de investigación aislado y que, según su propio texto, no describen investigación real, sino que fueron inventadas para validación de software.",
+          "La primera fuente consigna que el campo norte midió 23 unidades y fija el marcador NORTH23 como evidencia exacta de ese registro."
+        ]
+      },
+      {
+        "route": "v1-comparative",
+        "latencyMs": 164870,
+        "factualAudit": {
+          "checked": 41,
+          "supported": 1,
+          "removed": 40,
+          "unverified": 0
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 24,
+          "supported": 1,
+          "removed/orphaned_reference": 11,
+          "removed/unqualified_inference": 5
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": []
+      },
+      {
+        "route": "v2-comparative",
+        "latencyMs": 292450,
+        "factualAudit": {
+          "checked": 65,
+          "supported": 0,
+          "removed": 64,
+          "unverified": 1,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 3,
+            "pruned": 0,
+            "pairs": [
+              {
+                "a": "Lo que existe son dos registros aislados, cada uno con su propio marcador, y una declaración explícita de que el alcance de cada fuente se agota en lo que enuncia.",
+                "b": "Las tres fuentes declaran que sus registros son artefactos sintéticos creados para validación de software y no describen investigación real, por lo que el corpus no ofrece base documental para atribuir la diferencia de cobertura a métodos, condiciones o escalas compartidas.",
+                "reason": "Una afirma que existen dos registros; la otra habla de tres fuentes, lo que contradice el número de registros."
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 37,
+          "removed/orphaned_reference": 10,
+          "removed/unqualified_inference": 10,
+          "removed/internal_contradiction": 2,
+          "removed/inference_without_supported_premises": 2,
+          "removed/premise_without_literal_evidence": 1,
+          "removed/restates_rejected_claim": 2,
+          "unverified": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": []
+      }
+    ]
+  },
+  {
+    "label": "final auditor",
+    "root": "/private/tmp/nodus-research-g3vRMS",
+    "build": "2a407f0e",
+    "outcome": "completed",
+    "startedAt": "2026-09-24T04:54:06.968Z",
+    "completedAt": "2026-09-24T05:14:03.077Z",
+    "usage": {
+      "calls": 203,
+      "accountedUsd": 0.569868,
+      "unresolvedReservations": 0
+    },
+    "chat": [
+      {
+        "name": "exact",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 9624
+      },
+      {
+        "name": "comparison",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 8748
+      },
+      {
+        "name": "multilingual",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 6690
+      },
+      {
+        "name": "absence",
+        "expectedAnswer": true,
+        "citationsExist": true,
+        "knownEvidenceRetrieved": true,
+        "latencyMs": 8982
+      }
+    ],
+    "deepResearch": [
+      {
+        "route": "v1-general",
+        "latencyMs": 314998,
+        "factualAudit": {
+          "checked": 60,
+          "supported": 16,
+          "removed": 32,
+          "unverified": 12,
+          "consistency": {
+            "checked": true,
+            "conflicts": 0,
+            "removed": 0,
+            "pruned": 0,
+            "pairs": []
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 27,
+          "supported": 16,
+          "unverified": 12,
+          "removed/inference_without_supported_premises": 1,
+          "removed/unqualified_inference": 2,
+          "removed/nonfactual_with_content": 2
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La fuente que documenta el campo norte consigna que este «measured 23 units» y fija el marcador exacto «NORTH23» como evidencia.",
+          "Cada una declara que documenta «an isolated research fixture», que la observación «belongs to the named field only» y que la medición «was recorded after a controlled inspection»;.",
+          "Cada informe «contains no evidence about other fields beyond its explicit statements»;.",
+          "El resultado es que el corpus sostiene dos cifras aisladas, 23 y 41 unidades, y una laguna explícitamente reconocida, sin que exista base para presentarlas como un resultado territorial conjunto.",
+          "La fuente meridional no se limita a consignar su propia medición, sino que la formula como una refutación explícita de un resultado uniforme de 23 unidades.",
+          "Es decir, la contradicción no es una inferencia que este informe construya al yuxtaponer dos cifras, sino un enunciado que la propia fuente sureña afirma.",
+          "Las fuentes declaran que no contienen evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+          "El corpus examinado se compone de tres fuentes sintéticas que documentan registros separados.",
+          "La fuente del campo norte consigna que este midió 23 unidades y fija el marcador NORTH23 como evidencia, mientras que la fuente del campo sur registra 41 unidades asociadas al marcador SOUTH41 y formula esa cifra como refutación explícita de un resultado uniforme de 23 unidades.",
+          "Cada fuente declara documentar un dispositivo de investigación aislado, que la observación pertenece solo al campo nombrado y que la medición se registró tras una inspección controlada, además de afirmar que no contiene evidencia sobre otros campos más allá de sus afirmaciones explícitas.",
+          "La tercera fuente señala que no existe medición del campo este.",
+          "De ello se sigue que el corpus sostiene dos cifras puntuales y una laguna reconocida, sin base para presentarlas como un resultado territorial conjunto ni para proyectar el contraste sobre otros ámbitos."
+        ]
+      },
+      {
+        "route": "v2-general",
+        "latencyMs": 318276,
+        "factualAudit": {
+          "checked": 56,
+          "supported": 14,
+          "removed": 39,
+          "unverified": 3,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 2,
+            "pruned": 2,
+            "pairs": [
+              {
+                "a": "Su propio enunciado afirma que la medición del campo sur contradice un resultado uniforme de 23 unidades.",
+                "b": "La segunda fuente afirma además que su medición contradice un resultado uniforme de 23 unidades.",
+                "reason": "Ambas atribuyen a la segunda fuente la misma afirmación sobre el campo sur, pero una la presenta como enunciado propio de esa fuente y la otra como una afirmación adicional; sin embargo, la contradicción real es que la fuente 1 mide el campo norte en 23 y la fuente 2 mide el campo sur en 41, por lo que la medición del campo sur no puede contradecir un resultado uniforme de 23 si son campos distint"
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 28,
+          "supported": 14,
+          "unverified": 3,
+          "removed/inference_without_supported_premises": 3,
+          "removed/internal_contradiction": 2,
+          "removed/unqualified_inference": 2,
+          "removed/premise_without_literal_evidence": 3,
+          "removed/nonfactual_with_content": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente sintética consigna que el campo norte mide 23 unidades y adjunta el marcador literal NORTH23 como evidencia exacta.",
+          "La segunda fuente sintética consigna que el campo sur mide 41 unidades y adjunta el marcador SOUTH41.",
+          "La tercera fuente no aporta una cifra propia, sino que declara que no existe medición del campo este.",
+          "Las tres fuentes comparten una misma cláusula de alcance.",
+          "Sin controles registrados, cualquier explicación causal sería una inferencia sin respaldo en las fuentes disponibles.",
+          "La comparabilidad encuentra además un límite en la pertenencia de cada observación.",
+          "El corpus examinado se compone de tres fuentes sintéticas que se autodescriben como registros inventados para validación de software y que no describen investigación real.",
+          "Las tres fuentes se autodescriben como registros inventados para validación de software y no describen investigación real, por lo que los valores de 23 y 41 unidades no proceden de observación empírica.",
+          "No hay controles registrados, por lo que cualquier explicación causal de la divergencia entre 23 y 41 unidades sería una inferencia sin respaldo en las fuentes disponibles."
+        ]
+      },
+      {
+        "route": "v1-comparative",
+        "latencyMs": 188325,
+        "factualAudit": {
+          "checked": 75,
+          "supported": 13,
+          "removed": 62,
+          "unverified": 0,
+          "consistency": {
+            "checked": true,
+            "conflicts": 1,
+            "removed": 3,
+            "pruned": 5,
+            "pairs": [
+              {
+                "a": "La contradicción no es una inferencia de este informe ni un hallazgo empírico sobre los campos, sino una afirmación que la propia fuente formula respecto de un resultado uniforme de 23 unidades.",
+                "b": "La primera registra que el campo norte mide 23 unidades bajo el marcador NORTH23, la segunda registra 41 unidades para el campo sur bajo el marcador SOUTH41 y la tercera constata que no existe medición del campo este y que la comparación reporta controles ausentes.",
+                "reason": "El enunciado 6 atribuye a la fuente una afirmación sobre un resultado uniforme de 23 unidades, mientras que el 13 describe las tres piezas como 23, 41 y ausencia de medición del este, sin tal afirmación de uniformidad."
+              }
+            ]
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 47,
+          "supported": 13,
+          "removed/restates_rejected_claim": 1,
+          "removed/unqualified_inference": 9,
+          "removed/internal_contradiction": 2,
+          "removed/inference_without_supported_premises": 3
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente sintética registra que el campo norte mide 23 unidades y adjunta el marcador NORTH23 como evidencia exacta.",
+          "La segunda registra para el campo sur una medición de 41 unidades bajo el marcador SOUTH41.",
+          "La tercera constata que no existe medición del campo este y que la comparación reporta controles ausentes.",
+          "La fuente que reporta la comparación afirma que no existe medición de ese campo y que los controles están ausentes.",
+          "El corpus fija dos valores numéricos y una relación explícita entre ellos.",
+          "La fuente sintética 3 señala que la comparación reporta controles ausentes.",
+          "No se trata de un dato negativo inferido por este informe a partir del silencio documental, sino de una afirmación que la propia fuente formula."
+        ]
+      },
+      {
+        "route": "v2-comparative",
+        "latencyMs": 333921,
+        "factualAudit": {
+          "checked": 60,
+          "supported": 13,
+          "removed": 42,
+          "unverified": 5,
+          "consistency": {
+            "checked": true,
+            "conflicts": 0,
+            "removed": 1,
+            "pruned": 1,
+            "pairs": []
+          }
+        },
+        "ledgerOutcomes": {
+          "removed/premise_not_entailed": 23,
+          "supported": 13,
+          "removed/premise_without_literal_evidence": 1,
+          "removed/unqualified_inference": 13,
+          "removed/inference_without_supported_premises": 4,
+          "unverified": 5,
+          "removed/restates_rejected_claim": 1
+        },
+        "truncated": true,
+        "grade": "weak",
+        "retainedClaims": [
+          "La primera fuente registra una medición del campo norte de 23 unidades, acompañada del marcador exacto NORTH23 como evidencia identificable.",
+          "La segunda fuente registra una medición del campo sur de 41 unidades, con el marcador SOUTH41, y presenta esa cifra como contradictoria con un resultado uniforme de 23 unidades.",
+          "La tercera fuente no aporta una medición del campo este, sino el enunciado explícito de que tal medición no existe y de que la comparación reporta controles faltantes.",
+          "Cada observación pertenece solo al campo nombrado, y cada informe declara no contener evidencia sobre otros campos más allá de sus enunciados explícitos;;.",
+          "La fuente sintética 3 señala que «The comparison reports missing controls».",
+          "La fuente sintética 3 lo enuncia de forma directa al afirmar que «No measurement of the east field exists».",
+          "El corpus examinado se compone de tres fuentes sintéticas que registran dos mediciones aisladas y una declaración explícita de vacío.",
+          "La primera fuente consigna una medición del campo norte de 23 unidades, con el marcador NORTH23 como evidencia identificable, mientras que la segunda registra una medición del campo sur de 41 unidades, con el marcador SOUTH41, y presenta esa cifra como contradictoria con un resultado uniforme de 23 unidades.",
+          "La tercera fuente no aporta medición alguna del campo este, sino que enuncia de forma directa que tal medición no existe y que la comparación reporta controles faltantes."
+        ]
+      }
+    ]
+  }
+]

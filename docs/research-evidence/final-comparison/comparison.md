@@ -42,3 +42,10 @@ The live application used the build at `7a43eac4` (subsequent fixture/documentat
 commits did not change application behavior). Empty citation wrappers observed in
 these reports were fixed afterwards in `07f0e8bb` and verified by a focused test and
 production build; these live outputs have not been rewritten to hide the defect.
+
+## Follow-up (24 September)
+
+The claim audit was rebuilt and rerun on the same PDFs; manual review of the final
+run (build `2a407f0e`) is in `../2026-09-24-factual-review.json`, with every
+intermediate campaign in `../2026-09-24-grounding-campaigns.json`. The table above
+is kept unchanged as the 23 September record.

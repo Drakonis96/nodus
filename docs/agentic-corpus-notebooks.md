@@ -22,13 +22,17 @@ The strengthened OS boundary now denies all outbound connections except explicit
 disposable TCP loopback endpoints. See the corrective isolation record below;
 older write-only checks must not be read as proof of network exclusion.
 
-**Acceptance remains open:** factual grounding of long Deep Research reports,
-upgrades between different versions and exhaustive failure-matrix coverage.
-The matched synthetic comparison is retained in `docs/research-evidence/`;
-citation existence and automatic support scores are not factual acceptance.
-See the [acceptance map](research-evidence/acceptance.md) for reproducible checks,
-checkpoint commits and precise limits. The draft PR carries the live CI status.
-No release, tag or merge has been created.
+**Acceptance remains open.** On 24 September the long-report claim audit was
+rebuilt around atomic premises and whole-report reconciliation (see
+[Grounding closure](#grounding-closure-2026-09-24)). In the final live run
+(application build `2a407f0e`) manual review found no retained factual claim
+without source support in any of the four academic routes, with listed wording
+and coherence defects; this is one run per route on a synthetic three-document
+corpus, not a guarantee. The actual v5.6.0 upgrade passed on four disposable
+platforms at `07f0e8bb`; the final-head results are recorded in the
+[acceptance map](research-evidence/acceptance.md). Exhaustive failure-matrix
+coverage is still incomplete. Citation existence and automatic support scores
+are not factual acceptance. No release, tag or merge has been created.
 
 ## Development contract
 
@@ -1020,3 +1024,40 @@ An index needed by another academic vault/notebook survives. The source document
 in Global Library or Zotero is not deleted by This vault cleanup. In-flight writers
 must still hold valid leases and source membership and cannot resurrect deleted
 vectors. Work deletion retains its explicit owning database across async cleanup.
+
+
+## Grounding closure (2026-09-24)
+
+The 23 September review rejected the reports because the prose audit trusted the
+judge's boolean. The audit now works as follows (`shared/researchClaimAudit.ts`,
+`electron/ai/researchClaimAudit.ts`):
+
+- The judge lists every atomic premise a sentence asserts or presupposes
+  (independence, shared protocol, exclusivity, absence, counts, attribution…),
+  each with its own entailment and literal evidence, plus uncovered words.
+  Acceptance is derived in code: literal premises need verified quotes (an
+  absence needs a source that states it), inference premises must follow from
+  earlier valid premises and the sentence must mark the inference, and the
+  judge's boolean, premises and uncovered parts must agree. Any disagreement
+  fails closed.
+- One auditor per report carries rejected sentences and premises into every
+  later section, summary, limitation and next step; a token-containment
+  backstop removes close restatements.
+- After all parts are audited the whole report is reconciled: a proposition
+  rejected anywhere cannot survive elsewhere; statement pairs a consistency
+  judge declares incompatible (with quotes) are removed together and recorded
+  in the report metadata; repeated body sentences and transitions left without
+  content are pruned. An unavailable consistency check is disclosed.
+- Segmentation is linear (a nested-quantifier lookbehind froze the main process
+  in a live run) and never splits inside a direct quotation.
+
+Six paid campaigns on the identical corpus traced each change; one interrupted
+by the regex freeze, one aborted to save budget, and one rule (orphaned
+references) withdrawn after it removed cited facts. Records:
+`research-evidence/2026-09-24-grounding-campaigns.json` and
+`research-evidence/2026-09-24-factual-review.json`.
+
+The same session added a real-Electron abrupt-kill recovery harness for the
+preparation queue (`scripts/verify-research-queue-recovery.mjs`), which exposed
+and fixed page-crossing passages cited to their first page only (now
+"pp. 249–250" with overlapping physical reads).

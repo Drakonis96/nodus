@@ -9,7 +9,7 @@ exhaustive acceptance of every related combination.
 | --- | --- | --- |
 | Isolation | `test-research-isolation.mjs`; inherited write denials and actual external/unlisted-loopback denials before app launch; `2026-09-23-isolation.json` | Earlier combined network filter was insufficient; corrective record discloses two diagnostic TCP connects with no application bytes |
 | Canonical identity and additive migration | `test-research-canonical-inventory.mjs`, `test-research-notebooks.mjs`, synthetic database migration fixtures | No production database migration was performed |
-| Queue and shared indexes | `test-documentary-store.mjs`, `test-documentary-requests.mjs`, `test-documentary-writers.mjs` | Simulated clocks and separate database connections exercise leases; real SQLITE_FULL exercises rollback |
+| Queue and shared indexes | `test-documentary-store.mjs`, `test-documentary-requests.mjs`, `test-documentary-writers.mjs`; real SIGKILL recovery `2026-09-24-queue-recovery.json` | Simulated clocks exercise leases; real SQLITE_FULL exercises rollback; the real kill covers text preparation only |
 | Revisions and vector spaces | Same scripts; independent attachment heads, stale writer fencing, compatible vector adoption, dimension mismatch, atomic publications and retained old revision | Not an exhaustive combination of every document format and embedding provider |
 | Scope | `test-research-corpus-run.mjs`, `test-research-notebooks.mjs`, `test-research-source-filters.mjs`, real adversarial campaign | Fixed/linked selection, explicit empty scopes, separable composite Ideas, permission changes, forged history/IDs and cancellation covered |
 | Retrieval and citations | Lexical-only/store tests; real exact, comparison, multilingual and no-answer chat checks; independent-attachment page navigation | Citation existence is distinct from claim support; reference reads return candidates, not a complete bibliography graph |
@@ -19,9 +19,9 @@ exhaustive acceptance of every related combination.
 | Coexistence | `verify-research-runtime-lifecycle.mjs`; two disposable profiles, foreign executable fixture, immutable payload inventory and owned-process closure | No normal Zotero collection or external production MCP process was modified |
 | Research Chat live activity | `test-research-activity.mjs`, corpus/worker/Concilium regressions; isolated `--activity` UI fixture | Actual backend operations are tested separately from synthetic UI/IPC events; no new live model campaign; Deep Research does not publish activity |
 | UI and compatibility | Isolated notebook E2E; light/dark 1280×800 and 800×640 screenshots, keyboard focus, translated strings; full CI includes other vault engines | Not a complete screen-reader or assistive-technology audit |
-| Installers | Four successful native installer runs at `736823e0`, hashes and roots in `2026-09-23-installers.json`; macOS signed and notarized | Actual native install, same-version reinstall and removal; a different-version upgrade remains untested. Windows/Linux use disposable hosted runners rather than macOS Seatbelt |
-| Baseline comparison | `2026-09-23-comparison.json` and `.md`, identical three-PDF hashes and exact providers | One run per engine; no performance/quality advantage established. Long-report factual grounding remains unaccepted |
-| Cost | Shared campaign `/private/tmp/nodus-research-iAyBHl/artifacts/cost-ledger.json` | 646 calls, $1.17735043 accounted upper bound including two unresolved maximum reservations; never reset during the campaign |
+| Installers | Four-target actual upgrade from published v5.6.0 to private `5.6.1-research.11` at `91a82aa0` (`2026-09-24-installers.json`); earlier same-version runs in `2026-09-23-installers.json`; macOS signed and notarized | Windows/Linux use disposable hosted runners rather than macOS Seatbelt; one upgrade path (v5.6.0) and small profiles |
+| Baseline comparison | `2026-09-23-comparison.json` and `.md`, identical three-PDF hashes and exact providers; grounding reruns in `2026-09-24-grounding-campaigns.json` | One run per engine; no performance/quality advantage established. Final manual review in `2026-09-24-factual-review.json` found no unsupported retained claim, with listed wording defects and high run-to-run variance |
+| Cost | Shared campaign `/private/tmp/nodus-research-iAyBHl/artifacts/cost-ledger.json` | 1,757 calls, USD 3.821334595 accounted upper bound including five unresolved maximum reservations; never reset |
 
 ## Verification checkpoints
 
@@ -179,3 +179,90 @@ macOS ARM64 job passed; the other native jobs and general CI are still running.
 The installer run is queued behind an obsolete run for which cancellation was
 requested. No pending platform, signing/notarization or actual-version-upgrade
 criterion is accepted. The PR remains draft and overall acceptance stays open.
+
+## Closure campaign (24 September)
+
+Commits `27fe5ad0`…`91a82aa0` (application code) plus documentation. Scope remains
+academic Research only; OCR remains deferred; no web search.
+
+### Deep Research factual grounding
+
+Root cause of the 23 September rejection: the prose audit accepted the judge's
+`supported` boolean even when its reason admitted a missing premise, never checked
+presupposed premises separately, let the same proposition receive opposite verdicts
+in different parts of one report, and had no report-level consistency check. The
+rebuilt audit derives acceptance from atomic premises, carries rejections across
+all parts, reconciles the whole report and records removed conflict pairs (details
+in `../agentic-corpus-notebooks.md#grounding-closure-2026-09-24`).
+
+Six paid campaigns on the identical three-PDF corpus (`2026-09-24-grounding-campaigns.json`):
+
+| Build | Root | Outcome |
+| --- | --- | --- |
+| `b2d8174c` | `nodus-research-Ia0opa` | Independence premises removed; valid inferences over-removed, whole batches unverified |
+| `d289bcc0` | `nodus-research-NOguMC` | **Main process froze** (exponential regex); fixed in `3f9265c0` |
+| `3f9265c0` | `nodus-research-WiLeVl` | Aborted after chat to save budget (newer fixes committed) |
+| `28c2743a` | `nodus-research-AgEtMO` | Self-denied conflict pair, orphan anaphora, `(])` debris; fixed in `73c21c3a` |
+| `73c21c3a` | `nodus-research-ZRFQnB` | Orphaned-reference rule removed cited facts; withdrawn in `2a407f0e` |
+| `2a407f0e` | `nodus-research-g3vRMS` | Final review below |
+
+Manual review of the final run (`2026-09-24-factual-review.json`): no retained
+factual claim without source support in V1/V2 general or V1/V2 comparative
+(12, 9, 7 and 9 retained factual claims). Residual defects: two paraphrase
+intensifications of supported attributions ("refutación" for *contradicts*,
+"sin controles registrados" for *missing controls*), redundancy, and two dangling
+anaphoric references. Variance between runs is high (V2 comparative kept 7, 0 and
+9 factual claims in the last three runs). This is one run per route on a synthetic
+corpus and not a guarantee; reports are shorter partial answers by design when
+support is missing. Latency rose (188–334 s per route) and cost per campaign rose
+to about USD 0.57.
+
+### Remaining matrix: fixture versus real integration
+
+| Criterion | Fixture evidence | Real integration evidence | Still open |
+| --- | --- | --- | --- |
+| Queue persistence and recovery | Store/requests: restart fencing, crashed owner keeps its failure allowance, lease expiry | **New** `verify-research-queue-recovery.mjs`: SIGKILL of real Electron with 1 running/3 queued, no orphaned processes, automatic completion after relaunch, one published revision per document, no live leases or duplicate ordinals (`2026-09-24-queue-recovery.json`) | Kill during paid embedding; production single-instance lock after a crash |
+| Page locators | Chunker/store tests for page-crossing passages | Same harness: final-page marker cited as "pp. 249–250" after fix `45665d23` | Other formats' locator semantics |
+| Vault changes | `test-documentary-vault-ownership` (two owning vaults, UI switch across an extraction await), scope revalidation | Selection-change cancellation in the adversarial campaign | Switching vaults in the real app during a run |
+| Batches and shared jobs | Persistent embedding batches, multi-source campaigns, shared lease retained by another campaign, withdrawal fencing | Real `bge-m3` preparation of three PDFs in every campaign | Two real vaults sharing one index concurrently |
+| Provider failures | Missing key never switches provider, recoverable blocks are not failures, proxy/cost ledger tests | `no_model` recoverable block in the recovery harness; proxy retained a reservation for a failed call | Real provider outage or rate limit |
+| Revisions | Stale writer fencing, attachment heads, failed rebuild keeps previous revision | Revision rejection through managed MCP with a synthetic endpoint | Real Zotero attachment replaced mid-run |
+| Permissions | Notebook scopes, receipt revocation, forged IDs, promoted notes | Selection revocation in real Zotero; foreign IDs/history in the adversarial campaign | — |
+| Migrations | Synthetic migration fixtures, legacy policy migration | v5.6.0 profile with a legacy note preserved across the actual upgrade | Large production-sized vaults (deliberately not used) |
+| Accessibility | Preparation welcome browser fixture (now also on CI's macOS runner) | Keyboard focus containment and bounds in real Electron at two sizes and themes | Screen-reader audit |
+| Other engines | Full CI suite, including other vault engines | CI real-app smoke plus Stellar, graph-tab and argument-map E2Es | — |
+
+### CI, platforms and distribution at `91a82aa0`
+
+- Earlier failure at `07f0e8bb`: general CI [35911521709](https://github.com/Drakonis96/nodus/actions/runs/35911521709)
+  failed because the new cinematic welcome intercepted clicks in the Stellar
+  demonstration E2E. Fixed in `b2d8174c` (the demonstration profiles record the
+  welcome's Later decision); at that SHA CI passed with a third skip, the
+  preparation welcome browser fixture, which looked for Chrome only at Linux paths.
+  Fixed in `7628f15c`.
+- General CI [35961146567](https://github.com/Drakonis96/nodus/actions/runs/35961146567):
+  3,831 tests, 3,829 passed, 0 failed, 2 skipped (standalone Electron ABI suite and
+  the absent sibling marketplace checkout); real-app smoke, Stellar, graph-tab and
+  argument-map E2Es and three cross-repository targets passed.
+- Native integration [35961146556](https://github.com/Drakonis96/nodus/actions/runs/35961146556):
+  macOS ARM64, macOS x64, Windows x64 and Linux x64 passed (hash-locked private
+  runtime, license inventory, managed stdio, two-profile lifecycle, focused suites).
+- Disposable installers [35961146159](https://github.com/Drakonis96/nodus/actions/runs/35961146159):
+  actual upgrade from the published v5.6.0 installer (hash-verified release asset)
+  to the private test version `5.6.1-research.11`, launch of both versions,
+  preservation of a legacy note, the profile and foreign resources, then native
+  removal. All four targets passed (`2026-09-24-installers.json`). macOS x64 first
+  failed before installation because the release-asset download returned HTTP 500;
+  only that job was re-run on the same commit and passed. macOS packages were
+  signed, notarized and verified before installation. The public version remains
+  5.6.0 and nothing is published (`--publish never`).
+- Local on the same application code: 39/39 focused isolated scripts and the 6/6
+  standalone OS-isolation suite (`2026-09-24-final-regressions.json`); the real
+  queue-recovery harness; each app run first proved inside-write, outside-write,
+  descendant-write, external-network and forbidden-loopback denials.
+
+### Cost
+
+Same ledger, never reset: 1,757 calls, USD 3.821334595 accounted including five
+unresolved reservations retained at their maximum (three from 23 September, one
+from the aborted campaign, one failed call). Limit USD 5; about USD 1.18 unspent.
