@@ -16,6 +16,7 @@ import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/even
 import { sanitizeCustomThemes } from '@shared/appThemes';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
+import { isResearchEffort } from '@shared/researchReasoning';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
   SHARED_APPEARANCE_KEYS,
@@ -45,6 +46,23 @@ function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReason
       // identifier-shaped value here; the live model catalog validates support again.
       .filter(([model, effort]) => model.trim().length > 0 && /^[a-z][a-z0-9_-]{0,31}$/.test(String(effort)))
   ) as AppSettings['codexReasoningEfforts'];
+}
+
+/**
+ * The Research composer's memory of the level it last used per `provider:model`.
+ *
+ * Only levels this build still knows survive: the map comes from a preferences file the user
+ * can edit and outlives app versions that may have renamed or dropped a level. The model half
+ * of the key stays free-form, because a custom endpoint's ids are whatever its gateway calls
+ * them. Standard is dropped rather than stored, since a missing entry already opens the picker
+ * on Standard (see `withResearchEffort`).
+ */
+function sanitizeResearchEffortByModel(value: unknown): AppSettings['researchEffortByModel'] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([key, effort]) =>
+      /^[a-z][a-z0-9-]{0,31}:.{1,200}$/.test(key) && effort !== 'standard' && isResearchEffort(effort))
+  ) as AppSettings['researchEffortByModel'];
 }
 
 function sanitizeTranscriptionModel(value: unknown): ModelRef | null {
@@ -180,6 +198,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   concurrency: 1,
   chatReasoning: 'off',
   codexReasoningEfforts: {},
+  researchEffortByModel: {},
   openRouterThroughput: true,
   providerFreeTier: {},
   unpaywallEmail: '',
@@ -361,6 +380,7 @@ export function getSettings(): AppSettings {
     merged.libraryScopeOnboardingVersion = 0;
   }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
+  merged.researchEffortByModel = sanitizeResearchEffortByModel(parsed.researchEffortByModel);
   merged.mascotScale = normalizeNodiScale(parsed.mascotScale);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
@@ -508,6 +528,7 @@ export function getSettings(): AppSettings {
     seed.transcriptionModel = safeTranscriptionModel;
   }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(merged.codexReasoningEfforts);
+  merged.researchEffortByModel = sanitizeResearchEffortByModel(merged.researchEffortByModel);
   if ((merged.sttProvider as string) === 'local') {
     merged.sttProvider = 'transformers';
     seed.sttProvider = 'transformers';
@@ -599,6 +620,9 @@ export function updateSettings(patch: Partial<AppSettings>): AppSettings {
   }
   if (patch.codexReasoningEfforts !== undefined) {
     patch = { ...patch, codexReasoningEfforts: sanitizeCodexReasoningEfforts(patch.codexReasoningEfforts) };
+  }
+  if (patch.researchEffortByModel !== undefined) {
+    patch = { ...patch, researchEffortByModel: sanitizeResearchEffortByModel(patch.researchEffortByModel) };
   }
   if (patch.studyImproveToolbarStyleIds) {
     patch = { ...patch, studyImproveToolbarStyleIds: [...new Set(patch.studyImproveToolbarStyleIds.filter((value) => typeof value === 'string' && value.trim()))].slice(0, 4) };

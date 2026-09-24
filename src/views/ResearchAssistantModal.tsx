@@ -7,7 +7,6 @@ import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapt
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
-import type { ResearchEffort } from '@shared/researchReasoning';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
@@ -32,6 +31,7 @@ import { VirtualList } from '../components/VirtualList';
 import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
+import { useResearchEffort } from '../hooks/useResearchEffort';
 import { researchNoteSource, type ResearchConversationNavigationTarget } from '../researchNoteProvenance';
 import './researchAssistant.css';
 
@@ -260,8 +260,9 @@ export function ResearchAssistantModal({
   const [concilium, setConcilium] = useState<ConciliumConfig | null>(null);
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
-  const [thinkingEffort, setThinkingEffort] = useState<ResearchEffort>('standard');
-  useEffect(() => { setThinkingEffort('standard'); }, [selectedModel?.provider, selectedModel?.model]);
+  // Remembered per provider+model: a conversation keeps whatever level the model was last
+  // used at, so a level the user picked is not reset by switching chats or models.
+  const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, selectedModel);
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
@@ -464,7 +465,6 @@ export function ResearchAssistantModal({
     setAttachments([]);
     setAttachmentError('');
     setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
-    setThinkingEffort('standard');
     adapter?.reset?.();
     if (!activeId) void systemPrompts.select(null);
     setActiveId(null);
@@ -494,7 +494,6 @@ export function ResearchAssistantModal({
 
   const loadConversation = async (id: string, messageId?: string | null, messageIndex?: number | null): Promise<boolean> => {
     if (attachmentBusyRef.current) return false;
-    setThinkingEffort('standard');
     const conversation = await api.getConversation(id);
     if (!conversation) {
       await refreshConversations();

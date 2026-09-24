@@ -1,8 +1,17 @@
 import type { ModelInfo, ModelRef } from './types';
 
-/** Research Assistant only. Never persisted into chatReasoning or ModelRef. */
-export type ResearchEffort = 'standard' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'on';
+/** Every level the Research composer can ask for, off through the largest budget. A runtime
+ *  list as well as a type so a stored choice can be validated when it is read back. */
+export const RESEARCH_EFFORTS = ['standard', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'] as const;
+
+/** Research Assistant only. Never persisted into chatReasoning or ModelRef; the level the
+ *  composer last used for a model lives in its own settings key (`researchEffortByModel`). */
+export type ResearchEffort = (typeof RESEARCH_EFFORTS)[number];
 export type NativeResearchEffort = Exclude<ResearchEffort, 'standard'> | 'none' | 'off';
+
+export function isResearchEffort(value: unknown): value is ResearchEffort {
+  return typeof value === 'string' && (RESEARCH_EFFORTS as readonly string[]).includes(value);
+}
 export interface ResearchReasoningProfile {
   levels: NativeResearchEffort[];
   mode: 'none' | 'effort' | 'gemini-budget' | 'gemini-level' | 'anthropic-adaptive' | 'anthropic-budget' | 'toggle' | 'local';
@@ -10,6 +19,15 @@ export interface ResearchReasoningProfile {
 const ordered: NativeResearchEffort[] = ['none', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'];
 const profile = (mode: ResearchReasoningProfile['mode'], ...levels: NativeResearchEffort[]): ResearchReasoningProfile => ({ mode, levels });
 const unknown = () => profile('none');
+
+/**
+ * Providers whose ladder arrives with the live model catalogue instead of the profile
+ * tables below. Until that catalogue is fetched their profile advertises no levels at all,
+ * so nothing may read «no levels» as «this model offers none».
+ */
+export function researchReasoningNeedsCatalog(ref: ModelRef | null | undefined): boolean {
+  return ['codex', 'github-copilot', 'lmstudio', 'openrouter'].includes(ref?.provider ?? '');
+}
 
 /** Explicit, documented families only. Runtime catalogues take precedence for
  * subscriptions and LM Studio. See docs/research-assistant-reasoning.md. */
@@ -103,6 +121,53 @@ export function researchEffortChoices(p: ResearchReasoningProfile): ResearchEffo
 export function resolveResearchEffort(p: ResearchReasoningProfile, requested: unknown): NativeResearchEffort | undefined {
   return researchEffortChoices(p).includes(requested as ResearchEffort) && requested !== 'standard'
     ? requested as NativeResearchEffort : p.levels[0];
+}
+
+/**
+ * The settings key one selection's remembered level lives under. Provider ids never
+ * contain a colon and model ids may contain slashes (OpenRouter's `vendor/model`), so
+ * `provider:model` names one selection unambiguously.
+ */
+export function researchEffortMemoryKey(ref: ModelRef | null | undefined): string | null {
+  return ref?.provider && ref.model ? `${ref.provider}:${ref.model}` : null;
+}
+
+/**
+ * The writer for the per provider+model memory the Research composer owns.
+ *
+ * «Standard» removes the entry instead of storing it: with no choice remembered the
+ * picker already opens on Standard, so the map only ever holds levels the user went out
+ * of their way to pick, and no model is pinned to a value that used to be the default.
+ */
+export function withResearchEffort(
+  current: Record<string, ResearchEffort> | undefined,
+  ref: ModelRef | null | undefined,
+  effort: ResearchEffort
+): Record<string, ResearchEffort> {
+  const key = researchEffortMemoryKey(ref);
+  const next = { ...(current ?? {}) };
+  if (!key) return next;
+  if (effort === 'standard') delete next[key];
+  else next[key] = effort;
+  return next;
+}
+
+/**
+ * The level the composer opens on for one selection: the last level chosen for that same
+ * provider+model, or Standard when nothing was remembered for it.
+ *
+ * A value that is not a level at all (a hand-edited preferences file) is ignored here.
+ * A level the model no longer publishes is left alone on purpose — only the picker holds
+ * the live catalogue, so it is the place that normalises it, and the request path
+ * (`resolveResearchEffort`) already floors anything the model rejects.
+ */
+export function researchEffortFor(
+  remembered: Record<string, ResearchEffort> | undefined,
+  ref: ModelRef | null | undefined
+): ResearchEffort {
+  const key = researchEffortMemoryKey(ref);
+  const stored = key ? remembered?.[key] : undefined;
+  return isResearchEffort(stored) ? stored : 'standard';
 }
 
 /** Additional allowance for reasoning, preserving room for the visible answer.
