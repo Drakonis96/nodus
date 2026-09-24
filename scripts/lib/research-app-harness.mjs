@@ -63,10 +63,13 @@ export function simulatedUpstream(behaviour = () => null) {
   return { dispatch, calls };
 }
 
-export async function createResearchApp({ provider = null, extraPorts = [] } = {}) {
+/** `realProvider.campaignRoot` sends requests to the real providers through the
+ * shared cost-reserving proxy and ledger of that campaign root. */
+export async function createResearchApp({ provider = null, realProvider = null, extraPorts = [] } = {}) {
   const root = createResearchTestRoot();
   let proxy = null;
   if (provider) proxy = await startResearchProviderProxy(root, { dispatch: provider.dispatch });
+  else if (realProvider) proxy = await startResearchProviderProxy(realProvider.campaignRoot);
   const ports = [...extraPorts, ...(proxy ? [Number(new URL(proxy.url).port)] : [])];
   const sandbox = macResearchSandbox(root, ports);
   const proof = { ...verifyResearchSandbox(root, sandbox), allowedLoopbackPorts: ports };
@@ -100,6 +103,18 @@ export async function createResearchApp({ provider = null, extraPorts = [] } = {
         await window.nodus.updateSettings({ chatModel: { provider: 'deepseek', model: 'deepseek-flash' }, deepResearchModel: { provider: 'deepseek', model: 'deepseek-flash' },
           synthesisModel: { provider: 'deepseek', model: 'deepseek-flash' }, embeddingProvider: 'openrouter', embeddingModel: 'baai/bge-m3', chatReasoning: 'off' });
       });
+    },
+    /** Replaces the profile's provider credentials with the isolated encrypted copies. */
+    async importCredentials(source) {
+      if (app) throw new Error('close the application before replacing credentials');
+      const secrets = path.join(root, 'profile/secrets');
+      for (const name of fs.existsSync(secrets) ? fs.readdirSync(secrets) : []) if (/^ai_key_(deepseek|openrouter)/.test(name)) fs.rmSync(path.join(secrets, name));
+      const { importResearchTestCredentials } = await import('../research-test-credentials.mjs');
+      return importResearchTestCredentials(root, source);
+    },
+    async closeApp() {
+      if (app) await app.close().catch(() => undefined);
+      app = null; harness.app = null;
     },
     async close() {
       if (app) await app.close().catch(() => undefined);
