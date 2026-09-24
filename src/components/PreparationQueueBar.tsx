@@ -52,8 +52,8 @@ export function PreparationQueueBar({ activity }: { activity: QueueActivity }) {
           {expanded ? '▾' : '▸'} {t('Indexación')}
         </button>
         <div className="order-last min-w-0 basis-full">
-          <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-neutral-400">
-            <span data-testid="preparation-queue-status">
+          <div className="mb-1 flex items-start justify-between gap-3 text-xs text-neutral-400">
+            <span className="min-w-0 break-words" data-testid="preparation-queue-status">
               {running ? <>
                 {settled} / {total} — {t('Indexando:')} <span className="text-neutral-200">{running.title}</span>
                 <span className="ml-1 text-indigo-300">· {stageDetail(running)}</span>
@@ -97,7 +97,7 @@ export function PreparationQueueBar({ activity }: { activity: QueueActivity }) {
                 <div key={item.documentId} data-testid={`preparation-item-${item.documentId}`} data-state={item.state} className="py-1 text-xs">
                   <div className="flex items-center justify-between">
                     <span className="flex-1 truncate">{item.title}</span>
-                    <span className="mx-2 text-[10px] uppercase text-neutral-500">{stageDetail(item)}</span>
+                    {item.state !== 'complete' && <span className="mx-2 text-[10px] uppercase text-neutral-500">{stageDetail(item)}</span>}
                     <span className={item.state === 'complete' ? 'text-emerald-400' : item.state === 'failed' || item.state === 'blocked' ? 'text-red-400' : item.state === 'running' ? 'text-indigo-400' : 'text-neutral-500'}>
                       <span className="inline-flex items-center gap-1">{item.state === 'complete' && <Icon name="check" size={12} />}{t(STATE_LABELS[item.state])}</span>
                     </span>
