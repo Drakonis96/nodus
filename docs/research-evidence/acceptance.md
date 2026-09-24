@@ -358,3 +358,54 @@ Evidence: `2026-09-24-closure-followup.json`.
   `capability-signing` environment — a release publication reserved for the owner.
 - Ledger: 1,777 calls, USD 3.888697737 accounted, 21 unresolved reservations
   (authentication failures report no usage and keep their conservative bound).
+
+### End-to-end through the interface, Chemistry Studio 2.5.6 (24 September, code `fa19beff`)
+
+Evidence: `2026-09-24-end-to-end.json`, `2026-09-24-chemistry-studio-2.5.6.json`,
+screenshots `2026-09-24-end-to-end-queue.png` and `2026-09-24-end-to-end-quote-page.png`.
+
+- **Chemistry Studio 2.5.6 and the pin.** 2.5.6's skill forbade the reaction lines
+  Nodus 5.6.0 asks for while declaring 5.3.2 or newer; the marketplace's #41 makes it
+  follow whichever route contract the application appends, so `minNodusVersion` stays
+  5.3.2 (5.7.0 would make every 5.6.0 checkout refuse it). Release
+  `chemistry-studio-v2.5.6` is cut and verified (nr02 signature, 19,454,481 bytes,
+  SHA-256 `06251c4b…`); the catalog size is corrected in #42. The bootstrap pin is on
+  this branch (`7831f7f8`) and in Drakonis96/nodus#942 against `main` (not merged), whose
+  three cross-repo jobs pass. No 5.6.2 reference exists; the version stays 5.6.0.
+- **Script.** `scripts/verify-research-end-to-end.mjs` drives a fresh isolated profile
+  through the real UI with the real providers (DeepSeek Flash, OpenRouter bge-m3) and a
+  disposable Zotero 10.0.3; IPC only configures the profile and measures. Five isolation
+  proofs for both roots; one Electron instance; guard at USD 4.80.
+- **Flow (final run, `/private/tmp/nodus-research-HTejpf`).** Welcome accepted on the
+  empty vault (`accepted`, future additions on). A PDF added through the Global Library
+  and a PDF imported with "Sincronizar Zotero" were each added to the vault and indexed
+  (text, lexical, 1,024-d embeddings) about two seconds later without pressing prepare;
+  the Queue lists both jobs completed. "Extraer ideas" produced one idea per document,
+  gaps and a cross-document connection, with no queue failure. Four questions in a
+  notebook over both documents completed with no failed or cancelled activity step, no
+  renderer error and no main-process error. Activity order in every answer: scope →
+  lexical and embedding retrieval → Ideas → shared documentary search → supervisor
+  decision → original pages (comparison and ideas questions) or a second retrieval
+  (quote and absence questions) → graph (connections) → answer → citation check.
+- **Quality (manual).** Quote: exact sentence, page 2, correct. Comparison: all figures
+  and attributions correct except one claim (the report's aquifer warning, p. 2) cited to
+  the report's p. 3 passage, repeated in two consecutive runs. Ideas and connections:
+  correct, uses both ideas, the gaps and the right pages of the reply. Absent datum: says
+  neither document reports nitrates, invents nothing and does not infer absence.
+- **Defects found and fixed** (each with a test that failed before the fix):
+  `4fd402cb` the welcome could not be accepted on an empty vault; `2a931578` a streamed
+  citation cut inside `%XX` crashed Research Chat ("URI malformed"); `02ca3083`
+  "Extraer ideas" republished Library documents without page locators; `fa19beff` a
+  page-crossing passage could only be cited as a range. Harness: `0cd423f2` the cost
+  proxy refused a third concurrent call with a 403, which the app correctly read as an
+  invalid key and paused its queue.
+- **Still open.** Chat citations are checked for presence in the context, not for
+  support. In the Balanced preset the supervisor decision shares the 8,000-byte evidence
+  budget (by design), so runs end as `budget_exhausted` and answers call coverage partial
+  even when every indexed passage was retrieved, sometimes quoting internal codes.
+  Extraction yields one idea per 450 words. Indexes prepared before `fa19beff` have no
+  page starts until prepared again. One real run per question on a synthetic corpus is
+  not a guarantee.
+- **Cost.** Final run 32 calls, 55,510 input and 12,280 output tokens, USD 0.0306; the
+  three earlier runs of this campaign USD 0.0425. Ledger 1,872 calls, USD 3.961772227,
+  21 unresolved reservations from earlier campaigns.
