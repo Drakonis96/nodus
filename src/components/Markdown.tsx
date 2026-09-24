@@ -445,11 +445,22 @@ function CitationLink({
 
 function parseCitation(href: string | undefined): MarkdownCitation | null {
   if (!href) return null;
-  const match = href.match(/^nodus:\/\/(idea|work|gap|contradiction|passage)\/(.+)$/);
-  if (!match) return null;
   // Mid-stream a link can end inside a percent escape; it becomes a citation once complete.
-  const id = decodeCitationId(match[2]);
-  return id === null ? null : { kind: match[1] as MarkdownCitation['kind'], id };
+  const citation = (kind: MarkdownCitation['kind'], encoded: string): MarkdownCitation | null => {
+    const id = decodeCitationId(encoded);
+    return id === null ? null : { kind, id };
+  };
+  const idea = href.match(/^nodus:\/\/idea\/(.+)$/);
+  if (idea) return citation('idea', idea[1]);
+  const work = href.match(/^nodus:\/\/work\/(.+)$/);
+  if (work) return citation('work', work[1]);
+  const gap = href.match(/^nodus:\/\/gap\/(.+)$/);
+  if (gap) return citation('gap', gap[1]);
+  const contradiction = href.match(/^nodus:\/\/contradiction\/(.+)$/);
+  if (contradiction) return citation('contradiction', contradiction[1]);
+  const passage = href.match(/^nodus:\/\/passage\/(.+)$/);
+  if (passage) return citation('passage', passage[1]);
+  return null;
 }
 
 function citationLabel(kind: MarkdownCitation['kind']): string {
