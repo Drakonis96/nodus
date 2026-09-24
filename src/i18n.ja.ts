@@ -8144,6 +8144,8 @@ export const JA: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} 個のブックマークと {folders} 個のフォルダーをインポートしました。 {duplicates} 個の重複がスキップされました。",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} ブックマーク · {folders} フォルダ · プライベートおよびローカル",
   "Buscar marcadores…": "ブックマークを検索…",
+  "Buscar {label}…": "{label}を検索…",
+  "Sin opciones coincidentes.": "一致するオプションはありません。",
   "Marcador": "ブックマーク",
   "Vista previa de importación · {fileName}": "インポートプレビュー · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} 個のブックマーク · {folders} 個のフォルダ · {duplicates} 個の重複 · {invalidUrls} 個の無効な URL がスキップされました",

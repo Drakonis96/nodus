@@ -8144,6 +8144,8 @@ export const KO: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} 북마크와 {folders} 폴더를 가져왔습니다. {duplicates} 중복 항목을 건너뛰었습니다.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} 북마크 · {folders} 폴더 · 개인 및 로컬",
   "Buscar marcadores…": "북마크 검색…",
+  "Buscar {label}…": "{label} 검색…",
+  "Sin opciones coincidentes.": "일치하는 옵션이 없습니다.",
   "Marcador": "서표",
   "Vista previa de importación · {fileName}": "가져오기 미리보기 · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} 북마크 · {folders} 폴더 · {duplicates} 중복 · {invalidUrls} 잘못된 URL 건너뛰기",

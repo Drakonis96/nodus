@@ -36,7 +36,7 @@ import { decideNavigation } from '@shared/browserNavigation';
 import { NODUS_BROWSER_PARTITION, browserSession } from './session';
 import { installContextMenu, type ContextMenuActions } from './contextMenu';
 import { browserShortcutFor, historyNeighbourIndex } from '@shared/browserShortcuts';
-import { cachePageFavicon } from './favicon';
+import { cachePageFaviconForSite } from './favicon';
 import { recordBrowserHistoryVisit } from './history';
 import {
   cancelAllBrowserAuthRequests,
@@ -599,6 +599,11 @@ function wire(tab: Tab): void {
     if (!isWeb()) return;
     patch(tab, {
       url,
+      // A new document brings its own icon, and this one has not been reported
+      // yet. Keeping the previous page's would show a favicon for a site the
+      // tab is no longer on — and would leave the globe unreachable for a page
+      // that genuinely has no icon.
+      faviconDataUrl: null,
       canGoBack: canGoBackFrom(tab),
       canGoForward: contents.navigationHistory.canGoForward(),
     });
@@ -649,7 +654,7 @@ function wire(tab: Tab): void {
   on(tab, contents, 'page-favicon-updated', ((_event: unknown, urls: string[]) => {
     if (!isWeb()) return;
     const expectedUrl = tab.state.url;
-    void cachePageFavicon(Array.isArray(urls) ? urls : []).then((faviconDataUrl) => {
+    void cachePageFaviconForSite(expectedUrl, Array.isArray(urls) ? urls : []).then((faviconDataUrl) => {
       if (!faviconDataUrl || !isWeb() || tab.state.url !== expectedUrl) return;
       patch(tab, { faviconDataUrl });
     });

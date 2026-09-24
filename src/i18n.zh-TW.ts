@@ -7787,6 +7787,8 @@ export const ZH_TW: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "已匯入{bookmarks}個書籤和{folders}個資料夾。已跳過{duplicates}個重複項。",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks}個書籤 · {folders}個資料夾 · 私密且本地",
   "Buscar marcadores…": "搜尋書籤…",
+  "Buscar {label}…": "搜尋{label}…",
+  "Sin opciones coincidentes.": "沒有符合的選項。",
   "Marcador": "書籤",
   "Vista previa de importación · {fileName}": "匯入預覽 · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks}個書籤 · {folders}個資料夾 · {duplicates}個重複項 · 已跳過{invalidUrls}個無效URL",

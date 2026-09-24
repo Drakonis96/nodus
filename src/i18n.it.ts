@@ -8188,6 +8188,8 @@ export const IT: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "Importati {bookmarks} segnalibri e {folders} cartelle. {duplicates} duplicati ignorati.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} segnalibri · {folders} cartelle · privato e locale",
   "Buscar marcadores…": "Cerca segnalibri…",
+  "Buscar {label}…": "Cerca {label}…",
+  "Sin opciones coincidentes.": "Nessuna opzione corrispondente.",
   "Marcador": "Segnalibro",
   "Vista previa de importación · {fileName}": "Anteprima di importazione · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} segnalibri · {folders} cartelle · {duplicates} duplicati · {invalidUrls} URL non validi ignorati",

@@ -7,11 +7,13 @@
   const grid = document.getElementById('atlas-grid');
   const input = document.getElementById('atlas-search');
   const engine = document.getElementById('atlas-engine');
+  const engineValue = document.getElementById('atlas-engine-value');
+  const engineMenu = document.getElementById('atlas-engine-menu');
   const submit = document.getElementById('atlas-submit');
   const clear = document.getElementById('atlas-clear');
   const reset = document.getElementById('atlas-reset');
   const status = document.getElementById('atlas-status');
-  if (!grid || !input || !engine || !submit || !clear || !reset || !status) return;
+  if (!grid || !input || !engine || !engineValue || !engineMenu || !submit || !clear || !reset || !status) return;
 
   let catalogue;
   try {
@@ -53,7 +55,11 @@
     type: { label: 'Resource type', values: item => item.type_of_use || [] }
   };
 
-  const selected = { continent:'', country:'', region:'', area:'', type:'' };
+  // Every facet holds a LIST of chosen values. Within one facet the values are
+  // alternatives — choosing Spain and Portugal asks for either — while separate
+  // facets still narrow each other, so the whole thing reads as
+  // "these continents, these areas, this kind of resource".
+  const selected = { continent: [], country: [], region: [], area: [], type: [] };
   const facetNodes = {};
 
   for (const key of Object.keys(FACETS)) {
@@ -66,6 +72,10 @@
       search: root.querySelector('.atlas-facet-search'),
       options: root.querySelector('.atlas-facet-options')
     };
+    // The rows are toggle buttons, so the group is named for the facet they
+    // belong to: "Knowledge area, Social Sciences, toggle button, pressed".
+    facetNodes[key].options.setAttribute('role','group');
+    facetNodes[key].options.setAttribute('aria-label', FACETS[key].label);
   }
 
   const cards = [];
@@ -100,7 +110,8 @@
     return !q || item.__search.includes(q);
   };
 
-  const facetMatch = (item,key,value) => !value || FACETS[key].values(item).includes(value);
+  const facetMatch = (item,key,values) => !values.length ||
+    FACETS[key].values(item).some(value => values.includes(value));
 
   function matches(item, exceptKey='') {
     if (!queryMatch(item)) return false;
@@ -134,39 +145,64 @@
     while (changed && guard++ < 6) {
       changed = false;
       for (const key of Object.keys(FACETS)) {
-        if (!selected[key]) continue;
+        if (!selected[key].length) continue;
         const allowed = new Set(possibleValues(key).map(x => x.value));
-        if (!allowed.has(selected[key])) {
-          selected[key] = '';
+        // The chosen values that survive; a value the other facets have put out
+        // of reach is dropped rather than left narrowing the results to nothing.
+        const kept = selected[key].filter(value => allowed.has(value));
+        if (kept.length !== selected[key].length) {
+          selected[key] = kept;
           changed = true;
         }
       }
     }
   }
 
+  /** What the pill reads: its own name, the one value, or how many are chosen. */
+  function facetSummary(key) {
+    const chosen = selected[key];
+    if (!chosen.length) return FACETS[key].label;
+    if (chosen.length === 1) return chosen[0];
+    return `${chosen.length} selected`;
+  }
+
+  function optionRow(key, value, label, count, isChosen) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `atlas-facet-option${value ? '' : ' is-clear'}${isChosen ? ' is-selected' : ''}`;
+    button.dataset.value = value;
+    // A toggle button, not a radio: several rows of one facet stand chosen at
+    // once, which is the whole point of the change.
+    button.setAttribute('aria-pressed', String(Boolean(isChosen)));
+    button.innerHTML =
+      `<span class="atlas-facet-check" aria-hidden="true"></span>` +
+      `<span class="atlas-facet-option-label">${esc(label)}</span>` +
+      `<span class="atlas-facet-count">${count}</span>`;
+    return button;
+  }
+
   function renderFacet(key) {
     const node = facetNodes[key];
-    node.value.textContent = selected[key] || FACETS[key].label;
-    node.button.classList.toggle('is-active', Boolean(selected[key]));
+    const chosen = selected[key];
+    const summary = facetSummary(key);
+    node.value.textContent = summary;
+    // A pill carrying several values can outgrow its own cap and ellipsize, so
+    // the whole summary is kept reachable on hover.
+    node.button.title = chosen.length ? summary : '';
+    node.button.classList.toggle('is-active', Boolean(chosen.length));
 
     const q = fold(node.search.value.trim());
     const options = possibleValues(key).filter(x => !q || fold(x.value).includes(q));
+    // The panel now stays open across picks, so the list is rebuilt under a
+    // reader who is part-way down it. Restoring the offset keeps the rows from
+    // jumping back to the top on every checkbox.
+    const scrollTop = node.options.scrollTop;
     node.options.textContent = '';
 
-    const all = document.createElement('button');
-    all.className = `atlas-facet-option${selected[key] ? '' : ' is-selected'}`;
-    all.type = 'button';
-    all.dataset.value = '';
-    all.innerHTML = `<span>All</span><span class="atlas-facet-count">${resources.filter(item => matches(item,key)).length}</span>`;
-    node.options.appendChild(all);
-
+    node.options.appendChild(optionRow(
+      key, '', 'All', resources.filter(item => matches(item,key)).length, !chosen.length));
     for (const entry of options) {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `atlas-facet-option${selected[key] === entry.value ? ' is-selected' : ''}`;
-      button.dataset.value = entry.value;
-      button.innerHTML = `<span>${esc(entry.value)}</span><span class="atlas-facet-count">${entry.count}</span>`;
-      node.options.appendChild(button);
+      node.options.appendChild(optionRow(key, entry.value, entry.value, entry.count, chosen.includes(entry.value)));
     }
 
     if (!options.length && q) {
@@ -175,6 +211,7 @@
       empty.textContent = 'No matching options.';
       node.options.appendChild(empty);
     }
+    node.options.scrollTop = scrollTop;
   }
 
   function renderAllFacets() {
@@ -189,6 +226,9 @@
 
   function closeAll(except='') {
     for (const key of Object.keys(FACETS)) if (key !== except) closeFacet(key);
+    // The engine list is drawn here too, so the click that closes one panel
+    // closes the other.
+    closeEngine();
   }
 
   function update() {
@@ -201,7 +241,7 @@
       if (show) visible++;
     }
 
-    const filtered = Boolean(input.value.trim() || Object.values(selected).some(Boolean));
+    const filtered = Boolean(input.value.trim() || Object.values(selected).some(chosen => chosen.length));
     status.textContent = filtered ? `${visible} of ${resources.length} resources` : `${resources.length} resources`;
     clear.hidden = !input.value;
 
@@ -236,30 +276,82 @@
     node.options.addEventListener('click', (event) => {
       const option = event.target.closest('.atlas-facet-option');
       if (!option) return;
-      selected[key] = option.dataset.value || '';
-      closeFacet(key);
+      const value = option.dataset.value || '';
+      // "All" is the way back to no filter; any other row toggles itself. The
+      // panel deliberately stays open — picking a second value is the reason it
+      // accepts more than one — and the click is not bubbled, or the document
+      // handler behind it would close the panel on the very first pick.
+      selected[key] = value
+        ? (selected[key].includes(value)
+            ? selected[key].filter(chosen => chosen !== value)
+            : [...selected[key], value])
+        : [];
       update();
     });
   }
 
-  const ENGINES = {
-    google: q => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
-    bing: q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
-    duckduckgo: q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`,
-    brave: q => `https://search.brave.com/search?q=${encodeURIComponent(q)}`,
-    startpage: q => `https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`,
-    scholar: q => `https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`
-  };
+  /**
+   * The search engine, drawn here rather than by the platform.
+   *
+   * This was a <select>, and the operating system painted its popup from its
+   * own appearance setting, so a dark page opened a light menu. Nothing in CSS
+   * reaches that popup: `color-scheme: dark` on the control (and on the
+   * document) is inherited by the closed control and by every <option>'s
+   * computed style, and the menu still opened light — verified, not assumed.
+   * Owning the list is the only way the list is dark.
+   */
+  const ENGINES = [
+    ['directory', 'Directory', null],
+    ['google', 'Google', q => `https://www.google.com/search?q=${encodeURIComponent(q)}`],
+    ['bing', 'Bing', q => `https://www.bing.com/search?q=${encodeURIComponent(q)}`],
+    ['duckduckgo', 'DuckDuckGo', q => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`],
+    ['brave', 'Brave Search', q => `https://search.brave.com/search?q=${encodeURIComponent(q)}`],
+    ['startpage', 'Startpage', q => `https://www.startpage.com/sp/search?query=${encodeURIComponent(q)}`],
+    ['scholar', 'Google Scholar', q => `https://scholar.google.com/scholar?q=${encodeURIComponent(q)}`]
+  ];
+  let chosenEngine = ENGINES[0];
+
+  function renderEngineMenu() {
+    engineMenu.textContent = '';
+    for (const [value, label] of ENGINES) {
+      const chosen = value === chosenEngine[0];
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = `atlas-engine-option${chosen ? ' is-selected' : ''}`;
+      row.dataset.value = value;
+      row.setAttribute('role', 'option');
+      row.setAttribute('aria-selected', String(chosen));
+      row.innerHTML = `<span class="atlas-engine-tick" aria-hidden="true"></span><span>${esc(label)}</span>`;
+      engineMenu.appendChild(row);
+    }
+  }
+
+  function closeEngine() {
+    engineMenu.hidden = true;
+    engine.setAttribute('aria-expanded', 'false');
+  }
+
+  /** Choosing an engine also decides what the field promises to do with it. */
+  function chooseEngine(value) {
+    chosenEngine = ENGINES.find(([candidate]) => candidate === value) ?? ENGINES[0];
+    const directory = chosenEngine[0] === 'directory';
+    engineValue.textContent = chosenEngine[1];
+    input.placeholder = directory ? 'Search the research directory…' : `Search with ${chosenEngine[1]}…`;
+    submit.title = directory ? 'Filter directory' : `Search with ${chosenEngine[1]}`;
+    // Re-drawn now, not on the next open, so the tick matches the choice even
+    // while the list is shut.
+    renderEngineMenu();
+  }
 
   function runSearch() {
     const q = input.value.trim();
     if (!q) return;
-    if (engine.value === 'directory') {
+    const makeUrl = chosenEngine[2];
+    if (!makeUrl) {
       update();
       return;
     }
-    const makeUrl = ENGINES[engine.value];
-    if (makeUrl) window.open(makeUrl(q),'_blank','noopener');
+    window.open(makeUrl(q),'_blank','noopener');
   }
 
   input.addEventListener('input', update);
@@ -270,14 +362,21 @@
     }
   });
 
-  engine.addEventListener('change', () => {
-    const name = engine.options[engine.selectedIndex].textContent;
-    input.placeholder = engine.value === 'directory'
-      ? 'Search the research directory…'
-      : `Search with ${name}…`;
-    submit.title = engine.value === 'directory'
-      ? 'Filter directory'
-      : `Search with ${name}`;
+  engine.addEventListener('click', (event) => {
+    // Without this the document handler behind it would close the list in the
+    // same click that opened it.
+    event.stopPropagation();
+    const opening = engineMenu.hidden;
+    closeAll();
+    if (opening) renderEngineMenu();
+    engineMenu.hidden = !opening;
+    engine.setAttribute('aria-expanded', String(opening));
+  });
+  engineMenu.addEventListener('click', (event) => {
+    const row = event.target.closest('.atlas-engine-option');
+    if (!row) return;
+    chooseEngine(row.dataset.value);
+    closeEngine();
   });
 
   submit.addEventListener('click', runSearch);
@@ -289,7 +388,7 @@
   });
 
   reset.addEventListener('click', () => {
-    for (const key of Object.keys(selected)) selected[key] = '';
+    for (const key of Object.keys(selected)) selected[key] = [];
     update();
   });
 
@@ -298,5 +397,6 @@
     if (event.key === 'Escape') closeAll();
   });
 
+  chooseEngine('directory');
   update();
 })();

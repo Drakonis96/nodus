@@ -8773,6 +8773,8 @@ export const FR: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "{bookmarks} signets et {folders} dossiers importés. {duplicates} doublons ignorés.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} signets · {folders} dossiers · privé et local",
   "Buscar marcadores…": "Rechercher des signets…",
+  "Buscar {label}…": "Rechercher {label}…",
+  "Sin opciones coincidentes.": "Aucune option correspondante.",
   "Marcador": "Signet",
   "Vista previa de importación · {fileName}": "Aperçu de l’importation · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} signets · {folders} dossiers · {duplicates} doublons · {invalidUrls} URL non valides ignorées",

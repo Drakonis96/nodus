@@ -2,37 +2,32 @@ import type { ModelRef } from '@shared/types';
 import {
   annotateSpeciesSmiles,
   buildNameFeedbackRequest,
-  buildRouteConsistencyRequest,
-  buildRouteRepairRequest,
+  buildRouteReviewRequest,
   buildRouteSteps,
   countRouteSteps,
   declaresRacemic,
   findAnswerSpecies,
-  findDuplicateRoleProblems,
-  findReactionLines,
   findSmilesCandidates,
   findStepConditions,
-  findStepEquationProblems,
   findStepNamedSpecies,
-  findStepSpeciesLabels,
+  findStepProse,
+  formatNamedRouteFixPrompts,
   formatRouteAudit,
-  formatRouteClarification,
-  formatRouteFixPrompt,
   formatStructureAudit,
   formatUnresolvedNameClarification,
-  hasCheckerScaffolding,
   normalizeMoleculeDossier,
   normalizeRouteAudit,
   parseNameFeedback,
-  parseRouteConsistencyVerdict,
-  ROUTE_CONSISTENCY_SYSTEM,
+  parseRouteReview,
   ROUTE_NAME_FEEDBACK_SYSTEM,
-  ROUTE_REPAIR_SYSTEM,
+  ROUTE_REVIEW_SYSTEM,
   type MoleculeDossier,
   type NamedSpecies,
+  type NameFeedbackEntry,
   type ResolvedSpecies,
   type RouteAudit,
-  type RouteConsistencyVerdict,
+  type RouteStepAudit,
+  type RouteReview,
   type RouteSpeciesLabel,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
@@ -48,8 +43,10 @@ const INSPECT_TOOL = 'inspect';
 const ROUTE_TOOL = 'verify-route';
 const COMPILE_TOOL = 'compile';
 const MAX_BATCH = 24;
-/** Each step is a full validated compile; stop before a long route stalls the turn. */
-const MAX_ROUTE_DRAWINGS = 8;
+/** Each step is a full validated compile. The route checker refuses a plan with more than
+ *  sixteen steps, so every step it accepted fits; keep the cap aligned so a long route never
+ *  drops its tail — the final product step is the last one this could ever drop. */
+const MAX_ROUTE_DRAWINGS = 16;
 
 interface InspectOptions {
   model?: ModelRef | null;
@@ -60,6 +57,14 @@ interface InspectOptions {
   owner?: string;
   /** The requested target as SMILES; the route check then requires the route to form it. */
   target?: string | null;
+  /** The researcher's request, given to the route review as context. */
+  question?: string;
+  /** A runner shared across the whole post-answer phase, so the capability worker is opened
+   *  once. When absent each phase opens and closes its own. */
+  runner?: Runner;
+  /** Called with the deterministic report and drawings as soon as they exist, before the
+   *  route review lands, so the reply can show them without waiting on the reviewer. */
+  onDeterministic?: (text: string) => void;
 }
 
 function inspectProvider() {
@@ -76,13 +81,7 @@ async function inspectCandidates(candidates: string[], options: InspectOptions):
   if (!candidates.length) return [];
   const provider = inspectProvider();
   if (!provider) return [];
-  const runner = createTrustedCapabilityRunner({
-    locale: options.locale ?? 'en',
-    model: options.model ?? null,
-    pins: pinCapabilitiesForTurn(),
-    signal: options.signal,
-    runCoreStages: async (text) => text,
-  });
+  const { runner, dispose } = chemistryRunner(options);
   const dossiers: MoleculeDossier[] = [];
   try {
     for (let start = 0; start < candidates.length; start += MAX_BATCH) {
@@ -101,7 +100,7 @@ async function inspectCandidates(candidates: string[], options: InspectOptions):
       }
     }
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
   return dossiers;
 }
@@ -148,8 +147,13 @@ export function routeVerificationAvailable(): boolean {
   return routeProvider() !== null;
 }
 
-function chemistryRunner(options: InspectOptions) {
-  return createTrustedCapabilityRunner({
+/** A runner lease for one phase. A caller-supplied shared runner is reused and this lease
+ *  owns nothing; otherwise it owns a fresh runner and disposing stops it. Sharing opens the
+ *  capability worker once per turn, so its reference cache serves the resolve pass and the
+ *  route audit instead of paying for a second worker and a second network pass. */
+export function chemistryRunner(options: InspectOptions): { runner: Runner; dispose: () => Promise<void> } {
+  if (options.runner) return { runner: options.runner, dispose: async () => {} };
+  const runner = createTrustedCapabilityRunner({
     locale: options.locale ?? 'en',
     model: options.model ?? null,
     pins: pinCapabilitiesForTurn(),
@@ -157,6 +161,7 @@ function chemistryRunner(options: InspectOptions) {
     ...(options.owner ? { owner: options.owner } : {}),
     runCoreStages: async (text) => text,
   });
+  return { runner, dispose: async () => { await runner.dispose?.(); } };
 }
 
 type Runner = ReturnType<typeof createTrustedCapabilityRunner>;
@@ -188,13 +193,13 @@ async function verifyRouteSteps(steps: string[], options: InspectOptions, racemi
   if (!steps.length) return null;
   const provider = routeProvider();
   if (!provider) return null;
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     return await invokeRoute(runner, provider, steps, racemic, options.target);
   } catch {
     return null;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }
 
@@ -228,6 +233,9 @@ export interface RouteResolutionOutcome {
   clarification?: string;
   /** One line per name the resolver corrected, e.g. "old → new"; empty when nothing changed. */
   corrections: string[];
+  /** Species the model supplied as structures because no name would resolve, as prose, so the
+   *  caller discloses that their structure came from the model, not a reference. */
+  authorStructures: string[];
   /** True when the installed package has no resolve-names tool, so the caller falls back to
    *  the legacy reaction-line path. */
   legacy: boolean;
@@ -266,6 +274,48 @@ async function invokeResolveNames(runner: Runner, provider: CapabilityProvider, 
   return list.map(normalizeSpeciesResolution).filter((entry): entry is SpeciesResolution => entry !== null);
 }
 
+const STRUCTURE_TOOL = 'resolve-structure';
+
+/** A structure named by the reference service: the reverse of a name resolution. */
+interface SpeciesStructureName {
+  smiles: string;
+  status: 'named' | 'unnamed';
+  cid?: number;
+  name?: string;
+  formula?: string;
+  canonicalSmiles?: string;
+  feedback?: string;
+}
+
+/** True when the installed package can name a structure. Older packages only resolve names, so
+ *  a structure the author supplies then keeps the author's SMILES with no name read back. */
+function structureNamingAvailable(): boolean {
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  return Boolean(provider && provider.tools.some((tool) => tool.id === STRUCTURE_TOOL));
+}
+
+function normalizeStructureName(entry: unknown): SpeciesStructureName | null {
+  const value = entry && typeof entry === 'object' ? entry as Record<string, unknown> : null;
+  if (!value || typeof value.smiles !== 'string' || !value.smiles) return null;
+  return {
+    smiles: value.smiles.slice(0, 2000),
+    status: value.status === 'named' ? 'named' : 'unnamed',
+    ...(Number.isSafeInteger(value.cid) && (value.cid as number) > 0 ? { cid: value.cid as number } : {}),
+    ...(typeof value.name === 'string' && value.name ? { name: value.name.slice(0, 300) } : {}),
+    ...(typeof value.formula === 'string' && value.formula ? { formula: value.formula.slice(0, 200) } : {}),
+    ...(typeof value.canonicalSmiles === 'string' && value.canonicalSmiles ? { canonicalSmiles: value.canonicalSmiles.slice(0, 2000) } : {}),
+    ...(typeof value.feedback === 'string' && value.feedback ? { feedback: value.feedback.slice(0, 400) } : {}),
+  };
+}
+
+async function invokeNameStructures(runner: Runner, provider: CapabilityProvider, smiles: string[]): Promise<SpeciesStructureName[]> {
+  const result = await runner.invoke({ provider, toolId: STRUCTURE_TOOL, input: { smiles } });
+  const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'structure-naming');
+  const data = artifact?.data as { results?: unknown } | undefined;
+  const list = Array.isArray(data?.results) ? data.results as unknown[] : [];
+  return list.map(normalizeStructureName).filter((entry): entry is SpeciesStructureName => entry !== null);
+}
+
 /** Unresolved reactant/product names — the ones a step cannot be built without. An agent
  *  (catalyst or solvent) may have no resolvable name and is not chased. */
 function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<string, SpeciesResolution>): UnresolvedName[] {
@@ -273,6 +323,7 @@ function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<strin
   speciesByStep.forEach((step, index) => {
     for (const entry of step) {
       if (entry.role === 'agent') continue;
+      if (entry.declaredSmiles) continue; // the model already supplied a structure
       if (resolutions.get(entry.name)?.status === 'resolved') continue;
       const resolution = resolutions.get(entry.name);
       out.push({ step: index + 1, role: entry.role, byproduct: entry.byproduct, name: entry.name, ...(resolution?.feedback ? { feedback: resolution.feedback } : {}) });
@@ -281,7 +332,7 @@ function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<strin
   return out.slice(0, 24);
 }
 
-async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[], options: InspectOptions): Promise<Array<{ from: string; to: string }>> {
+async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[], options: InspectOptions): Promise<NameFeedbackEntry[]> {
   try {
     const raw = await completeText({
       system: ROUTE_NAME_FEEDBACK_SYSTEM,
@@ -295,6 +346,23 @@ async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[]
   }
 }
 
+/** One model review of the route plan: the problems a balance and continuity check cannot
+ *  see. Defensive — an unreadable reply yields no review, so it never blocks a route. */
+async function requestRouteReview(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, options: InspectOptions, stepProse: string[] = []): Promise<RouteReview | null> {
+  try {
+    const raw = await completeText({
+      system: ROUTE_REVIEW_SYSTEM,
+      user: buildRouteReviewRequest(question, labels, audit, stepProse),
+      temperature: 0,
+      maxTokens: 2000,
+      ...(options.signal ? { signal: options.signal } : {}),
+    }, options.model ?? null);
+    return parseRouteReview(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** The names-only route: resolve every species name to a structure (PubChem first, OPSIN
  *  fallback), send unresolved reactant/product names back to the model for correction up to
  *  `NAME_FEEDBACK_ATTEMPTS` times, derive the `reactants>agents>products` lines from the
@@ -305,7 +373,7 @@ export async function resolveNamedRoute(
   modelAnswer: string,
   options: InspectOptions = {},
 ): Promise<RouteResolutionOutcome> {
-  const legacy: RouteResolutionOutcome = { answer: finalAnswer, steps: [], labels: [], consistent: true, corrections: [], legacy: true };
+  const legacy: RouteResolutionOutcome = { answer: finalAnswer, steps: [], labels: [], consistent: true, corrections: [], authorStructures: [], legacy: true };
   if (options.enabled === false) return legacy;
   const provider = resolveProvider();
   if (!provider) return legacy;
@@ -314,7 +382,7 @@ export async function resolveNamedRoute(
   let speciesByStep = findStepNamedSpecies(modelAnswer, stepCount);
   if (!speciesByStep.some((step) => step.length)) return legacy;
 
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     const resolutions = new Map<string, SpeciesResolution>();
     const corrections: string[] = [];
@@ -337,19 +405,52 @@ export async function resolveNamedRoute(
       options.signal?.throwIfAborted();
       const corrected = await requestCorrectedNames(modelAnswer, unresolved, options);
       if (!corrected.length) break;
-      const renamed = new Map(corrected.map((entry) => [entry.from, entry.to]));
-      for (const [from, to] of renamed) if (from !== to) corrections.push(`${from} → ${to}`);
-      speciesByStep = speciesByStep.map((step) => step.map((entry) => renamed.has(entry.name) ? { ...entry, name: renamed.get(entry.name)! } : entry));
-      await resolveAll([...renamed.values()]);
+      const renamed = new Map<string, string>();
+      for (const entry of corrected) {
+        if (entry.kind === 'structure') {
+          // The model answered with a structure instead of a name — an exotic cage or a named
+          // literature intermediate it cannot name. Keep the name as written and attach the
+          // structure; the naming pass below reads a name back from PubChem when it can.
+          speciesByStep = speciesByStep.map((step) => step.map((item) => item.name === entry.from ? { ...item, declaredSmiles: entry.to } : item));
+          continue;
+        }
+        if (entry.from !== entry.to) corrections.push(`${entry.from} → ${entry.to}`);
+        renamed.set(entry.from, entry.to);
+      }
+      if (renamed.size) {
+        speciesByStep = speciesByStep.map((step) => step.map((entry) => renamed.has(entry.name) ? { ...entry, name: renamed.get(entry.name)! } : entry));
+        await resolveAll([...renamed.values()]);
+      }
+    }
+
+    // A species the model could only give as a structure: try to read a name back from PubChem,
+    // so the route uses a real name where one exists. An unnamed structure keeps the author's
+    // SMILES and is disclosed as author-supplied.
+    const declaredSmiles = [...new Set(speciesByStep.flat().map((entry) => entry.declaredSmiles).filter((value): value is string => Boolean(value)))];
+    const nameByStructure = new Map<string, SpeciesStructureName>();
+    if (declaredSmiles.length && structureNamingAvailable()) {
+      try {
+        for (let start = 0; start < declaredSmiles.length; start += 48) {
+          options.signal?.throwIfAborted();
+          const named = await invokeNameStructures(runner, provider, declaredSmiles.slice(start, start + 48));
+          for (const entry of named) nameByStructure.set(entry.smiles, entry);
+        }
+      } catch { /* naming is best effort; the declared structure stands */ }
     }
 
     const resolvedByStep: ResolvedSpecies[][] = speciesByStep.map((step) => step.map((entry) => {
       const resolution = resolutions.get(entry.name);
       if (resolution?.status === 'resolved' && resolution.smiles) {
-        if (entry.declaredSmiles && entry.declaredSmiles !== resolution.smiles) corrections.push(`${entry.name}: \`${entry.declaredSmiles}\` → \`${resolution.smiles}\``);
+        // The name is authoritative in the names-first path, and the resolver now returns the
+        // canonical isomeric SMILES, so a model-declared writing is not compared here: an
+        // equivalent SMILES written differently would otherwise look like a correction.
         return { ...entry, status: 'resolved' as const, smiles: resolution.smiles, source: resolution.source ?? 'pubchem', ...(resolution.formula ? { formula: resolution.formula } : {}) };
       }
-      if (entry.declaredSmiles) return { ...entry, status: 'fallback' as const, smiles: entry.declaredSmiles, source: 'declared' as const };
+      if (entry.declaredSmiles) {
+        const named = nameByStructure.get(entry.declaredSmiles);
+        const smiles = named?.canonicalSmiles ?? entry.declaredSmiles;
+        return { ...entry, status: 'fallback' as const, smiles, source: 'declared' as const, ...(named?.status === 'named' && named.name ? { name: named.name } : {}), ...(named?.formula ? { formula: named.formula } : {}) };
+      }
       return { ...entry, status: 'unresolved' as const, ...(resolution?.feedback ? { feedback: resolution.feedback } : {}) };
     }));
 
@@ -363,6 +464,7 @@ export async function resolveNamedRoute(
 
     const steps = buildRouteSteps(resolvedByStep);
     const labels: RouteSpeciesLabel[][] = resolvedByStep.map((step) => step.filter((entry) => entry.smiles).map((entry) => ({ role: entry.role, byproduct: entry.byproduct, name: entry.name, smiles: entry.smiles! })));
+    const authorStructures = resolvedByStep.flat().filter((entry) => entry.status === 'fallback' && entry.smiles).map((entry) => `${entry.name} — \`${entry.smiles}\``);
     const annotated = `${annotateSpeciesSmiles(finalAnswer, resolvedByStep).trimEnd()}\n`;
     return {
       answer: annotated,
@@ -370,134 +472,20 @@ export async function resolveNamedRoute(
       labels,
       consistent: critical.length === 0,
       corrections,
+      authorStructures,
       ...(critical.length ? { clarification: formatUnresolvedNameClarification(critical) } : {}),
       legacy: false,
     };
   } catch {
     return legacy;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }
 
-// ------------------------------------------------- name/prose consistency (legacy gate)
-
-/** How many times the route may be sent back to the model for a name/SMILES rewrite. */
-const CONSISTENCY_ATTEMPTS = 2;
-
-export interface RouteConsistencyOutcome {
-  answer: string;
-  /** False when the gate could not be resolved automatically. The route is still returned
-   *  and rendered; `clarification` is a `nodus-route-fix` fence the caller appends after the
-   *  route report, so a name disagreement annotates the answer instead of hiding it. */
-  consistent: boolean;
-  /** The one-click clarification, present only when `consistent` is false. */
-  clarification?: string;
-}
-
-/** One model call comparing every named species' IUPAC name and SMILES to the step prose.
- *  An unreadable reply returns null, which the caller treats as "not checked" rather than a
- *  fabricated failure. */
-async function checkRouteConsistency(
-  answer: string,
-  steps: string[],
-  labels: RouteSpeciesLabel[][],
-  options: InspectOptions,
-): Promise<RouteConsistencyVerdict | null> {
-  try {
-    const raw = await completeText({
-      system: ROUTE_CONSISTENCY_SYSTEM,
-      user: buildRouteConsistencyRequest(answer, steps, labels),
-      temperature: 0,
-      maxTokens: 1400,
-    }, options.model ?? null);
-    return parseRouteConsistencyVerdict(raw);
-  } catch {
-    return null;
-  }
-}
-
-/** One model call rewriting only the names and reaction SMILES so they agree with the fixed
- *  prose. Returns the corrected answer, or the model's ambiguity question. */
-async function repairRouteConsistency(
-  answer: string,
-  steps: string[],
-  labels: RouteSpeciesLabel[][],
-  verdict: RouteConsistencyVerdict,
-  options: InspectOptions,
-): Promise<{ text: string } | { ambiguous: string } | null> {
-  try {
-    const raw = await completeText({
-      system: ROUTE_REPAIR_SYSTEM,
-      user: buildRouteRepairRequest(answer, steps, labels, verdict),
-      temperature: 0,
-      maxTokens: 6000,
-    }, options.model ?? null);
-    const text = raw.trim();
-    if (!text) return null;
-    const ambiguous = /^AMBIGUOUS\b\s*:?\s*/i.exec(text);
-    if (ambiguous) return { ambiguous: text.slice(ambiguous[0].length).trim().slice(0, 1200) };
-    // A repair that echoes our own request, or loses the reaction lines, is not an answer;
-    // treating it as no repair keeps the original text instead of pasting the request into it.
-    if (hasCheckerScaffolding(text)) return null;
-    return findReactionLines(text).length ? { text } : null;
-  } catch {
-    return null;
-  }
-}
-
-/** The name/prose gate that runs before any of the other chemistry checks. When the answer
- *  names its species, every IUPAC name and isomeric SMILES must denote the structure the
- *  step prose describes; a disagreement is rewritten up to `CONSISTENCY_ATTEMPTS` times and
- *  otherwise becomes a one-click clarification. An answer with no names, or one where no
- *  model is available to check, is passed through untouched. */
-export async function ensureRouteConsistency(
-  finalAnswer: string,
-  modelAnswer: string,
-  options: InspectOptions = {},
-): Promise<RouteConsistencyOutcome> {
-  if (options.enabled === false) return { answer: finalAnswer, consistent: true };
-  let steps = findReactionLines(modelAnswer);
-  if (!steps.length) return { answer: finalAnswer, consistent: true };
-  let labels = findStepSpeciesLabels(modelAnswer, steps.length);
-  if (!labels.some((entries) => entries.length)) return { answer: finalAnswer, consistent: true };
-
-  let answer = finalAnswer;
-  let current = modelAnswer;
-  for (let attempt = 0; attempt <= CONSISTENCY_ATTEMPTS; attempt += 1) {
-    options.signal?.throwIfAborted();
-    // A structure listed under two roles, or a species in the species list that is not in
-    // the step's reaction line (or vice versa), is a deterministic failure; every other
-    // disagreement is semantic and needs the model to read the prose.
-    const deterministic = [...findDuplicateRoleProblems(labels), ...findStepEquationProblems(steps, labels)];
-    const verdict: RouteConsistencyVerdict | null = deterministic.length
-      ? { status: 'mismatch', problems: deterministic }
-      : await checkRouteConsistency(current, steps, labels, options);
-    // No verdict is a transport/shape failure, not a chemical disagreement: fail open.
-    if (!verdict || verdict.status === 'ok') return { answer, consistent: true };
-    // The clarification is returned beside the answer, not spliced into it: the route is still
-    // checked and drawn by the caller, so a name disagreement annotates rather than hides it.
-    if (verdict.status === 'ambiguous' || attempt === CONSISTENCY_ATTEMPTS) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, verdict.question) };
-    }
-    const repaired = await repairRouteConsistency(current, steps, labels, verdict, options);
-    if (!repaired) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, verdict.question) };
-    }
-    if ('ambiguous' in repaired) {
-      return { answer, consistent: false, clarification: formatRouteClarification(verdict.problems, repaired.ambiguous) };
-    }
-    // Only the route is rewritten; if the repair loses the named species there is nothing
-    // left to check and the corrected answer stands on its own.
-    current = repaired.text;
-    answer = repaired.text;
-    steps = findReactionLines(current);
-    if (!steps.length) return { answer, consistent: true };
-    labels = findStepSpeciesLabels(current, steps.length);
-    if (!labels.some((entries) => entries.length)) return { answer, consistent: true };
-  }
-  return { answer, consistent: true };
-}
+/** How many step drawings compile at once. Each compile forks its own RDKit subworker, so a
+ *  small pool hides the RDKit load without thrashing the machine. */
+const DRAW_CONCURRENCY = 2;
 
 /** Draws every step the checker accepted, in order, on the runner already opened for the
  *  route check. A step the checker refused is never auto-drawn: the verified lane abstains
@@ -510,9 +498,8 @@ async function drawRouteSteps(
   audit: RouteAudit,
   options: InspectOptions,
 ): Promise<string> {
-  const figures: string[] = [];
+  const drawable: RouteStepAudit[] = [];
   const skipped: string[] = [];
-  let drawn = 0;
   for (const step of audit.steps) {
     const reason = !step.ok
       ? step.error ?? 'could not be parsed'
@@ -524,33 +511,48 @@ async function drawRouteSteps(
             ? `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
             : '';
     if (reason) { skipped.push(`- Step ${step.index + 1} — ${reason}`); continue; }
-    if (drawn >= MAX_ROUTE_DRAWINGS) { skipped.push(`- Step ${step.index + 1} — not drawn (limit of ${MAX_ROUTE_DRAWINGS} reached)`); continue; }
-    options.signal?.throwIfAborted();
-    const reactionSmiles = steps[step.index];
-    try {
-      // The step's "Reagents and conditions:" prose is the only source for temperature,
-      // time and workup; the plugin sanitizes it to arrow text and drops it rather than
-      // fail the drawing. Empty when the model wrote no such line.
-      const condition = conditions[step.index] ?? '';
-      // A declared-racemic step has open centres by design, so tell the renderer to draw it
-      // with them unspecified instead of refusing the unspecified stereocentre.
-      const plan = JSON.stringify({ version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles, ...(condition ? { conditions: condition } : {}), ...(step.racemic ? { racemic: true } : {}) });
-      const result = await runner.invoke({ provider, toolId: COMPILE_TOOL, input: { plan, question: reactionSmiles } });
-      const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'chemistry-document');
-      // One block per step. A stored reference and its inline view would each render the
-      // same drawing, so the route shows the view alone.
-      if (!artifact?.view) { skipped.push(`- Step ${step.index + 1} — the verified drawing could not be produced`); continue; }
-      figures.push(runner.renderView({ provider, view: artifact.view as ViewDocumentV1 }));
-      drawn += 1;
-    } catch (error) {
-      skipped.push(`- Step ${step.index + 1} — ${error instanceof Error ? error.message : 'could not be drawn'}`);
-    }
+    if (drawable.length >= MAX_ROUTE_DRAWINGS) { skipped.push(`- Step ${step.index + 1} — not drawn (limit of ${MAX_ROUTE_DRAWINGS} reached)`); continue; }
+    drawable.push(step);
   }
+  const figures: Array<{ index: number; view: string } | null> = new Array(drawable.length).fill(null);
+  let cursor = 0;
+  const run = async () => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= drawable.length) return;
+      const step = drawable[index];
+      options.signal?.throwIfAborted();
+      const reactionSmiles = steps[step.index];
+      try {
+        // The step's "Reagents and conditions:" prose is the only source for temperature,
+        // time and workup; the plugin sanitizes it to arrow text and drops it rather than
+        // fail the drawing. Empty when the model wrote no such line.
+        const condition = conditions[step.index] ?? '';
+        // The route checker already accepted this step, so draw its open centres as
+        // unspecified rather than refusing — a step whose only open centre is on a reactant
+        // (a purchased input) must still render. A declared-racemic product keeps its flag.
+        const plan = JSON.stringify({ version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles, openStereo: true, ...(condition ? { conditions: condition } : {}), ...(step.racemic ? { racemic: true } : {}) });
+        const result = await runner.invoke({ provider, toolId: COMPILE_TOOL, input: { plan, question: reactionSmiles } });
+        const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'chemistry-document');
+        // One block per step. A stored reference and its inline view would each render the
+        // same drawing, so the route shows the view alone.
+        if (!artifact?.view) { skipped.push(`- Step ${step.index + 1} — the verified drawing could not be produced`); continue; }
+        figures[index] = { index: step.index, view: runner.renderView({ provider, view: artifact.view as ViewDocumentV1 }) };
+      } catch (error) {
+        skipped.push(`- Step ${step.index + 1} — ${error instanceof Error ? error.message : 'could not be drawn'}`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(DRAW_CONCURRENCY, drawable.length) }, run));
+  const ordered = figures.filter((figure): figure is { index: number; view: string } => figure !== null);
   // Nothing drawable is not a drawings section; the route report already says why each
   // step was refused.
-  if (!figures.length) return '';
-  const lines = ['### Route drawings (RDKit)', '', ...figures];
-  if (skipped.length) lines.push('', 'Not drawn:', ...skipped);
+  if (!ordered.length) return '';
+  // Label each scheme with the step it is, so the drawings line up with the report and the
+  // "Fix step N" chips instead of floating unlabelled under the route.
+  const lines = ['### Route drawings (RDKit)', '', ...ordered.flatMap((figure) => [`**Step ${figure.index + 1}**`, '', figure.view, ''])];
+  if (skipped.length) lines.push('Not drawn:', ...skipped);
   return `\n${lines.join('\n')}\n`;
 }
 
@@ -563,29 +565,39 @@ export async function appendRouteReportAndDrawings(
   overrides: { steps?: string[]; labels?: RouteSpeciesLabel[][] } = {},
 ): Promise<string> {
   if (options.enabled === false || !routeVerificationAvailable()) return finalAnswer;
-  // The name-first path derives the equations from resolved names and passes them in; the
-  // legacy path parses reaction lines the model wrote itself.
-  const steps = overrides.steps?.length ? overrides.steps : findReactionLines(modelAnswer);
-  if (!steps.length) return finalAnswer;
+  // The names-first path derives the equations from the resolved names and passes them in.
+  const steps = overrides.steps ?? [];
+  const labels = overrides.labels ?? [];
+  if (!steps.length || !labels.some((entries) => entries.length)) return finalAnswer;
   const conditions = findStepConditions(modelAnswer, steps.length);
-  const labels = overrides.labels ?? findStepSpeciesLabels(modelAnswer, steps.length);
+  const stepProse = findStepProse(modelAnswer, steps.length);
   const racemic = declaresRacemic(modelAnswer);
   const provider = routeProvider();
   if (!provider) return finalAnswer;
   const compile = compileProvider();
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
     if (!audit) return finalAnswer;
-    const report = formatRouteAudit(audit, labels);
+    // One model review looks for plan problems the checker cannot see (prose vs names, a
+    // product that is a different compound, a step that cannot work, a redundant step). It is
+    // blocking: a finding marks the route not verified. An unreadable reply never blocks. It
+    // runs while the drawings compile, so the reviewer and the drawings overlap.
+    const reviewPromise = requestRouteReview(options.question ?? '', labels, audit, options, stepProse);
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';
-    // A refusal the checker can name and the app cannot fix is offered back to the model as
-    // one click: it proposes a corrected step, and this same path checks and draws it again.
-    const fix = formatRouteFixPrompt(steps, audit);
+    // Paint the deterministic report and drawings before the reviewer returns. The transport
+    // replaces the provisional stream with this returned answer, so the route only waits on
+    // the reviewer when the reviewer is the last thing outstanding.
+    if (options.onDeterministic) options.onDeterministic(`${finalAnswer.trimEnd()}\n\n${formatRouteAudit(audit, labels, null)}\n${drawings}`);
+    const review = await reviewPromise;
+    const report = formatRouteAudit(audit, labels, review);
+    // A refusal the checker can name and the app cannot fix is offered back to the model as one
+    // click: names and roles only — the model never authored the derived SMILES.
+    const fix = formatNamedRouteFixPrompts(labels, audit, review);
     return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${fix ? `\n${fix}\n` : ''}`;
   } catch {
     return finalAnswer;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -602,33 +603,92 @@ test('the research atlas holds its five facets on one row on a desktop screen', 
   // neighbour down: it follows the width the row hands it, keeps its name, and
   // ellipsizes the value, which refuses to shrink past a readable stub.
   assert.match(desktop, /\.atlas-facet-button \{ width: 100%; \}/, 'a pill follows the width it is given');
-  assert.match(desktop, /\.atlas-facet-value \{ min-width: 3\.4em; \}/, 'a value keeps a readable stub');
+  assert.match(desktop, /\.atlas-facet-value \{ min-width: 2\.4em; \}/, 'a value keeps a readable stub');
   assert.match(css, /\.atlas-facet-button \{[\s\S]*?max-width: 225px/, 'a pill is still capped');
   assert.match(css, /\.atlas-facet-value \{[^}]*text-overflow: ellipsis/, 'its value ellipsizes instead of overflowing');
   assert.match(css, /\.atlas-reset \{[\s\S]*?flex: 0 0 auto; white-space: nowrap;/, 'Clear filters keeps its one line');
+
+  // The row is handed a width, so the pill's floor has to live on the box the
+  // row actually hands it to. A flex item will not shrink past its contents
+  // unless told to, and this one wraps a button declared `width: 100%`, whose
+  // content size resolves back to its own width — which is how the row's
+  // minimum came to be five unshrunk pills and the row overflowed its
+  // container below ~1015px, cut at both edges because it is centred.
+  const wrapper = css.match(/\.atlas-facet \{[^}]*\}/)?.[0];
+  assert.ok(wrapper, 'the facet wrapper states its own size');
+  assert.match(wrapper, /min-width: 0/, 'the wrapper may be handed a smaller width than its pill wants');
+  assert.match(desktop, /\.atlas-facet \{ min-width: calc\(2\.6em \+ 2\.4em \+ 54px\); \}/,
+    'and it stops shrinking where the pill stops being usable');
+  // The label is the facet's stable name, so it gives way after the value: a
+  // smaller shrink weight is what keeps two pills from both reading "Co…".
+  assert.match(desktop, /\.atlas-facet-label \{ min-width: 2\.6em; flex-shrink: \.35; \}/,
+    'the label outlasts the value when the row is squeezed');
 });
 
-test('the atlas dropdowns open a dark list, not the system default', () => {
+test('the atlas engine opens a list the page draws, not one the system paints', () => {
   const css = read('assets/css/research-atlas.css');
+  const page = read('research-atlas/index.html');
+  const script = read('assets/js/research-atlas.js');
   const bookmarks = fs.readFileSync(path.join(repoRoot, 'src', 'components', 'browser', 'NodusBookmarks.css'), 'utf8');
 
-  // The engine list ("Directory", "Google", …) is drawn by the platform: all the
-  // page can tell it is which colours to use, and it used to say white surface
-  // with #111 text, which is how a dark search bar opened a light menu.
-  assert.match(css, /\.atlas-engine \{[\s\S]*?color-scheme: dark;/, 'the control asks for the dark scheme itself');
-  assert.match(
-    css,
-    /\.atlas-engine option,\nselect\.atlas-facet-button option \{ color: var\(--ink\); background: var\(--raised\); \}/,
-    'the options carry the site surface and ink',
-  );
-  assert.match(css, /\.atlas-engine option:checked,\nselect\.atlas-facet-button option:checked \{ color: var\(--violet-3\); \}/,
-    'the chosen one carries the accent');
+  // The engine list ("Directory", "Google", …) was a <select>, and the platform
+  // painted its popup from its own appearance setting: a dark page opened a
+  // light menu, and `color-scheme: dark` reached the closed control and every
+  // <option>'s computed style without reaching the popup. No <select> may come
+  // back, because no declaration on the page can dress one.
+  assert.doesNotMatch(page, /<select/, 'the atlas no longer hands a popup to the platform');
+  assert.match(page, /<div class="atlas-engine-menu"[^>]*role="listbox"/, 'the engine list is the page\'s own');
+  assert.match(page, /id="atlas-engine"[^>]*aria-haspopup="listbox"/, 'the control announces the list it opens');
+
+  // Drawn here, so it is dark by construction: the same dark surface the facet
+  // panels use, and its own tick instead of the platform's checkmark.
+  assert.match(css, /\.atlas-engine-menu \{[\s\S]*?background: rgba\(10,8,19,\.97\)/,
+    'the engine list carries the atlas surface');
+  assert.match(css, /\.atlas-engine-menu \{[\s\S]*?border: 1px solid var\(--membrane\)/,
+    'and the atlas border');
+  assert.match(css, /\.atlas-engine-tick \{[\s\S]*?opacity: 0;/, 'the tick is drawn, hidden by default');
+  assert.match(css, /\.atlas-engine-option\.is-selected \.atlas-engine-tick \{ opacity: 1; \}/,
+    'and shown on the chosen engine');
+  assert.match(css, /\.atlas-engine-menu \{[^}]*z-index: 70/, 'the list rides above the facet row');
+  assert.match(css, /\.atlas-searchbar \{[\s\S]*?position: relative; z-index: 20;/,
+    'the bar its list hangs from is raised with it');
   assert.doesNotMatch(css, /#fff|#111/, 'no light menu is left in the atlas styles');
 
-  // Those two rules also reach the app: its start pages read this stylesheet
-  // directly, and there they wear the facet pill on a <select> of their own.
+  // The list is built from one list of engines, and the choice decides what the
+  // field promises to do.
+  assert.match(script, /const ENGINES = \[/, 'the engines live in one list');
+  assert.match(script, /function renderEngineMenu\(\)/, 'the list is rendered from it');
+  assert.match(script, /function chooseEngine\(value\)/, 'choosing one is a single path');
+
+  // That stylesheet also reaches the app: its start pages read it directly
+  // (NodusBookmarks.css imports it) and dress their facet buttons with the same
+  // pill. The app has no engine control of its own, only a static label.
   assert.match(bookmarks, /@import url\('\.\.\/\.\.\/\.\.\/site\/assets\/css\/research-atlas\.css'\)/,
     'the in-app start pages import the atlas stylesheet');
-  assert.match(read('research-atlas/index.html'), /<select class="atlas-engine"/, 'the site keeps the engine dropdown');
   assert.match(bookmarks, /--raised: ?#100d1c;/, 'the imported tokens resolve inside the app as well');
+});
+
+test('every stylesheet the site serves actually parses', () => {
+  // Nothing else here parses CSS. Every other assertion about these files is a
+  // regular expression, so a sheet with an unbalanced brace satisfies all of
+  // them and ships — which is exactly what happened: a stray `}` left in
+  // research-atlas.css passed this whole file, and was caught only by the app's
+  // Vite build, which is not on the site's own path to production.
+  const require = createRequire(import.meta.url);
+  const { parse } = require('postcss');
+  const stylesheets = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name.endsWith('.css')) stylesheets.push(full);
+    }
+  };
+  walk(path.join(siteRoot, 'assets/css'));
+  assert.ok(stylesheets.length > 0, 'the site ships stylesheets to check');
+  for (const sheet of stylesheets) {
+    const relative = path.relative(siteRoot, sheet);
+    assert.doesNotThrow(() => parse(fs.readFileSync(sheet, 'utf8'), { from: sheet }),
+      `site/${relative} parses`);
+  }
 });

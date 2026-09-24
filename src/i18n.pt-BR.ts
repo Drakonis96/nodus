@@ -8732,6 +8732,8 @@ export const PT_BR: Record<string, string> = {
   "Se importaron {bookmarks} marcadores y {folders} carpetas. Se omitieron {duplicates} duplicados.": "Foram importados {bookmarks} marcadores e {folders} pastas. {duplicates} duplicados ignorados.",
   "{bookmarks} marcadores · {folders} carpetas · privado y local": "{bookmarks} marcadores · {folders} pastas · privado e local",
   "Buscar marcadores…": "Buscar marcadores…",
+  "Buscar {label}…": "Buscar {label}…",
+  "Sin opciones coincidentes.": "Sem opções correspondentes.",
   "Marcador": "Marcador",
   "Vista previa de importación · {fileName}": "Prévia de importação · {fileName}",
   "{bookmarks} marcadores · {folders} carpetas · {duplicates} duplicados · {invalidUrls} URL no válidas omitidas": "{bookmarks} marcadores · {folders} pastas · {duplicates} duplicados · {invalidUrls} URLs inválidas ignoradas",

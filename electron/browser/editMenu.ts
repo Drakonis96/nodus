@@ -47,6 +47,24 @@ export interface EditEntry {
   enabled: boolean;
 }
 
+/**
+ * Chromium's verdict on the three clipboard actions, read defensively.
+ *
+ * A real `context-menu` event always carries `editFlags`, and both menus that
+ * need it used to read straight through the block. That is one dereference away
+ * from a handler that throws, and a handler that throws produces NO menu at all
+ * — the worst possible outcome for a right-click. A missing block can only mean
+ * "nothing is available", so it degrades to three disabled entries instead.
+ */
+export function editFlagsOf(params: { editFlags?: Partial<Pick<EditContext, 'canCut' | 'canCopy' | 'canPaste'>> }):
+Pick<EditContext, 'canCut' | 'canCopy' | 'canPaste'> {
+  return {
+    canCut: params.editFlags?.canCut ?? false,
+    canCopy: params.editFlags?.canCopy ?? false,
+    canPaste: params.editFlags?.canPaste ?? false,
+  };
+}
+
 const ICONS: Record<EditAction, BrowserMenuIcon> = { cut: 'cut', copy: 'copy', paste: 'paste' };
 
 /**
@@ -136,9 +154,7 @@ export function installAppEditContextMenu(contents: WebContents, t: (key: string
     const context: EditContext = {
       isEditable: params.isEditable,
       hasSelection: Boolean(String(params.selectionText ?? '').trim()),
-      canCut: params.editFlags.canCut,
-      canCopy: params.editFlags.canCopy,
-      canPaste: params.editFlags.canPaste,
+      ...editFlagsOf(params),
       clipboardHasContent: clipboardHasContent(),
     };
     // Nothing to offer: leave the event alone rather than popping an empty menu.
