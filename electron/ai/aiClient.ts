@@ -1259,17 +1259,27 @@ async function rawCompleteTransport(
       ...(opts.noRetry ? { maxRetries: 0 } : {}),
       ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
     });
+    const create = () => client.messages.create({
+      model: model.model,
+      max_tokens: opts.maxTokens ?? 8000,
+      ...requestSamplingBody(model, opts, reasoning),
+      ...researchBody(model, opts),
+      system: opts.system,
+      messages: [
+        { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
+      ],
+    }, { signal: opts.signal });
     try {
-      const res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => client.messages.create({
-        model: model.model,
-        max_tokens: opts.maxTokens ?? 8000,
-        ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
-        system: opts.system,
-        messages: [
-          { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
-        ],
-      }, { signal: opts.signal }));
+      let res;
+      try {
+        res = await scheduleProviderRequest(model, opts, key, 'anthropic', create);
+      } catch (e: any) {
+        // A Claude that deprecates `temperature` answers 400: drop it and remember the model
+        // (the OpenAI-compatible transport does the same), rather than failing the turn.
+        if (opts.noRetry || !rejectsTemperatureParameter(e)) throw e;
+        rememberTemperatureUnsupported(model);
+        res = await scheduleProviderRequest(model, opts, key, 'anthropic', create);
+      }
       const block = res.content.find((b: any) => b.type === 'text');
       if ((jsonMode || opts.requireCompleteOutput) && (res as any).stop_reason === 'max_tokens') {
         throw new AiError(
@@ -1996,23 +2006,32 @@ async function rawCompleteStreamTransport(
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
-    try {
-      await scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
-        const stream = await (client.messages.create as any)({
-          model: model.model,
-          max_tokens: opts.maxTokens ?? 8000,
-          ...requestSamplingBody(model, opts, reasoning),
+    const streamOnce = () => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
+      const stream = await (client.messages.create as any)({
+        model: model.model,
+        max_tokens: opts.maxTokens ?? 8000,
+        ...requestSamplingBody(model, opts, reasoning),
         ...researchBody(model, opts),
-          system: opts.system,
-          stream: true,
-          messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
-        }, { signal });
-        for await (const event of stream as AsyncIterable<any>) {
-          if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
-          else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
-          else if (event?.type === 'text') emitContent(event.text);
-        }
-      });
+        system: opts.system,
+        stream: true,
+        messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
+      }, { signal });
+      for await (const event of stream as AsyncIterable<any>) {
+        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
+        else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
+        else if (event?.type === 'text') emitContent(event.text);
+      }
+    });
+    try {
+      try {
+        await streamOnce();
+      } catch (e: any) {
+        // A Claude that deprecates `temperature` answers 400 before any content streams:
+        // drop it, remember the model, and replay once.
+        if (signal?.aborted || opts.noRetry || !rejectsTemperatureParameter(e)) throw e;
+        rememberTemperatureUnsupported(model);
+        await streamOnce();
+      }
     } catch (e: any) {
       // A user-triggered stop surfaces as an abort here — keep the partial answer
       // that already streamed instead of failing the whole turn.
