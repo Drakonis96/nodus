@@ -9,6 +9,7 @@ import { extractLibraryItemInWorker, libraryExtractionWorkerAvailable } from '..
 import { itemChildren, attachmentFilePath, itemAsAttachment } from '../zotero/zoteroClient';
 import { researchFingerprint } from './researchCorpusScope';
 import { getGlobalLibraryItem, globalLibraryAttachmentPath } from '../library/libraryService';
+export { readDocumentarySourceMap } from '../library/librarySourcePages';
 
 export interface DocumentarySourcePart { text: string; sourceMap: Record<string, string>; attachmentId: string; attachmentRevision: string }
 
@@ -26,16 +27,6 @@ export function documentarySourceText(markdown: string, map: LibrarySourceMap | 
   }
   parts.push(markdown.slice(position));
   return parts.join('');
-}
-
-export function readDocumentarySourceMap(folder: string, relativePath = 'source-map.json'): LibrarySourceMap | null {
-  try {
-    const root = fs.realpathSync(folder);
-    const target = fs.realpathSync(path.resolve(folder, relativePath));
-    if (!target.startsWith(`${root}${path.sep}`)) return null;
-    const result = JSON.parse(fs.readFileSync(target, 'utf8')) as LibrarySourceMap;
-    return result.version === 1 && Array.isArray(result.blocks) && result.reader?.sha256 ? result : null;
-  } catch { return null; }
 }
 
 export function documentaryReaderComplete(folder: string, relativePath?: string): boolean {

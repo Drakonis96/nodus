@@ -20,6 +20,7 @@ import { csvFileToText, xlsxFileToText } from './tabular';
 import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
+import { libraryMarkdownWithPageMarkers, readDocumentarySourceMap } from '../library/librarySourcePages';
 import { cleanExtractedText } from './textCleanup';
 import type { PipelineLogReasonId } from '@shared/pipelineLogMessages';
 import { logPipelineWarning } from '../logging/pipelineLogCore';
@@ -914,6 +915,8 @@ export async function resolveWorkText(
   try {
     const clean = getLibraryReaderRawContent(zoteroKey);
     if (clean?.markdown.trim()) {
+      // The clean copy has no page markers of its own; its source map has the pages.
+      const text = libraryMarkdownWithPageMarkers(clean.markdown, readDocumentarySourceMap(clean.folder, clean.sourceMapFile));
       return combineSegments([{
         sourceRef: `library:${zoteroKey}`,
         marker: '',
@@ -922,10 +925,10 @@ export async function resolveWorkText(
         zoteroLibraryId: null,
         attachmentKey: null,
         displayName: clean.document.title,
-        text: clean.markdown,
-        contentHash: textHash(clean.markdown),
+        text,
+        contentHash: textHash(text),
         pageCount: clean.document.pageCount,
-        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(clean.markdown),
+        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(text),
       }], 'Versión limpia de la Biblioteca global.', clean.document.originalAvailable);
     }
   } catch {
