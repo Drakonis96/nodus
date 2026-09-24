@@ -1296,6 +1296,11 @@ async function rawCompleteTransport(
         } else throw e;
       }
       const block = res.content.find((b: any) => b.type === 'text');
+      // A safety refusal returns no text and its own stop reason; without this it read as an
+      // empty response. Checked before the text is read so the reason is never lost.
+      if ((res as any).stop_reason === 'refusal') {
+        throw new AiError('El modelo se negó a responder a esta solicitud.', false, false, null);
+      }
       if ((jsonMode || opts.requireCompleteOutput) && (res as any).stop_reason === 'max_tokens') {
         throw new AiError(
           jsonMode ? truncatedJsonMessage(model, opts.maxTokens ?? 8000) : truncatedOutputMessage(model, opts.maxTokens ?? 8000),
@@ -1496,6 +1501,11 @@ async function rawCompleteTransport(
     // response guard so chunk-aware callers can recover by bisecting the input instead
     // of treating a recoverable truncation as a terminal provider failure.
     if (!content.trim()) {
+      if ((choice as any)?.finish_reason === 'content_filter') {
+        // A filtered completion is a refusal, not an outage; naming it keeps the user from
+        // retrying a request the provider will keep declining.
+        throw new AiError('El modelo se negó a responder a esta solicitud.', false);
+      }
       if ((choice as any)?.finish_reason === 'error') {
         // OpenRouter can surface an upstream failure as a syntactically successful
         // HTTP response with an empty choice. Unlike an ambiguous timeout, the server
@@ -2021,6 +2031,14 @@ async function rawCompleteStreamTransport(
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
+    // `message_delta` is the final event and the only one carrying `stop_reason`; the thinking
+    // token breakdown rides along with it. Kept outside `streamOnce` so a replay (temperature or
+    // thinking recovery) overwrites rather than inherits the previous attempt's outcome.
+    let stopReason: string | undefined;
+    let outputTokens: number | undefined;
+    let thinkingTokens: number | undefined;
+    let textDeltas = 0;
+    let thinkingDeltas = 0;
     const streamOnce = (adaptive = false) => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
       const stream = await (client.messages.create as any)({
         model: model.model,
@@ -2032,8 +2050,13 @@ async function rawCompleteStreamTransport(
         messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
       }, { signal });
       for await (const event of stream as AsyncIterable<any>) {
-        if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') emitContent(event.delta.text);
-        else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') emitReasoning(event.delta.thinking);
+        if (event?.type === 'message_delta') {
+          if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
+          if (typeof event.usage?.output_tokens === 'number') outputTokens = event.usage.output_tokens;
+          const breakdown = event.usage?.output_tokens_details;
+          if (typeof breakdown?.thinking_tokens === 'number') thinkingTokens = breakdown.thinking_tokens;
+        } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') { textDeltas += 1; emitContent(event.delta.text); }
+        else if (event?.type === 'content_block_delta' && event.delta?.type === 'thinking_delta') { thinkingDeltas += 1; emitReasoning(event.delta.thinking); }
         else if (event?.type === 'text') emitContent(event.text);
       }
     });
@@ -2061,7 +2084,24 @@ async function rawCompleteStreamTransport(
     }
     // Flush before the emptiness check: the held tail can be the whole answer.
     const answer = finish();
-    if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+    // An adaptive-thinking Claude spends output tokens thinking before it writes, so a long
+    // turn can hit the ceiling with next to no visible text. The stream does not say so on its
+    // own — `stop_reason` is the only signal — and silently storing the fragment is how a
+    // two-line "answer" reached the user. Surface it like the non-streaming paths do.
+    // A safety refusal comes back as `stop_reason: 'refusal'` with a thinking block and no text.
+    // Without this branch it fell through to "empty response", which reads as a provider outage.
+    if (stopReason === 'refusal') {
+      console.error(`[anthropic-stream] stop_reason=refusal output_tokens=${outputTokens ?? '?'} thinking_tokens=${thinkingTokens ?? '?'} text_deltas=${textDeltas} model=${model.model}`);
+      throw new AiError('El modelo se negó a responder a esta solicitud.', false, false, null);
+    }
+    if (stopReason === 'max_tokens') {
+      console.error(`[anthropic-stream] stop_reason=max_tokens output_tokens=${outputTokens ?? '?'} thinking_tokens=${thinkingTokens ?? '?'} text_deltas=${textDeltas} max_tokens=${opts.maxTokens ?? 8000} model=${model.model}`);
+      throw new AiError(truncatedOutputMessage(model, opts.maxTokens ?? 8000), false, false, 'output_truncated');
+    }
+    if (!answer.trim()) {
+      console.error(`[anthropic-stream] empty answer stop_reason=${stopReason ?? 'none'} output_tokens=${outputTokens ?? '?'} thinking_tokens=${thinkingTokens ?? '?'} text_deltas=${textDeltas} thinking_deltas=${thinkingDeltas} max_tokens=${opts.maxTokens ?? 8000} model=${model.model}`);
+      throw new AiError('Respuesta vacía del proveedor de IA.', false);
+    }
     return answer;
   }
 
@@ -2103,6 +2143,9 @@ async function rawCompleteStreamTransport(
   const extras = optionalBody(model, false, reasoning, opts);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
   const compatStarted = Date.now();
+  // The last chunk's `finish_reason` is the only truncation signal on this transport; capture it
+  // so a stream cut at the output ceiling is reported instead of silently stored as the answer.
+  let finishReason: string | undefined;
   const consumeStream = async (
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
@@ -2121,7 +2164,9 @@ async function rawCompleteStreamTransport(
           }
           throw new AiError(msg, false);
         }
-        const delta = chunk?.choices?.[0]?.delta;
+        const choice = chunk?.choices?.[0];
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        const delta = choice?.delta;
         emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
         emitContent(delta?.content);
       }
@@ -2189,6 +2234,12 @@ async function rawCompleteStreamTransport(
   }
   // Flush before the emptiness check: the held tail can be the whole answer.
   const answer = finish();
+  if (/^content_filter$/i.test(finishReason ?? '')) {
+    throw new AiError('El modelo se negó a responder a esta solicitud.', false);
+  }
+  if (/^(length|max_tokens|max_output_tokens)$/i.test(finishReason ?? '')) {
+    throw new AiError(truncatedOutputMessage(model, maxTokens), false, false, 'output_truncated');
+  }
   if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
   return answer;
 }

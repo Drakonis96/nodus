@@ -141,6 +141,31 @@ test('newer Claude models replay with adaptive thinking when they reject thinkin
   assert.match(sampling, /export function rememberAdaptiveThinking\(model: ModelRef\): void \{/);
 });
 
+test('a streamed answer cut at the output ceiling is reported, not stored', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const options = readFileSync(path.join(repoRoot, 'electron/ai/researchGenerationOptions.ts'), 'utf8');
+  // The Anthropic stream reads the only truncation signal it has — `stop_reason` on the final
+  // `message_delta`, plus the thinking-token breakdown — and refuses to store the fragment.
+  assert.match(source, /stopReason = event\.delta\.stop_reason/);
+  assert.match(source, /event\.usage\?\.output_tokens_details/);
+  assert.match(source, /if \(stopReason === 'max_tokens'\) \{/);
+  assert.match(source, /truncatedOutputMessage\(model, opts\.maxTokens \?\? 8000\), false, false, 'output_truncated'/);
+  // A safety refusal returns no text and its own stop reason, so it must be named, not read
+  // as an empty response — on both the streaming and the non-streaming Anthropic path.
+  assert.equal((source.match(/El modelo se negó a responder a esta solicitud\./g) ?? []).length, 4);
+  assert.match(source, /if \(stopReason === 'refusal'\) \{/);
+  assert.match(source, /\(res as any\)\.stop_reason === 'refusal'/);
+  // The OpenAI-compatible stream has the same gap, keyed off `finish_reason`.
+  assert.match(source, /finishReason = choice\.finish_reason/);
+  assert.match(source, /test\(finishReason \?\? ''\)/);
+  assert.match(source, /truncatedOutputMessage\(model, maxTokens\), false, false, 'output_truncated'/);
+  // Adaptive models cannot disable thinking and its tokens count against `max_tokens`, so the
+  // request reserves the documented depth instead of the manual `budget_tokens` allowance.
+  assert.match(options, /const ADAPTIVE_THINKING_ALLOWANCE/);
+  assert.match(options, /profile\.mode === 'anthropic-adaptive'/);
+  assert.match(options, /ADAPTIVE_THINKING_ALLOWANCE\[native \?\? 'none'\] \?\? researchThinkingAllowance\(native\)/);
+});
+
 test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
   // The predicates are imported, not reimplemented locally.
