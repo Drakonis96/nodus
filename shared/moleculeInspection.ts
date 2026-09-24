@@ -749,7 +749,7 @@ export const ROUTE_FIX_PROMPT_LEAD = 'Correction needed for the synthesis route 
  *  every generated correction is recognisable. */
 export const ROUTE_FIX_STEP_LEAD = 'Correction needed for step ';
 export const ROUTE_CLARIFICATION_LEAD = 'The species names in the synthesis route above do not match the prose, or the prose is ambiguous, and the correction could not be resolved automatically. Please confirm the intended chemistry.';
-export const ROUTE_UNRESOLVED_LEAD = 'The application could not resolve some species names to structures, so those steps could not be built. Please give the correct systematic IUPAC name for each unresolved species.';
+export const ROUTE_UNRESOLVED_LEAD = 'The application could not resolve some species names to structures, so those steps could not be built. For each unresolved species give its correct systematic IUPAC name, or — when you cannot name it — its isomeric SMILES (write it as its name followed by the SMILES in backticks).';
 export const ROUTE_MISSING_SPECIES_LEAD = 'The synthesis route describes steps but does not list the species under the four required labels, so the application could not check or draw it.';
 
 /** Whether a user message is a correction the application generated (a route-fix chip or a
@@ -1262,7 +1262,8 @@ const NAMES_ONLY_FORMAT = [
 ];
 
 const NAMES_ONLY_RULES = [
-  'Do not write SMILES, formulae or a reaction line — the application derives the structure and the balanced equation from your names. Rules that resolve these failures:',
+  'Do not write SMILES, formulae or a reaction line — the application derives the structure and the balanced equation from your names, with one exception. Rules that resolve these failures:',
+  '- If, and only if, you cannot give a systematic name a reference service will resolve — an exotic fused cage or a named literature intermediate — write that species as its name followed by its isomeric SMILES in backticks (`name — `SMILES``); the application uses the SMILES as the structure and checks it with RDKit. Give the name alone for every species a systematic name will resolve.',
   '- Keep every step that already passes exactly as it is, and never duplicate one. You may split a rejected step into consecutive steps. Combine two consecutive steps only when together they are one net transformation that balances as a single equation; never merge two distinct transformations. The route must still reach the requested target.',
   '- Keep the single target chemistry-plan block (kind "structure") for the requested target; re-emit it unchanged if it is missing. Never emit a chemistry-plan for a step.',
   '- Conserve every element and the total charge on both sides. A species that is short on one side is a missing reagent (Reactants) or byproduct (Products/Byproducts); list it by systematic IUPAC name.',
@@ -1483,7 +1484,7 @@ export function formatUnresolvedNameClarification(unresolved: UnresolvedName[]):
     'Unresolved species:',
     ...lines,
     '',
-    'Reply with the corrected name for each species.',
+    'Reply with the corrected name for each species, or its isomeric SMILES when you cannot name it.',
   ].join('\n');
   return `\`\`\`nodus-route-fix\n${JSON.stringify({ label: 'Confirm the intended structure', prompt })}\n\`\`\``;
 }

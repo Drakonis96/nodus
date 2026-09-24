@@ -43,8 +43,10 @@ const INSPECT_TOOL = 'inspect';
 const ROUTE_TOOL = 'verify-route';
 const COMPILE_TOOL = 'compile';
 const MAX_BATCH = 24;
-/** Each step is a full validated compile; stop before a long route stalls the turn. */
-const MAX_ROUTE_DRAWINGS = 8;
+/** Each step is a full validated compile. The route checker refuses a plan with more than
+ *  sixteen steps, so every step it accepted fits; keep the cap aligned so a long route never
+ *  drops its tail — the final product step is the last one this could ever drop. */
+const MAX_ROUTE_DRAWINGS = 16;
 
 interface InspectOptions {
   model?: ModelRef | null;
