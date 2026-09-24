@@ -68,6 +68,9 @@ export function createIpcContext(getWindow: () => BrowserWindow | null): IpcCont
       }
       const message = error instanceof Error ? error.message : String(error);
       const localized = localizeRuntimeError(message, getSettings().uiLanguage);
+      // When the UI gets a translated message the raw one is otherwise lost; keep it in the
+      // main-process log so a failure that only shows as a generic sentence can still be traced.
+      if (localized !== message) console.error(`[ipc] ${channel} failed (localized for the UI): ${message}`, error);
       if (localized === message) throw error;
       throw new Error(localized);
     }
