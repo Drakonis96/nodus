@@ -5,7 +5,7 @@ import { setActiveLang } from '../../../src/i18n';
 const fixture = window as any;
 fixture.actions = [];
 let policy = { vaultId: 'academic', welcomeVersion: 0, decision: 'pending', futureAdditions: true, ...fixture.initial?.policy };
-const documents = [
+const documents = fixture.initial?.empty ? [] : [
   { id: 'one', workId: 'w1', title: 'First source', preparation: { text: 'available', lexical: 'ready', embeddings: 'missing' } },
   { id: 'two', workId: 'w2', title: 'Second source', preparation: { text: 'abstract', lexical: 'missing', embeddings: 'missing' } },
 ];

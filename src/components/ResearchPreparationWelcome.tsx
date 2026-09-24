@@ -78,6 +78,12 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
     await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined', futureAdditions: false });
     onClose();
   });
+  // An empty vault (every new profile) has nothing to enqueue, but accepting still records
+  // consent for future additions, which is what the welcome promises.
+  const acceptEmpty = () => void run(async () => {
+    await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'accepted', futureAdditions: true });
+    onClose();
+  });
   const enqueue = (mode: 'text' | 'embeddings') => void run(async () => {
     if (!preview) return;
     await window.nodus.startResearchPreparationCampaign({ previewId: preview.id, mode, documentIds: [...selected] });
@@ -115,8 +121,8 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
         <div className="research-preparation-actions">
           <button className="btn btn-ghost" disabled={busy} onClick={() => setConfirmDecline(true)}>{t('No')}</button>
           <button className="btn" disabled={busy} onClick={close}>{t('Más tarde')}</button>
-          <button className="btn btn-primary" disabled={busy || !preview || !selected.size} onClick={() => {
-            if (preview?.embeddingAvailable) enqueue('embeddings'); else { onClose(); onConfigure(); }
+          <button className="btn btn-primary" disabled={busy || !preview || (!selected.size && documents.length > 0)} onClick={() => {
+            if (!preview?.embeddingAvailable) { onClose(); onConfigure(); } else if (documents.length) enqueue('embeddings'); else acceptEmpty();
           }}>{t(preview && !preview.embeddingAvailable ? 'Configurar embeddings' : 'Sí, iniciar')}</button>
         </div>
       </> : <>

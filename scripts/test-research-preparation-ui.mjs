@@ -68,6 +68,17 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     await dialog().getByRole('button', { name: 'Preparar solo texto local', exact: true }).click();
     await dialog().waitFor({ state: 'detached' });
     assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'start' && action[1].mode === 'text' && JSON.stringify(action[1].documentIds) === '["one"]'));
+    // A new profile has an empty vault. The welcome promises that new documents will be
+    // indexed automatically, so accepting it has to be possible with nothing to enqueue: it
+    // records consent for future additions and starts no campaign.
+    await mount({ empty: true });
+    await dialog().getByText('0 obras', { exact: false }).waitFor();
+    assert.equal(await dialog().getByRole('button', { name: 'Sí, iniciar', exact: true }).isDisabled(), false, 'an empty vault can still accept');
+    await dialog().getByRole('button', { name: 'Sí, iniciar', exact: true }).click();
+    await dialog().waitFor({ state: 'detached' });
+    const emptyActions = await page.evaluate(() => window.actions);
+    assert.equal(emptyActions.some(action => action[0] === 'start'), false, 'nothing is enqueued for an empty vault');
+    assert.ok(emptyActions.some(action => action[0] === 'policy' && action[1].decision === 'accepted' && action[1].futureAdditions === true), 'acceptance records consent for future additions');
     await page.getByTestId('open-preparation').click();
     await dialog().getByText('baai/bge-m3', { exact: true }).waitFor();
     await page.keyboard.press('Escape'); await dialog().waitFor({ state: 'detached' });
