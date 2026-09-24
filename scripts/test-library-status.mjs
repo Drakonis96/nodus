@@ -293,7 +293,7 @@ test('the Library repairs what is missing across the whole selection', async () 
   // clicks first.
   assert.match(source, /data-testid="library-retry-missing-selected"/);
   assert.match(source, /retryPlan\.works > 0 && \(/);
-  assert.match(source, /\{t\('Reintentar lo que falta'\)\}/);
+  assert.match(source, /\{t\('Reintentar'\)\}/);
 
   // Same rule as the per-work modal: themes/ideas pull the whole chain, because the
   // indexes are built FROM the ideas.

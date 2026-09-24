@@ -144,7 +144,7 @@ try {
   }
   const deleteButton = page.getByTestId('library-delete-selected');
   await deleteButton.waitFor({ timeout: 10_000 });
-  assert.equal(await deleteButton.innerText(), 'Eliminar selección', 'the action is named in the reader\'s language');
+  assert.equal((await deleteButton.innerText()).trim(), 'Eliminar', 'the action is named in the reader\'s language');
 
   // Red in the running theme, not just in a class name.
   const buttonColor = await deleteButton.evaluate((node) => getComputedStyle(node).backgroundColor);

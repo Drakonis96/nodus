@@ -9,8 +9,6 @@ import type {
   QueueItem,
   WorkEmbeddingStatus,
   WorkPassageStatus,
-  VaultAnalysisReuseKind,
-  VaultAnalysisReuseResult,
   VaultType,
   ZoteroTag,
   CollectionFacet,
@@ -398,8 +396,6 @@ export function Library({
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [documentStatuses, setDocumentStatuses] = useState<Map<string, DocumentUnderstandingState>>(new Map());
-  const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
-  const [reuseNotice, setReuseNotice] = useState<string | null>(null);
   // A balloon: it never reopens by itself when the section is shown again.
   const [filtersOpen, setFiltersOpenState] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpenState] = useState(() => snapshot?.advancedFiltersOpen ?? false);
@@ -652,22 +648,6 @@ export function Library({
     reportSnapshot.current?.(snapshotOf.current());
   }, [restoreAnchorId, works]);
 
-  const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
-    if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
-    const result: VaultAnalysisReuseResult = await window.nodus.reuseVaultAnalysis(ids);
-    const importedWorks = result.works.filter((work) => work.imported.length > 0);
-    if (importedWorks.length > 0) {
-      setReuseNotice(tx('Análisis reutilizado desde otras bóvedas para {n} obra(s).', { n: importedWorks.length }));
-    } else {
-      setReuseNotice(t('No se encontró análisis reutilizable en otras bóvedas para la selección.'));
-    }
-    const skipped = new Set(
-      result.works
-        .filter((work) => skipKinds.some((kind) => work.imported.includes(kind)))
-        .map((work) => work.nodusId)
-    );
-    return ids.filter((id) => !skipped.has(id));
-  };
 
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light');
@@ -740,34 +720,8 @@ export function Library({
     await load();
   };
 
-  const analyzeSelectedThemes = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['themes']);
-    for (const id of pending) {
-      await window.nodus.rescan(id, 'light');
-    }
-    setSelected(new Set());
-    await load();
-  };
 
-  const analyzeSelectedIdeas = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.setManualDeepBulk(pending, true);
-    setSelected(new Set());
-    await load();
-  };
 
-  const analyzeSelectedBoth = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.analyzeBothBulk(pending);
-    setSelected(new Set());
-    await load();
-  };
 
   // Full chain: themes → ideas → summary → index (ideas + passages) → discover relationships.
   const processFullSelected = async () => {
@@ -784,11 +738,9 @@ export function Library({
       });
       if (!ok) return;
     }
-    // Keep cross-vault reuse for new works, but never let it suppress an explicit
-    // renewal of already processed ones. Mixed selections therefore use two modes.
+    // Already processed works are renewed; the rest run only what is stale.
     const processedSet = new Set(processedIds);
-    const newIds = ids.filter((id) => !processedSet.has(id));
-    const pendingNewIds = await reuseSelectedAnalysis(newIds, ['ideas']);
+    const pendingNewIds = ids.filter((id) => !processedSet.has(id));
     if (processedIds.length > 0) {
       await window.nodus.processFullBulk(processedIds, undefined, { mode: 'refresh' });
     }
@@ -823,34 +775,10 @@ export function Library({
     toast(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
   };
 
-  const summarizeSelected = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['summary']);
-    if (pending.length > 0) await window.nodus.summarizeBulk(pending);
-    setSelected(new Set());
-    await load();
-  };
 
-  const embedSelected = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideaEmbeddings']);
-    if (pending.length > 0) await window.nodus.startEmbedding(pending);
-    setSelected(new Set());
-  };
 
-  const indexSelectedPassages = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['passages']);
-    if (pending.length > 0) await window.nodus.startPassageEmbedding(pending);
-    setSelected(new Set());
-    await load();
-  };
 
   const toggleSelected = (id: string, checked: boolean) => {
-    setReuseNotice(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -992,7 +920,6 @@ export function Library({
 
   const allVisibleSelected = works.length > 0 && selectedVisibleIds.length === works.length;
   const selectAllVisible = () => {
-    setReuseNotice(null);
     setSelected(new Set(works.map((work) => work.nodus_id)));
   };
   // Click a header: sort by it (default direction), flip direction on the second
@@ -1134,7 +1061,6 @@ export function Library({
         );
         return;
       }
-      setReuseNotice(null);
       setSelected(new Set());
       notifyDataChanged();
       await load();
@@ -1223,7 +1149,7 @@ export function Library({
         {scopeControls}
         <div className="library-header-actions">
           {vaultType === 'academic' && <>
-            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" onClick={() => void indexWorks()}>{t('Indexar biblioteca')}</button>
+            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" data-scope={selectedVisibleIds.length > 0 ? 'selection' : 'library'} onClick={() => void indexWorks(selectedVisibleIds.length > 0 ? selectedVisibleIds : undefined)}>{t(selectedVisibleIds.length > 0 ? 'Indexar selección' : 'Indexar biblioteca')}</button>
             <button className="btn btn-ghost" onClick={openResearchPreparationQueue}>{t('Ver en Queue')}</button>
           </>}
           {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
@@ -1670,7 +1596,6 @@ export function Library({
           <button
             className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
             onClick={() => {
-              setReuseNotice(null);
               if (allVisibleSelected) setSelected(new Set());
               else selectAllVisible();
             }}
@@ -1678,13 +1603,57 @@ export function Library({
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
             {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} de esta página', { n: works.length })}
           </button>
+          {/* One verb whose scope is the selection when there is one, the filtered
+              library otherwise. */}
           <button
             className="btn btn-primary px-2 py-1 text-xs"
-            onClick={processFullLibrary}
-            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
+            data-testid="library-extract-ideas"
+            data-scope={selectedVisibleIds.length > 0 ? 'selection' : 'library'}
+            onClick={() => void (selectedVisibleIds.length > 0 ? processFullSelected() : processFullLibrary())}
+            title={selectedVisibleIds.length > 0
+              ? t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')
+              : t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
           >
             <Icon name="compass" size={13} /> {t(vaultType === 'academic' ? 'Extraer ideas' : 'Procesar biblioteca')}
+            {selectedVisibleIds.length > 0 && <span className="tabular-nums opacity-80">· {selectedVisibleIds.length}</span>}
           </button>
+          {selectedVisibleIds.length > 0 && <>
+            {/* Offered only while some selected work has something left to finish. */}
+            {academicMode !== 'manual' && retryPlan.works > 0 && (
+              <button
+                className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+                onClick={() => void retryMissingSelected()}
+                title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
+                data-testid="library-retry-missing-selected"
+              >
+                <Icon name="refresh" size={13} /> {t('Reintentar')}
+              </button>
+            )}
+            {isRecordsVault && (
+              <button
+                className="btn btn-ghost border border-amber-700/70 px-2 py-1 text-xs text-amber-300"
+                onClick={() => void scanSelectedRecords()}
+                title={t('Extraer personas, lugares y eventos de estas obras hacia el árbol')}
+              >
+                <Icon name="users" size={13} /> {t('Extraer personas y eventos')}
+              </button>
+            )}
+            <button
+              className="btn bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-500"
+              onClick={() => void deleteSelected()}
+              title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
+              data-testid="library-delete-selected"
+            >
+              <Icon name="trash" size={13} /> {t('Eliminar')}
+            </button>
+            <button
+              className="btn btn-ghost px-2 py-1 text-xs"
+              data-testid="library-clear-selection"
+              onClick={() => { setSelected(new Set()); }}
+            >
+              {t('Limpiar selección')}
+            </button>
+          </>}
         </div>
       )}
 
@@ -1699,105 +1668,6 @@ export function Library({
         </div>
       )}
 
-      {selectedVisibleIds.length > 0 && (
-        <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
-          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
-          {academicMode !== 'manual' && <>
-          <label
-            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2.5 py-1.5 text-xs text-indigo-100"
-            title={t('Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.')}
-          >
-            <input
-              type="checkbox"
-              checked={reuseAnalysisFromVaults}
-              onChange={(e) => {
-                setReuseNotice(null);
-                setReuseAnalysisFromVaults(e.target.checked);
-              }}
-            />
-            <span className="min-w-0 leading-4">{t('Reutilizar análisis de otras bóvedas')}</span>
-          </label>
-          {reuseNotice && <span className="min-w-0 max-w-full text-xs text-indigo-200/80">{reuseNotice}</span>}
-          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
-          {/* One verb, with the scope spelled out. The partial verbs live in the
-              menu: offering seven equally-weighted buttons was what made this bar
-              read as seven unrelated decisions instead of one. */}
-          <button
-            className="btn btn-primary"
-            onClick={processFullSelected}
-            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')}
-          >
-            <Icon name="compass" /> {vaultType === 'academic' ? t('Extraer ideas') : tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
-          </button>
-          {vaultType === 'academic' && <button className="btn" data-testid="library-index-selection" onClick={() => void indexWorks(selectedVisibleIds)}><Icon name="layers" /> {t('Indexar selección')}</button>}
-          {/* The repair counterpart of the verb above: it never re-runs a step that is
-              already done, so it is offered only while some selected work has something
-              left to finish. */}
-          {retryPlan.works > 0 && (
-            <button
-              className="btn btn-ghost border border-neutral-700"
-              onClick={() => void retryMissingSelected()}
-              title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
-              data-testid="library-retry-missing-selected"
-            >
-              <Icon name="refresh" /> {t('Reintentar lo que falta')}
-              {/* The count is works, not steps, so it says so: the button sits next to
-                  a selection count and a bare number would read as the same thing. */}
-              <span className="tabular-nums opacity-80">· {tx('{n} obra(s)', { n: retryPlan.works })}</span>
-            </button>
-          )}
-          {/* Not a pipeline step in records vaults — it is what the view is for. */}
-          {isRecordsVault && (
-            <button
-              className="btn btn-ghost border border-amber-700/70 text-amber-300"
-              onClick={() => void scanSelectedRecords()}
-              title={t('Extraer personas, lugares y eventos de estas obras hacia el árbol')}
-            >
-              <Icon name="users" /> {t('Extraer personas y eventos')}
-            </button>
-          )}
-          <RowMenu
-            label={t('Analizar solo un paso')}
-            items={[
-              { label: t('Analizar solo temas'), icon: 'tag', onClick: () => void analyzeSelectedThemes() },
-              { label: t('Analizar solo ideas'), icon: 'bulb', onClick: () => void analyzeSelectedIdeas() },
-              { label: t('Analizar temas e ideas'), icon: 'layers', onClick: () => void analyzeSelectedBoth() },
-              { label: t('Generar resumen'), icon: 'wand', onClick: () => void summarizeSelected() },
-              { label: t('Preparar búsqueda semántica'), icon: 'search', onClick: () => void embedSelected() },
-              { label: t('Indexar texto citable'), icon: 'book', onClick: () => void indexSelectedPassages() },
-              { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
-            ]}
-          />
-          </>}
-          {/* Destructive and irreversible, so it sits apart from the verbs above: past
-              the overflow menu, away from the primary action, and red in both themes. */}
-          <button
-            className="btn bg-red-600 text-white hover:bg-red-500"
-            onClick={() => void deleteSelected()}
-            title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
-            data-testid="library-delete-selected"
-          >
-            <Icon name="trash" /> {t('Eliminar selección')}
-          </button>
-          <div className="flex-1" />
-          <button
-            className="btn btn-ghost"
-            onClick={() => {
-              setReuseNotice(null);
-              setSelected(new Set());
-            }}
-          >
-            {t('Limpiar selección')}
-          </button>
-        </div>
-      )}
-
-      {reuseNotice && selectedVisibleIds.length === 0 && (
-        <div className="mb-3 rounded-md border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-200">
-          {reuseNotice}
-        </div>
-      )}
 
       <div className="card flex-1 flex flex-col min-h-0 overflow-hidden text-sm">
         <div
@@ -1811,7 +1681,6 @@ export function Library({
                 title={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 aria-label={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 onChange={(e) => {
-                  setReuseNotice(null);
                   if (e.target.checked) selectAllVisible();
                   else setSelected(new Set());
                 }}
