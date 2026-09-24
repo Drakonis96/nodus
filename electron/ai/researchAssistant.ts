@@ -10,7 +10,7 @@ import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
-import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute } from './moleculeInspection';
+import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
 import { countRouteSteps, findStepNamedSpecies, formatMissingSpeciesPrompt, formatNameCorrectionNote, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
@@ -206,30 +206,50 @@ function skillExecution(request: ResearchChatRequest) {
 /** Runs the reply through its Skills, then appends the RDKit checks: the structure check on
  *  the species the model proposed and the route check plus a drawing of every verified step.
  *  The audits are skipped when Chemistry Studio is disabled. */
-async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal): Promise<string> {
+async function finalizeWithAudit(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal, onDeterministic?: (text: string) => void): Promise<string> {
+  try {
+    return await auditAnswer(answer, execution, signal, onDeterministic);
+  } catch (error) {
+    // A capability or worker failure must not discard the model's answer or kill the turn. Log
+    // the real error: the IPC layer only surfaces a localized generic message otherwise.
+    console.error('[research] audit pipeline failed; returning the model answer unchanged:', error);
+    return answer;
+  }
+}
+
+/** The audits themselves, split out so `finalizeWithAudit` can fail open around them. */
+async function auditAnswer(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal, onDeterministic?: (text: string) => void): Promise<string> {
   const skilled = await executeChatSkills(answer, execution, signal);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const options = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question };
-  // Names-first: resolve every species name to a structure (PubChem first, OPSIN fallback),
-  // derive the equations from the resolved structures, and attach the derived SMILES to the
-  // answer. An unresolved reactant/product name is sent back to the model to correct, and the
-  // route is still checked and drawn; the clarification is appended after it. When the answer
-  // carries no named route (or the installed package has no resolve-names tool), only the
-  // structure check and a possible "list the species" chip run.
-  const resolved = await resolveNamedRoute(skilled, skilled, options);
-  if (resolved.legacy) {
-    const withStructures = await appendStructureAudit(skilled, skilled, options);
-    // A route that describes steps but lists no species cannot be checked; offer one click to
-    // have the model re-emit it with the four labelled lines.
-    const steps = options.enabled !== false ? countRouteSteps(skilled) : 0;
-    const missingSpecies = steps > 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
-    return missingSpecies ? `${withStructures.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : withStructures;
+  const base = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
+  // One capability runner for the whole phase: the resolve pass warms the worker's reference
+  // cache and the route audit reuses it, so a route opens one worker, not three.
+  const session = chemistryEnabled ? chemistryRunner(base) : null;
+  const options = session ? { ...base, runner: session.runner } : base;
+  try {
+    // Names-first: resolve every species name to a structure (PubChem first, OPSIN fallback),
+    // derive the equations from the resolved structures, and attach the derived SMILES to the
+    // answer. An unresolved reactant/product name is sent back to the model to correct, and the
+    // route is still checked and drawn; the clarification is appended after it. When the answer
+    // carries no named route (or the installed package has no resolve-names tool), only the
+    // structure check and a possible "list the species" chip run.
+    const resolved = await resolveNamedRoute(skilled, skilled, options);
+    if (resolved.legacy) {
+      const withStructures = await appendStructureAudit(skilled, skilled, options);
+      // A route that describes steps but lists no species cannot be checked; offer one click to
+      // have the model re-emit it with the four labelled lines.
+      const steps = options.enabled !== false ? countRouteSteps(skilled) : 0;
+      const missingSpecies = steps > 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
+      return missingSpecies ? `${withStructures.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : withStructures;
+    }
+    const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
+    const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
+    const correctionNote = formatNameCorrectionNote(resolved.corrections);
+    const withNotes = correctionNote ? `${routed.trimEnd()}\n\n${correctionNote}\n` : routed;
+    return resolved.clarification ? `${withNotes.trimEnd()}\n\n${resolved.clarification}\n` : withNotes;
+  } finally {
+    await session?.dispose();
   }
-  const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
-  const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
-  const correctionNote = formatNameCorrectionNote(resolved.corrections);
-  const withNotes = correctionNote ? `${routed.trimEnd()}\n\n${correctionNote}\n` : routed;
-  return resolved.clarification ? `${withNotes.trimEnd()}\n\n${resolved.clarification}\n` : withNotes;
 }
 
 
@@ -306,7 +326,7 @@ async function streamResearchChatTurn(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
-  return { answer: council?.member ? answer : await finalizeWithAudit(answer, execution, signal), stats };
+  return { answer: council?.member ? answer : await finalizeWithAudit(answer, execution, signal, onDelta), stats };
 }
 
 /**

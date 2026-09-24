@@ -10,6 +10,7 @@ import {
   findSmilesCandidates,
   findStepConditions,
   findStepNamedSpecies,
+  findStepProse,
   formatNamedRouteFixPrompts,
   formatRouteAudit,
   formatStructureAudit,
@@ -24,6 +25,7 @@ import {
   type NamedSpecies,
   type ResolvedSpecies,
   type RouteAudit,
+  type RouteStepAudit,
   type RouteReview,
   type RouteSpeciesLabel,
   type UnresolvedName,
@@ -54,6 +56,12 @@ interface InspectOptions {
   target?: string | null;
   /** The researcher's request, given to the route review as context. */
   question?: string;
+  /** A runner shared across the whole post-answer phase, so the capability worker is opened
+   *  once. When absent each phase opens and closes its own. */
+  runner?: Runner;
+  /** Called with the deterministic report and drawings as soon as they exist, before the
+   *  route review lands, so the reply can show them without waiting on the reviewer. */
+  onDeterministic?: (text: string) => void;
 }
 
 function inspectProvider() {
@@ -70,13 +78,7 @@ async function inspectCandidates(candidates: string[], options: InspectOptions):
   if (!candidates.length) return [];
   const provider = inspectProvider();
   if (!provider) return [];
-  const runner = createTrustedCapabilityRunner({
-    locale: options.locale ?? 'en',
-    model: options.model ?? null,
-    pins: pinCapabilitiesForTurn(),
-    signal: options.signal,
-    runCoreStages: async (text) => text,
-  });
+  const { runner, dispose } = chemistryRunner(options);
   const dossiers: MoleculeDossier[] = [];
   try {
     for (let start = 0; start < candidates.length; start += MAX_BATCH) {
@@ -95,7 +97,7 @@ async function inspectCandidates(candidates: string[], options: InspectOptions):
       }
     }
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
   return dossiers;
 }
@@ -142,8 +144,13 @@ export function routeVerificationAvailable(): boolean {
   return routeProvider() !== null;
 }
 
-function chemistryRunner(options: InspectOptions) {
-  return createTrustedCapabilityRunner({
+/** A runner lease for one phase. A caller-supplied shared runner is reused and this lease
+ *  owns nothing; otherwise it owns a fresh runner and disposing stops it. Sharing opens the
+ *  capability worker once per turn, so its reference cache serves the resolve pass and the
+ *  route audit instead of paying for a second worker and a second network pass. */
+export function chemistryRunner(options: InspectOptions): { runner: Runner; dispose: () => Promise<void> } {
+  if (options.runner) return { runner: options.runner, dispose: async () => {} };
+  const runner = createTrustedCapabilityRunner({
     locale: options.locale ?? 'en',
     model: options.model ?? null,
     pins: pinCapabilitiesForTurn(),
@@ -151,6 +158,7 @@ function chemistryRunner(options: InspectOptions) {
     ...(options.owner ? { owner: options.owner } : {}),
     runCoreStages: async (text) => text,
   });
+  return { runner, dispose: async () => { await runner.dispose?.(); } };
 }
 
 type Runner = ReturnType<typeof createTrustedCapabilityRunner>;
@@ -182,13 +190,13 @@ async function verifyRouteSteps(steps: string[], options: InspectOptions, racemi
   if (!steps.length) return null;
   const provider = routeProvider();
   if (!provider) return null;
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     return await invokeRoute(runner, provider, steps, racemic, options.target);
   } catch {
     return null;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }
 
@@ -291,13 +299,13 @@ async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[]
 
 /** One model review of the route plan: the problems a balance and continuity check cannot
  *  see. Defensive — an unreadable reply yields no review, so it never blocks a route. */
-async function requestRouteReview(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, options: InspectOptions): Promise<RouteReview | null> {
+async function requestRouteReview(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, options: InspectOptions, stepProse: string[] = []): Promise<RouteReview | null> {
   try {
     const raw = await completeText({
       system: ROUTE_REVIEW_SYSTEM,
-      user: buildRouteReviewRequest(question, labels, audit),
+      user: buildRouteReviewRequest(question, labels, audit, stepProse),
       temperature: 0,
-      maxTokens: 1200,
+      maxTokens: 2000,
       ...(options.signal ? { signal: options.signal } : {}),
     }, options.model ?? null);
     return parseRouteReview(raw);
@@ -325,7 +333,7 @@ export async function resolveNamedRoute(
   let speciesByStep = findStepNamedSpecies(modelAnswer, stepCount);
   if (!speciesByStep.some((step) => step.length)) return legacy;
 
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     const resolutions = new Map<string, SpeciesResolution>();
     const corrections: string[] = [];
@@ -357,7 +365,9 @@ export async function resolveNamedRoute(
     const resolvedByStep: ResolvedSpecies[][] = speciesByStep.map((step) => step.map((entry) => {
       const resolution = resolutions.get(entry.name);
       if (resolution?.status === 'resolved' && resolution.smiles) {
-        if (entry.declaredSmiles && entry.declaredSmiles !== resolution.smiles) corrections.push(`${entry.name}: \`${entry.declaredSmiles}\` → \`${resolution.smiles}\``);
+        // The name is authoritative in the names-first path, and the resolver now returns the
+        // canonical isomeric SMILES, so a model-declared writing is not compared here: an
+        // equivalent SMILES written differently would otherwise look like a correction.
         return { ...entry, status: 'resolved' as const, smiles: resolution.smiles, source: resolution.source ?? 'pubchem', ...(resolution.formula ? { formula: resolution.formula } : {}) };
       }
       if (entry.declaredSmiles) return { ...entry, status: 'fallback' as const, smiles: entry.declaredSmiles, source: 'declared' as const };
@@ -387,9 +397,13 @@ export async function resolveNamedRoute(
   } catch {
     return legacy;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }
+
+/** How many step drawings compile at once. Each compile forks its own RDKit subworker, so a
+ *  small pool hides the RDKit load without thrashing the machine. */
+const DRAW_CONCURRENCY = 2;
 
 /** Draws every step the checker accepted, in order, on the runner already opened for the
  *  route check. A step the checker refused is never auto-drawn: the verified lane abstains
@@ -402,9 +416,8 @@ async function drawRouteSteps(
   audit: RouteAudit,
   options: InspectOptions,
 ): Promise<string> {
-  const figures: string[] = [];
+  const drawable: RouteStepAudit[] = [];
   const skipped: string[] = [];
-  let drawn = 0;
   for (const step of audit.steps) {
     const reason = !step.ok
       ? step.error ?? 'could not be parsed'
@@ -416,33 +429,48 @@ async function drawRouteSteps(
             ? `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
             : '';
     if (reason) { skipped.push(`- Step ${step.index + 1} — ${reason}`); continue; }
-    if (drawn >= MAX_ROUTE_DRAWINGS) { skipped.push(`- Step ${step.index + 1} — not drawn (limit of ${MAX_ROUTE_DRAWINGS} reached)`); continue; }
-    options.signal?.throwIfAborted();
-    const reactionSmiles = steps[step.index];
-    try {
-      // The step's "Reagents and conditions:" prose is the only source for temperature,
-      // time and workup; the plugin sanitizes it to arrow text and drops it rather than
-      // fail the drawing. Empty when the model wrote no such line.
-      const condition = conditions[step.index] ?? '';
-      // A declared-racemic step has open centres by design, so tell the renderer to draw it
-      // with them unspecified instead of refusing the unspecified stereocentre.
-      const plan = JSON.stringify({ version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles, ...(condition ? { conditions: condition } : {}), ...(step.racemic ? { racemic: true } : {}) });
-      const result = await runner.invoke({ provider, toolId: COMPILE_TOOL, input: { plan, question: reactionSmiles } });
-      const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'chemistry-document');
-      // One block per step. A stored reference and its inline view would each render the
-      // same drawing, so the route shows the view alone.
-      if (!artifact?.view) { skipped.push(`- Step ${step.index + 1} — the verified drawing could not be produced`); continue; }
-      figures.push(runner.renderView({ provider, view: artifact.view as ViewDocumentV1 }));
-      drawn += 1;
-    } catch (error) {
-      skipped.push(`- Step ${step.index + 1} — ${error instanceof Error ? error.message : 'could not be drawn'}`);
-    }
+    if (drawable.length >= MAX_ROUTE_DRAWINGS) { skipped.push(`- Step ${step.index + 1} — not drawn (limit of ${MAX_ROUTE_DRAWINGS} reached)`); continue; }
+    drawable.push(step);
   }
+  const figures: Array<{ index: number; view: string } | null> = new Array(drawable.length).fill(null);
+  let cursor = 0;
+  const run = async () => {
+    for (;;) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= drawable.length) return;
+      const step = drawable[index];
+      options.signal?.throwIfAborted();
+      const reactionSmiles = steps[step.index];
+      try {
+        // The step's "Reagents and conditions:" prose is the only source for temperature,
+        // time and workup; the plugin sanitizes it to arrow text and drops it rather than
+        // fail the drawing. Empty when the model wrote no such line.
+        const condition = conditions[step.index] ?? '';
+        // The route checker already accepted this step, so draw its open centres as
+        // unspecified rather than refusing — a step whose only open centre is on a reactant
+        // (a purchased input) must still render. A declared-racemic product keeps its flag.
+        const plan = JSON.stringify({ version: 2, kind: 'reaction', depiction: 'skeletal', reactionSmiles, openStereo: true, ...(condition ? { conditions: condition } : {}), ...(step.racemic ? { racemic: true } : {}) });
+        const result = await runner.invoke({ provider, toolId: COMPILE_TOOL, input: { plan, question: reactionSmiles } });
+        const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'chemistry-document');
+        // One block per step. A stored reference and its inline view would each render the
+        // same drawing, so the route shows the view alone.
+        if (!artifact?.view) { skipped.push(`- Step ${step.index + 1} — the verified drawing could not be produced`); continue; }
+        figures[index] = { index: step.index, view: runner.renderView({ provider, view: artifact.view as ViewDocumentV1 }) };
+      } catch (error) {
+        skipped.push(`- Step ${step.index + 1} — ${error instanceof Error ? error.message : 'could not be drawn'}`);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(DRAW_CONCURRENCY, drawable.length) }, run));
+  const ordered = figures.filter((figure): figure is { index: number; view: string } => figure !== null);
   // Nothing drawable is not a drawings section; the route report already says why each
   // step was refused.
-  if (!figures.length) return '';
-  const lines = ['### Route drawings (RDKit)', '', ...figures];
-  if (skipped.length) lines.push('', 'Not drawn:', ...skipped);
+  if (!ordered.length) return '';
+  // Label each scheme with the step it is, so the drawings line up with the report and the
+  // "Fix step N" chips instead of floating unlabelled under the route.
+  const lines = ['### Route drawings (RDKit)', '', ...ordered.flatMap((figure) => [`**Step ${figure.index + 1}**`, '', figure.view, ''])];
+  if (skipped.length) lines.push('Not drawn:', ...skipped);
   return `\n${lines.join('\n')}\n`;
 }
 
@@ -460,20 +488,27 @@ export async function appendRouteReportAndDrawings(
   const labels = overrides.labels ?? [];
   if (!steps.length || !labels.some((entries) => entries.length)) return finalAnswer;
   const conditions = findStepConditions(modelAnswer, steps.length);
+  const stepProse = findStepProse(modelAnswer, steps.length);
   const racemic = declaresRacemic(modelAnswer);
   const provider = routeProvider();
   if (!provider) return finalAnswer;
   const compile = compileProvider();
-  const runner = chemistryRunner(options);
+  const { runner, dispose } = chemistryRunner(options);
   try {
     const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
     if (!audit) return finalAnswer;
     // One model review looks for plan problems the checker cannot see (prose vs names, a
     // product that is a different compound, a step that cannot work, a redundant step). It is
-    // blocking: a finding marks the route not verified. An unreadable reply never blocks.
-    const review = await requestRouteReview(options.question ?? '', labels, audit, options);
-    const report = formatRouteAudit(audit, labels, review);
+    // blocking: a finding marks the route not verified. An unreadable reply never blocks. It
+    // runs while the drawings compile, so the reviewer and the drawings overlap.
+    const reviewPromise = requestRouteReview(options.question ?? '', labels, audit, options, stepProse);
     const drawings = compile ? await drawRouteSteps(runner, compile, steps, conditions, audit, options) : '';
+    // Paint the deterministic report and drawings before the reviewer returns. The transport
+    // replaces the provisional stream with this returned answer, so the route only waits on
+    // the reviewer when the reviewer is the last thing outstanding.
+    if (options.onDeterministic) options.onDeterministic(`${finalAnswer.trimEnd()}\n\n${formatRouteAudit(audit, labels, null)}\n${drawings}`);
+    const review = await reviewPromise;
+    const report = formatRouteAudit(audit, labels, review);
     // A refusal the checker can name and the app cannot fix is offered back to the model as one
     // click: names and roles only — the model never authored the derived SMILES.
     const fix = formatNamedRouteFixPrompts(labels, audit, review);
@@ -481,6 +516,6 @@ export async function appendRouteReportAndDrawings(
   } catch {
     return finalAnswer;
   } finally {
-    await runner.dispose?.();
+    await dispose();
   }
 }

@@ -70,6 +70,8 @@ export interface RouteSpeciesSummary {
   /** The species is a byproduct rather than the intended product. A display/authoring label
    *  only: like any other product it stays on the product side of the equation. */
   byproduct?: boolean;
+  /** The coefficient the checker solved for this species, when the step balances. */
+  coefficient?: number;
 }
 
 export type RouteLabelRole = 'reactant' | 'product' | 'agent';
@@ -101,6 +103,8 @@ export interface RouteStepAudit {
   nameProblems?: string[];
   /** The request declared this step racemic; its open centres are a stated outcome. */
   racemic?: boolean;
+  /** The equation balances only by assembling a product from more than one substrate. */
+  assemblyProblem?: string;
 }
 
 export interface RouteLinkAudit {
@@ -359,6 +363,38 @@ export function findStepConditions(text: string, count: number): string[] {
     const value = conciseConditions(match[1]);
     if (value) found.push(value);
   }
+  const out: string[] = [];
+  for (let index = 0; index < count; index++) out.push(found[index] ?? '');
+  return out;
+}
+
+/** The “Step N — <title>” heading and the paragraph under it for each step, in step order, so
+ *  the route review can judge the transformation the author intended, not only the species.
+ *  The heading already names the reaction ("Dehydration of citric acid…"); the prose explains
+ *  it. Missing steps are empty strings. */
+export function findStepProse(text: string, count: number): string[] {
+  const found: string[] = [];
+  let pending: { title: string; start: number } | null = null;
+  let offset = 0;
+  const commit = (end: number) => {
+    if (!pending) return;
+    const body = text.slice(pending.start, end).replace(/^[^\n]*\n?/, '');
+    const cut = body.search(/(?:`{1,2}|\*\*|__)?[ \t]*\b(?:reactants?|products?|by[-\s]?products?|agents?)[ \t]*[:：]/i);
+    const paragraph = (cut >= 0 ? body.slice(0, cut) : body).split(/\n{2,}/)[0] ?? '';
+    const prose = paragraph.replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 360);
+    found.push(prose ? `${pending.title} — ${prose}` : pending.title);
+    pending = null;
+  };
+  for (const line of text.split(/\r?\n/)) {
+    const heading = HASH_HEADING.exec(line) ?? BOLD_HEADING.exec(line);
+    const title = (heading?.[1] ?? '').trim();
+    if (title) {
+      commit(offset);
+      if (STEP_TITLE.test(title)) pending = { title, start: offset };
+    }
+    offset += line.length + 1;
+  }
+  commit(text.length);
   const out: string[] = [];
   for (let index = 0; index < count; index++) out.push(found[index] ?? '');
   return out;
@@ -650,11 +686,43 @@ export function annotateSpeciesSmiles(answer: string, speciesByStep: ResolvedSpe
   return out;
 }
 
+/** A species name as the resolver feedback may return it: a short label with letters, and no
+ *  markup or escaped syntax. A reply that smuggled an SVG, a JSON fragment or a newline into a
+ *  name is not shown to the user as a "correction". */
+function isPlausibleSpeciesName(value: string): boolean {
+  return value.length >= 2 && value.length <= 200
+    && /[A-Za-z]/.test(value)
+    && !/[<>{}\\\n\r\t`|"]/.test(value)
+    && !value.includes('→');
+}
+
 /** A compact, user-facing note listing the names the resolver corrected, or the empty string
- *  when nothing changed. A full declared-vs-resolved table was a temporary debug aid. */
+ *  when nothing changed. A full declared-vs-resolved table was a temporary debug aid. Entries
+ *  that are not two plausible names, and names corrected twice (A → B, B → C), are folded so
+ *  the note stays a short list of the names that actually changed. */
 export function formatNameCorrectionNote(corrections: string[]): string {
-  const unique = [...new Set(corrections.filter(Boolean))];
-  return unique.length ? `Name corrections: ${unique.join('; ')}` : '';
+  const rename = new Map<string, string>();
+  for (const raw of corrections) {
+    const [from, to] = String(raw).split('→').map((part) => part.trim());
+    if (!from || !to || from === to) continue;
+    if (!isPlausibleSpeciesName(from) || !isPlausibleSpeciesName(to)) continue;
+    rename.set(from, to);
+  }
+  const resolve = (name: string): string => {
+    let current = name;
+    const seen = new Set<string>();
+    while (rename.has(current) && !seen.has(current)) { seen.add(current); current = rename.get(current)!; }
+    return current;
+  };
+  const intermediates = new Set(rename.values());
+  const entries: string[] = [];
+  for (const from of rename.keys()) {
+    if (intermediates.has(from)) continue; // a name that was itself only an intermediate
+    const to = resolve(from);
+    const entry = `${from} → ${to}`;
+    if (from !== to && !entries.includes(entry)) entries.push(entry);
+  }
+  return entries.length ? `Name corrections: ${entries.join('; ')}` : '';
 }
 
 /** The request's target, from the usual phrasing "a synthesis of <name> (SMILES: <smiles>)".
@@ -706,11 +774,13 @@ export function requestedTargetFor(userMessages: string[]): string | null {
   return null;
 }
 
-const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b/i;
+const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bachiral\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?\s+(?:is\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
 
-/** Whether the answer declares a racemic outcome. This is model prose, not a verification: it
- *  only lets the route audit report an open centre as a stated racemate instead of refusing
- *  the step for leaving it unspecified. */
+/** Whether the answer declares a stereochemically open outcome. The model may state it in
+ *  several ways — a racemate, a meso/achiral product, or "stereochemistry not controlled" —
+ *  and each is a stated outcome, so the route audit reports the open centre as declared
+ *  instead of refusing the step for leaving it unspecified. This is model prose, not a
+ *  verification. */
 export function declaresRacemic(text: string): boolean {
   return RACEMIC_PATTERN.test(text);
 }
@@ -745,6 +815,7 @@ function normalizeRouteSpecies(entry: unknown): RouteSpeciesSummary | null {
     ...(typeof value.name === 'string' && value.name.trim() ? { name: value.name.trim().slice(0, 200) } : {}),
     ...(typeof value.nameOk === 'boolean' ? { nameOk: value.nameOk } : {}),
     ...(value.byproduct === true ? { byproduct: true } : {}),
+    ...(typeof value.coefficient === 'number' && Number.isInteger(value.coefficient) && value.coefficient > 0 ? { coefficient: value.coefficient } : {}),
   };
 }
 
@@ -771,6 +842,7 @@ function normalizeRouteStep(entry: unknown, index: number): RouteStepAudit | nul
     unspecifiedStereocentres: numberOr(value.unspecifiedStereocentres, 0),
     ...(stringArray(value.nameProblems).length ? { nameProblems: stringArray(value.nameProblems).map((entry) => entry.slice(0, 300)).slice(0, 24) } : {}),
     ...(value.racemic === true ? { racemic: true } : {}),
+    ...(typeof value.assemblyProblem === 'string' && value.assemblyProblem ? { assemblyProblem: value.assemblyProblem.slice(0, 400) } : {}),
   };
 }
 
@@ -853,7 +925,10 @@ function isolatedSteps(audit: RouteAudit): number[] {
 const sideTrace = (species: RouteSpeciesSummary[], names?: Map<string, string>): string => species.map((entry) => {
   const name = names?.get(entry.input) ?? names?.get(entry.canonicalSmiles) ?? entry.name;
   const identity = entry.formula || entry.canonicalSmiles;
-  return name ? `${name} (${identity})` : identity;
+  const label = name ? `${name} (${identity})` : identity;
+  // The solved coefficient is shown when it is not 1, so an equation that only balances at an
+  // odd stoichiometry is visible rather than hidden behind a bare "+".
+  return entry.coefficient && entry.coefficient > 1 ? `${entry.coefficient} ${label}` : label;
 }).join(' + ');
 
 /** A lookup from a declared SMILES to the IUPAC name the author wrote beside it. The
@@ -872,7 +947,21 @@ export function routeLabelNames(labels: RouteSpeciesLabel[][]): Map<string, stri
  *  redundant one. `step` is 1-based, or 0 for a route-level problem. */
 export interface RouteReviewProblem {
   step: number;
+  /** `blocking` only for a named structure that is wrong for the step; everything else —
+   *  feasibility, conditions, mechanism, an unusual reaction — is `advisory` and never blocks
+   *  a route the deterministic checker passed. An omitted or unreadable severity is advisory. */
+  severity: 'blocking' | 'advisory';
   detail: string;
+}
+
+/** The review findings that block a route: the named structure is wrong for the step. */
+export function blockingReviewProblems(review: RouteReview | null): RouteReviewProblem[] {
+  return review?.status === 'problems' ? review.problems.filter((problem) => problem.severity === 'blocking') : [];
+}
+
+/** The review findings that are shown but never block: a model judgement about feasibility. */
+export function advisoryReviewProblems(review: RouteReview | null): RouteReviewProblem[] {
+  return review?.status === 'problems' ? review.problems.filter((problem) => problem.severity === 'advisory') : [];
 }
 
 /** The outcome of the route review. A `null` return means the review could not be read, which
@@ -884,25 +973,29 @@ export interface RouteReview {
 
 export const ROUTE_REVIEW_SYSTEM = [
   'You review a proposed multi-step synthesis for problems that a balance checker cannot see. Every equation may balance and every intermediate may carry over, yet the plan can still be wrong.',
-  'You are given the researcher\'s request, the requested target, and each step as the species its author named.',
-  'Report only a specific, confident problem from this list:',
-  '- step prose that describes a different transformation than the species named in that step;',
-  '- a product that is a different compound than the requested target (for example a similar but distinct name);',
-  '- a step that cannot give the named product from the named reactant under the stated conditions (the wrong reagent for the transformation, or an atom-inconsistent or impossible byproduct);',
-  '- a redundant or pointless step (a protection/deprotection that achieves nothing) or a step that repeats an earlier one.',
+  'You are given the researcher\'s request, the requested target, each step\'s own description of its transformation, and the species its author named.',
+  'Each step carries its author\'s description (a heading such as "Dehydration of citric acid to aconitic acid" and the prose under it). Use it: a named, standard reaction — dehydration, decarboxylation, hydration, esterification, hydrolysis, reduction, oxidation, condensation, Mannich, Michael addition — is a possible step. Report a step only when the species named cannot come from the transformation described, never merely because the reaction is uncommon, advanced, or not one you would have chosen.',
+  'A cheminformatics toolkit has already verified that every equation balances and that every intermediate is carried over as the same structure. Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem: that is the checker\'s job and it has passed. A step that forms several bonds or combines bond-forming events into one balanced net equation is allowed — a one-pot cascade such as the Robinson tropinone synthesis is one step — so do not report a step merely for merging or splitting transformations.',
+  'Every structure below is a canonical isomeric SMILES, and so is the target. Two identical SMILES strings are the same compound; two different strings are different compounds. The checker has already compared each product to the target by canonical structure and reports in the request whether the target is formed — when it says the target is formed, do not report that step\'s product as a different compound from the target.',
+  'Report only a specific, confident problem from this list, and set its "severity":',
+  '- "blocking" when the named structure is wrong for the step: a product that is a different compound than the requested target; a product whose formula matches the intended one but whose connectivity or regiochemistry differs — a swapped substituent, or the wrong ring or epoxide regioisomer; a step whose prose describes a different transformation than the species named; or an atom-inconsistent or impossible byproduct. These are the mistakes the balance checker cannot see, so they stop the route.',
+  '- "advisory" for everything else — a step you doubt can give the named product under the stated conditions (the wrong reagent for the transformation, an unusual or advanced route, feasibility, conditions, yield or mechanism), a one-pot cascade, a named reaction you would not have chosen, or a redundant or pointless step. An advisory finding is shown to the reader but never blocks the route.',
   'Be conservative. Never invent a compound, reaction or mechanism, and never report a step that is merely unusual but chemically possible. Do not repeat an equation or continuity problem the checker already found.',
-  'Return EXCLUSIVELY one JSON object: {"status":"ok"} when there is no such problem, or {"status":"problems","problems":[{"step":<1-based step number, or 0 for a route-level problem>,"detail":"<one sentence>"}]}. Do not write anything outside the JSON.',
+  'Return EXCLUSIVELY one JSON object: {"status":"ok"} when there is no such problem, or {"status":"problems","problems":[{"step":<1-based step number, or 0 for a route-level problem>,"severity":"blocking"|"advisory","detail":"<one sentence>"}]}. A problem with no severity is treated as advisory. Do not write anything outside the JSON.',
 ].join('\n');
 
-export function buildRouteReviewRequest(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit): string {
+export function buildRouteReviewRequest(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, stepProse: string[] = []): string {
   return [
     'The researcher asked:',
     question.trim().slice(0, 4000) || '(the request text is not available)',
     '',
     `The requested target is: ${audit.target?.canonicalSmiles ?? audit.target?.input ?? 'the product described in the request'}`,
     '',
-    'The proposed route, each step as the species its author named:',
-    ...audit.steps.map((step) => `Step ${step.index + 1}:\n${namedStepLines(labels, step.index)}`),
+    'The proposed route, each step with its author\'s description and the species as systematic names — isomeric SMILES:',
+    ...audit.steps.map((step) => {
+      const prose = stepProse[step.index]?.trim();
+      return [`Step ${step.index + 1}:`, ...(prose ? [`  ${prose}`] : []), labelledStepLines(labels, step)].join('\n');
+    }),
     '',
     audit.blocked.length
       ? `The automatic checker already found: ${audit.blocked.join(' ')}`
@@ -910,6 +1003,17 @@ export function buildRouteReviewRequest(question: string, labels: RouteSpeciesLa
     '',
     'Report only the problems it cannot see. Return the JSON.',
   ].join('\n');
+}
+
+/** A finding is one sentence, so this only guards a runaway reply. Cut on a word boundary
+ *  and mark the cut, so a long detail is never shown ending mid-word. */
+const REVIEW_DETAIL_LIMIT = 1000;
+export function clampReviewDetail(detail: string): string {
+  const text = detail.trim();
+  if (text.length <= REVIEW_DETAIL_LIMIT) return text;
+  const cut = text.slice(0, REVIEW_DETAIL_LIMIT);
+  const boundary = cut.lastIndexOf(' ');
+  return `${(boundary > 0 ? cut.slice(0, boundary) : cut).trimEnd()}…`;
 }
 
 /** Parse the review defensively: an unreadable or inconsistent reply means "not checked",
@@ -927,22 +1031,39 @@ export function parseRouteReview(raw: string): RouteReview | null {
     const item = asRecord(entry);
     if (!item || typeof item.detail !== 'string' || !item.detail.trim()) return null;
     const step = Number.isInteger(item.step) ? Math.min(Math.max(item.step as number, 0), 15) : 0;
-    return { step, detail: item.detail.trim().slice(0, 400) };
+    // Only an explicit "blocking" stops the route; a missing or unreadable severity is advisory.
+    const severity: RouteReviewProblem['severity'] = item.severity === 'blocking' ? 'blocking' : 'advisory';
+    return { step, severity, detail: clampReviewDetail(item.detail) };
   }).filter((entry): entry is RouteReviewProblem => entry !== null).slice(0, 24);
   if (!problems.length) return null;
   return { status: 'problems', problems };
 }
 
 function formatRouteReview(review: RouteReview): string[] {
-  if (review.status !== 'problems' || !review.problems.length) return [];
-  return [
-    '',
-    '### Route review (model)',
-    '',
-    'A model reviewed the route plan and prose. A finding here marks the route not verified; it is a model judgement, not an RDKit result.',
-    '',
-    ...review.problems.map((problem) => `- ${problem.step > 0 ? `Step ${problem.step}: ` : ''}${problem.detail}`),
-  ];
+  const blocking = blockingReviewProblems(review);
+  const advisory = advisoryReviewProblems(review);
+  const lines: string[] = [];
+  if (blocking.length) {
+    lines.push(
+      '',
+      '### Route review (model)',
+      '',
+      'A model reviewed the route plan and prose. A finding here marks the route not verified; it is a model judgement, not an RDKit result.',
+      '',
+      ...blocking.map((problem) => `- ${problem.step > 0 ? `Step ${problem.step}: ` : ''}${problem.detail}`),
+    );
+  }
+  if (advisory.length) {
+    lines.push(
+      '',
+      '### Route review (model, advisory)',
+      '',
+      'A model reviewed the route plan and prose. These are its judgements, not RDKit results; they are shown for you to weigh and do not stop a route the checker passed.',
+      '',
+      ...advisory.map((problem) => `- ${problem.step > 0 ? `Step ${problem.step}: ` : ''}${problem.detail}`),
+    );
+  }
+  return lines;
 }
 
 /** The deterministic appendix a reader can act on: a one-line verdict, then per step balance
@@ -951,6 +1072,10 @@ function formatRouteReview(review: RouteReview): string[] {
  *  not. A model route review is folded into the verdict and shown below when it found a plan
  *  problem the checker cannot see. When the answer named the species, the IUPAC names are
  *  shown beside the structures they denote. */
+/** A coefficient above this is called out as a likely wrong byproduct set. Redox steps can
+ *  legitimately reach the high single digits, so this is an advisory note, never a refusal. */
+const LARGE_COEFFICIENT = 6;
+
 export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][] = [], review: RouteReview | null = null): string {
   const names = routeLabelNames(labels);
   const lines: string[] = [
@@ -959,13 +1084,14 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     'Every step was parsed with RDKit and every equation and intermediate link was checked. This block is generated by the application, not by the model.',
     '',
   ];
-  const failedSteps = audit.steps
-    .filter((step) => !step.ok || step.balanced !== true || (step.nameProblems?.length ?? 0) > 0 || (step.unspecifiedStereocentres > 0 && step.racemic !== true))
-    .map((step) => step.index + 1);
+  const failing = (step: RouteStepAudit): boolean => !step.ok || step.balanced !== true || Boolean(step.assemblyProblem) || (step.nameProblems?.length ?? 0) > 0 || (step.unspecifiedStereocentres > 0 && step.racemic !== true);
+  const failedSteps = audit.steps.filter(failing).map((step) => step.index + 1);
+  const assembled = audit.steps.filter((step) => Boolean(step.assemblyProblem)).map((step) => step.index + 1);
   const isolated = isolatedSteps(audit);
-  const reviewProblems = review?.status === 'problems' ? review.problems : [];
+  const reviewProblems = blockingReviewProblems(review);
   const reasons: string[] = [];
   if (failedSteps.length) reasons.push(`${failedSteps.length} of ${audit.steps.length} step(s) do not pass (${failedSteps.map((index) => `step ${index}`).join(', ')})`);
+  if (assembled.length) reasons.push(`${assembled.length === 1 ? 'a step' : 'steps'} cannot be assembled from a single substrate molecule (${assembled.map((index) => `step ${index}`).join(', ')})`);
   if (isolated.length) reasons.push(`${isolated.length} step(s) are disconnected from the rest of the route`);
   if (audit.target?.reason === 'not-formed') reasons.push('no step forms the requested target');
   else if (audit.target?.reason === 'stereo-mismatch') reasons.push('the target is formed only with the wrong stereochemistry');
@@ -979,7 +1105,8 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     if (!step.ok) { lines.push(`- ${label} FAIL — ${step.error ?? 'could not be parsed'}`); continue; }
     const racemic = step.racemic === true && step.unspecifiedStereocentres > 0;
     const nameFailure = (step.nameProblems?.length ?? 0) > 0;
-    const verdict = !nameFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic) ? 'OK' : 'FAIL';
+    const assemblyFailure = Boolean(step.assemblyProblem);
+    const verdict = !nameFailure && !assemblyFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic) ? 'OK' : 'FAIL';
     const stereo = step.unspecifiedStereocentres
       ? racemic
         ? ', declared racemic (stereochemistry not controlled)'
@@ -987,8 +1114,15 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
       : '';
     const balance = step.balanced ? 'balanced' : `NOT balanced (${step.differences.join('; ')})`;
     const nameNote = nameFailure ? ` name check failed: ${step.nameProblems!.join('; ')}.` : '';
+    // A step can balance only by solving an odd stoichiometry (8 citric acid → 9 …); the numbers
+    // are shown, and a large one is called out, because that usually means a byproduct is wrong.
+    const largest = Math.max(1, ...[...step.reactants, ...step.agents, ...step.products].map((entry) => entry.coefficient ?? 1));
+    const largeNote = step.balanced && !assemblyFailure && largest > LARGE_COEFFICIENT
+      ? ` The equation balances only with large coefficients (up to ${largest}); a byproduct is likely missing or wrong.`
+      : '';
+    const assemblyNote = assemblyFailure ? ` ${step.assemblyProblem}.` : '';
     const agents = step.agents.length ? ` [agents: ${sideTrace(step.agents, names)}]` : '';
-    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote} ${sideTrace(step.reactants, names)}${agents} → ${sideTrace(step.products, names)}`);
+    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${sideTrace(step.reactants, names)}${agents} → ${sideTrace(step.products, names)}`);
   }
   if (audit.links.length) {
     lines.push('', 'Intermediate continuity:', '');
@@ -1034,7 +1168,7 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
       lines.push(`- ${role} "${entry.name}" denotes a different structure than ${structure}.`);
     }
   }
-  if (review && reviewProblems.length) lines.push(...formatRouteReview(review));
+  if (review?.status === 'problems' && review.problems.length) lines.push(...formatRouteReview(review));
   const recap = [...audit.blocked];
   if (reviewProblems.length) recap.push(`The route review raised ${reviewProblems.length} problem(s).`);
   lines.push('', verified
@@ -1069,12 +1203,43 @@ function namedStepLines(labels: RouteSpeciesLabel[][], index: number): string {
   ].join('\n');
 }
 
+/** The four labelled lines with the resolved structure beside each name, for the route review:
+ *  it needs the connectivity to judge regiochemistry, which the names alone do not give. */
+function labelledStepLines(labels: RouteSpeciesLabel[][], step: RouteStepAudit): string {
+  // Show the audit's canonical isomeric SMILES, not the raw resolved writing: the reference
+  // services write the same compound differently, and the target is compared canonically, so
+  // handing the review the raw string makes it read identical compounds as different.
+  const canonical = new Map<string, string>();
+  for (const species of [...step.reactants, ...step.agents, ...step.products]) {
+    if (species.input && species.canonicalSmiles) canonical.set(species.input, species.canonicalSmiles);
+  }
+  const shown = (entry: RouteSpeciesLabel): string => {
+    if (!entry.smiles) return entry.name;
+    const smiles = entry.smiles.split('.').map((part) => canonical.get(part.trim()) ?? part.trim()).join('.');
+    return `${entry.name} — \`${smiles}\``;
+  };
+  const side = (role: RouteLabelRole, byproduct?: boolean): string => {
+    const entries = (labels[step.index] ?? []).filter((entry) => entry.role === role && (byproduct === undefined || entry.byproduct === byproduct));
+    return entries.map(shown).filter(Boolean).join('; ') || 'none';
+  };
+  return [
+    `  Reactants: ${side('reactant')}`,
+    `  Products: ${side('product', false)}`,
+    `  Byproducts: ${side('product', true)}`,
+    `  Agents: ${side('agent')}`,
+  ].join('\n');
+}
+
 /** Why a step's own equation needs correcting, or null when it passes on its own terms. */
 function namedStepFailure(step: RouteStepAudit): string | null {
   if (step.nameProblems?.length) return step.nameProblems.join('; ');
   if (!step.ok) return step.error ?? 'could not be parsed';
   if (step.balanced !== true) return `not balanced (${step.differences.join('; ')})`;
-  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state that the outcome is racemic`;
+  // A balanced step can still be impossible: the packing check refuses an equation that
+  // assembles a product from more than one substrate. The report already shows this, so the
+  // one-click prompts must name it too, or they point at a different step than the checker did.
+  if (step.assemblyProblem) return step.assemblyProblem;
+  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state in the prose that the outcome is racemic, that the product is meso or achiral, or that its stereochemistry is not controlled`;
   return null;
 }
 
@@ -1102,6 +1267,8 @@ const NAMES_ONLY_RULES = [
   '- Keep the single target chemistry-plan block (kind "structure") for the requested target; re-emit it unchanged if it is missing. Never emit a chemistry-plan for a step.',
   '- Conserve every element and the total charge on both sides. A species that is short on one side is a missing reagent (Reactants) or byproduct (Products/Byproducts); list it by systematic IUPAC name.',
   '- List every species that is consumed or produced once per side, under one role only. A true catalyst or solvent goes under Agents; never list a species that takes no part.',
+  '- Agents are true catalysts or solvents only. A species the step consumes is a Reactant, never an Agent, even when the prose calls it a catalyst or says it is derived from another reagent.',
+  '- A multi-component step lists every consumed reactant and every byproduct it releases (a condensation often releases water, carbon dioxide, or both); name each of them.',
   '- Give every species you make its stereodescriptors. If an outcome is racemic or a centre is genuinely unspecified, say so in the prose; never drop a descriptor silently.',
   '- A metal that enters as a reagent leaves as its salt: name the metal-containing product or byproduct (for example sodium salicylate, sodium chloride).',
   '- Carry a species from one step into the next with the same systematic IUPAC name, including its stereodescriptors.',
@@ -1160,7 +1327,7 @@ function namedFixPreamble(failures: string[], problems: string[], review: RouteR
 export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null): string {
   const problems = namedRouteProblems(labels, audit);
   const isolated = new Set(isolatedSteps(audit));
-  const reviewProblems = review?.status === 'problems' ? review.problems : [];
+  const reviewProblems = blockingReviewProblems(review);
   const reviewByStep = new Map<number, string[]>();
   for (const problem of reviewProblems) {
     if (problem.step <= 0) continue;
@@ -1270,7 +1437,7 @@ export function parseNameFeedback(raw: string): Array<{ from: string; to: string
     if (!item || typeof item.from !== 'string' || typeof item.to !== 'string') return null;
     const from = item.from.trim().slice(0, 200);
     const to = item.to.trim().slice(0, 200);
-    return from && to ? { from, to } : null;
+    return from && to && isPlausibleSpeciesName(from) && isPlausibleSpeciesName(to) ? { from, to } : null;
   }).filter((entry): entry is { from: string; to: string } => entry !== null).slice(0, 48);
 }
 

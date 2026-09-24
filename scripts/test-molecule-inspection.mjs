@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -195,13 +195,29 @@ test('a route review blocks the verdict and is shown as a model finding', () => 
   const clean = formatRouteAudit(audit);
   assert.match(clean, /\*\*Route verified\*\*/);
   assert.doesNotMatch(clean, /Route review/);
-  const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"detail":"the Products line names a different compound than the target."}]}');
-  assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, detail: 'the Products line names a different compound than the target.' }] });
+  const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"the Products line names a different compound than the target."}]}');
+  assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'blocking', detail: 'the Products line names a different compound than the target.' }] });
   const blockedText = formatRouteAudit(audit, [], review);
   assert.match(blockedText, /\*\*Route not verified\*\* — a route review raised 1 problem\(s\)\./);
   assert.match(blockedText, /### Route review \(model\)/);
   assert.match(blockedText, /- Step 1: the Products line names a different compound than the target\./);
   assert.match(blockedText, /Not verified: The route review raised 1 problem\(s\)\./);
+});
+
+test('an advisory review finding is shown but never blocks the route', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  assert.ok(audit);
+  // A finding with no severity is advisory by default: the reviewer cannot fail a route by
+  // doubting a transformation.
+  const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"detail":"I doubt acid X can give the named product."}]}');
+  assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'advisory', detail: 'I doubt acid X can give the named product.' }] });
+  const text = formatRouteAudit(audit, [], review);
+  assert.match(text, /\*\*Route verified\*\*/);
+  assert.doesNotMatch(text, /Route not verified/);
+  assert.match(text, /### Route review \(model, advisory\)/);
+  assert.match(text, /I doubt acid X can give the named product\./);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"advisory","detail":"x"}]}')), /\*\*Route verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"x"}]}')), /\*\*Route not verified\*\*/);
 });
 
 test('an unreadable review is not a problem and never blocks', () => {
@@ -214,6 +230,33 @@ test('an unreadable review is not a problem and never blocks', () => {
   assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
   // A review of `ok` does not block either.
   assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route verified\*\*/);
+});
+
+test('a review finding is kept whole or cut on a word boundary, never mid-word', () => {
+  // A real finding is longer than the old 400-character cap and must survive intact.
+  const sentence = 'The product is the requested target, but the step folds bond-forming events together. ';
+  const detail = sentence.repeat(7).trim();
+  assert.ok(detail.length > 400 && detail.length < 1000);
+  const parsed = parseRouteReview(JSON.stringify({ status: 'problems', problems: [{ step: 3, detail }] }));
+  assert.equal(parsed.problems[0].detail, detail);
+
+  const short = 'the Products line names a different compound than the target.';
+  assert.equal(clampReviewDetail(short), short);
+  const long = `${'word '.repeat(300)}tail`;
+  const clamped = clampReviewDetail(long);
+  assert.ok(clamped.endsWith('…'));
+  assert.ok(clamped.length <= 1001, 'kept within the limit plus the ellipsis');
+  const body = clamped.slice(0, -1);
+  assert.equal(body, body.trimEnd());
+  assert.ok(long.startsWith(body), 'the kept text is a prefix of the original, cut at a space');
+});
+
+test('the route review is told not to re-check balance and to allow one-pot cascades', () => {
+  assert.match(ROUTE_REVIEW_SYSTEM, /already verified that every equation balances/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade/);
+  // The checker owns balance; the reviewer still owns the plan problem it can see.
+  assert.match(ROUTE_REVIEW_SYSTEM, /regiochemistry/);
 });
 
 test('the continuity rule is names-first, never a reaction SMILES line', () => {
@@ -254,6 +297,10 @@ test('the template asks for names and roles only, and forbids the model from wri
 
 test('a declared racemate is formatted as a caveat, not a refusal', () => {
   assert.equal(declaresRacemic('The final product is a racemic mixture.'), true);
+  // An open outcome declared as meso/achiral or "not stereodefined" is a stated outcome too.
+  assert.equal(declaresRacemic('The bridgehead positions are not stereodefined in this achiral (meso) bicyclic ketone.'), true);
+  assert.equal(declaresRacemic('the product is the meso compound'), true);
+  assert.equal(declaresRacemic('the stereochemistry is not controlled'), true);
   assert.equal(declaresRacemic('obtained as a single (R) enantiomer'), false);
   const audit = normalizeRouteAudit({
     steps: [{ index: 0, reaction: 'CC(=O)CC.[H][H]>>CCC(C)O', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 1, racemic: true }],
@@ -315,6 +362,137 @@ test('the verified verdict only claims a formed target when one was checked', ()
   assert.doesNotMatch(formatRouteAudit(withoutTarget), /and the target is formed/);
 });
 
+test('the route report shows the solved coefficients and flags a large balance', () => {
+  const audit = normalizeRouteAudit({
+    continuous: true, blocked: [],
+    steps: [{
+      index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+      reactants: [{ input: 'citric', canonicalSmiles: 'citric', skeletonSmiles: 'citric', formula: 'C6H8O7', coefficient: 8 }],
+      agents: [],
+      products: [
+        { input: 'adc', canonicalSmiles: 'adc', skeletonSmiles: 'adc', formula: 'C5H6O5', coefficient: 9 },
+        { input: 'w', canonicalSmiles: 'w', skeletonSmiles: 'w', formula: 'H2O', coefficient: 5 },
+        { input: 'co2', canonicalSmiles: 'co2', skeletonSmiles: 'co2', formula: 'CO2', coefficient: 3 },
+      ],
+    }],
+    links: [],
+  });
+  const text = formatRouteAudit(audit);
+  assert.match(text, /8 C6H8O7/);
+  assert.match(text, /9 C5H6O5 \+ 5 H2O \+ 3 CO2/);
+  assert.match(text, /balances only with large coefficients \(up to 9\)/);
+  // An ordinary 1:1 balance shows the species without coefficients and no note.
+  const small = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  assert.doesNotMatch(formatRouteAudit(small), /large coefficients/);
+});
+
+test('the route review is given each species structure, not just its name', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' },
+    { role: 'product', byproduct: false, name: 'sodium phenoxide', smiles: '[Na+].[O-]c1ccccc1' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: false, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  const request = buildRouteReviewRequest('Propose a synthesis of phenol.', labels, audit);
+  assert.match(request, /phenol — `Oc1ccccc1`/);
+  assert.match(request, /sodium phenoxide — `\[Na\+\]\.\[O-\]c1ccccc1`/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /regiochemistry/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /wrong ring or epoxide regioisomer/);
+});
+
+test('the route review is shown canonical SMILES, so an identical compound reads identically', () => {
+  // PubChem writes tropinone as CN1C2CC(CC1CC2)=O; canonical is CN1C2CCC1CC(=O)C2, the target.
+  // The review must see the canonical form, or it reads the same compound as a different one.
+  const raw = 'CN1C2CC(CC1CC2)=O';
+  const canonical = 'CN1C2CCC1CC(=O)C2';
+  const step = passingStep(0, 'a>>b', [{ input: raw, canonicalSmiles: canonical, skeletonSmiles: canonical, formula: 'C8H13NO' }]);
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [step], links: [] });
+  const labels = [[{ role: 'product', byproduct: false, name: '8-methyl-8-azabicyclo[3.2.1]octan-3-one', smiles: raw }]];
+  const request = buildRouteReviewRequest('Propose a synthesis of tropinone.', labels, audit);
+  assert.match(request, /8-methyl-8-azabicyclo\[3\.2\.1\]octan-3-one — `CN1C2CCC1CC\(=O\)C2`/);
+  assert.doesNotMatch(request, /CN1C2CC\(CC1CC2\)=O/);
+});
+
+test('the route review is told SMILES identity is canonical and the target check is deterministic', () => {
+  assert.match(ROUTE_REVIEW_SYSTEM, /canonical isomeric SMILES/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /Two identical SMILES strings are the same compound/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /do not report that step's product as a different compound/);
+});
+
+test('each step heading and its prose are read for the review, not just the species', () => {
+  const answer = [
+    '**Step 1 — Hydrolysis of 2,5-dimethoxytetrahydrofuran to succinaldehyde**',
+    '',
+    'The acetal opens under acid to give the dialdehyde.',
+    '',
+    'Reactants: 2,5-dimethoxytetrahydrofuran; water',
+    '',
+    '**Step 2 — Dehydration of citric acid to aconitic acid**',
+    '',
+    'Citric acid loses water to give the unsaturated triacid.',
+    '',
+    'Reactants: citric acid',
+    '',
+    '### Notes',
+    '',
+    'A closing paragraph that is not a step.',
+  ].join('\n');
+  const prose = findStepProse(answer, 2);
+  assert.match(prose[0], /Hydrolysis of 2,5-dimethoxytetrahydrofuran to succinaldehyde/);
+  assert.match(prose[0], /acetal opens under acid/);
+  assert.doesNotMatch(prose[0], /Reactants/);
+  assert.match(prose[1], /Dehydration of citric acid to aconitic acid/);
+  assert.match(prose[1], /loses water/);
+  assert.doesNotMatch(prose[1], /closing paragraph/);
+});
+
+test('the route review request carries each step description and says a named reaction is possible', () => {
+  const labels = [[{ role: 'product', byproduct: false, name: 'aconitic acid', smiles: 'O=C(O)/C=C(C(=O)O)C(=O)O' }]];
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  const request = buildRouteReviewRequest('Propose a synthesis of tropinone.', labels, audit, ['Dehydration of citric acid to aconitic acid — citric acid loses water']);
+  assert.match(request, /Step 1:/);
+  assert.match(request, /Dehydration of citric acid to aconitic acid/);
+  assert.match(request, /aconitic acid — `/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /dehydration, decarboxylation/);
+});
+
+test('a step that cannot be assembled is FAIL and named in the verdict', () => {
+  const audit = normalizeRouteAudit({
+    continuous: false, blocked: ['Step 1: the equation can only balance by taking more product molecules than the substrate molecules can form.'],
+    steps: [{
+      index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+      assemblyProblem: 'the equation can only balance by taking more product molecules than the substrate molecules can form: 9 × C5H6O5 need 9 substrate molecules, but only 8 can each supply one',
+      reactants: [], agents: [], products: [],
+    }],
+    links: [],
+  });
+  const text = formatRouteAudit(audit);
+  assert.match(text, /\*\*Route not verified\*\* — [^.]*cannot be assembled from a single substrate molecule \(step 1\)/);
+  assert.match(text, /- Step 1 FAIL — balanced\. .*need 9 substrate molecules/);
+  // The large-coefficient note is redundant once the assembly reason is shown.
+  assert.doesNotMatch(text, /large coefficients/);
+  // The one-click prompts must name the same failure the report and verdict do, not only the
+  // model review, or the chips point at a different step than the checker did.
+  const labels = [[{ role: 'product', byproduct: false, name: '3-oxopentanedioic acid', smiles: 'O=C(O)CC(=O)CC(=O)O' }]];
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit));
+  assert.match(chips[0].prompt, /The route checker rejected these steps:/);
+  assert.match(chips[0].prompt, /- Step 1: the equation can only balance by taking more product molecules/);
+  const stepChip = chips.find(chip => chip.label === 'Fix step 1');
+  assert.ok(stepChip, 'the assembly step gets its own fix chip');
+  assert.match(stepChip.prompt, /Step 1 was rejected: the equation can only balance/);
+});
+
+test('the rules say a consumed species is a Reactant, never an Agent', () => {
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /A[\s\S]*species the step consumes is a Reactant, never an Agent/);
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'butanedial', smiles: 'O=CCCC=O' },
+    { role: 'product', byproduct: false, name: 'tropinone', smiles: 'CN1C2CCC1CC(=O)C2' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: ['x'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit));
+  assert.match(chips[0].prompt, /A species the step consumes is a Reactant, never an Agent/);
+  assert.match(chips[0].prompt, /lists every consumed reactant and every byproduct it releases/);
+});
+
 // ---------------------------------------------------------------- IUPAC names in the route
 
 test('the route report shows the IUPAC names the answer gave', () => {
@@ -364,6 +542,9 @@ test('the template asks for a systematic IUPAC name for every species and all fo
   for (const role of ['Reactants:', 'Products:', 'Byproducts:', 'Agents:']) assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes(role));
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('systematic IUPAC name'));
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('stereodescriptors'));
+  // A worked multi-component example shows the roles, including two byproducts.
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('propanedioic acid'), 'the worked example is present');
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('carbon dioxide; water'), 'and shows a step with two byproducts');
 });
 
 // ---------------------------------------------------------------- name-first derivation
@@ -497,10 +678,17 @@ test('the resolved SMILES is attached to the name in place, replacing any declar
 test('corrections are summarized for the user, and the feedback prompt parses', () => {
   assert.equal(formatNameCorrectionNote([]), '', 'nothing corrected prints nothing');
   assert.equal(formatNameCorrectionNote(['sodium but-1-ynide → sodium but-1-yn-1-ide']), 'Name corrections: sodium but-1-ynide → sodium but-1-yn-1-ide');
-  assert.equal(formatNameCorrectionNote(['a → b', 'a → b']), 'Name corrections: a → b', 'duplicates collapse');
+  assert.equal(formatNameCorrectionNote(['tropinone → tropinone']), '', 'a name corrected to itself is not shown');
+  // A name corrected over two attempts reads once, as the first name to the final one.
+  assert.equal(
+    formatNameCorrectionNote(['aconitic acid → trans-aconitic acid', 'trans-aconitic acid → (E)-prop-1-ene-1,2,3-tricarboxylic acid']),
+    'Name corrections: aconitic acid → (E)-prop-1-ene-1,2,3-tricarboxylic acid');
+  // A reply that smuggled SVG or JSON syntax into a "name" is not echoed to the user.
+  assert.equal(formatNameCorrectionNote(['</text> <text x="130" class="label">citric acid</text> → 2-hydroxypropane-1,2,3-tricarboxylic acid']), '');
 
   const parsed = parseNameFeedback('{"names":[{"from":"sodium but-1-ynide","to":"sodium but-1-yn-1-ide"}]}');
   assert.deepEqual(parsed, [{ from: 'sodium but-1-ynide', to: 'sodium but-1-yn-1-ide' }]);
+  assert.deepEqual(parseNameFeedback(JSON.stringify({ names: [{ from: '</text>\\n <text x="130">citric acid</text>', to: 'citric acid' }] })), [], 'markup is not a name');
   assert.deepEqual(parseNameFeedback('not json'), []);
   assert.ok(ROUTE_NAME_FEEDBACK_SYSTEM.includes('sodium but-1-yn-1-ide'), 'the systematic salt example is in the prompt');
 
@@ -584,14 +772,14 @@ test('a review-only block still offers chips, with the review findings folded in
   ]];
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b'), passingStep(1, 'b>>c')], links: [] });
   const review = parseRouteReview(JSON.stringify({ status: 'problems', problems: [
-    { step: 1, detail: '"2-acetylsalicylic acid" is a different compound than the requested target.' },
-    { step: 0, detail: 'the route methylates and then demethylates without need.' },
+    { step: 1, severity: 'blocking', detail: '"2-acetylsalicylic acid" is a different compound than the requested target.' },
+    { step: 0, severity: 'advisory', detail: 'the route methylates and then demethylates without need.' },
   ] }));
   const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, review));
   assert.deepEqual(chips.map((chip) => chip.label), ['Ask the model to fix the failed steps', 'Fix from the target backwards', 'Fix step 1']);
   assert.match(chips[0].prompt, /A model review of the route plan also reported:/);
   assert.match(chips[0].prompt, /Step 1: "2-acetylsalicylic acid" is a different compound/);
-  assert.match(chips[0].prompt, /the route methylates and then demethylates without need\./);
+  assert.doesNotMatch(chips[0].prompt, /demethylates without need/, 'an advisory finding never joins a fix request');
   assert.match(chips[2].prompt, /Step 1 was rejected: review: "2-acetylsalicylic acid" is a different compound/);
 });
 
