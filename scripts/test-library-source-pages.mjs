@@ -15,9 +15,9 @@ const repo = path.resolve(import.meta.dirname, '..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-library-pages-'));
 process.on('exit', () => fs.rmSync(scratch, { recursive: true, force: true }));
 const outfile = path.join(scratch, 'pages.cjs');
-await build({ stdin: { contents: "export * from './electron/library/librarySourcePages'; export { planRetrievalChunks } from './shared/retrievalChunks';", resolveDir: repo, loader: 'ts' },
+await build({ stdin: { contents: "export * from './electron/library/librarySourcePages'; export { planRetrievalChunks, textWithPageStarts } from './shared/retrievalChunks';", resolveDir: repo, loader: 'ts' },
   outfile, bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent', alias: { '@shared': path.join(repo, 'shared') } });
-const { libraryMarkdownWithPageMarkers, readDocumentarySourceMap, planRetrievalChunks } = createRequire(import.meta.url)(outfile);
+const { libraryMarkdownWithPageMarkers, readDocumentarySourceMap, planRetrievalChunks, textWithPageStarts } = createRequire(import.meta.url)(outfile);
 
 const paragraphs = [
   'Capítulo primero: método. La muestra excluye deliberadamente las parcelas de secano.',
@@ -65,4 +65,21 @@ test('the deep-scan text of a Library item goes through the page markers', () =>
   const source = fs.readFileSync(path.join(repo, 'electron/extraction/textExtractor.ts'), 'utf8');
   const branch = source.slice(source.indexOf('getLibraryReaderRawContent(zoteroKey)'), source.indexOf("origin: 'library_clean'"));
   assert.match(branch, /libraryMarkdownWithPageMarkers\(clean\.markdown, readDocumentarySourceMap\(clean\.folder, clean\.sourceMapFile\)\)/);
+});
+
+// Short pages put a whole report in one passage labelled "pp. 1–3". In a real run
+// Research Chat quoted the page-2 sentence exactly and could only say "pp. 1–3":
+// the range alone does not say where inside the passage each page begins.
+test('a page-crossing passage shows the model where each page begins', () => {
+  const [chunk] = planRetrievalChunks(libraryMarkdownWithPageMarkers(markdown, map));
+  assert.equal(chunk.pageLabel, 'pp. 1–3');
+  assert.deepEqual(chunk.pageStarts.map(start => start.page), [1, 2, 3]);
+  assert.doesNotMatch(chunk.text, /\[p\. \d\]/, 'the stored and embedded text carries no markers');
+  const shown = textWithPageStarts(chunk.text, chunk.pageStarts);
+  assert.match(shown, /\[p\. 2\] Capítulo segundo: resultados\. El ahorro no se tradujo/);
+  assert.match(shown, /\[p\. 3\] Capítulo tercero/);
+  assert.equal(shown.replace(/\[p\. \d\] /g, ''), chunk.text);
+  const single = planRetrievalChunks('[[p. 4]] One page only.')[0];
+  assert.equal(single.pageStarts, undefined, 'a single-page passage needs no markers');
+  assert.equal(textWithPageStarts(single.text, single.pageStarts), single.text);
 });

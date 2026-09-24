@@ -17,6 +17,23 @@ export interface RetrievalChunk {
   pageNumber: number | null;
   /** Last physical page, only when the chunk crosses a page boundary. */
   pageEnd?: number;
+  /** Where each page begins in `text`, only when the chunk crosses a page boundary:
+   * the range alone cannot say on which page a quoted sentence inside it lies. */
+  pageStarts?: Array<{ page: number; offset: number }>;
+}
+
+/** The passage text as a model should read it: a `[p. N]` marker where each page
+ * begins, so a quotation from a page-crossing passage can be given its own page.
+ * The stored and embedded text never carries these markers. */
+export function textWithPageStarts(text: string, pageStarts?: Array<{ page: number; offset: number }>): string {
+  if (!pageStarts?.length) return text;
+  let result = '', position = 0;
+  for (const { page, offset } of [...pageStarts].sort((a, b) => a.offset - b.offset)) {
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(offset) || offset < position || offset > text.length) continue;
+    result += `${text.slice(position, offset)}[p. ${page}] `;
+    position = offset;
+  }
+  return result + text.slice(position);
 }
 
 /**
@@ -85,12 +102,19 @@ export function planRetrievalChunks(
     // first page attributes a quotation from the next page to the wrong one.
     const first = slice[0]?.pageNumber ?? null, last = slice.at(-1)?.pageNumber ?? null;
     const crosses = first != null && last != null && last > first;
+    let text = '';
+    const pageStarts: Array<{ page: number; offset: number }> = [];
+    slice.forEach((token, index) => {
+      if (index && !token.continuation) text += ' ';
+      if (crosses && token.pageNumber != null && token.pageNumber !== pageStarts.at(-1)?.page) pageStarts.push({ page: token.pageNumber, offset: text.length });
+      text += token.value;
+    });
     chunks.push({
-      text: slice.map((token, index) => `${index && !token.continuation ? ' ' : ''}${token.value}`).join(''),
+      text,
       pageLabel: crosses ? `pp. ${first}–${last}` : slice[0]?.pageLabel ?? null,
       sourceRef: slice[0]?.sourceRef ?? null,
       pageNumber: first,
-      ...(crosses ? { pageEnd: last } : {}),
+      ...(crosses ? { pageEnd: last, pageStarts } : {}),
     });
     if (end >= sourceEnd) start = sourceEnd;
     else start = Math.max(start + 1, end - overlapWords);

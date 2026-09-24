@@ -8,6 +8,9 @@ export interface DocumentaryChunk {
   pageLabel: string | null;
   pageNumber: number | null;
   sourceRef: string | null;
+  pageEnd?: number;
+  /** Where each page begins in a page-crossing chunk's text. */
+  pageStarts?: Array<{ page: number; offset: number }>;
 }
 export interface DocumentaryJob {
   id: string;

@@ -119,7 +119,7 @@ export interface ResearchEvidence {
   attachmentRevision?: string;
   revision: string;
   text: string;
-  locator: { sourceRef: string | null; pageNumber: number | null; pageLabel: string | null; pageEnd?: number; charStart?: number; charEnd?: number };
+  locator: { sourceRef: string | null; pageNumber: number | null; pageLabel: string | null; pageEnd?: number; pageStarts?: Array<{ page: number; offset: number }>; charStart?: number; charEnd?: number };
   provenance: 'source' | 'abstract' | 'idea-evidence' | 'profile-support' | 'user-note' | 'generated-report';
   limitations: string[];
 }

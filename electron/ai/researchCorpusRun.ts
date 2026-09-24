@@ -2,6 +2,7 @@ import { researchActivityStep, startResearchActivity } from './researchActivity'
 import type { ResearchDocumentRead, ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { RETRIEVAL_PRESETS, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
+import { textWithPageStarts } from '@shared/retrievalChunks';
 import type { DeepResearchRequest, WritingWorkshopBrief, WritingWorkshopIdeaCandidate, WritingWorkshopPassageCandidate, WritingWorkshopSnapshot } from '@shared/types';
 import type { DeepResearchDeps, SectionRetrievalInput } from './deepResearchCore';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -265,7 +266,7 @@ export class ResearchCorpusRun {
   private passage(item: ResearchEvidence): WritingWorkshopPassageCandidate {
     const document = this.scope.documents.find(document => document.id === item.documentId)!;
     const id = documentaryCitationId(this.scope.id, item.id);
-    return { id, label: document.title, summary: item.text, nodus_id: document.workId ?? document.id,
+    return { id, label: document.title, summary: textWithPageStarts(item.text, item.locator.pageStarts), nodus_id: document.workId ?? document.id,
       authors: document.authors, year: document.year, zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '',
       pageLabel: item.locator.pageLabel, ...(item.limitations.length ? { limitations: item.limitations } : {}), citation: `nodus://passage/${encodeURIComponent(id)}`, score: 1, reason: item.provenance };
   }
