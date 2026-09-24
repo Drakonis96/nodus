@@ -23,6 +23,7 @@ import {
   ROUTE_REVIEW_SYSTEM,
   type MoleculeDossier,
   type NamedSpecies,
+  type NameFeedbackEntry,
   type ResolvedSpecies,
   type RouteAudit,
   type RouteStepAudit,
@@ -230,6 +231,9 @@ export interface RouteResolutionOutcome {
   clarification?: string;
   /** One line per name the resolver corrected, e.g. "old → new"; empty when nothing changed. */
   corrections: string[];
+  /** Species the model supplied as structures because no name would resolve, as prose, so the
+   *  caller discloses that their structure came from the model, not a reference. */
+  authorStructures: string[];
   /** True when the installed package has no resolve-names tool, so the caller falls back to
    *  the legacy reaction-line path. */
   legacy: boolean;
@@ -268,6 +272,48 @@ async function invokeResolveNames(runner: Runner, provider: CapabilityProvider, 
   return list.map(normalizeSpeciesResolution).filter((entry): entry is SpeciesResolution => entry !== null);
 }
 
+const STRUCTURE_TOOL = 'resolve-structure';
+
+/** A structure named by the reference service: the reverse of a name resolution. */
+interface SpeciesStructureName {
+  smiles: string;
+  status: 'named' | 'unnamed';
+  cid?: number;
+  name?: string;
+  formula?: string;
+  canonicalSmiles?: string;
+  feedback?: string;
+}
+
+/** True when the installed package can name a structure. Older packages only resolve names, so
+ *  a structure the author supplies then keeps the author's SMILES with no name read back. */
+function structureNamingAvailable(): boolean {
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  return Boolean(provider && provider.tools.some((tool) => tool.id === STRUCTURE_TOOL));
+}
+
+function normalizeStructureName(entry: unknown): SpeciesStructureName | null {
+  const value = entry && typeof entry === 'object' ? entry as Record<string, unknown> : null;
+  if (!value || typeof value.smiles !== 'string' || !value.smiles) return null;
+  return {
+    smiles: value.smiles.slice(0, 2000),
+    status: value.status === 'named' ? 'named' : 'unnamed',
+    ...(Number.isSafeInteger(value.cid) && (value.cid as number) > 0 ? { cid: value.cid as number } : {}),
+    ...(typeof value.name === 'string' && value.name ? { name: value.name.slice(0, 300) } : {}),
+    ...(typeof value.formula === 'string' && value.formula ? { formula: value.formula.slice(0, 200) } : {}),
+    ...(typeof value.canonicalSmiles === 'string' && value.canonicalSmiles ? { canonicalSmiles: value.canonicalSmiles.slice(0, 2000) } : {}),
+    ...(typeof value.feedback === 'string' && value.feedback ? { feedback: value.feedback.slice(0, 400) } : {}),
+  };
+}
+
+async function invokeNameStructures(runner: Runner, provider: CapabilityProvider, smiles: string[]): Promise<SpeciesStructureName[]> {
+  const result = await runner.invoke({ provider, toolId: STRUCTURE_TOOL, input: { smiles } });
+  const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'structure-naming');
+  const data = artifact?.data as { results?: unknown } | undefined;
+  const list = Array.isArray(data?.results) ? data.results as unknown[] : [];
+  return list.map(normalizeStructureName).filter((entry): entry is SpeciesStructureName => entry !== null);
+}
+
 /** Unresolved reactant/product names — the ones a step cannot be built without. An agent
  *  (catalyst or solvent) may have no resolvable name and is not chased. */
 function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<string, SpeciesResolution>): UnresolvedName[] {
@@ -275,6 +321,7 @@ function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<strin
   speciesByStep.forEach((step, index) => {
     for (const entry of step) {
       if (entry.role === 'agent') continue;
+      if (entry.declaredSmiles) continue; // the model already supplied a structure
       if (resolutions.get(entry.name)?.status === 'resolved') continue;
       const resolution = resolutions.get(entry.name);
       out.push({ step: index + 1, role: entry.role, byproduct: entry.byproduct, name: entry.name, ...(resolution?.feedback ? { feedback: resolution.feedback } : {}) });
@@ -283,7 +330,7 @@ function unresolvedNames(speciesByStep: NamedSpecies[][], resolutions: Map<strin
   return out.slice(0, 24);
 }
 
-async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[], options: InspectOptions): Promise<Array<{ from: string; to: string }>> {
+async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[], options: InspectOptions): Promise<NameFeedbackEntry[]> {
   try {
     const raw = await completeText({
       system: ROUTE_NAME_FEEDBACK_SYSTEM,
@@ -324,7 +371,7 @@ export async function resolveNamedRoute(
   modelAnswer: string,
   options: InspectOptions = {},
 ): Promise<RouteResolutionOutcome> {
-  const legacy: RouteResolutionOutcome = { answer: finalAnswer, steps: [], labels: [], consistent: true, corrections: [], legacy: true };
+  const legacy: RouteResolutionOutcome = { answer: finalAnswer, steps: [], labels: [], consistent: true, corrections: [], authorStructures: [], legacy: true };
   if (options.enabled === false) return legacy;
   const provider = resolveProvider();
   if (!provider) return legacy;
@@ -356,10 +403,37 @@ export async function resolveNamedRoute(
       options.signal?.throwIfAborted();
       const corrected = await requestCorrectedNames(modelAnswer, unresolved, options);
       if (!corrected.length) break;
-      const renamed = new Map(corrected.map((entry) => [entry.from, entry.to]));
-      for (const [from, to] of renamed) if (from !== to) corrections.push(`${from} → ${to}`);
-      speciesByStep = speciesByStep.map((step) => step.map((entry) => renamed.has(entry.name) ? { ...entry, name: renamed.get(entry.name)! } : entry));
-      await resolveAll([...renamed.values()]);
+      const renamed = new Map<string, string>();
+      for (const entry of corrected) {
+        if (entry.kind === 'structure') {
+          // The model answered with a structure instead of a name — an exotic cage or a named
+          // literature intermediate it cannot name. Keep the name as written and attach the
+          // structure; the naming pass below reads a name back from PubChem when it can.
+          speciesByStep = speciesByStep.map((step) => step.map((item) => item.name === entry.from ? { ...item, declaredSmiles: entry.to } : item));
+          continue;
+        }
+        if (entry.from !== entry.to) corrections.push(`${entry.from} → ${entry.to}`);
+        renamed.set(entry.from, entry.to);
+      }
+      if (renamed.size) {
+        speciesByStep = speciesByStep.map((step) => step.map((entry) => renamed.has(entry.name) ? { ...entry, name: renamed.get(entry.name)! } : entry));
+        await resolveAll([...renamed.values()]);
+      }
+    }
+
+    // A species the model could only give as a structure: try to read a name back from PubChem,
+    // so the route uses a real name where one exists. An unnamed structure keeps the author's
+    // SMILES and is disclosed as author-supplied.
+    const declaredSmiles = [...new Set(speciesByStep.flat().map((entry) => entry.declaredSmiles).filter((value): value is string => Boolean(value)))];
+    const nameByStructure = new Map<string, SpeciesStructureName>();
+    if (declaredSmiles.length && structureNamingAvailable()) {
+      try {
+        for (let start = 0; start < declaredSmiles.length; start += 48) {
+          options.signal?.throwIfAborted();
+          const named = await invokeNameStructures(runner, provider, declaredSmiles.slice(start, start + 48));
+          for (const entry of named) nameByStructure.set(entry.smiles, entry);
+        }
+      } catch { /* naming is best effort; the declared structure stands */ }
     }
 
     const resolvedByStep: ResolvedSpecies[][] = speciesByStep.map((step) => step.map((entry) => {
@@ -370,7 +444,11 @@ export async function resolveNamedRoute(
         // equivalent SMILES written differently would otherwise look like a correction.
         return { ...entry, status: 'resolved' as const, smiles: resolution.smiles, source: resolution.source ?? 'pubchem', ...(resolution.formula ? { formula: resolution.formula } : {}) };
       }
-      if (entry.declaredSmiles) return { ...entry, status: 'fallback' as const, smiles: entry.declaredSmiles, source: 'declared' as const };
+      if (entry.declaredSmiles) {
+        const named = nameByStructure.get(entry.declaredSmiles);
+        const smiles = named?.canonicalSmiles ?? entry.declaredSmiles;
+        return { ...entry, status: 'fallback' as const, smiles, source: 'declared' as const, ...(named?.status === 'named' && named.name ? { name: named.name } : {}), ...(named?.formula ? { formula: named.formula } : {}) };
+      }
       return { ...entry, status: 'unresolved' as const, ...(resolution?.feedback ? { feedback: resolution.feedback } : {}) };
     }));
 
@@ -384,6 +462,7 @@ export async function resolveNamedRoute(
 
     const steps = buildRouteSteps(resolvedByStep);
     const labels: RouteSpeciesLabel[][] = resolvedByStep.map((step) => step.filter((entry) => entry.smiles).map((entry) => ({ role: entry.role, byproduct: entry.byproduct, name: entry.name, smiles: entry.smiles! })));
+    const authorStructures = resolvedByStep.flat().filter((entry) => entry.status === 'fallback' && entry.smiles).map((entry) => `${entry.name} — \`${entry.smiles}\``);
     const annotated = `${annotateSpeciesSmiles(finalAnswer, resolvedByStep).trimEnd()}\n`;
     return {
       answer: annotated,
@@ -391,6 +470,7 @@ export async function resolveNamedRoute(
       labels,
       consistent: critical.length === 0,
       corrections,
+      authorStructures,
       ...(critical.length ? { clarification: formatUnresolvedNameClarification(critical) } : {}),
       legacy: false,
     };

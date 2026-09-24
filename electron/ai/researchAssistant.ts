@@ -11,7 +11,7 @@ import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
-import { countRouteSteps, findStepNamedSpecies, formatMissingSpeciesPrompt, formatNameCorrectionNote, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
+import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
@@ -245,7 +245,9 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
     const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
     const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
     const correctionNote = formatNameCorrectionNote(resolved.corrections);
-    const withNotes = correctionNote ? `${routed.trimEnd()}\n\n${correctionNote}\n` : routed;
+    const structureNote = formatAuthorStructureNote(resolved.authorStructures);
+    const notes = [correctionNote, structureNote].filter(Boolean).join('\n\n');
+    const withNotes = notes ? `${routed.trimEnd()}\n\n${notes}\n` : routed;
     return resolved.clarification ? `${withNotes.trimEnd()}\n\n${resolved.clarification}\n` : withNotes;
   } finally {
     await session?.dispose();

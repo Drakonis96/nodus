@@ -1411,8 +1411,10 @@ export const ROUTE_NAME_FEEDBACK_SYSTEM = [
   'You are given species whose names PubChem and OPSIN could not resolve. For each, return the correct systematic IUPAC name of the same species, using the step prose for context and the resolver feedback for why the current name failed.',
   'Keep the identity: do not change which compound it is, do not drop stereochemistry the prose states, and do not invent a different reagent.',
   'Prefer a name a reference service holds — for example the systematic salt name `sodium but-1-yn-1-ide` rather than `sodium but-1-ynide`.',
-  'Return EXCLUSIVELY one JSON object: {"names":[{"from":"the name I gave you","to":"the corrected systematic IUPAC name"}]}.',
-  'If you cannot name a species systematically, omit it from the array.',
+  'If you cannot construct a name the reference services will resolve — an exotic fused polycycle, a cage, a named literature intermediate whose systematic name you cannot derive reliably — do not guess. Give the STRUCTURE instead: its isomeric SMILES. The application checks the structure with RDKit and, when PubChem holds it, reads its name back.',
+  'Return EXCLUSIVELY one JSON object. For a name: {"names":[{"from":"the name I gave you","to":"the corrected systematic IUPAC name"}]}. For a structure you cannot name: {"names":[{"from":"the name I gave you","smiles":"the isomeric SMILES"}]}.',
+  'Do not invent a name or a structure you are unsure of; a wrong structure is worse than a stated limitation.',
+  'If you cannot name or describe a species at all, omit it from the array.',
 ].join('\n');
 
 export function buildNameFeedbackRequest(species: UnresolvedName[], prose: string): string {
@@ -1425,7 +1427,22 @@ export function buildNameFeedbackRequest(species: UnresolvedName[], prose: strin
   ].join('\n');
 }
 
-export function parseNameFeedback(raw: string): Array<{ from: string; to: string }> {
+/** A structure the model may hand back in place of a name: one line of isomeric SMILES, with no
+ *  prose, markup or whitespace inside it. */
+function isPlausibleStructure(value: string): boolean {
+  return value.length >= 2 && value.length <= 2000 && /[A-Za-z]/.test(value) && !/[\s`<>{}"|]/.test(value);
+}
+
+/** One correction from the name-feedback loop: the model either fixes the name or, when it
+ *  cannot name the species, supplies the structure instead. */
+export interface NameFeedbackEntry {
+  from: string;
+  /** The corrected systematic name, or a structure (isomeric SMILES / PubChem CID). */
+  to: string;
+  kind: 'name' | 'structure';
+}
+
+export function parseNameFeedback(raw: string): NameFeedbackEntry[] {
   const match = /\{[\s\S]*\}/.exec(raw);
   if (!match) return [];
   let value: unknown;
@@ -1434,11 +1451,26 @@ export function parseNameFeedback(raw: string): Array<{ from: string; to: string
   const list = Array.isArray(record?.names) ? record.names as unknown[] : [];
   return list.map((entry) => {
     const item = asRecord(entry);
-    if (!item || typeof item.from !== 'string' || typeof item.to !== 'string') return null;
+    if (!item || typeof item.from !== 'string') return null;
     const from = item.from.trim().slice(0, 200);
-    const to = item.to.trim().slice(0, 200);
-    return from && to && isPlausibleSpeciesName(from) && isPlausibleSpeciesName(to) ? { from, to } : null;
-  }).filter((entry): entry is { from: string; to: string } => entry !== null).slice(0, 48);
+    if (!from || !isPlausibleSpeciesName(from)) return null;
+    if (typeof item.smiles === 'string' && item.smiles.trim()) {
+      const smiles = item.smiles.trim().slice(0, 2000);
+      if (isPlausibleStructure(smiles)) return { from, to: smiles, kind: 'structure' as const };
+    }
+    if (typeof item.to === 'string' && item.to.trim()) {
+      const to = item.to.trim().slice(0, 200);
+      if (to && isPlausibleSpeciesName(to)) return { from, to, kind: 'name' as const };
+    }
+    return null;
+  }).filter((entry): entry is NameFeedbackEntry => entry !== null).slice(0, 48);
+}
+
+/** A short note naming the species the author supplied as structures because no reference
+ *  would name them, so a checked route never hides that its structure came from the model. */
+export function formatAuthorStructureNote(entries: string[]): string {
+  const unique = [...new Set(entries.map((entry) => entry.trim()).filter(Boolean))];
+  return unique.length ? `Author-supplied structures (no reference name was available): ${unique.join('; ')}` : '';
 }
 
 /** The escalation when a name cannot be resolved to a structure even after the feedback

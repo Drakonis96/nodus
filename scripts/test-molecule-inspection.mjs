@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -687,7 +687,11 @@ test('corrections are summarized for the user, and the feedback prompt parses', 
   assert.equal(formatNameCorrectionNote(['</text> <text x="130" class="label">citric acid</text> → 2-hydroxypropane-1,2,3-tricarboxylic acid']), '');
 
   const parsed = parseNameFeedback('{"names":[{"from":"sodium but-1-ynide","to":"sodium but-1-yn-1-ide"}]}');
-  assert.deepEqual(parsed, [{ from: 'sodium but-1-ynide', to: 'sodium but-1-yn-1-ide' }]);
+  assert.deepEqual(parsed, [{ from: 'sodium but-1-ynide', to: 'sodium but-1-yn-1-ide', kind: 'name' }]);
+  // The model may answer with a structure when it cannot name the species.
+  assert.deepEqual(
+    parseNameFeedback('{"names":[{"from":"Eaton photodimer","smiles":"BrC12CCC(OCCO1)C1(Br)CCC3(OCCO3)C21"}]}'),
+    [{ from: 'Eaton photodimer', to: 'BrC12CCC(OCCO1)C1(Br)CCC3(OCCO3)C21', kind: 'structure' }]);
   assert.deepEqual(parseNameFeedback(JSON.stringify({ names: [{ from: '</text>\\n <text x="130">citric acid</text>', to: 'citric acid' }] })), [], 'markup is not a name');
   assert.deepEqual(parseNameFeedback('not json'), []);
   assert.ok(ROUTE_NAME_FEEDBACK_SYSTEM.includes('sodium but-1-yn-1-ide'), 'the systematic salt example is in the prompt');
@@ -696,6 +700,14 @@ test('corrections are summarized for the user, and the feedback prompt parses', 
   const payload = fixPayload(fence);
   assert.equal(payload.label, 'Confirm the intended structure');
   assert.match(payload.prompt, /sodium but-1-ynide/);
+});
+
+test('an author-supplied structure is disclosed, and the feedback prompt offers the fallback', () => {
+  assert.equal(formatAuthorStructureNote([]), '', 'nothing supplied prints nothing');
+  assert.match(formatAuthorStructureNote(['Eaton photodimer — `BrC12CCC1`']), /Author-supplied structures.*Eaton photodimer/);
+  // The prompt tells the model it may answer with a structure when it cannot name the species.
+  assert.match(ROUTE_NAME_FEEDBACK_SYSTEM, /Give the STRUCTURE instead/);
+  assert.match(ROUTE_NAME_FEEDBACK_SYSTEM, /"smiles"/);
 });
 
 const routeFixChips = (text) => splitChatVisuals(text).filter((part) => part.kind === 'route-fix').map((part) => JSON.parse(part.content));
