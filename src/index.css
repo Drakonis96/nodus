@@ -425,6 +425,12 @@ body {
 .light .text-red-400 {
   color: #dc2626;
 }
+.light .text-orange-400 {
+  color: #c2410c;
+}
+.library-row-action-spin { animation: library-row-action-spin 1.4s linear infinite; }
+@keyframes library-row-action-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .library-row-action-spin { animation: none; } }
 .light .text-cyan-300 {
   color: #0891b2;
 }

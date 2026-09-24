@@ -26,6 +26,7 @@ import { WorkStatusModal } from './WorkStatusModal';
 import { DocumentProfileModal } from './DocumentProfileModal';
 import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
+import { libraryIndexAction } from '../libraryIndexAction';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { notifyDataChanged, useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import { deriveWorkStatus, queueItemsByWork, retryableSteps, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
@@ -47,7 +48,7 @@ const LIBRARY_PAGE_SIZE = 200;
 // Title and authors get the room the five pipeline-status columns used to take:
 // checkbox, title, authors, year, theme(s), ideas, status, actions.
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(10rem,1fr) 4.5rem minmax(9rem,1fr) 5rem 11rem 8.5rem';
+  '2rem minmax(18rem,2fr) minmax(10rem,1fr) 4.5rem minmax(9rem,1fr) 5rem 11rem 10.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
 
@@ -1976,10 +1977,6 @@ export function Library({
                   )}
                 </div>
                 <div className="min-w-0 p-1">
-                  {vaultType === 'academic' && <button className="mb-1 block max-w-full truncate text-[10px] text-indigo-400" onClick={() => openResearchPreparation([w.nodus_id])}
-                    title={`${t('Búsqueda léxica')}: ${t(preparationByWork.get(w.nodus_id)?.lexical === 'ready' ? 'Disponible para consultar' : 'Preparación pendiente')} · ${t('Embeddings')}: ${t(preparationByWork.get(w.nodus_id)?.embeddings === 'ready' ? 'Completado' : 'Preparación pendiente')}`}>
-                    {t(preparationByWork.get(w.nodus_id)?.text === 'abstract' ? 'Solo abstract' : preparationByWork.get(w.nodus_id)?.lexical === 'ready' ? 'Disponible para consultar' : 'Preparación pendiente')}
-                  </button>}
                   {academicMode === 'manual' ? <span className="text-xs text-neutral-500">{t('Modo Manual')}</span> : status && <StatusPill status={status} work={w} onClick={() => setStatusWork(w)} />}
                   {academicMode !== 'manual' && vaultType === 'academic' && <button
                     className={`mt-1 block max-w-full truncate text-[10px] ${documentStatuses.get(w.nodus_id) === 'current' ? 'text-cyan-400' : documentStatuses.get(w.nodus_id) === 'failed' ? 'text-red-400' : 'text-neutral-600'}`}
@@ -1997,14 +1994,18 @@ export function Library({
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
-                    {academicMode !== 'manual' && <button
-                      className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
-                      title={t('Analizar: temas, ideas, resumen, indexado y relaciones')}
+                    {academicMode !== 'manual' && <RowIconButton
+                      title={t(vaultType === 'academic' ? 'Extraer ideas' : 'Analizar')}
+                      icon="bulb"
+                      tone="violet"
                       onClick={() => processFullWork(w)}
-                    >
-                      {t(vaultType === 'academic' ? 'Extraer ideas' : 'Analizar')}
-                    </button>}
-                    {vaultType === 'academic' && <button className="btn btn-ghost text-xs" onClick={() => openResearchPreparation([w.nodus_id])}>{t('Indexar documento')}</button>}
+                    />}
+                    {vaultType === 'academic' && (() => {
+                      // The colour is this document's index state; the label is what a click does.
+                      const index = libraryIndexAction(preparationByWork.get(w.nodus_id));
+                      return <RowIconButton title={t(index.label)} icon="layers" tone={index.tone} spinning={index.busy}
+                        testId={`vault-library-index-${w.nodus_id}`} onClick={() => openResearchPreparation([w.nodus_id])} />;
+                    })()}
                     <RowIconButton
                       title={t('Abrir lector limpio')}
                       icon="book"
@@ -2164,12 +2165,16 @@ function RowIconButton({
   icon,
   tone = 'neutral',
   disabled = false,
+  spinning = false,
+  testId,
   onClick,
 }: {
   title: string;
   icon: string;
-  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet' | 'amber';
+  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet' | 'amber' | 'green' | 'orange' | 'red';
   disabled?: boolean;
+  spinning?: boolean;
+  testId?: string;
   onClick: () => void;
 }) {
   const toneClass =
@@ -2181,16 +2186,25 @@ function RowIconButton({
           ? 'text-violet-400 hover:text-violet-300'
           : tone === 'amber'
             ? 'text-amber-400 hover:text-amber-300'
-            : 'text-neutral-400 hover:text-neutral-100';
+            : tone === 'green'
+              ? 'text-emerald-400 hover:text-emerald-300'
+              : tone === 'orange'
+                ? 'text-orange-400 hover:text-orange-300'
+                : tone === 'red'
+                  ? 'text-red-400 hover:text-red-300'
+                  : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
       className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${toneClass}`}
       title={title}
       aria-label={title}
+      data-testid={testId}
+      data-tone={tone}
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={13} />
+      {/* Spin a wrapper, never the icon itself: Tailwind's transform utilities clash with a spin on one element. */}
+      {spinning ? <span className="library-row-action-spin inline-flex"><Icon name={icon} size={13} /></span> : <Icon name={icon} size={13} />}
     </button>
   );
 }

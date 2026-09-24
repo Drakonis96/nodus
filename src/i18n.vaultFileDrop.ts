@@ -1,4 +1,5 @@
-/** Files dropped on a vault's Library: imported to the Global Library and used in the vault. */
+/** A vault's Library: files dropped on it (imported to the Global Library and used in the
+ * vault) and its per-document index button. */
 const keys = [
   'Se añadirá a la Biblioteca global y a este vault.',
   '{n} documento(s) añadido(s) a este vault y a la Biblioteca global. Se indexarán automáticamente.',
@@ -18,4 +19,19 @@ const translations: Record<string, string[]> = {
   ko: ['글로벌 라이브러리와 이 vault에 추가됩니다.', '문서 {n}개를 이 vault와 글로벌 라이브러리에 추가했습니다. 자동으로 색인됩니다.', '문서 {n}개를 이 vault와 글로벌 라이브러리에 추가했습니다. 자동 색인이 꺼져 있습니다.', '이 문서들은 이미 이 vault에 있습니다.'],
   ja: ['グローバルライブラリとこの vault に追加されます。', '{n} 件の文書をこの vault とグローバルライブラリに追加しました。自動的にインデックス化されます。', '{n} 件の文書をこの vault とグローバルライブラリに追加しました。自動インデックス化はオフです。', 'これらの文書はすでにこの vault にあります。'],
 };
+keys.push('Reindexar documento', 'Reintentar indexado');
+const indexActionTranslations: Record<string, string[]> = {
+  en: ['Reindex document', 'Retry indexing'],
+  fr: ['Réindexer le document', 'Réessayer l’indexation'],
+  de: ['Dokument neu indexieren', 'Indexierung erneut versuchen'],
+  pt: ['Reindexar documento', 'Tentar indexar novamente'],
+  'pt-BR': ['Reindexar documento', 'Tentar indexar novamente'],
+  it: ['Reindicizza documento', 'Riprova l’indicizzazione'],
+  tr: ['Belgeyi yeniden dizinle', 'Dizinlemeyi yeniden dene'],
+  'zh-CN': ['重新索引文档', '重试索引'],
+  'zh-TW': ['重新索引文件', '重試索引'],
+  ko: ['문서 다시 색인', '색인 다시 시도'],
+  ja: ['文書を再インデックス化', 'インデックス化を再試行'],
+};
+for (const [language, values] of Object.entries(indexActionTranslations)) translations[language].push(...values);
 export const VAULT_FILE_DROP_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));
