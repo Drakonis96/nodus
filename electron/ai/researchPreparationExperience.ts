@@ -4,9 +4,8 @@ import { DocumentaryCampaigns } from '../db/documentaryCampaigns';
 import { getActiveVault, getVault, withOwningVault } from '../vaults/vaultRegistry';
 import { withVaultDatabase } from '../db/database';
 import { preparationPreflight } from './researchPreparationPreflight';
-import { getSettings } from '../db/settingsRepo';
 import { effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
-import { documentaryStore, drainDocumentaryRequests, getResearchPreparationInventory, interruptUnusedDocumentaryRequest, setResearchPreparationPaused } from './documentaryPreparation';
+import { documentaryStore, drainDocumentaryRequests, embeddingConfigurationUsable, getResearchPreparationInventory, interruptUnusedDocumentaryRequest, setResearchPreparationPaused } from './documentaryPreparation';
 import { researchCorpusInventory } from './researchCorpusInventory';
 import { notifyDocumentaryPreparation } from './documentaryPreparationEvents';
 
@@ -52,8 +51,7 @@ export async function previewResearchPreparation(input: { scope: 'vault' | 'sele
   if (input.scope === 'selection' && documents.length !== wanted.size) throw new Error('research_source_not_authorized');
   let config: EmbeddingExecutionConfig | null = null;
   try { config = effectiveEmbeddingConfig(); } catch { /* Text-only remains available. */ }
-  const local = config && ['ollama', 'lmstudio', 'nodus'].includes(config.provider);
-  const available = !!config && (!!local || !!getSettings().providerKeys[config.provider]);
+  const available = !!config && embeddingConfigurationUsable(config);
   const preview: ResearchPreparationPreview = { id: randomUUID(), vaultId: vault.id, createdAt: Date.now(), documents,
     embedding: config ? { provider: config.provider, model: config.modelId, external: externalEmbedding(config) } : null,
     embeddingAvailable: available, block: available ? null : 'no_model' };
@@ -104,10 +102,35 @@ export function getResearchPreparationProgress(): ResearchPreparationProgress {
   });
   return { paused: documentaryStore().preference('paused'), campaigns: results };
 }
+/** A retry must be able to succeed. A campaign freezes the embedding model configured
+ * when it was created; when that model can no longer run (typically the default remote
+ * model before any key existed) and the one configured now can, the retry adopts the
+ * current model for the campaign and its unfinished jobs. A frozen model that still runs
+ * is never replaced behind the user's back. */
+function adoptRunnableEmbedding(repo: DocumentaryCampaigns, campaignId: string, documentId?: string): void {
+  const row = repo.db.prepare('SELECT configuration_json FROM documentary_campaigns WHERE id=?').get(campaignId) as { configuration_json: string } | undefined;
+  if (!row) return;
+  const configuration = JSON.parse(row.configuration_json) as PreviewRecord['configuration'];
+  if (!configuration.embedding || embeddingConfigurationUsable(configuration.embedding)) return;
+  let current: EmbeddingExecutionConfig;
+  try { current = effectiveEmbeddingConfig(); } catch { return; }
+  if (!embeddingConfigurationUsable(current)) return;
+  repo.db.transaction(() => {
+    repo.db.prepare('UPDATE documentary_campaigns SET configuration_json=?,updated_at=? WHERE id=?').run(JSON.stringify({ ...configuration, embedding: current }), Date.now(), campaignId);
+    const jobs = repo.db.prepare('SELECT job_id FROM documentary_campaign_members WHERE campaign_id=? AND (? IS NULL OR document_id=?)').all(campaignId, documentId ?? null, documentId ?? null) as { job_id: string }[];
+    for (const { job_id } of jobs) {
+      const request = repo.db.prepare("SELECT configuration_json FROM documentary_requests WHERE document_id=? AND state IN ('failed','blocked','cancelled','paused','queued')").get(job_id) as { configuration_json: string | null } | undefined;
+      if (!request?.configuration_json) continue;
+      const frozen = JSON.parse(request.configuration_json) as PreviewRecord['configuration'];
+      if (frozen.embedding && !embeddingConfigurationUsable(frozen.embedding)) repo.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=?').run(JSON.stringify({ ...frozen, embedding: current }), job_id);
+    }
+  })();
+}
 export async function controlResearchPreparationCampaign(input: { campaignId: string; action: ResearchPreparationAction; documentId?: string }): Promise<void> {
   if (!input || typeof input.campaignId !== 'string' || !['pause', 'resume', 'cancel', 'retry'].includes(input.action)
     || (input.documentId !== undefined && typeof input.documentId !== 'string')) throw new Error('Invalid preparation action');
   const repo = campaigns();
+  if (input.action === 'retry') adoptRunnableEmbedding(repo, input.campaignId, input.documentId);
   repo.control(input.campaignId, input.action, input.documentId);
   interruptUnusedDocumentaryRequest();
   notifyDocumentaryPreparation();
@@ -123,7 +146,7 @@ export async function controlAllResearchPreparation(action: ResearchPreparationA
     for (const campaign of progress.campaigns) {
       if (action === 'cancel') repo.control(campaign.id, action);
       else if (campaign.state === 'active') for (const job of campaign.jobs) {
-        if (['failed', 'blocked'].includes(job.state)) repo.control(campaign.id, 'retry', job.documentId);
+        if (['failed', 'blocked'].includes(job.state)) { adoptRunnableEmbedding(repo, campaign.id, job.documentId); repo.control(campaign.id, 'retry', job.documentId); }
       }
     }
   }).immediate();

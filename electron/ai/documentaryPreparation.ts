@@ -257,6 +257,11 @@ export function interruptUnusedDocumentaryRequest(): void {
   if (row?.state !== 'running') activePreparation?.abort();
 }
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
+/** Whether a frozen embedding configuration can run now: a local runtime, or a remote
+ * provider whose credential is configured. */
+export function embeddingConfigurationUsable(config: Pick<EmbeddingExecutionConfig, 'provider'>): boolean {
+  return ['ollama', 'lmstudio', 'nodus'].includes(config.provider) || !!getSettings().providerKeys[config.provider];
+}
 export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
   const store = documentaryStore();
   const inventory = researchCorpusInventory();
@@ -441,7 +446,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         let completed = 0, unknown = 0;
         for (const result of prepared) {
           checkLease();
-          if (configuration.embedding && !['ollama', 'lmstudio', 'nodus'].includes(configuration.embedding.provider) && !getSettings().providerKeys[configuration.embedding.provider]) throw new Error('documentary_embeddings_unavailable');
+          if (configuration.embedding && !embeddingConfigurationUsable(configuration.embedding)) throw new Error('documentary_embeddings_unavailable');
           if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease, (count, uncertain) => {
             store.db.prepare('UPDATE documentary_requests SET completed_passages=?,unknown_requests=?,updated_at=? WHERE document_id=? AND lease_token=?').run(completed + count, unknown + uncertain, Date.now(), request.document_id, request.lease_token);
             notifyDocumentaryPreparation();

@@ -102,6 +102,30 @@ try {
   assert.equal(repo.list().length, countBeforeAddition + 1);
   const latest = experience.getResearchPreparationProgress().campaigns[0];
   assert.deepEqual(latest.jobs.map(job => job.title), ['future-addition'], 'automatic work excludes old pending members');
+  // Live finding: a document added before any embedding key existed froze the default
+  // remote model; after configuring the local bge model, "Reintentar" re-queued it with the
+  // same unusable model and it blocked again, forever.
+  const settingsRepo = load('electron/db/settingsRepo.ts');
+  const aiClient = load('electron/ai/aiClient.ts');
+  const originalSettings = settingsRepo.getSettings, originalEmbedding = aiClient.effectiveEmbeddingConfig;
+  try {
+    const jobOf = id => repo.db.prepare('SELECT job_id FROM documentary_campaign_members WHERE campaign_id=?').get(id).job_id;
+    const frozenEmbedding = id => JSON.parse(repo.db.prepare('SELECT configuration_json FROM documentary_requests WHERE document_id=?').get(jobOf(id)).configuration_json).embedding;
+    const block = id => repo.db.prepare("UPDATE documentary_requests SET state='blocked',error='documentary_embeddings_unavailable' WHERE document_id=?").run(jobOf(id));
+    settingsRepo.getSettings = () => ({ ...originalSettings(), providerKeys: {} });
+    aiClient.effectiveEmbeddingConfig = () => ({ provider: 'nodus', modelId: 'bge-m3-q8_0', endpoint: 'nodus-local-runtime' });
+    const stale = repo.create(vault.id, vault.name, [doc], { embedding: { provider: 'openai', modelId: 'text-embedding-3-small', endpoint: 'https://api.openai.com/v1' }, processingVersion: 'nodus-documentary/2' });
+    block(stale);
+    await experience.controlResearchPreparationCampaign({ campaignId: stale, documentId: doc.id, action: 'retry' });
+    assert.equal(frozenEmbedding(stale).provider, 'nodus', 'a retry adopts the model configured now when the frozen one cannot run');
+    assert.equal(experience.getResearchPreparationProgress().campaigns.find(item => item.id === stale).embedding.model, 'bge-m3-q8_0', 'the Queue shows the model that will run');
+    assert.equal(repo.db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(jobOf(stale)).state, 'queued');
+    settingsRepo.getSettings = () => ({ ...originalSettings(), providerKeys: { openrouter: 'synthetic-test-only' } });
+    const runnable = repo.create(vault.id, vault.name, [doc], { embedding: { provider: 'openrouter', modelId: 'baai/bge-m3', endpoint: 'https://openrouter.ai/api/v1' }, processingVersion: 'nodus-documentary/2' });
+    block(runnable);
+    await experience.controlAllResearchPreparation('retry');
+    assert.equal(frozenEmbedding(runnable).provider, 'openrouter', 'a frozen model that still runs is never swapped behind the user');
+  } finally { settingsRepo.getSettings = originalSettings; aiClient.effectiveEmbeddingConfig = originalEmbedding; }
   console.log('Frozen This-vault consent, missing configuration, independent future policy, shared job interests, per-document controls and revoked previews passed.');
 } finally {
   preparation.closeDocumentaryPreparation(); database.closeDb(); fs.rmSync(root, { recursive: true, force: true });
