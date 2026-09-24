@@ -3,7 +3,7 @@ import { summarizeResearchActivity, type ResearchActivity, type ResearchActivity
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
 import nodusMark from '../assets/nodus-logo-violet.svg';
-import zoteroMark from '../assets/brands/zotero.svg';
+import zoteroMark from '../assets/nodus-logo-zotero.svg';
 import './researchActivity.css';
 
 const layers: Record<ResearchActivityLayer, [string, string]> = {
@@ -54,7 +54,10 @@ export function ResearchActivityPanel({ activities, outcome, onDismiss }: { acti
     <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
     {minimized ? <button ref={toggleRef} className="research-activity-orb" onClick={toggle} aria-label={t('Ampliar actividad')} aria-expanded={false} title={announcement}>
       <span className={outcome === 'active' ? 'research-activity-orb-scan' : undefined} aria-hidden="true"><Icon name="radar" size={20} /></span>
-      <span className={`research-activity-indicator ${outcome}`} aria-hidden="true" />
+      {/* The request's state, as in the rows: turning while it runs, then green, red or grey. */}
+      {outcome === 'active'
+        ? <span className="research-activity-orb-badge research-activity-spinner" aria-hidden="true"><Icon name="rotateCw" size={11} /></span>
+        : <span className={`research-activity-orb-badge research-activity-indicator ${outcome}`} aria-hidden="true" />}
     </button> : <>
       <header><div><h2>{t('Actividad del Research chat')}</h2><p>{status}</p></div>
         <button ref={toggleRef} onClick={toggle} aria-label={t('Minimizar actividad')} aria-expanded={true} title={t('Minimizar actividad')}><Icon name="minus" size={16} /></button>

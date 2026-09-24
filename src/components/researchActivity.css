@@ -12,8 +12,6 @@
 .research-activity li[data-status=active] { background:color-mix(in srgb, var(--vault-accent, #8b5cf6) 9%, transparent); }
 .research-activity-icon { display:grid; place-items:center; width:23px; height:25px; flex-shrink:0; color:var(--activity-muted); }
 .research-activity-brand { width:19px; height:19px; object-fit:contain; }
-.research-activity-brand.zotero { filter:invert(1); }
-.light .research-activity-brand.zotero { filter:none; }
 .research-activity-copy { min-width:0; flex:1; }
 .research-activity-copy > div { display:flex; gap:7px; flex-wrap:wrap; align-items:baseline; }
 .research-activity-copy strong { font-size:12px; font-weight:600; line-height:1.6; }
@@ -34,7 +32,9 @@
 @keyframes research-activity-turn { to { transform:rotate(360deg); } }
 .research-activity.is-minimized { width:52px; height:52px; border-radius:50%; overflow:visible; }
 .research-activity-orb { width:100%; height:100%; display:grid; place-items:center; border-radius:50%; }
-.research-activity-orb .research-activity-indicator { position:absolute; right:3px; bottom:3px; width:10px; height:10px; border:2px solid var(--activity-bg); }
+.research-activity-orb .research-activity-orb-badge { position:absolute; right:1px; bottom:1px; margin:0; border-radius:50%; }
+.research-activity-orb .research-activity-indicator.research-activity-orb-badge { right:3px; bottom:3px; width:11px; height:11px; border:2px solid var(--activity-bg); }
+.research-activity-orb .research-activity-spinner.research-activity-orb-badge { width:17px; height:17px; background:var(--activity-bg); }
 @keyframes research-activity-pulse { 50% { opacity:.35; } }
 @media (prefers-reduced-motion:reduce) { .research-activity-indicator.active, .research-activity-spinner, .research-activity-orb-scan { animation:none; } }
 @media (max-width:640px) { .research-activity { right:12px; bottom:12px; width:min(330px, calc(100% - 24px)); max-height:calc(100% - 24px); } }
