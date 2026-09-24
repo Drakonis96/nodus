@@ -10,18 +10,16 @@ export interface ResearchClaimRecord {
    * only and never decides acceptance. */
   failure?: ResearchClaimFailure;
   premises?: ResearchClaimPremise[];
-  /** Key of the preceding sentence this one needs to be understood. */
-  contextKey?: string;
 }
 export type ResearchClaimFailure = 'judge_rejected' | 'no_premises' | 'premise_not_entailed' | 'premise_without_literal_evidence'
   | 'inference_without_supported_premises' | 'unqualified_inference' | 'unsupported_parts' | 'inconsistent_verdict'
-  | 'nonfactual_with_content' | 'restates_rejected_claim' | 'internal_contradiction' | 'orphaned_reference';
+  | 'nonfactual_with_content' | 'restates_rejected_claim' | 'internal_contradiction';
 export interface ResearchProseAudit { markdown: string; claims: ResearchClaimRecord[] }
 export interface ResearchAuditSource { id: string; text: string; label: string; citation: string }
 interface Premise { text: string; type: ResearchPremiseType; entailed: boolean; evidence: Array<{ id: string; quote: string }>; from: number[] }
 interface Verdict {
   index: number; kind: ResearchClaimRecord['kind']; premises: Premise[]; unsupportedParts: string[];
-  explicitInference: boolean; supported: boolean; reason: string; dependsOnContext?: boolean;
+  explicitInference: boolean; supported: boolean; reason: string;
 }
 export interface ResearchProseVerdicts { claims: Verdict[] }
 export const RESEARCH_AUDIT_BATCH = 8;
@@ -66,8 +64,7 @@ export function normalizeResearchProseVerdicts(input: { claims: unknown[] }, siz
       ...premise, from: premise.from === undefined ? [] : premise.from,
       evidence: premise.evidence === undefined ? [] : Array.isArray(premise.evidence) ? premise.evidence.filter(evidence => typeof evidence?.quote !== 'string' || evidence.quote.length >= 12) : premise.evidence,
     } : premise) : item.premises;
-    const claim = { ...item, premises, explicitInference: item.explicitInference ?? false, reason: typeof item.reason === 'string' ? item.reason.slice(0, 600) : item.reason,
-      dependsOnContext: item.dependsOnContext === true };
+    const claim = { ...item, premises, explicitInference: item.explicitInference ?? false, reason: typeof item.reason === 'string' ? item.reason.slice(0, 600) : item.reason };
     if (Number.isInteger(item.index)) seen.set(item.index, (seen.get(item.index) ?? 0) + 1);
     if (validClaim(claim) && claim.index < size) verdicts[claim.index] = claim;
     else if (Number.isInteger(item.index) && item.index >= 0 && item.index < size) malformed.set(item.index, malformedField(claim));
@@ -225,11 +222,8 @@ export function applyResearchProseVerdicts(markdown: string, sources: ResearchAu
     }
     let decision = decideResearchVerdict(span.text, verdict, sources);
     if (decision.valid && verdict.kind !== 'nonfactual' && restatesRejectedClaim(span.text, rejected)) decision = { valid: false, failure: 'restates_rejected_claim', evidence: [] };
-    // A sentence that needs its predecessor cannot outlive it.
-    const contextKey = verdict.dependsOnContext && index > 0 ? researchSentenceKey(spans[index - 1].text) : undefined;
-    if (decision.valid && verdict.dependsOnContext && (index === 0 || claims[index - 1].status !== 'supported')) decision = { valid: false, failure: 'orphaned_reference', evidence: [] };
     claims.push({ sentence: span.text, kind: verdict.kind, status: decision.valid ? 'supported' : 'removed', evidence: decision.evidence, reason: verdict.reason,
-      ...(decision.failure ? { failure: decision.failure } : {}), ...(contextKey ? { contextKey } : {}),
+      ...(decision.failure ? { failure: decision.failure } : {}),
       premises: verdict.premises.map(premise => ({ text: premise.text, type: premise.type, entailed: premise.entailed })) });
     if (!decision.valid) { edits.push({ ...span, text: '' }); continue; }
     if (verdict.kind === 'nonfactual') continue;
@@ -292,8 +286,6 @@ export async function reconcileResearchReport(parts: ResearchReportParts, ledger
         if (!plain || heading(span.text)) return;
         const key = researchSentenceKey(plain);
         if (seen && tokens(plain).size >= 5 && (seen.has(key) || keys.has(key))) { drop.add(index); return; }
-        const needs = (byKey.get(key) ?? []).find(claim => claim.status === 'supported' && claim.contextKey)?.contextKey;
-        if (needs && (index === 0 || researchSentenceKey(spans[index - 1].text) !== needs)) { drop.add(index); return; }
         keys.add(key);
         if (!transition(plain)) return;
         const next = spans[index + 1];

@@ -171,17 +171,6 @@ try {
   assert.deepEqual(structured.parts.nextSteps, ['Conviene distinguir dos situaciones que suelen confundirse.'], 'next steps are directives, not transitions');
   assert.equal(structured.pruned, 3);
   assert.ok(structureLedger.every(claim => claim.status === 'supported'), 'structural pruning never records a factual removal');
-  // A sentence that needs its predecessor goes when the predecessor goes.
-  const orphan = applyResearchProseVerdicts('South field measured 99 units. This value is documented by the source.', live,
-    [verdict(0, [premise('south 99', 'South field measured 99 units.', { id: 'south' })]), verdict(1, [south], { dependsOnContext: true })]);
-  assert.deepEqual(orphan.claims.map(claim => claim.failure), ['premise_without_literal_evidence', 'orphaned_reference']);
-  assert.equal(orphan.markdown, '');
-  const contextLedger = [{ sentence: 'This value is documented by the source.', kind: 'attributed', status: 'supported', evidence: [], reason: 'x',
-    contextKey: shared.researchSentenceKey('South field measured 41 units.') }];
-  const contextual = await reconcileResearchReport({ sections: ['## A\n\nSouth field measured 41 units. This value is documented by the source.', '## B\n\nNorth field measured 23 units. This value is documented by the source.'],
-    abstract: '', limitations: [], nextSteps: [] }, contextLedger, async () => []);
-  assert.deepEqual(contextual.parts.sections, ['## A\n\nSouth field measured 41 units. This value is documented by the source.', '## B\n\nNorth field measured 23 units.'],
-    'a dependent sentence survives only after the sentence it was audited against');
   assert.equal(applyResearchProseVerdicts('Measured 41 units ([S](nodus://passage/south)]).', live, [verdict(0, [south])]).markdown, 'Measured 41 units. [Source 2](nodus://passage/south)',
     'malformed writer wrappers leave no bracket debris');
   const diagnosed = normalizeResearchProseVerdicts({ claims: [verdict(0, [premise('x', 'The north field measured 23 units.', { type: 'attributed' })])] }, 1);
