@@ -307,6 +307,130 @@ function LibraryCollectionMoveDialog({
   );
 }
 
+/** Copy or move the selected documents into one Nodus collection, chosen from the tree. */
+function LibraryBulkCollectionDialog({ mode, count, collections, currentId, onClose, onApply }: {
+  mode: 'copy' | 'move';
+  count: number;
+  collections: LibraryCollectionView[];
+  currentId: string | null;
+  onClose: () => void;
+  onApply: (targetId: string) => Promise<void>;
+}) {
+  const children = useMemo(() => collectionChildren(collections), [collections]);
+  const entries = useMemo(() => flattenedCollections(children), [children]);
+  const [search, setSearch] = useState('');
+  const visibleIds = useMemo(() => collectionSearchIds(collections, search), [collections, search]);
+  const visibleEntries = useMemo(() => entries.filter(({ collection: entry }) => !visibleIds || visibleIds.has(entry.id)), [entries, visibleIds]);
+  const [target, setTarget] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+  const apply = async () => {
+    if (!target || busy) return;
+    setBusy(true); setError(null);
+    try { await onApply(target); onClose(); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); }
+  };
+  const title = t(mode === 'copy' ? 'Copiar a una colección' : 'Mover a una colección');
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+      <section data-testid="library-bulk-collection-dialog" data-mode={mode} className="card-modal flex max-h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl" role="dialog" aria-modal="true" aria-label={title}>
+        <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name={mode === 'copy' ? 'copy' : 'folderMove'} /></span>
+          <div className="min-w-0 flex-1"><h2 className="font-semibold">{title}</h2><p className="mt-0.5 text-xs text-neutral-500">{tx('{n} documento(s) seleccionado(s)', { n: count })}</p></div>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button>
+        </header>
+        <div className="shrink-0 border-b border-neutral-800 p-3">
+          <div className="relative">
+            <Icon name="search" size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+            <input className="input w-full" style={{ paddingInlineStart: '2.25rem' }} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Buscar colección…')} autoFocus />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto p-3">
+          {visibleEntries.map(({ collection: entry, depth }) => {
+            const unavailable = entry.source !== 'nodus' || (mode === 'move' && entry.id === currentId);
+            const active = target === entry.id;
+            return <button
+              key={entry.id}
+              data-testid={`library-bulk-collection-target-${entry.id}`}
+              className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2 text-left text-sm ${active ? 'border-indigo-500/55 bg-indigo-500/10 text-indigo-200' : 'border-transparent text-neutral-400 hover:bg-neutral-900/60 hover:text-neutral-200'} disabled:cursor-not-allowed disabled:opacity-35`}
+              style={{ paddingLeft: 12 + depth * 18 }}
+              disabled={unavailable || busy}
+              title={entry.source !== 'nodus' ? t('Las colecciones importadas son de solo lectura en Nodus.') : entry.id === currentId ? t('Colección actual') : entry.name}
+              onClick={() => setTarget(entry.id)}
+              onDoubleClick={() => { if (!unavailable) { setTarget(entry.id); void onApply(entry.id).then(onClose, (cause: unknown) => setError(errorText(cause))); } }}
+            >
+              <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border ${active ? 'border-indigo-400' : 'border-neutral-700'}`}>{active && <span className="h-2.5 w-2.5 rounded-full bg-indigo-400" />}</span>
+              <span className="shrink-0" style={{ color: entry.color ?? undefined }}><Icon name={entry.icon ?? 'folder'} size={15} /></span>
+              <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+              {entry.source !== 'nodus' && <Icon name="lock" size={10} className="shrink-0" />}
+            </button>;
+          })}
+          {visibleEntries.length === 0 && <p className="px-3 py-8 text-center text-sm text-neutral-500">{t('Sin colecciones.')}</p>}
+          {error && <p role="alert" className="mt-3 rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+        </div>
+        <footer className="flex justify-end gap-2 border-t border-neutral-800 p-4">
+          <button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
+          <button data-testid="confirm-library-bulk-collection" className="btn btn-primary" disabled={busy || !target} onClick={() => void apply()}>{busy ? <Spinner /> : <Icon name={mode === 'copy' ? 'copy' : 'folderMove'} />} {t(mode === 'copy' ? 'Copiar aquí' : 'Mover aquí')}</button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
+/** Add one tag to every selected document. */
+function LibraryBulkTagDialog({ count, onClose, onApply }: { count: number; onClose: () => void; onApply: (tag: string) => Promise<void> }) {
+  const [tag, setTag] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [busy, onClose]);
+  const apply = async () => {
+    if (!tag.trim() || busy) return;
+    setBusy(true); setError(null);
+    try { await onApply(tag.trim()); onClose(); }
+    catch (cause) { setError(errorText(cause)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/65 p-6" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+      <section data-testid="library-bulk-tag-dialog" className="card-modal w-full max-w-sm overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl" role="dialog" aria-modal="true" aria-label={t('Etiquetar')}>
+        <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-500/15 text-indigo-300"><Icon name="tag" /></span>
+          <div className="min-w-0 flex-1"><h2 className="font-semibold">{t('Etiquetar')}</h2><p className="mt-0.5 text-xs text-neutral-500">{tx('{n} documento(s) seleccionado(s)', { n: count })}</p></div>
+          <button className="btn btn-ghost" onClick={onClose} disabled={busy} aria-label={t('Cerrar')}><Icon name="x" /></button>
+        </header>
+        <form className="space-y-3 p-4" onSubmit={(event) => { event.preventDefault(); void apply(); }}>
+          <input data-testid="library-bulk-tag-input" className="input w-full" value={tag} onChange={(event) => setTag(event.target.value)} placeholder={t('Nueva etiqueta')} autoFocus />
+          {error && <p role="alert" className="rounded-lg bg-red-500/10 p-3 text-xs text-red-300">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
+            <button type="submit" data-testid="confirm-library-bulk-tag" className="btn btn-primary" disabled={busy || !tag.trim()}>{busy ? <Spinner /> : <Icon name="tag" />} {t('Añadir etiqueta')}</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+/** One icon of the selection bar: the tooltip and the accessible name carry the words. */
+function BulkIconButton({ icon, label, hint, onClick, testId, danger = false, disabled = false }: {
+  icon: string; label: string; hint?: string; onClick: () => void; testId?: string; danger?: boolean; disabled?: boolean;
+}) {
+  return <button type="button" data-testid={testId} aria-label={label} title={hint ? `${label} · ${hint}` : label} disabled={disabled} onClick={onClick}
+    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent disabled:cursor-not-allowed disabled:opacity-35 ${danger ? 'text-red-400 hover:border-red-500/40 hover:bg-red-500/10' : 'text-neutral-400 hover:border-indigo-500/40 hover:bg-indigo-500/10 hover:text-indigo-300'}`}>
+    <Icon name={icon} size={15} />
+  </button>;
+}
+
 function LibraryCollectionStyleDialog({ collection, onClose, onSave }: {
   collection: LibraryCollectionView;
   onClose: () => void;
@@ -925,7 +1049,6 @@ function GlobalLibraryContent({
   const [migrationOpen, setMigrationOpen] = useState(false);
   // A balloon: it never reopens by itself when the section is shown again.
   const [filtersOpen, setFiltersOpenState] = useState(false);
-  const [collectionTarget, setCollectionTarget] = useState('');
   const [metadataItem, setMetadataItem] = useState<LibraryItemRecord | null>(null);
   const [createReferenceMode, setCreateReferenceMode] = useState<'identifier' | 'manual' | null>(null);
   const [metadataBatchItems, setMetadataBatchItems] = useState<string[] | null>(null);
@@ -938,8 +1061,7 @@ function GlobalLibraryContent({
   const [vaultLinkItems, setVaultLinkItems] = useState<string[] | null>(null);
   const [detailLinks, setDetailLinks] = useState<LibraryVaultLink[]>([]);
   const [manager, setManager] = useState<{ item: LibraryItemRecord; tab?: 'attachments' | 'notes' | 'relations' | 'tags' } | null>(null);
-  const [bulkTag, setBulkTag] = useState('');
-  const [collectionAction, setCollectionAction] = useState<'copy' | 'move' | 'remove'>('copy');
+  const [bulkDialog, setBulkDialog] = useState<'copy' | 'move' | 'tag' | null>(null);
   const [movingCollection, setMovingCollection] = useState<LibraryCollectionView | null>(null);
   const [stylingCollection, setStylingCollection] = useState<LibraryCollectionView | null>(null);
   const [smartSearchEditor, setSmartSearchEditor] = useState<LibrarySavedSearchRecord | 'new' | null>(null);
@@ -1358,9 +1480,10 @@ function GlobalLibraryContent({
     setDetailId(created.id); setDetail(created); toast(t('Se creó una ficha Nodus independiente; el espejo de origen se conserva.')); await load();
   };
 
-  const applyBulkTag = async () => {
-    if (!selected.size || !bulkTag.trim()) return;
-    await window.nodus.patchGlobalLibraryItemTags([...selected], { add: [bulkTag.trim()] }); setBulkTag(''); await load();
+  const applyBulkTag = async (tag: string) => {
+    if (!selected.size) return;
+    await window.nodus.patchGlobalLibraryItemTags([...selected], { add: [tag] });
+    toast(tx('Etiqueta «{tag}» añadida a {n} documento(s).', { tag, n: selected.size })); await load();
   };
 
   const rebuildSelectedCleanReading = async () => {
@@ -1401,21 +1524,19 @@ function GlobalLibraryContent({
     }
   };
 
-  const addSelectedToCollection = async () => {
+  const selectedLocalCollection = collections.find((entry) => entry.id === selectedCollection && entry.source === 'nodus') ?? null;
+  const applySelectedToCollection = async (mode: 'copy' | 'move', target: string) => {
     if (!selected.size) return;
-    const selectedLocal = collections.find((entry) => entry.id === selectedCollection)?.source === 'nodus' ? selectedCollection : null;
-    if (collectionAction === 'remove') {
-      if (!selectedLocal) return;
-      await window.nodus.patchGlobalLibraryItemCollections([...selected], { remove: [selectedLocal] });
-      toast(t('Documentos retirados de la colección.'));
-    } else {
-      if (!collectionTarget) return;
-      await window.nodus.patchGlobalLibraryItemCollections([...selected], {
-        add: [collectionTarget], ...(collectionAction === 'move' && selectedLocal ? { remove: [selectedLocal] } : {}),
-      });
-      toast(t(collectionAction === 'move' && selectedLocal ? 'Documentos movidos a la colección.' : 'Documentos añadidos a la colección.'));
-    }
-    setCollectionTarget(''); setSelected(new Set()); await load();
+    const moving = mode === 'move' && selectedLocalCollection;
+    await window.nodus.patchGlobalLibraryItemCollections([...selected], { add: [target], ...(moving ? { remove: [selectedLocalCollection.id] } : {}) });
+    toast(t(moving ? 'Documentos movidos a la colección.' : 'Documentos añadidos a la colección.'));
+    setSelected(new Set()); await load();
+  };
+  const removeSelectedFromCollection = async () => {
+    if (!selected.size || !selectedLocalCollection) return;
+    await window.nodus.patchGlobalLibraryItemCollections([...selected], { remove: [selectedLocalCollection.id] });
+    toast(t('Documentos retirados de la colección.'));
+    setSelected(new Set()); await load();
   };
 
   const deleteSelected = async () => {
@@ -1684,7 +1805,30 @@ function GlobalLibraryContent({
             </div>
           </div>
 
-          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-wrap items-center gap-2 border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-2 text-xs"><b>{tx('{n} seleccionados', { n: selected.size })}</b>{trashMode ? <><button data-testid="bulk-restore-library-trash" className="btn btn-secondary h-8" onClick={() => void restoreSelected()}><Icon name="refresh" size={13} /> {t('Restaurar')}</button><button data-testid="bulk-purge-library-trash" className="btn btn-ghost h-8 text-red-400" onClick={() => setTrashImpactItems([...selected])}><Icon name="trash" size={13} /> {t('Revisar y vaciar')}</button></> : <><select aria-label={t('Acción de colección')} className="input ml-2 h-8 text-xs" value={collectionAction} onChange={(event) => setCollectionAction(event.target.value as typeof collectionAction)}><option value="copy">{t('Copiar a')}</option><option value="move">{t('Mover a')}</option><option value="remove">{t('Quitar de esta colección')}</option></select>{collectionAction !== 'remove' && <select className="input h-8 min-w-44 text-xs" value={collectionTarget} onChange={(event) => setCollectionTarget(event.target.value)}><option value="">{t('Elegir colección…')}</option>{localCollections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select>}<button className="btn btn-ghost h-8" disabled={collectionAction === 'remove' ? collections.find((entry) => entry.id === selectedCollection)?.source !== 'nodus' : !collectionTarget} onClick={() => void addSelectedToCollection()}>{t('Aplicar')}</button><input className="input h-8 w-32 text-xs" value={bulkTag} onChange={(event) => setBulkTag(event.target.value)} placeholder={t('Etiqueta…')} /><button className="btn btn-ghost h-8" disabled={!bulkTag.trim()} onClick={() => void applyBulkTag()}><Icon name="tag" size={13} /> {t('Etiquetar')}</button><button data-testid="bulk-resolve-library-metadata" className="btn btn-ghost h-8" onClick={() => setMetadataBatchItems([...selected])}><Icon name="search" size={13} /> {t('Completar metadatos')}</button><button data-testid="bulk-library-citations" className="btn btn-ghost h-8" onClick={() => setCitationItems([...selected])}><Icon name="quote" size={13} /> {t('Citar / exportar')}</button><button data-testid="bulk-add-library-to-vault" className="btn btn-ghost h-8" onClick={() => setVaultLinkItems([...selected])}><Icon name="vault" size={13} /> {t('Usar en un vault')}</button><details className="relative"><summary className="btn btn-ghost h-8 list-none border border-neutral-700" aria-label={t('Acciones avanzadas')} title={t('Acciones avanzadas')}><Icon name="menu" size={13} /></summary><div className="library-action-menu absolute right-0 top-[calc(100%+.3rem)] z-40 w-60 rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 shadow-2xl"><button className="library-action-menu-item" onClick={() => void rebuildSelectedCleanReading()}><Icon name="refresh" /><span><b>{t('Reconstruir versiones limpias')}</b><small>{t('Repite extracción, OCR y estructura')}</small></span></button><button className="library-action-menu-item text-red-400" onClick={() => void deleteSelected()}><Icon name="trash" /><span><b>{t('Enviar a la papelera')}</b></span></button></div></details></>}<button className="ml-auto text-neutral-500 hover:text-neutral-200" onClick={() => setSelected(new Set())}>{t('Limpiar selección')}</button></div>}
+          {/* The selection's actions, as one row of icons whose tooltips carry the words. */}
+          {selected.size > 0 && <div data-testid="global-library-bulk-actions" className="flex flex-nowrap items-center gap-0.5 overflow-x-auto border-b border-indigo-500/20 bg-indigo-500/5 px-3 py-1 text-xs">
+            <b className="mr-2 shrink-0 whitespace-nowrap">{tx('{n} seleccionados', { n: selected.size })}</b>
+            {trashMode ? <>
+              <BulkIconButton testId="bulk-restore-library-trash" icon="refresh" label={t('Restaurar')} onClick={() => void restoreSelected()} />
+              <BulkIconButton testId="bulk-purge-library-trash" icon="trash" danger label={t('Revisar y vaciar')} onClick={() => setTrashImpactItems([...selected])} />
+            </> : <>
+              <BulkIconButton testId="bulk-copy-library-collection" icon="copy" label={t('Copiar a una colección')} disabled={!localCollections.length} onClick={() => setBulkDialog('copy')} />
+              <BulkIconButton testId="bulk-move-library-collection" icon="folderMove" label={t('Mover a una colección')}
+                hint={selectedLocalCollection ? undefined : t('Abre una colección de Nodus para mover documentos desde ella.')}
+                disabled={!selectedLocalCollection || localCollections.length < 2} onClick={() => setBulkDialog('move')} />
+              {selectedLocalCollection && <BulkIconButton testId="bulk-remove-library-collection" icon="minus" label={t('Quitar de esta colección')} hint={selectedLocalCollection.name} onClick={() => void removeSelectedFromCollection()} />}
+              <BulkIconButton testId="bulk-tag-library-items" icon="tag" label={t('Etiquetar')} onClick={() => setBulkDialog('tag')} />
+              <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-neutral-700/70" />
+              <BulkIconButton testId="bulk-resolve-library-metadata" icon="wand" label={t('Completar metadatos')} onClick={() => setMetadataBatchItems([...selected])} />
+              <BulkIconButton testId="bulk-library-citations" icon="quote" label={t('Citar / exportar')} onClick={() => setCitationItems([...selected])} />
+              <BulkIconButton testId="bulk-add-library-to-vault" icon="vault" label={t('Usar en un vault')} onClick={() => setVaultLinkItems([...selected])} />
+              <BulkIconButton testId="bulk-rebuild-library-clean" icon="scanText" label={t('Reconstruir versiones limpias')} hint={t('Repite extracción, OCR y estructura')} onClick={() => void rebuildSelectedCleanReading()} />
+              <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-neutral-700/70" />
+              <BulkIconButton testId="bulk-trash-library-items" icon="trash" danger label={t('Enviar a la papelera')} onClick={() => void deleteSelected()} />
+            </>}
+            <span className="ml-auto" />
+            <BulkIconButton testId="bulk-clear-library-selection" icon="x" label={t('Limpiar selección')} onClick={() => setSelected(new Set())} />
+          </div>}
 
           <div data-testid="library-catalog-scroll" className="library-catalog-scroll min-h-0 flex-1 overflow-x-auto">
           <div data-testid="global-library-table-header" className="grid h-9 items-center border-b border-neutral-800 px-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-600" style={{ gridTemplateColumns: tableGrid, minWidth: tableMinWidth }}>
@@ -1842,6 +1986,8 @@ function GlobalLibraryContent({
       </>}
       {zoteroOpen && <ZoteroImportDialog onClose={() => setZoteroOpen(false)} onFinished={() => void load()} />}
       {librarySettingsOpen && <LibrarySettingsDialog settings={librarySettings} onClose={() => setLibrarySettingsOpen(false)} onSaved={setLibrarySettings} />}
+      {(bulkDialog === 'copy' || bulkDialog === 'move') && <LibraryBulkCollectionDialog mode={bulkDialog} count={selected.size} collections={collections} currentId={selectedLocalCollection?.id ?? null} onClose={() => setBulkDialog(null)} onApply={(target) => applySelectedToCollection(bulkDialog, target)} />}
+      {bulkDialog === 'tag' && <LibraryBulkTagDialog count={selected.size} onClose={() => setBulkDialog(null)} onApply={applyBulkTag} />}
       {movingCollection && <LibraryCollectionMoveDialog collection={movingCollection} collections={collections} onClose={() => setMovingCollection(null)} onMove={(parentId) => moveCollection(movingCollection, parentId)} />}
       {stylingCollection && <LibraryCollectionStyleDialog collection={stylingCollection} onClose={() => setStylingCollection(null)} onSave={async (icon, color) => { await window.nodus.updateGlobalLibraryCollection(stylingCollection.id, { icon, color }); await load(); }} />}
       {migrationOpen && <LibraryMigrationDialog onClose={() => setMigrationOpen(false)} onFinished={() => void load()} />}

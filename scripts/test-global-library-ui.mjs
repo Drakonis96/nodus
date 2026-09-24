@@ -13,6 +13,20 @@ test('the unified Library keeps the global catalogue independent and the vault c
   assert.match(vaultTypes, /'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library'/, 'prosopography allows the global Library route');
 });
 
+test('the Global Library selection bar is one row of icon actions; copy, move and tag open small dialogs', async () => {
+  const view = await readSource('src/views/GlobalLibraryView.tsx');
+  const start = view.indexOf('data-testid="global-library-bulk-actions"');
+  const bar = view.slice(start, view.indexOf('</div>}', start));
+  assert.match(bar, /flex-nowrap/, 'the actions share one row');
+  assert.doesNotMatch(bar, /<select|<input|<details/, 'no inline selects, tag field or overflow menu');
+  for (const action of ['bulk-copy-library-collection', 'bulk-move-library-collection', 'bulk-remove-library-collection', 'bulk-tag-library-items',
+    'bulk-resolve-library-metadata', 'bulk-library-citations', 'bulk-add-library-to-vault', 'bulk-rebuild-library-clean', 'bulk-trash-library-items',
+    'bulk-restore-library-trash', 'bulk-purge-library-trash', 'bulk-clear-library-selection']) assert.match(bar, new RegExp(`<BulkIconButton testId="${action}"`), action);
+  assert.match(view, /function BulkIconButton[\s\S]*?aria-label=\{label\} title=/, 'every icon names itself in its tooltip and accessible name');
+  for (const marker of ['library-bulk-collection-dialog', 'library-bulk-collection-target-', 'confirm-library-bulk-collection', 'library-bulk-tag-dialog', 'library-bulk-tag-input', 'confirm-library-bulk-tag'])
+    assert.match(view, new RegExp(`data-testid=(?:"|{\`)${marker}`), marker);
+});
+
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
   const zoteroProgress = await readSource('src/components/ZoteroImportProgressBar.tsx');

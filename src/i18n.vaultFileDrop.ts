@@ -72,4 +72,20 @@ const queueTranslations: Record<string, string[]> = {
   ja: ['この文書はすでに別のタスクでインデックス化されています。', 'この文書のインデックス化を開始できませんでした。再試行してください。', 'インデックス化', 'インデックス化中:', 'インデックス化を一時停止中', 'インデックス化を再開', 'インデックス化を一時停止', 'インデックス化に失敗した {n} 件の文書を再試行', 'インデックス化を停止', 'インデックス化から外す', '保留中の文書はキャンセルされます。インデックス化済みの内容は保持されます。'],
 };
 for (const [language, values] of Object.entries(queueTranslations)) translations[language].push(...values);
+keys.push('Copiar a una colección', 'Mover a una colección', 'Copiar aquí', 'Abre una colección de Nodus para mover documentos desde ella.', '{n} documento(s) seleccionado(s)', 'Etiqueta «{tag}» añadida a {n} documento(s).');
+// The Global Library's selection bar.
+const selectionTranslations: Record<string, string[]> = {
+  en: ['Copy to a collection', 'Move to a collection', 'Copy here', 'Open a Nodus collection to move documents out of it.', '{n} document(s) selected', 'Tag “{tag}” added to {n} document(s).'],
+  fr: ['Copier dans une collection', 'Déplacer vers une collection', 'Copier ici', 'Ouvrez une collection Nodus pour en déplacer des documents.', '{n} document(s) sélectionné(s)', 'Étiquette « {tag} » ajoutée à {n} document(s).'],
+  de: ['In eine Sammlung kopieren', 'In eine Sammlung verschieben', 'Hierher kopieren', 'Öffne eine Nodus-Sammlung, um Dokumente aus ihr zu verschieben.', '{n} Dokument(e) ausgewählt', 'Tag „{tag}“ zu {n} Dokument(en) hinzugefügt.'],
+  pt: ['Copiar para uma coleção', 'Mover para uma coleção', 'Copiar para aqui', 'Abra uma coleção Nodus para mover documentos a partir dela.', '{n} documento(s) selecionado(s)', 'Etiqueta «{tag}» adicionada a {n} documento(s).'],
+  'pt-BR': ['Copiar para uma coleção', 'Mover para uma coleção', 'Copiar para cá', 'Abra uma coleção do Nodus para mover documentos a partir dela.', '{n} documento(s) selecionado(s)', 'Etiqueta “{tag}” adicionada a {n} documento(s).'],
+  it: ['Copia in una raccolta', 'Sposta in una raccolta', 'Copia qui', 'Apri una raccolta Nodus per spostarne i documenti.', '{n} documento/i selezionato/i', 'Etichetta «{tag}» aggiunta a {n} documento/i.'],
+  tr: ['Bir koleksiyona kopyala', 'Bir koleksiyona taşı', 'Buraya kopyala', 'Belgeleri taşımak için bir Nodus koleksiyonu açın.', '{n} belge seçildi', '“{tag}” etiketi {n} belgeye eklendi.'],
+  'zh-CN': ['复制到合集', '移动到合集', '复制到此处', '请打开一个 Nodus 合集，才能从中移动文档。', '已选择 {n} 个文档', '已为 {n} 个文档添加标签“{tag}”。'],
+  'zh-TW': ['複製到合集', '移動到合集', '複製到此處', '請開啟一個 Nodus 合集，才能從中移動文件。', '已選取 {n} 份文件', '已為 {n} 份文件新增標籤「{tag}」。'],
+  ko: ['컬렉션으로 복사', '컬렉션으로 이동', '여기로 복사', '문서를 옮기려면 Nodus 컬렉션을 여세요.', '문서 {n}개 선택됨', '문서 {n}개에 “{tag}” 태그를 추가했습니다.'],
+  ja: ['コレクションにコピー', 'コレクションに移動', 'ここにコピー', '文書を移動するには Nodus のコレクションを開いてください。', '{n} 件の文書を選択中', '{n} 件の文書にタグ「{tag}」を追加しました。'],
+};
+for (const [language, values] of Object.entries(selectionTranslations)) translations[language].push(...values);
 export const VAULT_FILE_DROP_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));
