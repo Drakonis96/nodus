@@ -269,13 +269,16 @@ try {
   await page.locator('[data-queue-trigger]').click();
   const queuePanel = page.getByTestId('header-queue-panel');
   await queuePanel.waitFor();
+  const preparationBar = queuePanel.getByTestId('preparation-queue-bar');
+  await preparationBar.getByRole('button', { name: /Indexación/ }).click();
+  await preparationBar.locator('[data-testid^="preparation-item-"]').first().waitFor();
   const queueRows = await queuePanel.locator('[data-testid^="preparation-"]').evaluateAll(elements => elements.map(element => ({ testId: element.getAttribute('data-testid'), text: element.textContent.trim().slice(0, 300) })));
   await shot('04-queue');
   await page.keyboard.press('Escape');
   evidence.steps.automaticIndexing = { ids, addedAt, manualPrepareCalled: false, samples, final: prepared.state,
     campaigns: prepared.progress.campaigns, embeddingSpaces: prepared.inventory.embeddingSpaces, queueRows };
-  assert.ok(queueRows.some(row => row.testId.startsWith('preparation-job-') && row.text.includes(itemA.title.slice(0, 20))), 'the Queue lists document A');
-  assert.ok(queueRows.some(row => row.testId.startsWith('preparation-job-') && row.text.includes(DOCUMENTS.B.title.slice(0, 20))), 'the Queue lists document B');
+  assert.ok(queueRows.some(row => row.testId.startsWith('preparation-item-') && row.text.includes(itemA.title.slice(0, 20))), 'the Queue lists document A');
+  assert.ok(queueRows.some(row => row.testId.startsWith('preparation-item-') && row.text.includes(DOCUMENTS.B.title.slice(0, 20))), 'the Queue lists document B');
 
   // 3. Ideas, through the separate "Extraer ideas" action on each row of the vault's Library.
   if (!simulated) costGuard('ideas extraction', 0.4);

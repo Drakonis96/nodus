@@ -1,8 +1,9 @@
 import { clearBackgroundJob, cancelAudioGeneration, type AudioGenerationRequest } from '../backgroundJobs';
-import { Fragment, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { QueueActivity } from '../queueActivity';
-import { DICTIONARY_FINISHED, DOCUMENT_LIVE, backgroundFailure, ocrVersion, researchVersion, preparationLive, preparationVersion } from '../queueActivity';
+import { DICTIONARY_FINISHED, DOCUMENT_LIVE, backgroundFailure, ocrVersion, researchVersion } from '../queueActivity';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
+import { PreparationQueueBar } from './PreparationQueueBar';
 import { progressDetail } from './DeepResearchQueueStrip';
 import { errorText, t, tr, tx } from '../i18n';
 
@@ -29,13 +30,6 @@ function Action({ label, run }: { label: string; run: () => unknown | Promise<un
     void Promise.resolve().then(run).catch((reason: unknown) => setError(errorText(reason))).finally(() => setBusy(false));
   }}>{label}</button>{error && <span role="alert" className="max-w-64 break-words text-red-400">{error}</span>}</>;
 }
-const preparationError = (error: string | null): string | null => ({
-  documentary_ocr_deferred: t('Documento omitido: necesita OCR. Puedes continuar con las demás fuentes.'),
-  documentary_ocr_resources_missing: t('Faltan recursos de OCR local. Configura los idiomas instalados en Ajustes y reintenta.'),
-  documentary_ocr_incomplete: t('El OCR no pudo leer todas las páginas escaneadas. Revisa el original y reintenta.'),
-  documentary_embeddings_unavailable: t('El modelo de embeddings no está disponible. Revisa su configuración y reintenta.'),
-  documentary_extraction_worker_unavailable: t('El proceso local de extracción no está disponible. Reinicia Nodus y reintenta.'),
-})[error ?? ''] ?? error;
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' ? value as Record<string, unknown> : {};
 const EXTRACTION_PHASE = { queued: 'En cola', analyze: 'Analizando PDF…', extract: 'Extracción de texto', ocr: 'OCR', assets: 'Archivos', write: 'Guardando…', done: 'Completado' };
 
@@ -62,31 +56,8 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
     return () => { cancelled = true; };
   }, [dictionaryIds]);
   return <>
-    {activity.preparation.campaigns.length > 0 && <Task testId="research-preparation-controls" title={t('Preparar fuentes')}>
-      <Action label={t(activity.preparation.paused ? 'Reanudar' : 'Pausar')} run={() => window.nodus.setResearchPreparationPaused(!activity.preparation.paused)} />
-      {activity.preparation.campaigns.some(preparationLive) && <Action label={t('Cancelar preparación')} run={() => window.nodus.controlAllResearchPreparation('cancel')} />}
-      {activity.preparation.campaigns.some(campaign => campaign.jobs.some(job => ['failed', 'blocked'].includes(job.state))) && <Action label={t('Reintentar')} run={() => window.nodus.controlAllResearchPreparation('retry')} />}
-    </Task>}
-    {activity.preparation.campaigns.slice(0, limit).map(campaign => <Fragment key={campaign.id}>
-      <Task testId={`preparation-campaign-${campaign.id}`} title={`${t('Preparar fuentes')} · ${campaign.vaultName}`}
-        detail={campaign.embedding ? `Embeddings: ${campaign.embedding.provider} · ${campaign.embedding.model}` : t('Extracción de texto')}>
-        {preparationLive(campaign) && <>
-          <Action label={t(campaign.state === 'paused' ? 'Reanudar' : 'Pausar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, action: campaign.state === 'paused' ? 'resume' : 'pause' })} />
-          <Action label={t('Cancelar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, action: 'cancel' })} />
-        </>}
-        {campaign.jobs.some(job => ['failed', 'blocked', 'cancelled'].includes(job.state)) && <Action label={t('Reintentar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, action: 'retry' })} />}
-        {!preparationLive(campaign) && <Action label={t('Ocultar')} run={() => activity.dismiss(`preparation:${campaign.id}`, preparationVersion(campaign))} />}
-      </Task>
-      {campaign.jobs.slice(0, limit).map(job => <Task key={job.id} testId={`preparation-job-${campaign.id}-${job.id}`} title={job.title}
-        detail={`${t(({ queued: 'En cola', running: 'Procesando…', paused: 'Pausado', complete: 'Completado', failed: 'Fallido', cancelled: 'Cancelado', blocked: 'Preparación pendiente' } as const)[activity.preparation.paused && ['queued', 'running'].includes(job.state) ? 'paused' : job.state])} · ${t(({ ocr: 'OCR', extraction: 'Extracción de texto', lexical: 'Búsqueda léxica', embeddings: 'Embeddings', complete: 'Completado' } as const)[job.stage])}${job.currentPage != null && job.totalPages != null ? ` · ${job.currentPage}/${job.totalPages}` : ''}${job.totalPassages !== null ? ` · ${job.completedPassages}/${job.totalPassages}` : ''}${job.unknownRequests ? ` · ${tx('{n} solicitudes con resultado desconocido', { n: job.unknownRequests })}` : ''}`}
-        error={job.state === 'cancelled' ? null : preparationError(job.error)} percent={job.stage === 'embeddings' && job.totalPassages ? job.completedPassages / job.totalPassages * 100 : null}>
-        {['queued', 'running', 'paused'].includes(job.state) && <>
-          <Action label={t(job.state === 'paused' ? 'Reanudar' : 'Pausar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, documentId: job.documentId, action: job.state === 'paused' ? 'resume' : 'pause' })} />
-          <Action label={t('Cancelar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, documentId: job.documentId, action: 'cancel' })} />
-        </>}
-        {['failed', 'blocked', 'cancelled'].includes(job.state) && <Action label={t('Reintentar')} run={() => window.nodus.controlResearchPreparationCampaign({ campaignId: campaign.id, documentId: job.documentId, action: 'retry' })} />}
-      </Task>)}
-    </Fragment>)}
+    {/* Indexing is one entry, like Idea extraction: one bar, one set of controls. */}
+    <PreparationQueueBar activity={activity} />
     {activity.extraction.slice(0, limit).map((job) => {
       const live = job.status === 'queued' || job.status === 'processing';
       return <Task key={job.id} testId={`library-extraction-${job.id}`} title={`${t('Extracción de texto')} · ${titles[job.itemId] ?? t('Documento')}`}

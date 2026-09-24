@@ -65,27 +65,40 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
       await page.waitForTimeout(350); await page.mouse.up();
     }
-    await t.test('documentary preparation shares the header queue with campaign and source controls', async () => {
+    await t.test('documentary preparation is one Queue entry with one set of controls', async () => {
       const campaign = { id: 'prepare-one', vaultId: 'owner', vaultName: 'Research vault', state: 'active', createdAt: Date.now(), updatedAt: Date.now(), embedding: { provider: 'openrouter', model: 'baai/bge-m3', external: true }, jobs: [
         { id: 'job-one', documentId: 'source-one', title: 'Full document', state: 'running', stage: 'embeddings', completedPassages: 32, totalPassages: 70, unknownRequests: 1, error: null },
+        { id: 'job-two', documentId: 'source-two', title: 'Second document', state: 'queued', stage: 'extraction', completedPassages: 0, totalPassages: 0, unknownRequests: 0, error: null },
       ] };
-      await fresh({ getResearchPreparationProgress: { paused: false, campaigns: [campaign] } });
-      await count(1); await open();
-      const group = page.getByTestId('preparation-campaign-prepare-one');
-      await group.getByText('Embeddings: openrouter · baai/bge-m3', { exact: true }).waitFor();
-      await group.getByRole('button', { name: 'Pausar', exact: true }).click();
-      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, action: 'pause' });
-      const row = page.getByTestId('preparation-job-prepare-one-job-one');
-      await row.getByText(/32\/70/).waitFor();
-      assert.equal(await row.getByRole('progressbar').getAttribute('aria-valuenow'), String(32 / 70 * 100));
-      await row.getByRole('button', { name: 'Cancelar', exact: true }).click();
-      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, documentId: 'source-one', action: 'cancel' });
+      // A second campaign that also holds source-one: the document is still listed once.
+      const overlap = { ...campaign, id: 'prepare-two', jobs: [{ ...campaign.jobs[0], id: 'job-three', state: 'queued' }] };
+      await fresh({ getResearchPreparationProgress: { paused: false, campaigns: [campaign, overlap] } });
+      await open();
+      const bar = page.getByTestId('preparation-queue-bar');
+      assert.equal(await page.locator('[data-testid="preparation-queue-bar"]').count(), 1, 'one entry for every campaign');
+      assert.equal(await page.locator('[data-testid^="preparation-campaign-"], [data-testid^="preparation-job-"]').count(), 0, 'no per-campaign or per-job controls');
+      await bar.getByTestId('preparation-queue-status').getByText('Full document').waitFor();
+      await bar.getByText(/Embeddings · 32\/70/).waitFor();
+      await bar.getByText(/openrouter · baai\/bge-m3/).waitFor();
+      assert.equal(await bar.getByRole('progressbar').getAttribute('aria-valuenow'), String(Math.round(32 / 70 / 2 * 100)));
+      await bar.getByRole('button', { name: 'Pausar la indexación', exact: true }).click();
+      await action('setResearchPreparationPaused', true);
+      await bar.getByRole('button', { name: /Indexación/ }).click();
+      assert.equal(await bar.locator('[data-testid^="preparation-item-"]').count(), 2, 'each document listed once');
+      const row = bar.getByTestId('preparation-item-source-one');
+      await row.getByRole('button', { name: 'Quitar de la indexación: Full document', exact: true }).click();
+      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, action: 'cancel', documentId: 'source-one' });
+      await action('controlResearchPreparationCampaign', { campaignId: overlap.id, action: 'cancel', documentId: 'source-one' });
+      await bar.getByRole('button', { name: 'Detener la indexación', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Detener la indexación' }).getByRole('button', { name: 'Detener', exact: true }).click();
+      await action('controlAllResearchPreparation', 'cancel');
       await close();
-      const done = { ...campaign, jobs: campaign.jobs.map(job => ({ ...job, state: 'complete', stage: 'complete', completedPassages: 70 })) };
-      await emit('onResearchPreparationProgress', { paused: false, campaigns: [done] });
+      const done = (value) => ({ ...value, state: 'complete', jobs: value.jobs.map(job => ({ ...job, state: 'complete', stage: 'complete', completedPassages: 70, totalPassages: 70 })) });
+      await emit('onResearchPreparationProgress', { paused: false, campaigns: [done(campaign), done(overlap)] });
       await count(0); await open();
-      await group.getByRole('button', { name: 'Ocultar', exact: true }).click();
-      await group.waitFor({ state: 'detached' });
+      await bar.getByText('2 completados').waitFor();
+      await bar.getByTestId('preparation-queue-dismiss').click();
+      await bar.waitFor({ state: 'detached' });
     });
     await t.test('global clear confirms dismissal across lanes and preserves running, pending and paused tasks', async () => {
       const mixedScan = queue();
