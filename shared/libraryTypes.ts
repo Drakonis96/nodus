@@ -624,6 +624,12 @@ export interface LibraryCatalogQuery {
   yearFrom?: number | null;
   yearTo?: number | null;
   hasAttachments?: boolean | null;
+  /** Multi-value facets: an item matches when it matches any listed value. */
+  sources?: LibraryItemSource[];
+  itemTypes?: LibraryItemType[];
+  extractionStatuses?: NonNullable<LibraryItemRecord['extraction']>['status'][];
+  tags?: string[];
+  vaultIds?: string[];
   sort?: LibrarySortRule[];
   includeFacets?: boolean;
 }

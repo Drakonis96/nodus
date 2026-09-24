@@ -185,14 +185,15 @@ export interface ArgumentSnapshot {
  * cut is kept or it is dropped, never half of it.
  */
 export interface LibraryFacetsSnapshot {
-  source: LibraryItemSource | '';
-  extraction: LibraryCatalogItem['extractionStatus'] | '';
-  itemType: LibraryItemType | '';
+  /** Each facet holds any number of values; an empty list is no cut. */
+  sources: LibraryItemSource[];
+  extractions: LibraryCatalogItem['extractionStatus'][];
+  itemTypes: LibraryItemType[];
   yearFrom: string;
   yearTo: string;
-  facetTag: string;
-  facetVault: string;
-  attachmentFilter: '' | 'with' | 'without';
+  tags: string[];
+  vaults: string[];
+  attachments: Array<'with' | 'without'>;
 }
 
 /**
