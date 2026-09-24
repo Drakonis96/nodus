@@ -221,15 +221,15 @@ to about USD 0.57.
 
 | Criterion | Fixture evidence | Real integration evidence | Still open |
 | --- | --- | --- | --- |
-| Queue persistence and recovery | Store/requests: restart fencing, crashed owner keeps its failure allowance, lease expiry | **New** `verify-research-queue-recovery.mjs`: SIGKILL of real Electron with 1 running/3 queued, no orphaned processes, automatic completion after relaunch, one published revision per document, no live leases or duplicate ordinals (`2026-09-24-queue-recovery.json`) | Kill during paid embedding; production single-instance lock after a crash |
+| Queue persistence and recovery | Store/requests: restart fencing, crashed owner keeps its failure allowance, lease expiry | **New** `verify-research-queue-recovery.mjs`: SIGKILL of real Electron with 1 running/3 queued, no orphaned processes, automatic completion after relaunch, one published revision per document, no live leases or duplicate ordinals (`2026-09-24-queue-recovery.json`) | Production single-instance lock after a crash (QA profile uses its own lock) |
 | Page locators | Chunker/store tests for page-crossing passages | Same harness: final-page marker cited as "pp. 249–250" after fix `45665d23` | Other formats' locator semantics |
-| Vault changes | `test-documentary-vault-ownership` (two owning vaults, UI switch across an extraction await), scope revalidation | Selection-change cancellation in the adversarial campaign | Switching vaults in the real app during a run |
-| Batches and shared jobs | Persistent embedding batches, multi-source campaigns, shared lease retained by another campaign, withdrawal fencing | Real `bge-m3` preparation of three PDFs in every campaign | Two real vaults sharing one index concurrently |
-| Provider failures | Missing key never switches provider, recoverable blocks are not failures, proxy/cost ledger tests | `no_model` recoverable block in the recovery harness; proxy retained a reservation for a failed call | Real provider outage or rate limit |
-| Revisions | Stale writer fencing, attachment heads, failed rebuild keeps previous revision | Revision rejection through managed MCP with a synthetic endpoint | Real Zotero attachment replaced mid-run |
+| Vault changes | `test-documentary-vault-ownership` (two owning vaults, UI switch across an extraction await), scope revalidation | Selection-change cancellation in the adversarial campaign; **real vault switch** during chat, Deep Research and preparation (`2026-09-24-robustness-scenarios.json`) | Deep Research is protected by refusing the switch, not by aborting |
+| Batches and shared jobs | Persistent embedding batches, multi-source campaigns, shared lease retained by another campaign, withdrawal fencing | Real `bge-m3` preparation of three PDFs in every campaign; **two real vaults** preparing one document concurrently with a withdrawal | Removal of a document from one vault (no unlink API) |
+| Provider failures | Missing key never switches provider, recoverable blocks are not failures, proxy/cost ledger tests | Real app against a **simulated** upstream behind the real proxy: 429, 500, malformed bodies, connection resets and persistent outages | Faults are simulated; real provider behaviour may differ |
+| Revisions | Stale writer fencing, attachment heads, failed rebuild keeps previous revision | **Real Zotero 10.0.3** attachment bytes replaced after import; Global Library attachment replaced mid-extraction | Replacement exactly between pin and read inside one Deep Research run |
 | Permissions | Notebook scopes, receipt revocation, forged IDs, promoted notes | Selection revocation in real Zotero; foreign IDs/history in the adversarial campaign | — |
 | Migrations | Synthetic migration fixtures, legacy policy migration | v5.6.0 profile with a legacy note preserved across the actual upgrade | Large production-sized vaults (deliberately not used) |
-| Accessibility | Preparation welcome browser fixture (now also on CI's macOS runner) | Keyboard focus containment and bounds in real Electron at two sizes and themes | Screen-reader audit |
+| Accessibility | Preparation welcome browser fixture (now also on CI's macOS runner) | Keyboard focus containment and bounds; **axe-core** WCAG A/AA audit of six Research surfaces in both themes, 0 violations after fixes | Screen-reader test with a person |
 | Other engines | Full CI suite, including other vault engines | CI real-app smoke plus Stellar, graph-tab and argument-map E2Es | — |
 
 ### CI, platforms and distribution at `91a82aa0`
@@ -266,3 +266,57 @@ to about USD 0.57.
 Same ledger, never reset: 1,757 calls, USD 3.821334595 accounted including five
 unresolved reservations retained at their maximum (three from 23 September, one
 from the aborted campaign, one failed call). Limit USD 5; about USD 1.18 unspent.
+
+
+### Robustness scenarios (24 September, application build `2c7f1c4a`)
+
+Eight real-Electron scenarios (`2026-09-24-robustness-scenarios.json`), each after
+the five OS-boundary proofs, no paid calls. Where marked, the provider answer is
+simulated behind the real proxy; the app, queue, databases and proxy are real.
+
+- **Vault switch:** a Research Chat in flight is rejected with
+  `research_scope_changed`; a Deep Research in flight refuses the switch; a
+  preparation owned by vault A completes while the UI is in vault B, and B acquires
+  no links or works (Global Library items are visible in every academic vault by design).
+- **Provider outages (simulated):** during embeddings text stays searchable, states
+  read queued/running while retrying and failed/`provider_failed` at the end, calls
+  stop, no other provider is used and an explicit retry recovers; each chat fault
+  is retried into a cited answer, a persistent outage returns an explicit error, and
+  Deep Research fails closed with an abstention.
+- **Attachment replacement:** in real Zotero, replaced bytes are refused with
+  `research_source_revision_changed` by automatic and manual reads and never
+  returned; restoring them restores access. In the Global Library, a replacement
+  during extraction never publishes the old text as current, the document reads as
+  not yet prepared, and re-preparing makes only the new text current.
+- **Two vaults, one index:** concurrent requests share the same text and vector
+  identities; a withdrawal keeps the other vault's interest alive; no passage is
+  embedded twice and search never repeats a passage.
+- **Kill during embeddings:** after SIGKILL and relaunch all vectors complete
+  without user action; only the batch outstanding at the kill is re-sent, and it
+  stays recorded as unknown (possible double charge).
+- **Kill during text preparation:** rerun of the 250-page recovery harness.
+- **Accessibility:** axe-core 4.13 found three pre-existing contrast failures; after
+  `b5dc96a7`, 0 violations on all 12 surface/theme combinations. Not a screen-reader
+  test with a person.
+
+Defects fixed by these scenarios: `1d35b7a0` (retry and provider states in the
+inventory), `ab322ae4` (a replaced source treated as unauthorized and shown as an
+extraction failure), `b5dc96a7` (contrast). Local on the same code: 40/40 focused
+isolated suites and the 6/6 OS-isolation suite; lint of every changed file.
+
+**Platforms at `2c7f1c4a`:** general CI [35979349389](https://github.com/Drakonis96/nodus/actions/runs/35979349389)
+(dispatched): the test job passed 3,830 tests with 0 failures and 2 skips, and all
+E2Es passed; the three cross-repository jobs failed on "chemistry-studio: the pinned
+version is the one the marketplace publishes" because the external marketplace now
+publishes 2.5.6 while both this branch and `main` pin 2.5.1 (the latest `main` CI,
+[35974026979](https://github.com/Drakonis96/nodus/actions/runs/35974026979), fails the
+same three jobs). Native matrix [35979358827](https://github.com/Drakonis96/nodus/actions/runs/35979358827)
+passed four targets. Installers [35979124961](https://github.com/Drakonis96/nodus/actions/runs/35979124961):
+actual v5.6.0 → `5.6.1-research.12` upgrade, preservation and removal passed on all four
+targets (`2026-09-24-installers-2c7f1c4a.json`); macOS x64 was re-run once after an HTTP 500
+from a release asset during capability bootstrap.
+
+**Branch state:** after these commits the PR conflicts with `main` (17 new commits;
+one conflict in `electron/ai/researchAssistant.ts`), so pull-request workflows no
+longer start. CI and the native matrix were dispatched manually on `2c7f1c4a`; the
+conflict is left unresolved pending the owner's decision.
