@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { createResearchTestRoot } from './research-isolation.mjs';
 import { startResearchProviderProxy } from './research-provider-proxy.mjs';
@@ -39,7 +40,7 @@ test('paid gate reserves before dispatch, rejects other models and never logs cr
 test('calls beyond the two dispatch slots wait for a slot instead of being refused', async () => {
   const root = createResearchTestRoot();
   let inFlight = 0, peak = 0, dispatches = 0;
-  const proxy = await startResearchProviderProxy(root, { dispatch: async () => {
+  const proxy = await startResearchProviderProxy(root, { port: Number(process.env.NODUS_TEST_FIXTURE_PORT ?? 0), dispatch: async () => {
     dispatches++; inFlight++; peak = Math.max(peak, inFlight);
     await new Promise(resolve => setTimeout(resolve, 150));
     inFlight--;
@@ -47,9 +48,16 @@ test('calls beyond the two dispatch slots wait for a slot instead of being refus
   } });
   try {
     const body = JSON.stringify({ model: 'deepseek-flash', messages: [{ role: 'user', content: 'Synthetic' }], max_tokens: 10 });
-    const responses = await Promise.all(Array.from({ length: 5 }, () => fetch(`${proxy.url}/deepseek/chat/completions`, { method: 'POST', headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' }, body })));
-    assert.deepEqual(responses.map(response => response.status), [200, 200, 200, 200, 200]);
-    await Promise.all(responses.map(response => response.text()));
+    // Fresh connections: the shared fetch pool would reuse sockets the previous test's
+    // proxy closed on the same fixture port.
+    const post = () => new Promise((resolve, reject) => {
+      const request = http.request(`${proxy.url}/deepseek/chat/completions`, { method: 'POST', agent: false, headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' } }, response => {
+        response.resume(); response.on('end', () => resolve(response.statusCode));
+      });
+      request.on('error', reject); request.end(body);
+    });
+    const statuses = await Promise.all(Array.from({ length: 5 }, post));
+    assert.deepEqual(statuses, [200, 200, 200, 200, 200]);
     assert.equal(dispatches, 5);
     assert.ok(peak <= 2, `at most two paid calls in flight, saw ${peak}`);
     assert.equal(proxy.ledger.read().calls.length, 5);

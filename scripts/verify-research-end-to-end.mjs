@@ -386,11 +386,13 @@ try {
     }
     const screenshot = await shot(`07-question-${index + 1}`);
     const after = ledgerTotal();
+    const crashed = await page.getByText('Algo ha fallado en esta sección', { exact: true }).isVisible().catch(() => false);
     questions.push({ ...question, requestId: outcome.requestId, durationMs: outcome.finished - outcome.started, error: outcome.error ?? null, answer,
-      stats: outcome.response?.stats ?? null, activity, panel, citations, screenshot,
+      stats: outcome.response?.stats ?? null, activity, panel, citations, screenshot, viewCrashed: crashed,
       cost: { calls: after.calls - before.calls, usd: after.usd - before.usd } });
+    evidence.steps.questions = questions;
+    if (crashed) throw new Error(`${question.name}: the Research Chat view crashed while showing the answer`);
   }
-  evidence.steps.questions = questions;
 
   // Logs: the pipeline log, the renderer console and the main process.
   evidence.logs = {
