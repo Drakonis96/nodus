@@ -43,8 +43,8 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
-import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
+import { classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
 import {
   optionalBodyUnsupported,
   reasoningHintUnsupported,
@@ -842,6 +842,15 @@ function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> 
   return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo);
 }
 
+/** The Anthropic thinking body with `thinking.type` forced to `adaptive`, for a model that
+ *  rejects `thinking.type.disabled` (newer Claude). The effort mapping — including off → low —
+ *  is kept, so the model still reasons no more than the requested effort asks. */
+function adaptiveThinkingBody(model: ModelRef, opts: CallOpts): Record<string, unknown> {
+  const body = researchBody(model, opts);
+  if (!('thinking' in body) && !('output_config' in body)) return body;
+  return { ...body, thinking: { type: 'adaptive' } };
+}
+
 function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort, stripTemperature = false): Record<string, number> {
   if (stripTemperature || temperatureUnsupported(model)) return {};
   if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
@@ -1259,11 +1268,11 @@ async function rawCompleteTransport(
       ...(opts.noRetry ? { maxRetries: 0 } : {}),
       ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
     });
-    const create = () => client.messages.create({
+    const create = (adaptive = false) => client.messages.create({
       model: model.model,
       max_tokens: opts.maxTokens ?? 8000,
       ...requestSamplingBody(model, opts, reasoning),
-      ...researchBody(model, opts),
+      ...(adaptive || adaptiveThinkingRequired(model) ? adaptiveThinkingBody(model, opts) : researchBody(model, opts)),
       system: opts.system,
       messages: [
         { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
@@ -1272,13 +1281,19 @@ async function rawCompleteTransport(
     try {
       let res;
       try {
-        res = await scheduleProviderRequest(model, opts, key, 'anthropic', create);
+        res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create());
       } catch (e: any) {
-        // A Claude that deprecates `temperature` answers 400: drop it and remember the model
-        // (the OpenAI-compatible transport does the same), rather than failing the turn.
-        if (opts.noRetry || !rejectsTemperatureParameter(e)) throw e;
-        rememberTemperatureUnsupported(model);
-        res = await scheduleProviderRequest(model, opts, key, 'anthropic', create);
+        if (opts.noRetry) throw e;
+        if (rejectsTemperatureParameter(e)) {
+          // A Claude that deprecates `temperature` answers 400: drop it and remember the model
+          // (the OpenAI-compatible transport does the same), rather than failing the turn.
+          rememberTemperatureUnsupported(model);
+          res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create());
+        } else if (rejectsAdaptiveThinking(e)) {
+          // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
+          rememberAdaptiveThinking(model);
+          res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create(true));
+        } else throw e;
       }
       const block = res.content.find((b: any) => b.type === 'text');
       if ((jsonMode || opts.requireCompleteOutput) && (res as any).stop_reason === 'max_tokens') {
@@ -2006,12 +2021,12 @@ async function rawCompleteStreamTransport(
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
     const client = new Anthropic({ apiKey: key });
-    const streamOnce = () => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
+    const streamOnce = (adaptive = false) => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
       const stream = await (client.messages.create as any)({
         model: model.model,
         max_tokens: opts.maxTokens ?? 8000,
         ...requestSamplingBody(model, opts, reasoning),
-        ...researchBody(model, opts),
+        ...(adaptive || adaptiveThinkingRequired(model) ? adaptiveThinkingBody(model, opts) : researchBody(model, opts)),
         system: opts.system,
         stream: true,
         messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
@@ -2026,11 +2041,17 @@ async function rawCompleteStreamTransport(
       try {
         await streamOnce();
       } catch (e: any) {
-        // A Claude that deprecates `temperature` answers 400 before any content streams:
-        // drop it, remember the model, and replay once.
-        if (signal?.aborted || opts.noRetry || !rejectsTemperatureParameter(e)) throw e;
-        rememberTemperatureUnsupported(model);
-        await streamOnce();
+        if (signal?.aborted || opts.noRetry) throw e;
+        if (rejectsTemperatureParameter(e)) {
+          // A Claude that deprecates `temperature` answers 400 before any content streams:
+          // drop it, remember the model, and replay once.
+          rememberTemperatureUnsupported(model);
+          await streamOnce();
+        } else if (rejectsAdaptiveThinking(e)) {
+          // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
+          rememberAdaptiveThinking(model);
+          await streamOnce(true);
+        } else throw e;
       }
     } catch (e: any) {
       // A user-triggered stop surfaces as an abort here — keep the partial answer

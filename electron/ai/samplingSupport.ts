@@ -23,3 +23,19 @@ export function temperatureUnsupported(model: ModelRef): boolean {
 export function rememberTemperatureUnsupported(model: ModelRef): void {
   unsupported.add(modelKey(model));
 }
+
+/**
+ * Models whose provider answered a 400 rejecting `thinking.type.disabled` and requiring
+ * `thinking.type.adaptive`. Newer Claude models (`claude-opus-5-5`) removed thinking-off, so the
+ * transport sends adaptive from the start once the model has been learned. Session-scoped, like
+ * the temperature memory.
+ */
+const adaptiveThinking = new Set<string>();
+
+export function adaptiveThinkingRequired(model: ModelRef): boolean {
+  return adaptiveThinking.has(modelKey(model));
+}
+
+export function rememberAdaptiveThinking(model: ModelRef): void {
+  adaptiveThinking.add(modelKey(model));
+}

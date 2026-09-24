@@ -172,6 +172,19 @@ export function rejectsTemperatureParameter(error: unknown): boolean {
   return statusOf(error) === 400 && TEMPERATURE_REJECTION.test(messageOf(error));
 }
 
+/**
+ * A 400 that rejects `thinking.type.disabled` and points at the adaptive contract. Newer Claude
+ * models (`claude-opus-5-5`) drop the ability to turn thinking off: they answer
+ * `"thinking.type.disabled" is not supported for this model. Use "thinking.type.adaptive" and
+ * "output_config.effort" to control thinking behavior.` The transport replays the request with
+ * adaptive thinking (effort still set) and remembers the model for the session.
+ */
+const ADAPTIVE_THINKING_REJECTION = /thinking\.type\.disabled[^\n]{0,80}(?:not\s+supported|unsupported|not\s+accepted|not\s+allowed|invalid)|thinking\.type\.adaptive/i;
+
+export function rejectsAdaptiveThinking(error: unknown): boolean {
+  return statusOf(error) === 400 && ADAPTIVE_THINKING_REJECTION.test(messageOf(error));
+}
+
 /** The statuses a provider answers with when it refused a request before running it. */
 const REFUSAL_STATUSES = new Set([400, 422]);
 

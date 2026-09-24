@@ -102,7 +102,7 @@ test('both transports drop the knob on that signal and keep the rest of the requ
   const go = readFileSync(path.join(repoRoot, 'electron/ai/openCodeGoCompletion.ts'), 'utf8');
   // The session memory is shared, not duplicated per transport, so a model learned on one
   // route does not have to fail again on the other.
-  assert.match(source, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.match(source, /import \{ adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
   assert.match(go, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
   assert.doesNotMatch(source, /const temperatureUnsupportedModels = new Set<string>\(\)/);
   // The generic transport replays without the field in both the non-streaming and the
@@ -120,10 +120,31 @@ test('both transports drop the knob on that signal and keep the rest of the requ
   assert.match(go, /if \(temperatureUnsupported\(ref\)\) return \{\};/);
 });
 
+test('newer Claude models replay with adaptive thinking when they reject thinking-off', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const errors = readFileSync(path.join(repoRoot, 'electron/ai/providerErrors.ts'), 'utf8');
+  const sampling = readFileSync(path.join(repoRoot, 'electron/ai/samplingSupport.ts'), 'utf8');
+  // The predicate keys off the provider's own wording, not just a 400 status.
+  assert.match(errors, /export function rejectsAdaptiveThinking\(error: unknown\): boolean \{/);
+  assert.ok(errors.includes(String.raw`thinking\.type\.disabled`));
+  assert.ok(errors.includes('thinking.type.adaptive'));
+  // Both Anthropic native paths recover, force adaptive, and remember the model for the session.
+  assert.equal((source.match(/rejectsAdaptiveThinking\(e\)/g) ?? []).length, 2);
+  assert.equal((source.match(/rememberAdaptiveThinking\(model\);/g) ?? []).length, 2);
+  assert.match(source, /function adaptiveThinkingBody\(model: ModelRef, opts: CallOpts\): Record<string, unknown> \{/);
+  assert.match(source, /return \{ \.\.\.body, thinking: \{ type: 'adaptive' \} \};/);
+  // The recovered request still carries the effort mapping, and both paths short-circuit to it
+  // once the model has been learned.
+  assert.equal((source.match(/\.\.\.\(adaptive \|\| adaptiveThinkingRequired\(model\) \? adaptiveThinkingBody\(model, opts\) : researchBody\(model, opts\)\)/g) ?? []).length, 2);
+  // Session memory is shared with the temperature memory, so a restart costs one failed request.
+  assert.match(sampling, /export function adaptiveThinkingRequired\(model: ModelRef\): boolean \{/);
+  assert.match(sampling, /export function rememberAdaptiveThinking\(model: ModelRef\): void \{/);
+});
+
 test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
   // The predicates are imported, not reimplemented locally.
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.doesNotMatch(source, /^function rejectsOptionalTransportField/m);
   // Both the non-streaming and the streaming transport mark whether the field was sent…
   assert.equal((source.match(/const sentReasoning = \(extras as any\)\.reasoning_effort !== undefined;/g) ?? []).length, 2);
