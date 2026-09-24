@@ -77,6 +77,13 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
         accounting: typeof usage?.cost === 'number' ? 'provider_cost' : accountedUsd === null ? 'reservation_retained' : 'peak_price_upper_bound' }) + '\n', { mode: 0o600 });
       response.end();
     } catch (error) {
+      // Test-only simulated upstreams can ask for a real connection reset instead
+      // of an error body; a paid upstream never raises this code.
+      if (error?.code === 'SIMULATED_RESET' && !response.headersSent) {
+        if (reservation) fs.appendFileSync(log, JSON.stringify({ reservation, provider, failed: true, simulatedReset: true }) + '\n', { mode: 0o600 });
+        request.socket.destroy();
+        return;
+      }
       if (reservation) fs.appendFileSync(log, JSON.stringify({ reservation, provider, failed: true, reservationRetained: true, latencyMs: performance.now() - started }) + '\n', { mode: 0o600 });
       if (!response.headersSent) response.writeHead(403, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ error: { message: error instanceof Error && error.message.startsWith('research_') ? error.message : 'research_dispatch_blocked' } }));
