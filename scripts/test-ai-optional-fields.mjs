@@ -106,8 +106,11 @@ test('both transports drop the knob on that signal and keep the rest of the requ
   assert.match(go, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
   assert.doesNotMatch(source, /const temperatureUnsupportedModels = new Set<string>\(\)/);
   // The generic transport replays without the field in both the non-streaming and the
-  // streaming path, and both keep the optional body.
-  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 2);
+  // streaming path, and the Anthropic native transport does the same in both of its paths.
+  // The Anthropic replay re-reads `requestSamplingBody`, which now omits the field, so only
+  // the generic transport needs the explicit `bodyFor(true)` body.
+  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 4);
+  assert.equal((source.match(/rememberTemperatureUnsupported\(model\);/g) ?? []).length, 4);
   assert.equal((source.match(/bodyFor\(true\)/g) ?? []).length, 2);
   // OpenCode Go speaks its own HTTP, so it needs its own recovery — the one in aiClient
   // never ran on that route.
