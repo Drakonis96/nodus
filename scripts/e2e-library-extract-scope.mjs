@@ -5,99 +5,59 @@
 // a confirmation. This drives the real UI and records what reaches the real
 // `works:processFullBulk` IPC handler, so the scope is the one the main process gets.
 //
+// Runs under the isolated research harness (OS boundary proven first, simulated provider).
 // Requires a build (dist/ + dist-electron/); run via `node scripts/e2e-library-extract-scope.mjs`.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
-import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { _electron as electron } from 'playwright-core';
+import { createResearchApp, simulatedUpstream } from './lib/research-app-harness.mjs';
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
-const appVersion = require(path.join(repoRoot, 'package.json')).version;
-
-if (!process.argv.includes('--electron-library-extract-scope')) {
-  execFileSync(path.join(repoRoot, 'node_modules/.bin/electron'), [fileURLToPath(import.meta.url), '--electron-library-extract-scope'], {
-    cwd: repoRoot, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit',
-  });
-  process.exit(0);
-}
-if (!existsSync(path.join(repoRoot, 'dist-electron/main.js'))) {
-  console.log('[e2e] no build found — running npm run build first…');
-  execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit' });
-}
-
-const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-e2e-extract-scope-'));
-const WORKS = ['e2e-extract-a', 'e2e-extract-b', 'e2e-extract-c'];
+const appVersion = require(path.join(import.meta.dirname, '../package.json')).version;
+const WORKS = [];
+const PROOFS = ['writeInsideAllowed', 'writeOutsideDenied', 'descendantWriteDenied', 'externalNetworkDenied', 'forbiddenLoopbackPortDenied'];
 
 async function waitForCondition(label, probe, { timeout = 30_000, interval = 100 } = {}) {
   const deadline = Date.now() + timeout;
-  let lastError = null;
   while (Date.now() < deadline) {
-    try {
-      if (await probe()) return;
-      lastError = null;
-    } catch (cause) { lastError = cause; }
+    if (await probe().catch(() => false)) return;
     await new Promise((resolve) => setTimeout(resolve, interval));
   }
-  throw new Error(`Tiempo agotado esperando: ${label}.${lastError instanceof Error ? ` Último error: ${lastError.message}` : ''}`);
+  throw new Error(`Tiempo agotado esperando: ${label}.`);
 }
 
-const Database = require('better-sqlite3');
-let app = null;
-let external = null;
+// The isolated harness proves the OS boundary before the app starts; no model is called.
+const harness = await createResearchApp({ provider: simulatedUpstream() });
+assert.ok(PROOFS.every((key) => harness.proof[key] === true), `isolation proof failed: ${JSON.stringify(harness.proof)}`);
 try {
-  const childEnv = { ...process.env, NODUS_USERDATA: userData, NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available' };
-  delete childEnv.ELECTRON_RUN_AS_NODE;
-  app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
-
-  const page = await app.firstWindow();
+  const { app, page } = await harness.launch();
   page.setDefaultTimeout(30_000);
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error));
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForFunction(() => !!document.getElementById('root')?.children.length, { timeout: 30_000 });
   await page.evaluate((version) => {
     localStorage.setItem('nodus.lastSeenVersion', version);
-    localStorage.setItem(`nodus.mobileTeaserSeen.${version}`, '1');
-    // Two announcements introduce themselves over the shell on a profile that has not
-    // seen them (keys live in PdfPresenterTutorialAnnouncement / TutorialVideosGuide).
-    // This test is about the Library, not about dismissing those.
-    localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
-    localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
-    // The Library presents its own guide the first time it is opened.
-    localStorage.setItem('nodus.libraryTutorialSeen.v1', '1');
+    for (const key of [`nodus.mobileTeaserSeen.${version}`, 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA', 'nodus.tutorialVideosAnnouncementSeen.2026-07',
+      'nodus.libraryTutorialSeen.v1', 'nodus.platformHighlightsSeen.2026-07', 'nodus.toolkitBetaGuideSeen.2.4.0']) localStorage.setItem(key, '1');
   }, appVersion);
+  await page.evaluate(() => window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'declined' }));
 
-  // ── A vault with three works that have not been analysed ────────────────────
-  const { vault } = await page.evaluate(async () => {
-    const created = await window.nodus.createVault({ name: 'E2E extract scope', type: 'academic' });
-    const switched = await window.nodus.switchVault(created.vault.id);
-    if (!switched.ok) throw new Error(switched.message);
-    return created;
-  });
-  external = new Database(vault.path);
-  const insert = external.prepare(`INSERT INTO works(nodus_id,zotero_key,title,authors_json,year,item_type,source_type,archived)
-    VALUES(?,?,?,?,?,?,?,0)`);
-  WORKS.forEach((id, index) => insert.run(id, `Z-${index}`, `Obra ${index + 1}`, '[]', 2024, 'book', 'pdf'));
-  external.close();
-  external = null;
+  // ── Three works in the vault, through the real Global Library → vault link ───
+  const workIds = await page.evaluate(async ({ root, titles }) => {
+    await window.nodus.updateSettings({ autoBackupFolder: `${root}/library` });
+    const vault = await window.nodus.getActiveVault();
+    const ids = [];
+    for (const title of titles) ids.push((await window.nodus.createGlobalLibraryItem({ title, itemType: 'book', creators: [] }, [])).id);
+    const report = await window.nodus.linkGlobalLibraryItemsToVault(ids, vault.id);
+    return report.links.map((link) => link.workId);
+  }, { root: harness.root, titles: ['Obra 1', 'Obra 2', 'Obra 3'] });
+  assert.equal(workIds.length, 3);
+  WORKS.splice(0, WORKS.length, ...workIds);
   await page.evaluate(() => window.nodus.updateSettings({
     onboardingComplete: true, recoverySetupVersion: 1, tourComplete: true, advancedTourComplete: true,
     basicsTutorialVersion: 5, mascotStyle: 'classic', mascotStyleChosen: true, uiLanguage: 'es',
   }));
   await page.reload();
   await page.getByTestId('app-shell').waitFor({ timeout: 30_000 });
-  const startupUpdate = page.getByTestId('startup-update-modal');
-  await startupUpdate.waitFor({ timeout: 30_000 }).catch(() => undefined);
-  if (await startupUpdate.count()) {
-    await startupUpdate.getByRole('button', { name: 'Entendido', exact: false }).click();
-    await startupUpdate.waitFor({ state: 'detached' });
-  }
 
   // Record what the real handler receives, without running any model.
   await app.evaluate(({ ipcMain }) => {
@@ -146,7 +106,5 @@ try {
   assert.deepEqual(pageErrors, [], `the renderer logged no page errors: ${pageErrors.map((error) => error.message).join(' | ')}`);
   console.log('e2e library extract scope passed');
 } finally {
-  try { external?.close(); } catch { /* already closed */ }
-  if (app) await app.close().catch(() => undefined);
-  await rm(userData, { recursive: true, force: true });
+  await harness.close();
 }
