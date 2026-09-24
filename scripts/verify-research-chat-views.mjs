@@ -30,7 +30,7 @@ try {
         await page.getByTestId('research-context-trigger').click();
         await page.locator('.research-context-panel').getByRole('button', { name: new RegExp(`^${mode} `) }).click();
         await page.locator('.research-context-panel').getByRole('button', { name: 'Listo', exact: true }).click();
-        assert.match(await page.getByTestId('research-context-trigger').innerText(), new RegExp(mode));
+        assert.match(await page.getByTestId('research-context-trigger').innerText(), /^Contexto\b/, 'the trigger keeps its name whatever the mode');
         assert.equal(await page.getByTestId('research-focus-trigger').count(), 0);
       }
     } else {

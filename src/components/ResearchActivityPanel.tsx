@@ -33,10 +33,10 @@ function LayerIcon({ layer }: { layer: ResearchActivityLayer }) {
 /** A fixed list of every layer a research turn can consult, in flow order. Each row is
  * this request's live state for that layer: a turning arrow while it is being consulted,
  * then green when it contributed, orange when it answered with nothing and the flow had
- * to rely on another layer, red when its attempt failed. A new request starts over. */
-export function ResearchActivityPanel({ activities, outcome, onDismiss }: { activities: ResearchActivity[]; outcome: ResearchActivityStatus; onDismiss?: () => void }) {
+ * to rely on another layer, red when its attempt failed. A new request starts over.
+ * The panel only minimises to its radar; it is never closed. */
+export function ResearchActivityPanel({ activities, outcome }: { activities: ResearchActivity[]; outcome: ResearchActivityStatus }) {
   const [minimized, setMinimized] = useState(() => localStorage.getItem('nodus.researchActivityMinimized') === '1');
-  const [dismissed, setDismissed] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const rows = useMemo(() => summarizeResearchActivity(activities), [activities]);
   const active = activities.filter(item => item.status === 'active');
@@ -45,7 +45,7 @@ export function ResearchActivityPanel({ activities, outcome, onDismiss }: { acti
     setMinimized(value => { localStorage.setItem('nodus.researchActivityMinimized', value ? '0' : '1'); return !value; });
     requestAnimationFrame(() => toggleRef.current?.focus());
   };
-  if (dismissed || !activities.length) return null;
+  if (!activities.length) return null;
   const status = outcome === 'active' ? tx('{n} operaciones activas', { n: active.length }) : t(statuses[outcome]);
   const announcement = `${status}${current ? ` · ${t(layers[current.layer][0])} · ${t(operations[current.operation])}` : ''}`;
   return <section className={`research-activity ${minimized ? 'is-minimized' : ''}`} aria-label={t('Actividad del Research chat')} data-testid="research-activity" onKeyDown={event => {
@@ -59,7 +59,6 @@ export function ResearchActivityPanel({ activities, outcome, onDismiss }: { acti
     </button> : <>
       <header><div><h2>{t('Actividad del Research chat')}</h2><p>{status}</p></div>
         <button ref={toggleRef} onClick={toggle} aria-label={t('Minimizar actividad')} aria-expanded={true} title={t('Minimizar actividad')}><Icon name="minus" size={16} /></button>
-        {outcome !== 'active' && <button onClick={() => { setDismissed(true); onDismiss?.(); }} aria-label={t('Cerrar actividad')} title={t('Cerrar actividad')}><Icon name="x" size={16} /></button>}
       </header>
       <ol>
         {rows.map(row => <li key={row.layer} data-status={row.state} data-layer={row.layer}>

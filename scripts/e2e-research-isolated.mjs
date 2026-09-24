@@ -101,6 +101,9 @@ try {
     await page.reload();
     if (process.argv.includes('--preparation')) report.preparation = await (await import('./verify-research-preparation-ui.mjs')).verifyResearchPreparationUi(page, root);
     await page.getByRole('button', { name: 'Research chat', exact: true }).first().click({ timeout: 20000 });
+    // Notebooks live at the top of the chat history.
+    await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
+    if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
     const control = page.getByTestId('research-notebooks');
     await control.waitFor();
     await control.getByRole('combobox').selectOption(corpus.notebook.id);

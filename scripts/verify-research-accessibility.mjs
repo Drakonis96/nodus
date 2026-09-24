@@ -47,6 +47,9 @@ try {
     await page.reload();
     await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length));
     await page.getByRole('button', { name: 'Research chat', exact: true }).first().click({ timeout: 20000 });
+    // Notebooks live at the top of the chat history.
+    await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
+    if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
     const control = page.getByTestId('research-notebooks');
     await control.waitFor({ timeout: 15000 }).catch(async error => { await page.screenshot({ path: path.join(harness.root, `artifacts/a11y-${theme}-no-control.png`) }); throw error; });
     await control.getByRole('combobox').selectOption(notebook.id);

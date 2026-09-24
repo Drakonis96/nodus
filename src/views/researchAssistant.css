@@ -81,11 +81,10 @@
 
 .research-assistant-actions {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 10px;
   width: max-content;
-  max-width: 44rem;
   min-width: 0;
 }
 
@@ -162,7 +161,7 @@
   .research-assistant-header > .flex-1 { display: none; }
   .research-assistant-header > div:first-child { flex: 1 0 calc(100% - 60px); }
   .research-assistant-header > select { order: 3; flex: 1; min-width: 140px; max-width: none; }
-  .research-assistant-header > .research-assistant-actions { order: 4; }
+  .research-assistant-header > .research-assistant-actions { order: 4; flex-wrap: wrap; }
 }
 
 /* Source restrictions are an explicit per-conversation context boundary. */
@@ -199,6 +198,14 @@
 
 /* Embedded chat changes only its frame and the optional side panels. */
 .research-chat-history[hidden] { display: none; }
+/* The top of the history: icon actions, then the notebook the chat reads from. */
+.research-chat-history-tools { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--research-border, #262626); }
+.research-chat-history-tool { display: inline-grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 9px; border: 1px solid transparent; color: #a3a3a3; }
+.research-chat-history-tool:hover:not(:disabled) { color: var(--vault-accent); border-color: color-mix(in srgb, var(--vault-accent) 40%, transparent); background: color-mix(in srgb, var(--vault-accent) 12%, transparent); }
+.research-chat-history-tool:focus-visible { outline: 2px solid var(--vault-accent); outline-offset: 2px; }
+.research-chat-history-tool:disabled { opacity: .4; cursor: not-allowed; }
+.light .research-chat-history-tools { border-bottom-color: #e5e5e5; }
+.light .research-chat-history-tool { color: #525252; }
 .research-message button.study-evidence-citation {
   color: color-mix(in srgb, var(--vault-accent) 55%, #171717);
   background: color-mix(in srgb, var(--vault-accent) 10%, white);

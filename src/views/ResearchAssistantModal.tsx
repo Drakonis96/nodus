@@ -884,16 +884,10 @@ export function ResearchAssistantModal({
               onClick={() => setShowContext((value) => !value)}
             >
               <Icon name="layers" size={15} className="research-accent-text" />
-              <span className="hidden min-w-0 truncate sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
+              <span className="hidden min-w-0 truncate sm:inline">{t('Contexto')}</span>
               <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
-          {!adapter && !isGenealogy && <ResearchNotebookControl value={selection.notebookId} onChange={notebookId => {
-            if (sending) void api.cancelResearchChat();
-            const next = { ...selection, notebookId };
-            setSelection(next);
-            if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
-          }} />}
           {!adapter && !isGenealogy && !selection.notebookId && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
             const next = { ...selection, sourceFilter };
             if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
@@ -917,11 +911,18 @@ export function ResearchAssistantModal({
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
           <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
-            <div className="p-3 border-b border-neutral-800">
-              <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
-                <Icon name="plus" /> {t('Nueva conversación')}
-              </button>
-            </div>
+            <ResearchNotebookControl
+              value={selection.notebookId}
+              enabled={!adapter && !isGenealogy}
+              leading={<button type="button" className="research-chat-history-tool" onClick={startNewConversation} disabled={sending} aria-label={t('Nueva conversación')} title={t('Nueva conversación')}><Icon name="plus" size={16} /></button>}
+              trailing={<button type="button" className="research-chat-history-tool" disabled aria-label={t('Nueva carpeta')} title={t('Nueva carpeta')}><Icon name="folderPlus" size={16} /></button>}
+              onChange={notebookId => {
+                if (sending) void api.cancelResearchChat();
+                const next = { ...selection, notebookId };
+                setSelection(next);
+                if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+              }}
+            />
             <VirtualList
               items={visibleConversations}
               itemHeight={58}
@@ -957,7 +958,7 @@ export function ResearchAssistantModal({
 
           <section className="flex-1 min-w-0 min-h-0 flex flex-col">
             <div className="relative flex-1 min-h-0">
-              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} onDismiss={() => inputRef.current?.focus()} />}
+              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {conversationNotice && (
                   <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">

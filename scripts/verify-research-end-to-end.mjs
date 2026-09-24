@@ -325,6 +325,9 @@ try {
 
   // 4. Research Chat: a notebook over both documents, four questions through the composer.
   await page.getByRole('button', { name: 'Research chat', exact: true }).first().click();
+  // Notebooks live at the top of the chat history.
+  await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
+  if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
   const control = page.getByTestId('research-notebooks');
   await control.waitFor({ timeout: 30000 });
   await control.getByRole('button', { name: /Nuevo cuaderno/ }).click();

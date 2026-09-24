@@ -1,12 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { RETRIEVAL_PRESETS, type ResearchCorpusCollection, type ResearchCorpusDocument, type ResearchNotebook, type ResearchNotebookInput, type ResearchPreparationInventory, type ResearchSourceReference } from '@shared/researchCorpus';
 import { ResearchZoteroControl } from './ResearchZoteroControl';
 import { ResearchSystemPromptControl } from './ResearchSystemPromptControl';
 import type { ResearchSystemPrompt } from '@shared/researchSystemPrompts';
+import { Icon } from './ui';
 import { t } from '../i18n';
 
-export function ResearchNotebookControl({ value, onChange }: { value?: string | null; onChange: (id: string | null) => void }) {
+/** The top of the chat history: icon actions (new conversation, new notebook, new
+ * folder) and, in an academic vault, the notebook the conversation reads from. */
+export function ResearchNotebookControl({ value, onChange, enabled = true, leading, trailing }: {
+  value?: string | null; onChange: (id: string | null) => void; enabled?: boolean; leading?: ReactNode; trailing?: ReactNode;
+}) {
   const [academic, setAcademic] = useState(false);
   const [notebooks, setNotebooks] = useState<ResearchNotebook[]>([]);
   const [editing, setEditing] = useState<ResearchNotebook | 'new' | null>(null);
@@ -14,16 +19,22 @@ export function ResearchNotebookControl({ value, onChange }: { value?: string | 
   const trigger = useRef<HTMLButtonElement>(null);
   const refresh = () => window.nodus.listResearchNotebooks().then(setNotebooks).catch(reason => setError(String(reason)));
   useEffect(() => { let active = true; void window.nodus.getActiveVault().then(vault => { if (active) { setAcademic(vault.type === 'academic'); if (vault.type === 'academic') void refresh(); } }); return () => { active = false; }; }, []);
-  if (!academic) return null;
+  const notebooksOn = academic && enabled;
   const selected = notebooks.find(notebook => notebook.id === value);
   const close = () => { setEditing(null); trigger.current?.focus(); };
-  return <div className="flex items-center gap-1" data-testid="research-notebooks">
-    <select aria-label={t('Cuaderno de investigación')} className="input min-w-0 max-w-48 text-xs" value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
-      <option value="">{t('Chat general')}</option>
-      {notebooks.map(notebook => <option key={notebook.id} value={notebook.id}>{notebook.name}</option>)}
-    </select>
-    <button ref={trigger} type="button" className="btn btn-ghost text-xs" onClick={() => setEditing(selected ?? 'new')}>{selected ? t('Editar') : t('Nuevo cuaderno')}</button>
-    {selected && <button type="button" className="btn btn-ghost text-xs" aria-label={t('Nuevo cuaderno')} onClick={() => setEditing('new')}>+</button>}
+  return <div className="research-chat-history-tools" data-testid={notebooksOn ? 'research-notebooks' : undefined}>
+    <div className="flex items-center gap-1">
+      {leading}
+      {notebooksOn && <button ref={trigger} type="button" className="research-chat-history-tool" aria-label={t('Nuevo cuaderno')} title={t('Nuevo cuaderno')} onClick={() => setEditing('new')}><Icon name="notebook" size={16} /></button>}
+      {trailing}
+    </div>
+    {notebooksOn && <div className="flex items-center gap-1">
+      <select aria-label={t('Cuaderno de investigación')} className="input min-w-0 flex-1 text-xs" value={value ?? ''} onChange={event => onChange(event.target.value || null)}>
+        <option value="">{t('Chat general')}</option>
+        {notebooks.map(notebook => <option key={notebook.id} value={notebook.id}>{notebook.name}</option>)}
+      </select>
+      {selected && <button type="button" className="research-chat-history-tool" aria-label={t('Editar')} title={t('Editar')} onClick={() => setEditing(selected)}><Icon name="edit" size={15} /></button>}
+    </div>}
     {error && <span role="alert" className="text-xs text-red-400">{error}</span>}
     {editing && <NotebookDialog notebook={editing === 'new' ? null : editing} onClose={close} onSaved={async id => { await refresh(); onChange(id); close(); }} />}
   </div>;
