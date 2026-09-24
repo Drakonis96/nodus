@@ -9,7 +9,7 @@ import { getSettings } from '../db/settingsRepo';
 import { DEFAULT_LOCAL_BASE_URLS, normalizeCustomBaseUrl, normalizeCustomModels } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
-import { researchTestProviderBase } from '../qa/researchProviderProxy';
+import { researchTestProviderBase, researchTestProviderModels } from '../qa/researchProviderProxy';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
@@ -348,7 +348,7 @@ export function cachedModelContextWindow(provider: AiProvider, model: string): n
   return cached && Date.now() - cached.at < 300000 ? cached.value : null;
 }
 export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
-  const models = await fetchModels(provider, key, signal);
+  const models = researchTestProviderModels(provider, 'chat') ?? await fetchModels(provider, key, signal);
   for (const model of models) if (Number.isSafeInteger(model.contextLength) && model.contextLength! >= 1024) {
     modelContextCache.set(modelContextKey(provider, model.id), { value: model.contextLength!, at: Date.now() });
   }
@@ -497,6 +497,8 @@ async function listOpenCodeGo(): Promise<ModelInfo[]> {
 
 /** Fetch embedding-capable models for the configured embedding provider. */
 export async function listEmbeddingModels(provider: EmbeddingProvider, key: string | null): Promise<ModelInfo[]> {
+  const testModels = researchTestProviderModels(provider, 'embedding');
+  if (testModels) return testModels;
   switch (provider) {
     case 'openai':
       return listOpenAiEmbeddingModels(key);
