@@ -70,7 +70,7 @@
 .research-effort-track input::-moz-range-thumb { width: 38px; height: 38px; border: 1px solid #00000022; border-radius: 50%; background: #fff; box-shadow: 0 1px 5px #0002; }
 .research-effort-description { margin: 0; text-align: center; font-size: 11px; line-height: 16px; color: #a1a1aa; }
 .light .research-composer, .light .research-effort-panel { background: #fff; color: #18181b; border-color: #e7e7e9; box-shadow: 0 3px 22px #00000008; }
-.light .research-effort-trigger { color: #8b8b90; }
+.light .research-effort-trigger { color: #5f5f66; }
 .light .research-effort-description { color: #71717a; }
 @media (max-width: 640px) {
   .research-composer-footer { padding: 10px 8px 8px; }

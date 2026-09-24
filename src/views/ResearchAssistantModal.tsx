@@ -1163,7 +1163,7 @@ export function ResearchAssistantModal({
                 )}
               </div>
               </div>
-              <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-600">
+              <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-400">
                 <kbd className="composer-kbd">Enter</kbd>
                 <span>{t('para enviar')}</span>
                 <span className="text-neutral-700">·</span>
