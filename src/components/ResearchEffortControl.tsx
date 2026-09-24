@@ -1,7 +1,7 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { ModelInfo, ModelRef } from '@shared/types';
-import { researchEffortChoices, researchReasoningProfile, type ResearchEffort } from '@shared/researchReasoning';
+import { researchEffortChoices, researchReasoningNeedsCatalog, researchReasoningProfile, type ResearchEffort } from '@shared/researchReasoning';
 import { t } from '../i18n';
 import { Icon } from './ui';
 
@@ -21,8 +21,11 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
   const slider = useRef<HTMLInputElement>(null);
   const id = useId();
   const info = catalog?.provider === model?.provider ? catalog?.models.find(x => x.id === model?.model) : undefined;
-  const profile = researchReasoningProfile(model, info);
-  const choices = researchEffortChoices(profile);
+  const profile = useMemo(
+    () => researchReasoningProfile(model, info),
+    [model?.provider, model?.model, info]
+  );
+  const choices = useMemo(() => researchEffortChoices(profile), [profile]);
   const index = Math.max(0, choices.indexOf(value));
   const current = choices[index];
   const description = profile.levels.length === 0 ? t('Este modelo no publica un control de thinking.')
@@ -32,13 +35,23 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
 
   useEffect(() => {
     setOpen(false);
-    if (!model || !['codex', 'github-copilot', 'lmstudio', 'openrouter'].includes(model.provider)) return;
+    if (!model || !researchReasoningNeedsCatalog(model)) return;
     let active = true;
     void window.nodus.listModels(model.provider).then(models => {
       if (active) setCatalog({ provider: model.provider, models });
     }).catch(() => { if (active) setCatalog(null); });
     return () => { active = false; };
   }, [model?.provider, model?.model]);
+
+  // A remembered level the model no longer offers — chosen under an older catalogue, or under
+  // a version of the profiles that has since dropped it — is dropped here, where the live
+  // ladder is known: the control must never claim a level it would not send. Catalogue-driven
+  // providers wait for their catalogue, since until then «no levels» means «not loaded».
+  useEffect(() => {
+    if (choices.includes(value)) return;
+    if (researchReasoningNeedsCatalog(model) && info === undefined) return;
+    onChange('standard');
+  }, [choices, info, model?.provider, model?.model, onChange, value]);
 
   useLayoutEffect(() => {
     if (!open) return;

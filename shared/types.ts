@@ -1,6 +1,9 @@
 import type { SkillMarketplace } from './skillMarketplace';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
+// Type-only, so the pair of modules stays free of a runtime cycle: the reasoning profile
+// needs ModelRef/ModelInfo and the settings shape needs the effort union.
+import type { ResearchEffort } from './researchReasoning';
 // Shared domain types used by both the Electron main process and the React renderer.
 // Keep this file free of any runtime imports from either side.
 // Per-domain slices of the window.nodus contract. NodusApi extends them, so the
@@ -2118,6 +2121,13 @@ export interface AppSettings {
   chatReasoning: ReasoningEffort;
   /** Per-model Codex reasoning overrides. Missing means use that model's advertised default. */
   codexReasoningEfforts: Record<string, CodexReasoningEffort>;
+  /**
+   * The thinking level the Research composer last used, keyed by `provider:model`, so
+   * reopening a model starts where the user left it. Missing (or Standard, which is
+   * stored as an absence) means the composer opens on Standard. App-wide like the other
+   * model preferences: the level belongs to the model, not to the vault asking.
+   */
+  researchEffortByModel: Record<string, ResearchEffort>;
   // When using OpenRouter, bias routing toward the fastest upstream provider.
   openRouterThroughput: boolean;
   /**

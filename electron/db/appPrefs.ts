@@ -108,6 +108,9 @@ export type SharedAppearanceKey = (typeof SHARED_APPEARANCE_KEYS)[number];
 
 export const SHARED_MODEL_KEYS = [
   'codexReasoningEfforts',
+  // The Research composer's memory of the level it last used per model. A level belongs
+  // to the model, not to the vault that happened to be open when it was picked.
+  'researchEffortByModel',
   'localProviders',
   // The user's own OpenAI-compatible endpoint. App-level like the local base URLs:
   // one gateway serves every vault, and re-typing the URL per vault is nobody's idea

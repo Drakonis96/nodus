@@ -23,7 +23,17 @@ try {
   await page.waitForFunction(() => window.requests.length === 1);
   assert.equal(await page.evaluate(() => window.requests[0].thinkingEffort), 'high');
   assert.equal(await page.evaluate(() => window.updates.some(x => 'chatReasoning' in x || 'nodiModel' in x)), false);
+  assert.deepEqual(
+    await page.evaluate(() => window.updates.filter(patch => 'researchEffortByModel' in patch).at(-1).researchEffortByModel),
+    { 'openai:gpt-5.4': 'high' },
+    'the level is saved for this model as soon as it is picked, and Standard is never stored'
+  );
   const models = page.locator('select').first();
+  // A level belongs to the model it was picked for.
+  await models.selectOption('deepseek::deepseek-flash');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'a model that was never used opens on Standard');
+  await models.selectOption('openai::gpt-5.4');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Alto', exact: true }).count(), 1, 'reopening a model restores the level picked for it');
   await models.selectOption('gemini::gemini-3-pro-preview');
   await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
   assert.equal(await slider.getAttribute('max'), '1');
@@ -33,6 +43,10 @@ try {
   await slider.press('End');
   assert.equal(await slider.getAttribute('aria-valuetext'), 'Ultra');
   await slider.press('Escape');
+  // A subscription model's ladder arrives with its catalogue: the restored level waits for it.
+  await models.selectOption('deepseek::deepseek-flash');
+  await models.selectOption('codex::gpt-6-astra');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Ultra', exact: true }).count(), 1, 'a catalogue-driven model restores its level too');
   await models.selectOption('openai::gpt-4.1');
   await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
   assert.equal(await slider.count(), 0);
@@ -57,6 +71,33 @@ try {
   const bounds = await page.locator('.research-composer').boundingBox();
   const inputBounds = await input.boundingBox();
   assert.ok(inputBounds.x >= bounds.x && inputBounds.x + inputBounds.width <= bounds.x + bounds.width);
+  // A relaunch: the page starts from the map the previous session left on disk, so the
+  // composer opens on the remembered level and that is the level the request carries.
+  await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'openai:gpt-5.4': 'xhigh', 'deepseek:deepseek-flash': 'max' }))}`);
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Muy alto', exact: true }).click();
+  await page.screenshot({ path: `${output}/memory-restored.png` });
+  await slider.press('Escape');
+  await input.fill('Pregunta con memoria'); await input.press('Enter');
+  await page.waitForFunction(() => window.requests.length === 1);
+  assert.equal(await page.evaluate(() => window.requests[0].thinkingEffort), 'xhigh', 'the remembered level is restored on open and sent');
+  const restoredModels = page.locator('select').first();
+  await restoredModels.selectOption('deepseek::deepseek-flash');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Máximo', exact: true }).count(), 1, 'every model keeps its own remembered level');
+  await restoredModels.selectOption('gemini::gemini-3-pro-preview');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'and a model with no memory still opens on Standard');
+  // A remembered level the model no longer publishes — a catalogue that changed under the
+  // memory — is dropped instead of sent, and dropped from the store, not just hidden here.
+  await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'codex:gpt-6-astra': 'minimal' }))}`);
+  const staleModels = page.locator('select').first();
+  await staleModels.selectOption('codex::gpt-6-astra');
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  assert.equal(await slider.getAttribute('max'), '5', 'the subscription catalogue loaded, so the level was judged against the live ladder');
+  await slider.press('Escape');
+  assert.deepEqual(
+    await page.evaluate(() => window.updates.filter(patch => 'researchEffortByModel' in patch).at(-1).researchEffortByModel),
+    {},
+    'a level the model no longer offers is removed from the remembered map'
+  );
   assert.deepEqual(errors, []);
-  console.log('Research Assistant UI: keyboard, slider, model reset, exact request, theme/accent, context and compact layout passed.');
+  console.log('Research Assistant UI: keyboard, slider, remembered effort per model, stale level dropped, exact request, theme/accent, context and compact layout passed.');
 } finally { await browser.close(); }
