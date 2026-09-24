@@ -2,14 +2,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import AdmZip from 'adm-zip';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import assert from 'node:assert/strict';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
+import { launchIndependentZotero } from './lib/independent-zotero.mjs';
 
 const root = createResearchTestRoot();
 const baselineWorkspace = process.argv.find(argument => argument.startsWith('--baseline-workspace='))?.slice('--baseline-workspace='.length);
@@ -35,10 +34,6 @@ if (process.argv.includes('--pin-window')) {
   const { importResearchTestCredentials } = await import('./research-test-credentials.mjs');
   try { importResearchTestCredentials(root, process.argv.find(argument => argument.startsWith('--credentials-root='))?.slice('--credentials-root='.length)); } catch (error) { await providerProxy.close(); throw error; }
 }
-const profile = path.join(root, 'zotero/profile');
-const data = path.join(root, 'zotero/data');
-fs.mkdirSync(path.join(profile, 'extensions'), { recursive: true });
-fs.mkdirSync(data, { recursive: true });
 const probe = http.createServer();
 await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
 const port = probe.address().port;
@@ -49,23 +44,6 @@ await new Promise(resolve => probe.close(resolve));
 const allowedPorts = [port, externalMcpPort, ...(providerProxy ? [Number(new URL(providerProxy.url).port)] : [])];
 const policy = macResearchSandbox(root, allowedPorts);
 const proof = { ...verifyResearchSandbox(root, policy), allowedLoopbackPorts: allowedPorts };
-const prefs = {
-  'extensions.zotero.useDataDir': true, 'extensions.zotero.dataDir': data,
-  'extensions.zotero.sync.autoSync': false, 'extensions.zotero.sync.storage.enabled': false,
-  'extensions.zotero.httpServer.enabled': true, 'extensions.zotero.httpServer.port': port,
-  'extensions.zotero.httpServer.localAPI.enabled': true,
-  'extensions.zotero.automaticScraperUpdates': false, 'extensions.zotero.firstRun2': false,
-  'extensions.zotero.firstRunGuidance': false, 'app.update.enabled': false, 'app.update.auto': false,
-  'extensions.update.enabled': false, 'extensions.autoDisableScopes': 0, 'extensions.enabledScopes': 15,
-  'xpinstall.signatures.required': false, 'toolkit.telemetry.enabled': false,
-  'datareporting.healthreport.uploadEnabled': false, 'browser.shell.checkDefaultBrowser': false,
-  'extensions.zoteroMacWordIntegration.skipInstallation': true,
-  'extensions.zoteroOpenOfficeIntegration.skipInstallation': true,
-  'network.process.enabled': false, 'security.sandbox.content.level': 0,
-  'extensions.logging.enabled': true,
-  'extensions.zotero.debug.log': true,
-};
-fs.writeFileSync(path.join(profile, 'user.js'), Object.entries(prefs).map(([key, value]) => `user_pref(${JSON.stringify(key)}, ${JSON.stringify(value)});`).join('\n'));
 const records = [];
 for (let index = 0; index < 3; index++) {
   const text = ['North field measured 23 units. NORTH23 is the exact evidence marker.',
@@ -81,56 +59,12 @@ for (let index = 0; index < 3; index++) {
   fs.writeFileSync(file, bytes);
   records.push({ title: `Synthetic research source ${index + 1}`, abstract: text, file, sha256: createHash('sha256').update(bytes).digest('hex') });
 }
-const output = path.join(root, 'artifacts/zotero-corpus.json');
-const extensionId = 'nodus-fixture-preparer@tests.invalid';
-const zip = new AdmZip();
-zip.addFile('manifest.json', Buffer.from(JSON.stringify({ manifest_version: 2, name: 'Nodus isolated fixture preparer', version: '1.0',
-  applications: { zotero: { id: extensionId, update_url: 'https://tests.invalid/no-update', strict_min_version: '9.0', strict_max_version: '10.*' } } })));
-zip.addFile('bootstrap.js', Buffer.from(`
-function install() {}
-function uninstall() {}
-function shutdown() {}
-async function startup() {
-  await Zotero.initializationPromise;
-  try {
-    if (Zotero.DataDirectory.dir !== ${JSON.stringify(data)}) throw new Error('unexpected_data_directory');
-    await Zotero.Libraries.get(Zotero.Libraries.userLibraryID).waitForDataLoad('item');
-    const collections = [], items = [];
-    for (const [index, record] of ${JSON.stringify(records)}.entries()) {
-      const collection = new Zotero.Collection();
-      collection.libraryID = Zotero.Libraries.userLibraryID;
-      collection.name = 'Nodus synthetic collection ' + (index + 1);
-      await collection.saveTx();
-      collections.push({ id: collection.id, key: collection.key });
-      const item = new Zotero.Item('report');
-      item.libraryID = Zotero.Libraries.userLibraryID;
-      item.setField('title', record.title);
-      item.setField('abstractNote', record.abstract);
-      item.setCollections([collection.id]);
-      await item.saveTx();
-      const attachment = await Zotero.Attachments.importFromFile({ file: record.file, parentItemID: item.id });
-      await Zotero.Fulltext.indexItems([attachment.id]);
-      items.push({ id: item.id, key: item.key, version: item.version, attachment: { key: attachment.key, version: attachment.version, path: await attachment.getFilePathAsync(), sha256: record.sha256 } });
-    }
-    await Zotero.File.putContentsAsync(${JSON.stringify(output)}, JSON.stringify({ version: Zotero.version, dataDirectory: Zotero.DataDirectory.dir, libraryID: Zotero.Libraries.userLibraryID, collections, items }));
-    Zotero.getMainWindow().document.title = 'Zotero · Nodus Research · Desarrollo';
-  } catch (error) { await Zotero.File.putContentsAsync(${JSON.stringify(output)}, JSON.stringify({ error: String(error) })); }
-}
-`));
-zip.writeZip(path.join(profile, 'extensions', `${extensionId}.xpi`));
-fs.writeFileSync(path.join(root, 'isolation.sb'), policy);
-const log = fs.openSync(path.join(root, 'artifacts/zotero.log'), 'w');
-const child = spawn('/usr/bin/sandbox-exec', ['-f', path.join(root, 'isolation.sb'), '/Applications/Zotero.app/Contents/MacOS/zotero', '-no-remote', '-ZoteroDebugText', '-profile', profile, '-datadir', data], {
-  cwd: root, env: { ...researchTestEnvironment(root), HOME: root, MOZ_NO_REMOTE: '1', MOZ_DISABLE_CONTENT_SANDBOX: '1',
-    MOZ_DISABLE_SOCKET_PROCESS_SANDBOX: '1', MOZ_DISABLE_RDD_SANDBOX: '1', MOZ_DISABLE_GMP_SANDBOX: '1', MOZ_DISABLE_GPU_SANDBOX: '1' }, stdio: ['ignore', log, log],
-});
-const report = { root, profile, data, proof, pid: child.pid, endpoint: `http://127.0.0.1:${port}/api`, passed: false };
+const report = { root, profile: path.join(root, 'zotero/profile'), data: path.join(root, 'zotero/data'), proof, endpoint: `http://127.0.0.1:${port}/api`, passed: false };
+let zotero;
 try {
-  const deadline = Date.now() + 55000;
-  while (!fs.existsSync(output) && Date.now() < deadline && child.exitCode === null) await new Promise(resolve => setTimeout(resolve, 250));
-  if (!fs.existsSync(output)) throw new Error(`Zotero fixture preparation did not finish; inspect ${root}/artifacts/zotero.log`);
-  const corpus = JSON.parse(fs.readFileSync(output, 'utf8'));
-  if (corpus.error) throw new Error(corpus.error);
+  zotero = await launchIndependentZotero({ root, port, policy, records });
+  const { corpus } = zotero;
+  report.pid = zotero.child.pid;
   const response = await fetch(`${report.endpoint}/users/0/items/${corpus.items[0].key}`, { headers: { 'Zotero-Allowed-Request': '1', 'Zotero-API-Version': '3' }, signal: AbortSignal.timeout(10000) });
   const firstItem = await response.json();
   if (!response.ok || firstItem.key !== corpus.items[0].key) throw new Error('Independent Zotero API identity mismatch');
@@ -165,10 +99,7 @@ try {
   Object.assign(report, { passed: true, zoteroVersion: corpus.version, sources: corpus.items.length });
 } finally {
   if (providerProxy) { report.accounting = providerProxy.ledger.read(); await providerProxy.close(); }
-  if (child.exitCode === null) child.kill('SIGTERM');
-  await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 5000))]);
-  if (child.exitCode === null) child.kill('SIGKILL');
-  fs.closeSync(log);
+  await zotero?.stop();
   fs.writeFileSync(path.join(root, 'artifacts/zotero-startup.json'), JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ root, passed: report.passed, proof, zoteroVersion: report.zoteroVersion,
     mcp: report.mcp, nodusPassed: report.nodus?.passed, liveChecks: report.nodus?.live?.checks.map(check => ({

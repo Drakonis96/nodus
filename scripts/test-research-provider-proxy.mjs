@@ -32,3 +32,26 @@ test('paid gate reserves before dispatch, rejects other models and never logs cr
     assert.doesNotMatch(fs.readFileSync(path.join(root, 'artifacts/provider-metrics.jsonl'), 'utf8'), /fixture-secret|Synthetic source/);
   } finally { await proxy.close(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+// Deep extraction issues several model calls at once. A third concurrent call used to be
+// refused with a 403 that the application reads as an invalid key, which paused its queue;
+// it now waits for one of the two dispatch slots instead.
+test('calls beyond the two dispatch slots wait for a slot instead of being refused', async () => {
+  const root = createResearchTestRoot();
+  let inFlight = 0, peak = 0, dispatches = 0;
+  const proxy = await startResearchProviderProxy(root, { dispatch: async () => {
+    dispatches++; inFlight++; peak = Math.max(peak, inFlight);
+    await new Promise(resolve => setTimeout(resolve, 150));
+    inFlight--;
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }], usage: { prompt_tokens: 10, completion_tokens: 2 } }), { headers: { 'content-type': 'application/json' } });
+  } });
+  try {
+    const body = JSON.stringify({ model: 'deepseek-flash', messages: [{ role: 'user', content: 'Synthetic' }], max_tokens: 10 });
+    const responses = await Promise.all(Array.from({ length: 5 }, () => fetch(`${proxy.url}/deepseek/chat/completions`, { method: 'POST', headers: { Authorization: 'Bearer fixture', 'Content-Type': 'application/json' }, body })));
+    assert.deepEqual(responses.map(response => response.status), [200, 200, 200, 200, 200]);
+    await Promise.all(responses.map(response => response.text()));
+    assert.equal(dispatches, 5);
+    assert.ok(peak <= 2, `at most two paid calls in flight, saw ${peak}`);
+    assert.equal(proxy.ledger.read().calls.length, 5);
+  } finally { await proxy.close(); fs.rmSync(root, { recursive: true, force: true }); }
+});

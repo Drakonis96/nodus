@@ -22,6 +22,17 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
   const nonce = randomUUID();
   let stopped = false, running = 0;
   const controllers = new Set();
+  // At most two paid calls in flight. Further calls wait for a slot rather than being
+  // refused: a refusal is a 403, which the application rightly reads as a bad credential.
+  const waiting = [];
+  const acquireSlot = async () => {
+    while (running >= 2) {
+      if (stopped) throw new Error('research_dispatch_not_authorized');
+      await new Promise(resolve => waiting.push(resolve));
+    }
+    if (stopped) throw new Error('research_dispatch_not_authorized');
+    running++;
+  };
   const server = http.createServer(async (request, response) => {
     let reservation, provider, started, firstByteMs;
     const controller = new AbortController();
@@ -29,12 +40,12 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
     try {
       const url = new URL(request.url, 'http://127.0.0.1');
       const match = new RegExp(`^/${nonce}/(deepseek|openrouter)(/.*)$`).exec(url.pathname);
-      if (stopped || request.method !== 'POST' || !match || url.search || running >= 2) throw new Error('research_dispatch_not_authorized');
+      if (stopped || request.method !== 'POST' || !match || url.search) throw new Error('research_dispatch_not_authorized');
       provider = match[1];
       const target = ENDPOINTS[provider];
       if (match[2] !== target.route) throw new Error('research_dispatch_not_authorized');
       if (!request.headers.authorization?.startsWith('Bearer ')) throw new Error('research_credential_missing');
-      running++; admitted = true; controllers.add(controller);
+      await acquireSlot(); admitted = true; controllers.add(controller);
       const chunks = []; let size = 0;
       for await (const chunk of request) { size += chunk.length; if (size > 512000) throw new Error('research_request_too_large'); chunks.push(chunk); }
       const bytes = Buffer.concat(chunks);
@@ -87,11 +98,12 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
       if (reservation) fs.appendFileSync(log, JSON.stringify({ reservation, provider, failed: true, reservationRetained: true, latencyMs: performance.now() - started }) + '\n', { mode: 0o600 });
       if (!response.headersSent) response.writeHead(403, { 'Content-Type': 'application/json' });
       response.end(JSON.stringify({ error: { message: error instanceof Error && error.message.startsWith('research_') ? error.message : 'research_dispatch_blocked' } }));
-    } finally { if (admitted) running--; controllers.delete(controller); }
+    } finally { if (admitted) { running--; waiting.shift()?.(); } controllers.delete(controller); }
   });
   await new Promise(resolve => server.listen(port, '127.0.0.1', resolve));
   return { url: `http://127.0.0.1:${server.address().port}/${nonce}`, ledger, close: async () => {
     stopped = true; for (const controller of controllers) controller.abort();
+    for (const resolve of waiting.splice(0)) resolve();
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   } };
 }

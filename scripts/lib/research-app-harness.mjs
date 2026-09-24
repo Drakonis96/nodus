@@ -64,8 +64,9 @@ export function simulatedUpstream(behaviour = () => null) {
 }
 
 /** `realProvider.campaignRoot` sends requests to the real providers through the
- * shared cost-reserving proxy and ledger of that campaign root. */
-export async function createResearchApp({ provider = null, realProvider = null, extraPorts = [] } = {}) {
+ * shared cost-reserving proxy and ledger of that campaign root. `extraEnv` reaches only
+ * the application (for example an explicit disposable Zotero endpoint). */
+export async function createResearchApp({ provider = null, realProvider = null, extraPorts = [], extraEnv = {} } = {}) {
   const root = createResearchTestRoot();
   let proxy = null;
   if (provider) proxy = await startResearchProviderProxy(root, { dispatch: provider.dispatch });
@@ -76,7 +77,7 @@ export async function createResearchApp({ provider = null, realProvider = null, 
   fs.writeFileSync(path.join(root, 'isolation.sb'), sandbox);
   const wrapper = path.join(root, 'electron-isolated');
   fs.writeFileSync(wrapper, `#!/bin/sh\nexec /usr/bin/sandbox-exec -f ${quote(path.join(root, 'isolation.sb'))} ${quote(require('electron'))} "$@"\n`, { mode: 0o700 });
-  const environment = { ...researchTestEnvironment(root), ...(proxy ? { NODUS_RESEARCH_PROVIDER_PROXY: proxy.url } : {}) };
+  const environment = { ...researchTestEnvironment(root), ...extraEnv, ...(proxy ? { NODUS_RESEARCH_PROVIDER_PROXY: proxy.url } : {}) };
   let app = null;
   const harness = {
     root, proof, proxy,
