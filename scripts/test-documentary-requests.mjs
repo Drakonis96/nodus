@@ -72,5 +72,11 @@ try {
   assert.ok(chunks.length > 1);
   assert.ok(chunks.every(chunk => Buffer.byteLength(chunk.text) <= 4096 && chunk.pageNumber === 6 && chunk.sourceRef === 'zotero:pdf'));
   assert.equal(chunks.map(chunk => chunk.text).join(''), '漢😀'.repeat(10000), 'long unspaced Unicode input is not silently clipped or corrupted');
+  // Live finding: a chunk that started on page 249 and held a quotation from page
+  // 250 was cited as "p. 249".
+  const crossing = planRetrievalChunks(`[[p. 249]] ${'early '.repeat(400)} [[p. 250]] MARKER250 ${'late '.repeat(30)}`);
+  const cited = crossing.find(chunk => chunk.text.includes('MARKER250'));
+  assert.deepEqual([cited.pageNumber, cited.pageEnd, cited.pageLabel], [249, 250, 'pp. 249–250'], 'a chunk crossing pages cites its whole range');
+  assert.equal(crossing.find(chunk => !chunk.text.includes('MARKER250')).pageEnd, undefined, 'a single-page chunk keeps its single page');
   console.log('Source jobs: exclusivity, restart fencing, idempotency, pause, changed revisions, vault boundaries, retry bound, cancellation and Unicode chunk bounds passed.');
 } finally { a.close(); b.close(); fs.rmSync(root, { recursive: true, force: true }); }

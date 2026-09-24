@@ -1,5 +1,5 @@
 /** Canonical documentary chunker, shared by extraction and background preparation. */
-export const RETRIEVAL_CHUNKER_VERSION = "words-280-overlap-60/utf8-4096/source-locators/2";
+export const RETRIEVAL_CHUNKER_VERSION = "words-280-overlap-60/utf8-4096/source-locators/3";
 export const RETRIEVAL_CHUNK_WORDS = 280;
 export const RETRIEVAL_OVERLAP_WORDS = 60;
 function clampInt(value: number | undefined, fallback: number, min: number, max: number): number {
@@ -10,10 +10,13 @@ function clampInt(value: number | undefined, fallback: number, min: number, max:
 
 export interface RetrievalChunk {
   text: string;
-  /** The most recent PDF page marker that precedes this chunk, if present. */
+  /** The page of the chunk's first word, or "pp. first–last" when it crosses pages. */
   pageLabel: string | null;
   sourceRef: string | null;
+  /** First physical page; navigation opens here. */
   pageNumber: number | null;
+  /** Last physical page, only when the chunk crosses a page boundary. */
+  pageEnd?: number;
 }
 
 /**
@@ -78,11 +81,16 @@ export function planRetrievalChunks(
       bytes += additional; end++;
     }
     const slice = tokens.slice(start, end);
+    // A chunk that crosses a page boundary cites its whole range: citing only its
+    // first page attributes a quotation from the next page to the wrong one.
+    const first = slice[0]?.pageNumber ?? null, last = slice.at(-1)?.pageNumber ?? null;
+    const crosses = first != null && last != null && last > first;
     chunks.push({
       text: slice.map((token, index) => `${index && !token.continuation ? ' ' : ''}${token.value}`).join(''),
-      pageLabel: slice[0]?.pageLabel ?? null,
+      pageLabel: crosses ? `pp. ${first}–${last}` : slice[0]?.pageLabel ?? null,
       sourceRef: slice[0]?.sourceRef ?? null,
-      pageNumber: slice[0]?.pageNumber ?? null,
+      pageNumber: first,
+      ...(crosses ? { pageEnd: last } : {}),
     });
     if (end >= sourceEnd) start = sourceEnd;
     else start = Math.max(start + 1, end - overlapWords);

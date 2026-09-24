@@ -29,18 +29,21 @@ try {
   assert.equal(recovered.stage, 'chunk');
   assert.equal(recovered.attempts, 1, 'a crash preserves the failure allowance');
   assert.throws(() => first.saveExtraction(a, 'stale writer', 2100), /lease_lost/);
-  second.saveChunks(recovered, [{ text: 'North field measured 23 units.', pageLabel: 'iv', pageNumber: 6, sourceRef: 'pdf:source' }], 2100);
+  second.saveChunks(recovered, [{ text: 'North field measured 23 units.', pageLabel: 'iv', pageNumber: 6, sourceRef: 'pdf:source' },
+    { text: 'A passage crossing a page boundary.', pageLabel: 'pp. 7–8', pageNumber: 7, pageEnd: 8, sourceRef: 'pdf:source' }], 2100);
   second.publishLexical(recovered, 2200);
   assert.equal(first.lexicalSearch('23 units', [id], 5).length, 1, 'searchable before embeddings');
   assert.equal(first.lexicalSearch('23 units', [], 5).length, 0);
   assert.equal(first.physicalPages([id], 6, 6, 10, 'pdf').length, 1, 'physical page 6 is distinct from printed page iv');
   assert.equal(first.physicalPages([id], 4, 4, 10).length, 0);
+  assert.equal(first.physicalPages([id], 8, 8, 10).length, 1, 'a passage that ends on the requested page is read with it');
+  assert.equal(JSON.parse(first.physicalPages([id], 8, 8, 10)[0].locator_json).pageEnd, 8);
   assert.deepEqual(first.physicalPages([], 6, 6, 10), []);
   assert.deepEqual(first.physicalPages([id], 6, 6, 10, 'foreign-file'), []);
   assert.deepEqual(first.physicalPages([id], 1, 500, 10), [], 'wide page ranges are refused');
   assert.equal(first.revision(id).embedding_ready, 0);
   assert.throws(() => second.publishEmbeddings(recovered, [[1, 2, 3]], 2300), /space_mismatch/);
-  second.publishEmbeddings(recovered, [[1, 0]], 2300);
+  second.publishEmbeddings(recovered, [[1, 0], [0, 1]], 2300);
   assert.equal(first.revision(id).embedding_ready, 1);
   const nextId = first.enqueue({ ...identity, revision: 'r2' }, {}, 0, 3000);
   const next = first.claim(3000, 1000);
