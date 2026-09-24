@@ -40,8 +40,22 @@ execFileSync(
   { cwd: repoRoot, stdio: 'inherit' }
 );
 
+// The labels are resolved by the main process with this shared catalogue, which has no
+// Electron dependency of its own.
+const labelsBundle = path.join(dir, 'menu-labels.cjs');
+execFileSync(
+  path.join(repoRoot, 'node_modules/.bin/esbuild'),
+  [
+    path.join(repoRoot, 'shared/menuLabels.ts'),
+    '--bundle', '--platform=node', '--format=cjs', '--target=es2022',
+    `--outfile=${labelsBundle}`,
+  ],
+  { cwd: repoRoot, stdio: 'inherit' }
+);
+
 const require = createRequire(import.meta.url);
 const { editEntries, EDIT_LABELS } = require(bundle);
+const { menuLabel, MENU_LABELS } = require(labelsBundle);
 
 const field = (over = {}) => ({
   isEditable: true,
@@ -106,6 +120,26 @@ test('every action has a label', () => {
   for (const label of Object.values(EDIT_LABELS)) assert.ok(String(label).length > 0);
 });
 
+test('the edit labels resolve in the selected language, not always Spanish', () => {
+  // The bug: the main-process translator only walked `message`/`error` fields, so a label
+  // like 'Cortar' reached an English window as Spanish. Every edit label must be a catalogue
+  // key and must resolve differently in at least one non-source language.
+  for (const label of Object.values(EDIT_LABELS)) {
+    assert.ok(MENU_LABELS[label], `${label} is a catalogue key`);
+    assert.notEqual(menuLabel(label, 'en'), label, `${label} localises for English`);
+  }
+  assert.equal(menuLabel('Cortar', 'en'), 'Cut');
+  assert.equal(menuLabel('Copiar', 'fr'), 'Copier');
+  assert.equal(menuLabel('Pegar', 'de'), 'Einfügen');
+  assert.equal(menuLabel('Cortar', 'zh-CN'), '剪切');
+  assert.equal(menuLabel('Pegar', 'ko'), '붙여넣기');
+  // Spanish is the source string, and an unknown key passes through untouched.
+  assert.equal(menuLabel('Cortar', 'es'), 'Cortar');
+  assert.equal(menuLabel('No such label', 'en'), 'No such label');
+  // Every catalogue entry names English at least, which is the fallback.
+  for (const [key, entry] of Object.entries(MENU_LABELS)) assert.ok(entry.en, `${key} has English`);
+});
+
 // ---------------------------------------------------------------------------
 // Wiring, checked against source: these are the parts a unit test cannot reach.
 // ---------------------------------------------------------------------------
@@ -130,6 +164,14 @@ test('Nodus’s own windows install the edit menu, so the address bar has one', 
 
 test('the browser page menu uses the same three entries', () => {
   assert.match(code('electron/browser/contextMenu.ts'), /appendEditItems\(menu, contents/);
+});
+
+test('both native menus resolve labels with the shared catalogue', () => {
+  // The wiring that was broken: these two call sites used a translator that ignored the key.
+  assert.match(code('electron/main.ts'), /menuLabel\(key, getSettings\(\)\.uiLanguage\)/);
+  assert.match(code('electron/ipc/browser.ts'), /menuLabel\(key, getSettings\(\)\.uiLanguage\)/);
+  assert.doesNotMatch(code('electron/main.ts'), /localizeIpcPayload\(\{ v: key \}/);
+  assert.doesNotMatch(code('electron/ipc/browser.ts'), /localizeIpcPayload\(\{ v: key \}/);
 });
 
 test('the app-window menu offers nothing but the three edit entries', () => {
