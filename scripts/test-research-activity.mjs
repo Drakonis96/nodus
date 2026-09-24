@@ -11,7 +11,7 @@ try {
     await build({ entryPoints: [source], outfile: path.join(root, `${name}.cjs`), bundle: true, platform: 'node', format: 'cjs' });
   }
   const { withResearchActivity, startResearchActivity, researchActivityStep, researchActivityEnabled } = require(path.join(root, 'activity.cjs'));
-  const { updateResearchActivities, settleResearchActivities } = require(path.join(root, 'state.cjs'));
+  const { updateResearchActivities, settleResearchActivities, summarizeResearchActivity, RESEARCH_ACTIVITY_LAYER_ORDER } = require(path.join(root, 'state.cjs'));
   const first = [], second = [];
   let release;
   const gate = new Promise(resolve => { release = resolve; });
@@ -69,6 +69,30 @@ try {
   assert.equal(settleResearchActivities(state, 'completed')[0].status, 'failed', 'missing terminal events cannot invent success');
   assert.equal(settleResearchActivities(state, 'cancelled')[0].status, 'cancelled');
   assert.equal(state[0].status, 'active', 'state updates are immutable');
+  // The panel is a fixed list of every layer a research turn can consult, in the order
+  // the flow consults them, each reduced to one state for this request only.
+  assert.deepEqual(RESEARCH_ACTIVITY_LAYER_ORDER, ['scope', 'profiles', 'ideas', 'nodus', 'context', 'graph', 'zotero', 'attachments', 'tools', 'response']);
+  const at = (layer, operation, status, count) => ({ id: `${layer}-${operation}-${status}-${count}`, layer, operation, status, startedAt: 1, ...(count === undefined ? {} : { count }) });
+  const summary = Object.fromEntries(summarizeResearchActivity([
+    at('scope', 'resolve', 'completed'),
+    at('nodus', 'lexical', 'completed', 0), at('nodus', 'semantic', 'completed', 4),
+    at('ideas', 'semantic', 'completed', 0),
+    at('zotero', 'pages', 'failed'),
+    at('graph', 'read', 'active'),
+    at('profiles', 'lexical', 'failed'), at('profiles', 'semantic', 'completed', 0),
+    at('response', 'write', 'cancelled'),
+  ]).map(entry => [entry.layer, entry]));
+  assert.equal(summarizeResearchActivity([]).length, 10, 'every layer is listed before anything runs');
+  assert.ok(summarizeResearchActivity([]).every(entry => entry.state === 'idle'));
+  assert.equal(summary.scope.state, 'completed');
+  assert.equal(summary.nodus.state, 'completed', 'one decisive operation makes the layer decisive');
+  assert.equal(summary.ideas.state, 'empty', 'consulted without results: the flow had to rely on another layer');
+  assert.equal(summary.zotero.state, 'failed');
+  assert.equal(summary.graph.state, 'active');
+  assert.equal(summary.profiles.state, 'failed', 'a failed attempt without any result stays red');
+  assert.equal(summary.response.state, 'cancelled');
+  assert.equal(summary.attachments.state, 'idle');
+  assert.deepEqual([summary.nodus.operation, summary.nodus.count, summary.nodus.attempts], ['semantic', 4, 2], 'the row shows its latest operation');
   await build({ entryPoints: ['src/i18n.researchActivity.ts'], outfile: path.join(root, 'translations.cjs'), bundle: true, platform: 'node', format: 'cjs' });
   const translations = require(path.join(root, 'translations.cjs')).RESEARCH_ACTIVITY_TRANSLATIONS;
   const keys = Object.keys(translations.en).sort();

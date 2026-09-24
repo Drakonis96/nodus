@@ -1,6 +1,11 @@
 /** Request-scoped Research Chat activity labels. */
 export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, string>> = {
   "en": {
+    "Sin consultar": "Not consulted",
+    "Consultando…": "Consulting…",
+    "Consultado": "Consulted",
+    "Sin resultados": "No results",
+    "Biblioteca Zotero": "Zotero Library",
     "Actividad del Research chat": "Research chat activity",
     "Ampliar actividad": "Expand activity",
     "Minimizar actividad": "Minimize activity",
@@ -36,6 +41,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "fr": {
+    "Sin consultar": "Non consulté",
+    "Consultando…": "Consultation…",
+    "Consultado": "Consulté",
+    "Sin resultados": "Aucun résultat",
+    "Biblioteca Zotero": "Bibliothèque Zotero",
     "Actividad del Research chat": "Activité du Research chat",
     "Ampliar actividad": "Développer l’activité",
     "Minimizar actividad": "Réduire l’activité",
@@ -71,6 +81,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "de": {
+    "Sin consultar": "Nicht abgefragt",
+    "Consultando…": "Wird abgefragt…",
+    "Consultado": "Abgefragt",
+    "Sin resultados": "Keine Ergebnisse",
+    "Biblioteca Zotero": "Zotero-Bibliothek",
     "Actividad del Research chat": "Research-Chat-Aktivität",
     "Ampliar actividad": "Aktivität erweitern",
     "Minimizar actividad": "Aktivität minimieren",
@@ -106,6 +121,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "pt": {
+    "Sin consultar": "Não consultado",
+    "Consultando…": "A consultar…",
+    "Consultado": "Consultado",
+    "Sin resultados": "Sem resultados",
+    "Biblioteca Zotero": "Biblioteca Zotero",
     "Actividad del Research chat": "Atividade do Research chat",
     "Ampliar actividad": "Expandir atividade",
     "Minimizar actividad": "Minimizar atividade",
@@ -141,6 +161,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "pt-BR": {
+    "Sin consultar": "Não consultado",
+    "Consultando…": "Consultando…",
+    "Consultado": "Consultado",
+    "Sin resultados": "Sem resultados",
+    "Biblioteca Zotero": "Biblioteca Zotero",
     "Actividad del Research chat": "Atividade do Research chat",
     "Ampliar actividad": "Expandir atividade",
     "Minimizar actividad": "Minimizar atividade",
@@ -176,6 +201,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "it": {
+    "Sin consultar": "Non consultato",
+    "Consultando…": "Consultazione…",
+    "Consultado": "Consultato",
+    "Sin resultados": "Nessun risultato",
+    "Biblioteca Zotero": "Biblioteca Zotero",
     "Actividad del Research chat": "Attività del Research chat",
     "Ampliar actividad": "Espandi attività",
     "Minimizar actividad": "Riduci attività",
@@ -211,6 +241,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "tr": {
+    "Sin consultar": "Sorgulanmadı",
+    "Consultando…": "Sorgulanıyor…",
+    "Consultado": "Sorgulandı",
+    "Sin resultados": "Sonuç yok",
+    "Biblioteca Zotero": "Zotero Kitaplığı",
     "Actividad del Research chat": "Research chat etkinliği",
     "Ampliar actividad": "Etkinliği genişlet",
     "Minimizar actividad": "Etkinliği küçült",
@@ -246,6 +281,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "zh-CN": {
+    "Sin consultar": "未查询",
+    "Consultando…": "正在查询…",
+    "Consultado": "已查询",
+    "Sin resultados": "无结果",
+    "Biblioteca Zotero": "Zotero 文献库",
     "Actividad del Research chat": "Research chat 活动",
     "Ampliar actividad": "展开活动",
     "Minimizar actividad": "最小化活动",
@@ -281,6 +321,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "zh-TW": {
+    "Sin consultar": "未查詢",
+    "Consultando…": "正在查詢…",
+    "Consultado": "已查詢",
+    "Sin resultados": "無結果",
+    "Biblioteca Zotero": "Zotero 文獻庫",
     "Actividad del Research chat": "Research chat 活動",
     "Ampliar actividad": "展開活動",
     "Minimizar actividad": "最小化活動",
@@ -316,6 +361,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "ko": {
+    "Sin consultar": "조회하지 않음",
+    "Consultando…": "조회 중…",
+    "Consultado": "조회함",
+    "Sin resultados": "결과 없음",
+    "Biblioteca Zotero": "Zotero 라이브러리",
     "Actividad del Research chat": "Research chat 활동",
     "Ampliar actividad": "활동 펼치기",
     "Minimizar actividad": "활동 최소화",
@@ -351,6 +401,11 @@ export const RESEARCH_ACTIVITY_TRANSLATIONS: Record<string, Record<string, strin
     "Zotero": "Zotero"
   },
   "ja": {
+    "Sin consultar": "未参照",
+    "Consultando…": "参照中…",
+    "Consultado": "参照済み",
+    "Sin resultados": "結果なし",
+    "Biblioteca Zotero": "Zotero ライブラリ",
     "Actividad del Research chat": "Research chat のアクティビティ",
     "Ampliar actividad": "アクティビティを展開",
     "Minimizar actividad": "アクティビティを最小化",

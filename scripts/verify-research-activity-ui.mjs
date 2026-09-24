@@ -27,8 +27,11 @@ export async function verifyResearchActivityUi(page, app, root) {
   const send = async text => { await input.fill(text); await page.getByRole('button', { name: 'Enviar', exact: true }).click(); };
   await send('Synthetic activity fixture request one');
   const panel = page.getByTestId('research-activity');
-  await panel.locator('li[data-layer="zotero"]').waitFor();
-  assert.equal(await panel.locator('li[data-status="active"]').count(), 2);
+  await panel.locator('li[data-layer="zotero"][data-status="active"]').waitFor();
+  assert.equal(await panel.locator('li').count(), 10, 'every layer is listed, consulted or not');
+  assert.equal(await panel.locator('li[data-status="active"]').count(), 2, 'a turning arrow on each layer being consulted');
+  assert.equal(await panel.locator('li[data-status="active"] .research-activity-spinner').count(), 2);
+  assert.equal(await panel.locator('li[data-status="idle"]').count(), 5, 'layers not consulted yet stay listed');
   assert.match(await panel.innerText(), /Biblioteca Nodus/); assert.match(await panel.innerText(), /Zotero/);
   assert.doesNotMatch(await panel.innerText(), /FOREIGN_EVENT/);
   assert.equal(await panel.locator('img.nodus').count(), 1); assert.equal(await panel.locator('img.zotero').count(), 1);
@@ -64,9 +67,12 @@ export async function verifyResearchActivityUi(page, app, root) {
   });
   await panel.getByRole('button', { name: 'Cerrar actividad' }).waitFor();
   assert.equal(await panel.locator('li[data-status="active"]').count(), 0);
+  assert.equal(await panel.locator('li[data-status="completed"]').count(), 5, 'green once a layer has contributed');
   await send('Synthetic activity fixture request two');
   await panel.locator('li[data-layer="zotero"][data-status="active"]').waitFor();
-  assert.equal(await panel.locator('li').count(), 5, 'each new request replaces the previous activity list');
+  assert.equal(await panel.locator('li').count(), 10, 'the list stays fixed');
+  assert.equal(await panel.locator('li[data-layer="nodus"][data-status="active"]').count(), 1, 'each new request starts every layer over');
+  assert.equal(await panel.locator('li[data-status="idle"]').count(), 5);
   await app.evaluate(() => globalThis.__researchActivityFixture.pending.reject(new Error('Synthetic UI failure')));
   await panel.getByRole('button', { name: 'Cerrar actividad' }).waitFor();
   assert.equal(await panel.locator('li[data-status="failed"]').count(), 2, 'a failed IPC request cannot leave active spinners');
