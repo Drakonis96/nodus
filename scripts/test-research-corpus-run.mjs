@@ -155,11 +155,11 @@ try {
   assert.equal(notebookService.resolveResearchNotebook(attachmentBook.id).documents.length, 0, 'deleting a conversation revokes promoted attachment access');
   console.log('Corpus run: pre-ranking scope, mixed Ideas, lexical-only retrieval, shared section budget, no profile barrier and selection revocation passed.');
 } finally {
-  load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
+  // A notebook queued its own indexing, so a drain may still hold the documentary store;
+  // it closes the store when it stops, and Windows cannot delete the file before then.
+  await load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
   // The corpus inventory opens the Global Library catalog; Windows cannot delete it open.
   load('electron/library/libraryService.ts').closeGlobalLibrary();
   load('electron/db/database.ts').closeDb();
-  // Windows releases SQLite and WAL handles a moment after close; retry instead of
-  // failing the run on EPERM (every native Windows run since f4ce96fb).
-  fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  fs.rmSync(scratch, { recursive: true, force: true });
 }

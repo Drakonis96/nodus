@@ -44,15 +44,19 @@ export function documentaryStore(): DocumentaryStore {
   }
   return shared;
 }
-export function closeDocumentaryPreparation(): void {
+/** Resolves once the shared store is closed: at once when idle, or when a drain in
+ * progress has stopped (it closes the store itself, so no write is cut short). */
+export function closeDocumentaryPreparation(): Promise<void> {
   stopping = true;
   if (corpusPoll) clearInterval(corpusPoll); corpusPoll = null;
   activePreparation?.abort();
   if (retryTimer) clearTimeout(retryTimer);
   if (autoTimer) clearTimeout(autoTimer);
   unsubscribe?.(); unsubscribe = null;
-  if (!draining) { shared?.close(); shared = null; }
+  if (!draining) { shared?.close(); shared = null; return Promise.resolve(); }
+  return new Promise(resolve => { drainClosed = resolve; });
 }
+let drainClosed: (() => void) | null = null;
 
 /** Shared text writer used once extraction has supplied a real source revision. */
 export async function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
@@ -487,7 +491,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
     }
   } finally {
     draining = false;
-    if (stopping) { store.close(); shared = null; }
+    if (stopping) { store.close(); shared = null; drainClosed?.(); drainClosed = null; }
     else {
       const delay = requests.nextDelay(owners());
       if (delay !== null && !store.preference('paused')) {
