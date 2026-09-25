@@ -2,16 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+/** Highest paid-inference budget any campaign may authorize (raised from USD 5 on
+ * 25 September 2026). A ledger file's own limitUsd is its campaign's authorization. */
+export const RESEARCH_BUDGET_CEILING_USD = 7;
+
 /** Single campaign ledger shared by every test/provider; reservations are durable
  * before network dispatch and unknown/failed usage keeps the full reservation. */
 export class ResearchCostLedger {
-  constructor(file, limit = 5) {
-    if (!Number.isFinite(limit) || limit <= 0 || limit > 5) throw new Error('Invalid research budget');
+  constructor(file, limit = RESEARCH_BUDGET_CEILING_USD) {
+    if (!Number.isFinite(limit) || limit <= 0 || limit > RESEARCH_BUDGET_CEILING_USD) throw new Error('Invalid research budget');
     this.file = file; this.limit = limit;
   }
   read() {
     const ledger = fs.existsSync(this.file) ? JSON.parse(fs.readFileSync(this.file, 'utf8')) : { limitUsd: this.limit, calls: [] };
-    if (!Number.isFinite(ledger.limitUsd) || ledger.limitUsd <= 0 || ledger.limitUsd > 5 || !Array.isArray(ledger.calls)) throw new Error('Invalid research ledger');
+    if (!Number.isFinite(ledger.limitUsd) || ledger.limitUsd <= 0 || ledger.limitUsd > RESEARCH_BUDGET_CEILING_USD || !Array.isArray(ledger.calls)) throw new Error('Invalid research ledger');
     const ids = new Set();
     for (const call of ledger.calls) {
       if (typeof call.id !== 'string' || ids.has(call.id) || !Number.isFinite(call.maximumUsd) || call.maximumUsd <= 0
