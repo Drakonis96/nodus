@@ -24,13 +24,17 @@ test('the research scope a model reads names its limits in words, never as inter
     const text = JSON.stringify(scope);
     for (const internal of ['budget_exhausted', 'no_matches', 'text_pending', 'embeddings_pending', 'something_new', 'readDocumentIds', 'matchedDocumentIds',
       'sourceCoverage', 'decisionTokens', 'scopeId', 'doc-a', 'doc-b', 'f'.repeat(64), '"partial"']) assert.ok(!text.includes(internal), `${internal} stays out of the prompt`);
+    // "Not read in the original" is not a limitation: indexed passages are the source's own
+    // text. Answers read original_read: false as "only summaries were seen".
     assert.deepEqual(scope.sources.map(source => [source.title, source.passages_found, source.original_read]),
-      [['Norias y turnos', true, false], ['El pleito', false, true], ['Las acequias', false, false]]);
+      [['Norias y turnos', true, undefined], ['El pleito', false, true], ['Las acequias', false, undefined]]);
     assert.deepEqual(scope.sources[1].notes, [describeResearchLimitation('text_pending'), describeResearchLimitation('embeddings_pending')]);
     assert.equal(scope.limits.length, 3, 'each limit is described once');
     assert.match(describeResearchLimitation('no_matches'), /does not show/);
     assert.match(describeResearchLimitation('something_new'), /limit/);
     assert.equal(scope.search_may_be_incomplete, true);
     assert.equal(researchScopeForPrompt({ ...coverage, partial: false, limitations: [] }).limits, undefined);
+    const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
+    assert.match(assistant, /Passages are verbatim text of their source, not summaries/, 'the chat instruction says what a passage is');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

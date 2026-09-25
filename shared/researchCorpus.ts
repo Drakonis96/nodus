@@ -208,11 +208,13 @@ export function describeResearchLimitation(code: string): string {
 }
 /** The run's coverage as a model should read it: titles and plain descriptions, without
  * identifiers, counters or codes. The stored record keeps the codes for the interface. */
-export function researchScopeForPrompt(coverage: ResearchTraversal): { sources: Array<{ title: string; passages_found: boolean; original_read: boolean; notes?: string[] }>; search_may_be_incomplete: boolean; limits?: string[] } {
+export function researchScopeForPrompt(coverage: ResearchTraversal): { sources: Array<{ title: string; passages_found: boolean; original_read?: true; notes?: string[] }>; search_may_be_incomplete: boolean; limits?: string[] } {
   const matched = new Set(coverage.matchedDocumentIds ?? []);
   const read = new Set(coverage.readDocumentIds ?? []);
   const limits = [...new Set(coverage.limitations ?? [])].map(describeResearchLimitation);
-  return { sources: (coverage.sourceCoverage ?? []).map(source => ({ title: source.title, passages_found: matched.has(source.documentId), original_read: read.has(source.documentId),
+  // Only a positive original read is stated: indexed passages are already the source's own
+  // text, and "original not read" was taken by answers to mean "only summaries were seen".
+  return { sources: (coverage.sourceCoverage ?? []).map(source => ({ title: source.title, passages_found: matched.has(source.documentId), ...(read.has(source.documentId) ? { original_read: true as const } : {}),
     ...(source.reasons.length ? { notes: [...new Set(source.reasons)].map(describeResearchLimitation) } : {}) })),
   search_may_be_incomplete: coverage.partial, ...(limits.length ? { limits } : {}) };
 }
