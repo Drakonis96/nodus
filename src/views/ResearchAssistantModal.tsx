@@ -11,6 +11,9 @@ import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNote
 import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
 import { HeaderBalloon } from '../components/HeaderBalloon';
 import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
+import { ProjectFolderBrowser, chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../components/ResearchChatFolderTree';
+import { MarqueeText } from '../components/MarqueeText';
+import { UNFILED_FOLDER, nextFolderName } from '@shared/researchChatFolders';
 import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
 import { useSkillLibrary } from '../components/skillLibrary';
 import type { ResearchNotebook, ResearchNotebookPreparation } from '@shared/researchCorpus';
@@ -25,6 +28,7 @@ import type {
   AppSettings,
   ChatConversationSummary,
   ResearchChatProject,
+  ResearchChatProjectFolder,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
@@ -281,6 +285,10 @@ export function ResearchAssistantModal({
   // Projects and pinned chats exist where the transport stores them: the vault's research chat.
   const supportsProjects = !adapter && typeof window.nodus.listChatProjects === 'function';
   const [projects, setProjects] = useState<ResearchChatProject[]>([]);
+  // Folders inside projects. The tree's selection is one state, shown in the history and
+  // on the project's page alike.
+  const [projectFolders, setProjectFolders] = useState<ResearchChatProjectFolder[]>([]);
+  const folderTree = useChatFolderTreeState();
   // A project's page: shown while it is open and no conversation has started in it.
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [editingNotebook, setEditingNotebook] = useState<ResearchNotebook | 'new' | null>(null);
@@ -293,6 +301,9 @@ export function ResearchAssistantModal({
   const mentionOptions = skillsEnabled && mention ? rankSkillMentions(skillLibrary.skills, mention.query) : [];
   const projectHome = supportsProjects && !!activeProjectId && !activeId;
   const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
+  // A chat started on a project's page while one of its folders is selected starts in it.
+  const homeFolderId = projectHome && folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId !== UNFILED_FOLDER ? folderTree.selection.folderId : null;
+  const projectPlacement = projectHome ? { projectId: activeProjectId, ...(homeFolderId ? { folderId: homeFolderId } : {}) } : {};
   const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
   // A notebook's page, like a project's: shown while it is open and no chat has started in it.
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
@@ -351,12 +362,14 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
   const refreshConversations = useCallback(async () => {
-    const [list, projectList] = await Promise.all([
+    const [list, projectList, folderList] = await Promise.all([
       apiRef.current.listConversations(true),
       supportsProjects ? window.nodus.listChatProjects!() : Promise.resolve([] as ResearchChatProject[]),
+      supportsProjects && window.nodus.listChatProjectFolders ? window.nodus.listChatProjectFolders() : Promise.resolve([] as ResearchChatProjectFolder[]),
     ]);
     setConversations(list);
     setProjects(projectList);
+    setProjectFolders(folderList);
   }, [supportsProjects]);
 
   useEffect(() => {
@@ -555,6 +568,7 @@ export function ResearchAssistantModal({
   const deleteProject = async (project: ResearchChatProject) => {
     await window.nodus.deleteChatProject!(project.id);
     if (activeProjectId === project.id) setActiveProjectId(null);
+    if (folderTree.selection?.projectId === project.id) folderTree.select(null);
     await refreshConversations();
   };
   const renameConversation = async (conversation: ChatConversationSummary, title: string) => {
@@ -569,6 +583,20 @@ export function ResearchAssistantModal({
   const moveConversation = async (conversation: ChatConversationSummary, projectId: string | null) => {
     await window.nodus.setConversationProject!(conversation.id, projectId);
     await refreshConversations();
+  };
+  const folderActions: ChatFolderActions = {
+    folders: projectFolders,
+    onCreateFolder: async (projectId, parentId) => {
+      if (!window.nodus.createChatProjectFolder) return null;
+      const created = await window.nodus.createChatProjectFolder({ projectId, parentId, name: nextFolderName(projectFolders, projectId, parentId, t('Nueva carpeta')) });
+      await refreshConversations();
+      return created;
+    },
+    onRenameFolder: async (folder, name) => { await window.nodus.renameChatProjectFolder!(folder.id, name); await refreshConversations(); },
+    onMoveFolder: async (folder, parentId, index) => { await window.nodus.moveChatProjectFolder!(folder.id, parentId, index); await refreshConversations(); },
+    onDeleteFolder: async (folder) => { await window.nodus.deleteChatProjectFolder!(folder.id); await refreshConversations(); },
+    onFileConversation: async (conversation, folderId) => { await window.nodus.setConversationFolder!(conversation.id, folderId); await refreshConversations(); },
+    onMoveConversation: moveConversation,
   };
   // A notebook opens on its own page; the first message there starts a chat inside it.
   const openNotebook = (notebookId: string) => {
@@ -791,7 +819,7 @@ export function ResearchAssistantModal({
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...(projectHome ? { projectId: activeProjectId } : {}) });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...projectPlacement });
       conversationId = created.id;
       await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
       activeIdRef.current = created.id;
@@ -840,7 +868,7 @@ export function ResearchAssistantModal({
     try {
       let id = activeIdRef.current;
       if (!id) {
-        const created = await api.createConversation({ model: selectedModel, selection, ...(projectHome ? { projectId: activeProjectId } : {}) });
+        const created = await api.createConversation({ model: selectedModel, selection, ...projectPlacement });
         id = created.id; activeIdRef.current = id; setActiveId(id);
         await window.nodus.selectResearchSystemPrompt(`${attachmentSurface}:${id}`, systemPrompts.selectedId);
       }
@@ -1021,6 +1049,8 @@ export function ResearchAssistantModal({
               onMoveConversation={moveConversation}
               onUpdateProject={updateProject}
               onDeleteProject={deleteProject}
+              folderTree={folderTree}
+              folderActions={folderActions}
             />
           </aside>
 
@@ -1038,9 +1068,13 @@ export function ResearchAssistantModal({
                     {conversationNotice}
                   </div>
                 )}
-                {projectHome && messages.length === 0 && <ProjectChatList
-                  conversations={visibleConversations.filter(conversation => conversation.projectId === activeProjectId)}
-                  onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                {projectHome && activeProjectId && messages.length === 0 && <ProjectFolderBrowser
+                  projectId={activeProjectId}
+                  conversations={visibleConversations}
+                  tree={folderTree}
+                  actions={folderActions}
+                  renderList={shown => <ProjectChatList conversations={shown} draggable onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                    empty={folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId ? t('No hay chats aquí. Arrastra uno sobre una carpeta para guardarlo en ella.') : undefined} />}
                 />}
                 {notebookHome && messages.length === 0 && <ProjectChatList
                   conversations={visibleConversations.filter(conversation => conversation.notebookId === activeNotebookId)}
@@ -1475,12 +1509,12 @@ function deriveNoteTitle(content: string, contextTitle: string | null): string {
 }
 
 /** The chats of an open project, under its composer. */
-function ProjectChatList({ conversations, onOpen, empty }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void; empty?: string }) {
+function ProjectChatList({ conversations, onOpen, empty, draggable = false }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void; empty?: string; draggable?: boolean }) {
   if (!conversations.length) return <p className="research-project-empty">{empty ?? t('Los chats que empieces aquí quedarán en este proyecto.')}</p>;
   return <ul className="research-project-chats" data-testid="research-project-chats">
-    {conversations.map(conversation => <li key={conversation.id}>
-      <button type="button" onClick={() => onOpen(conversation.id)}>
-        <span className="research-project-chat-title">{conversation.title}</span>
+    {conversations.map(conversation => <li key={conversation.id} data-testid={`research-project-chat-${conversation.id}`} {...(draggable ? chatDragProps(conversation) : {})}>
+      <button type="button" data-marquee-host onClick={() => onOpen(conversation.id)}>
+        <MarqueeText text={conversation.title} className="research-project-chat-title" />
         <span className="research-project-chat-date">{formatRelative(conversation.updated_at)}</span>
       </button>
     </li>)}

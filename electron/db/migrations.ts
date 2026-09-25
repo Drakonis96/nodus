@@ -9344,18 +9344,31 @@ export const migrations: Migration[] = [
       token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
     );
   ` },
-  // Research chat projects and where each conversation sits (a project, pinned). Create-only
-  // and without foreign keys on purpose, so both repair paths keep this body: the repo's
-  // transactions release a project's chats and drop a conversation's placement.
+  // Research chat projects, their folder trees, and where each conversation sits (a project,
+  // a folder in it, pinned). Projects stay flat; folders nest inside one project. The
+  // folders' keys do the structural work: a project takes its folders with it, a folder
+  // its subfolders, and a deleted folder leaves its chats in the project, unfiled. The
+  // repo's transactions still release a project's chats and drop a conversation's
+  // placement, since placements carry no key to chat_conversations.
   { version: 182, up: `
     CREATE TABLE IF NOT EXISTS research_chat_projects (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS research_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES research_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES research_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS research_chat_project_folders_project ON research_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS research_chat_project_folders_parent ON research_chat_project_folders(parent_id);
     CREATE TABLE IF NOT EXISTS research_chat_placements (
-      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES research_chat_project_folders(folder_id) ON DELETE SET NULL
     );
     CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS research_chat_placements_folder ON research_chat_placements(folder_id);
   ` },
   { version: 183, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
   // A notebook shows in the chat history like a project: its own icon and colour.

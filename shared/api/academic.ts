@@ -62,6 +62,7 @@ import type {
   ChatConversation,
   ChatConversationSummary,
   ResearchChatProject,
+  ResearchChatProjectFolder,
   ChatMessageRecord,
   CitationPreview,
   CitationRef,
@@ -791,6 +792,8 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
     title?: string;
     /** Research chat project the new conversation starts in. */
     projectId?: string | null;
+    /** A folder of that project it starts in. */
+    folderId?: string | null;
   }): Promise<ChatConversation>;
   saveConversationMessages(
     id: string,
@@ -808,7 +811,18 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   updateChatProject?(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
   /** The project's chats return to the general history; none is deleted. */
   deleteChatProject?(id: string): Promise<void>;
+  /** Every project's folders; a project's tree is built from parentId and position. */
+  listChatProjectFolders?(): Promise<ResearchChatProjectFolder[]>;
+  createChatProjectFolder?(input: { projectId: string; parentId?: string | null; name: string }): Promise<ResearchChatProjectFolder>;
+  renameChatProjectFolder?(id: string, name: string): Promise<ResearchChatProjectFolder>;
+  /** Nest under `parentId` (null: the project's root) at `index`; refused with research_chat_folder_cycle into its own subtree. */
+  moveChatProjectFolder?(id: string, parentId: string | null, index?: number): Promise<ResearchChatProjectFolder>;
+  /** Subfolders go too; the chats of all of them stay in the project, unfiled. */
+  deleteChatProjectFolder?(id: string): Promise<void>;
+  /** Changing project clears the chat's folder. */
   setConversationProject?(id: string, projectId: string | null): Promise<void>;
+  /** A folder also places the chat in its project; null leaves it in the project, unfiled. */
+  setConversationFolder?(id: string, folderId: string | null): Promise<void>;
   /** Refused with research_chat_pin_limit beyond RESEARCH_CHAT_PIN_LIMIT pinned chats. */
   setConversationPinned?(id: string, pinned: boolean): Promise<void>;
 

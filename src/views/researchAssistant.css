@@ -426,6 +426,31 @@
 .light .research-history-menu-item.is-danger { color: #dc2626; }
 .light .research-history-menu-separator { border-top-color: #e5e5e5; }
 
+/* A name cut short slides sideways while its row is hovered, and only then: at rest it
+   truncates exactly as a plain truncated span, with the same box and the same height. */
+.research-marquee { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+[data-marquee-host]:hover .research-marquee.is-overflowing { text-overflow: clip; }
+[data-marquee-host]:hover .research-marquee.is-overflowing > span { display: inline-block; animation: research-marquee var(--marquee-duration, 4s) ease-in-out infinite alternate; }
+@keyframes research-marquee { 0%, 12% { transform: translateX(0); } 88%, 100% { transform: translateX(var(--marquee-shift, 0)); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-marquee-host]:hover .research-marquee.is-overflowing { text-overflow: ellipsis; }
+  [data-marquee-host]:hover .research-marquee.is-overflowing > span { display: inline; animation: none; }
+}
+
+/* Folders inside a project: the tree's rows, their counts and where a drag would land. */
+.research-folder-toggle { display: grid; place-items: center; flex-shrink: 0; width: 16px; height: 22px; margin-right: -4px; border-radius: 5px; color: #737373; }
+.research-folder-toggle:hover { color: #e5e5e5; }
+.research-folder-toggle > svg { transition: transform .12s ease; }
+.research-folder-toggle.is-open > svg { transform: rotate(90deg); }
+.research-folder-actions-spacer { flex-shrink: 0; width: 26px; }
+.research-folder-count { flex-shrink: 0; min-width: 14px; font-size: 11px; color: #737373; text-align: right; font-variant-numeric: tabular-nums; }
+.research-folder-row.is-drop-inside { background: color-mix(in srgb, var(--vault-accent, #6366f1) 20%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vault-accent, #6366f1) 65%, transparent); }
+.research-folder-row.is-drop-before { box-shadow: inset 0 2px 0 var(--vault-accent, #6366f1); }
+.research-folder-row.is-drop-after { box-shadow: inset 0 -2px 0 var(--vault-accent, #6366f1); }
+.light .research-folder-toggle { color: #a1a1aa; }
+.light .research-folder-toggle:hover { color: #18181b; }
+.light .research-folder-count { color: #a1a1aa; }
+
 /* A project's colour and icon. */
 .research-project-style-backdrop { position: fixed; inset: 0; z-index: 250; display: grid; place-items: center; background: #0007; }
 .research-project-style { width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px; border-radius: 22px; border: 1px solid #2a2a2a; background: #141414; box-shadow: 0 24px 80px #0009; }
@@ -461,6 +486,18 @@
 .research-project-empty { margin: 28px 12px; text-align: center; font-size: 13px; color: #8a8a8a; }
 .light .research-project-chats li + li { border-top-color: #e5e5e5; }
 .light .research-project-chats button:hover { background: #f4f4f5; }
+
+/* A project's folders beside the chats of the folder they select. */
+.research-project-browser { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; margin: 8px 12px 0; }
+.research-project-tree { display: flex; flex-direction: column; flex: 0 1 236px; min-width: 190px; padding: 6px; border: 1px solid #262626; border-radius: 14px; }
+.research-project-tree-head { display: flex; align-items: center; justify-content: space-between; padding: 0 0 4px 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #8f8f8f; }
+.research-project-tree-empty { padding: 6px 8px 4px; font-size: 12px; line-height: 1.45; color: #8a8a8a; }
+.research-project-browser-list { flex: 1 1 320px; min-width: 0; }
+.research-project-browser-heading { display: flex; min-width: 0; padding: 6px 12px 0; font-size: 13px; font-weight: 600; color: #a3a3a3; }
+.research-project-browser .research-project-chats { margin: 4px 0 0; }
+.research-project-browser .research-project-empty { margin: 18px 12px; text-align: left; }
+.light .research-project-tree { border-color: #e5e5e5; }
+.light .research-project-browser-heading { color: #52525b; }
 
 /* Skills invoked with @: the list above the composer and the pills they become. */
 .research-composer-shell { position: relative; }

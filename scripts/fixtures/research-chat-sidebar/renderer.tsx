@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ResearchChatSidebar } from '../../../src/components/ResearchChatSidebar';
+import { ProjectFolderBrowser, chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../../../src/components/ResearchChatFolderTree';
+import { MarqueeText } from '../../../src/components/MarqueeText';
+import { folderSubtree, nextFolderName } from '../../../shared/researchChatFolders';
 import { setActiveLang } from '../../../src/i18n';
-import type { ChatConversationSummary, ResearchChatProject } from '../../../shared/types';
+import type { ChatConversationSummary, ResearchChatProject, ResearchChatProjectFolder } from '../../../shared/types';
 
 const fixture = window as any;
 fixture.actions = [];
@@ -10,19 +13,57 @@ const now = new Date().toISOString();
 const chat = (id: string, title: string, extra: Partial<ChatConversationSummary> = {}): ChatConversationSummary =>
   ({ id, title, created_at: now, updated_at: now, archived: false, model: null, messageCount: 2, projectId: null, pinnedAt: null, ...extra });
 const project = (id: string, name: string, icon = 'folder', color: string | null = null): ResearchChatProject => ({ id, name, icon, color, createdAt: now, updatedAt: now });
+const folder = (id: string, projectId: string, parentId: string | null, name: string, position: number): ResearchChatProjectFolder => ({ id, projectId, parentId, name, position, createdAt: now });
+/** Siblings renumbered with `moving` at `index` (the end when omitted), as the repository does. */
+const placeFolder = (folders: ResearchChatProjectFolder[], moving: ResearchChatProjectFolder, parentId: string | null, index?: number) => {
+  const siblings = folders.filter(item => item.projectId === moving.projectId && item.parentId === parentId && item.id !== moving.id).sort((a, b) => a.position - b.position);
+  siblings.splice(index ?? siblings.length, 0, { ...moving, parentId });
+  const placed = new Map(siblings.map((item, position) => [item.id, { ...item, position }]));
+  return folders.map(item => placed.get(item.id) ?? item);
+};
 
 function App() {
   const [projects, setProjects] = useState<ResearchChatProject[]>([project('p-z', 'Zeta'), project('p-a', 'Alfa', 'flask', '#3b82f6')].sort((a, b) => a.name.localeCompare(b.name)));
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([
     chat('c1', 'Sevilla en guías de viaje', { pinnedAt: '2026-09-24T10:00:00Z' }),
-    chat('c2', 'Regadío del Tormeral', { projectId: 'p-a' }),
+    chat('c2', 'Regadío del Tormeral', { projectId: 'p-a', folderId: 'f-2' }),
     chat('c3', 'Réplica y cifras'),
     chat('c4', 'Cartografía medieval'),
     chat('c5', 'Pozos y norias', { notebookId: 'n1' }),
+    chat('c6', 'Un título de conversación larguísimo que no cabe entero en la barra lateral', { projectId: 'p-z' }),
   ]);
+  const [folders, setFolders] = useState<ResearchChatProjectFolder[]>([
+    folder('f-1', 'p-a', null, 'Capítulo primero: fuentes, archivos y cartografía del regadío', 0),
+    folder('f-2', 'p-a', 'f-1', 'Fuentes', 0),
+    folder('f-3', 'p-a', null, 'Notas', 1),
+  ]);
+  const folderTree = useChatFolderTreeState();
   const [notebooks, setNotebooks] = useState<any[]>([{ id: 'n1', name: 'Cuaderno de riegos', icon: 'notebook', color: null, sources: [], exclusions: [], mode: 'linked', revision: 1, resolvedDocumentIds: [], createdAt: now, updatedAt: now }]);
   const log = (...entry: unknown[]) => fixture.actions.push(entry);
-  return <aside style={{ width: 280, height: 640, display: 'flex', flexDirection: 'column' }} data-testid="research-history-sidebar" className="research-chat-history">
+  const folderActions: ChatFolderActions = {
+    folders,
+    onCreateFolder: async (projectId, parentId) => {
+      const created = folder(`f-new-${folders.length}`, projectId, parentId, nextFolderName(folders, projectId, parentId, 'Nueva carpeta'), folders.filter(item => item.projectId === projectId && item.parentId === parentId).length);
+      log('createFolder', projectId, parentId);
+      setFolders(current => [...current, created]);
+      return created;
+    },
+    onRenameFolder: async (target, name) => { log('renameFolder', target.id, name); setFolders(current => current.map(item => item.id === target.id ? { ...item, name } : item)); },
+    onMoveFolder: async (target, parentId, index) => { log('moveFolder', target.id, parentId, index ?? null); setFolders(current => placeFolder(current, target, parentId, index)); },
+    onDeleteFolder: async target => {
+      log('deleteFolder', target.id);
+      const gone = folderSubtree(folders, target.id);
+      setFolders(current => current.filter(item => !gone.has(item.id)));
+      setConversations(current => current.map(item => item.folderId && gone.has(item.folderId) ? { ...item, folderId: null } : item));
+    },
+    onFileConversation: async (conversation, folderId) => {
+      log('file', conversation.id, folderId);
+      const projectId = folderId ? folders.find(item => item.id === folderId)!.projectId : conversation.projectId;
+      setConversations(current => current.map(item => item.id === conversation.id ? { ...item, folderId, projectId } : item));
+    },
+    onMoveConversation: async (conversation, projectId) => { log('move', conversation.id, projectId); setConversations(current => current.map(item => item.id === conversation.id ? { ...item, projectId, folderId: null } : item)); },
+  };
+  return <div style={{ display: 'flex', gap: 16 }}><aside style={{ width: 280, height: 640, display: 'flex', flexDirection: 'column' }} data-testid="research-history-sidebar" className="research-chat-history">
     <ResearchChatSidebar
       conversations={conversations} projects={projects} notebooks={notebooks}
       supportsProjects notebooksOn activeId={null} activeProjectId={null} activeNotebookId={null} sending={false} archivedCount={0} showArchived={false}
@@ -44,11 +85,23 @@ function App() {
       }}
       onArchiveConversation={async conversation => log('archive', conversation.id)}
       onDeleteConversation={conversation => log('delete', conversation.id)}
-      onMoveConversation={async (conversation, projectId) => { log('move', conversation.id, projectId); setConversations(current => current.map(item => item.id === conversation.id ? { ...item, projectId } : item)); }}
+      onMoveConversation={folderActions.onMoveConversation}
       onUpdateProject={async (target, patch) => { log('updateProject', target.id, patch); setProjects(current => current.map(item => item.id === target.id ? { ...item, ...patch } : item)); }}
       onDeleteProject={async target => { log('deleteProject', target.id); setProjects(current => current.filter(item => item.id !== target.id)); }}
+      folderTree={folderTree}
+      folderActions={folderActions}
     />
-  </aside>;
+  </aside>
+  {/* The project's page for Alfa: the same tree, the same selection. */}
+  <main data-testid="project-home" style={{ width: 580 }}>
+    <ProjectFolderBrowser projectId="p-a" conversations={conversations} tree={folderTree} actions={folderActions}
+      renderList={shown => <ul className="research-project-chats" data-testid="research-project-chats">
+        {shown.map(conversation => <li key={conversation.id} data-testid={`home-chat-${conversation.id}`} {...chatDragProps(conversation)}>
+          <button type="button" data-marquee-host><MarqueeText text={conversation.title} className="research-project-chat-title" /></button>
+        </li>)}
+      </ul>} />
+  </main>
+  </div>;
 }
 setActiveLang('es');
 createRoot(document.getElementById('root')!).render(<App />);

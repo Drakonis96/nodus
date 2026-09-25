@@ -6081,6 +6081,8 @@ export interface ChatConversationSummary {
   notebookId?: string | null;
   /** Research chat project holding this conversation, if any. */
   projectId?: string | null;
+  /** Folder inside that project; always one of the project's own folders, or null. */
+  folderId?: string | null;
   /** Set while the conversation is one of the (at most five) pinned chats. */
   pinnedAt?: string | null;
   id: string;
@@ -6100,6 +6102,18 @@ export interface ResearchChatProject {
   color: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A folder inside a research chat project. Folders nest; projects do not. */
+export interface ResearchChatProjectFolder {
+  id: string;
+  projectId: string;
+  /** Null at the project's root. */
+  parentId: string | null;
+  name: string;
+  /** Order among its siblings. */
+  position: number;
+  createdAt: string;
 }
 
 /** How many conversations may be pinned at once. */

@@ -1827,7 +1827,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
-  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null; title?: string; projectId?: string | null }) =>
+  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null; title?: string; projectId?: string | null; folderId?: string | null }) =>
     chat.createConversation(input ?? {})
   );
   h(
@@ -1853,7 +1853,13 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('chat:projects:create', async (_e, input: { name: string; icon?: string | null; color?: string | null }) => chatProjects.createChatProject(input));
   h('chat:projects:update', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => chatProjects.updateChatProject(id, patch));
   h('chat:projects:delete', async (_e, id: string) => chatProjects.deleteChatProject(id));
+  h('chat:folders:list', async () => chatProjects.listChatProjectFolders());
+  h('chat:folders:create', async (_e, input: { projectId: string; parentId?: string | null; name: string }) => chatProjects.createChatProjectFolder(input));
+  h('chat:folders:rename', async (_e, id: string, name: string) => chatProjects.renameChatProjectFolder(id, name));
+  h('chat:folders:move', async (_e, id: string, parentId: string | null, index?: number) => chatProjects.moveChatProjectFolder(id, parentId, index));
+  h('chat:folders:delete', async (_e, id: string) => chatProjects.deleteChatProjectFolder(id));
   h('chat:setProject', async (_e, id: string, projectId: string | null) => chatProjects.setConversationProject(id, projectId));
+  h('chat:setFolder', async (_e, id: string, folderId: string | null) => chatProjects.setConversationFolder(id, folderId));
   h('chat:setPinned', async (_e, id: string, pinned: boolean) => chatProjects.setConversationPinned(id, pinned));
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)

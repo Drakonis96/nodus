@@ -1,6 +1,9 @@
 // The research chat history in a browser, with synthetic data: Projects, Pinned chats and
 // the other chats; search across chats, projects and notebooks; the pin limit; the chat
-// menu and moving a chat into a project; renaming a project and its icon and colour.
+// menu and moving a chat into a project; renaming a project and its icon and colour. Then
+// the folders inside a project, in the history and on the project's page at once: one
+// selection, filing and unfiling by drag, nesting with its cycle guard, renaming, deletion;
+// and long names that slide on hover without changing anything at rest.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -43,12 +46,15 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
     const sidebar = page.getByTestId('research-history-sidebar');
     await sidebar.getByTestId('research-chat-search').waitFor();
     const action = async (...expected) => page.waitForFunction(expected => window.actions.some(actual => JSON.stringify(actual) === JSON.stringify(expected)), expected);
-    const order = () => sidebar.locator('.research-history-heading, .research-history-row, .research-history-empty').evaluateAll(nodes => nodes.map(node => node.textContent.trim()));
+    // A row reads as its name: a folder's count and the icons are not part of it.
+    const order = () => sidebar.locator('.research-history-heading, .research-history-row, .research-history-empty').evaluateAll(nodes => nodes.map(node => (node.querySelector('.research-marquee') ?? node).textContent.trim()));
+    const home = page.getByTestId('project-home');
+    const logged = () => page.evaluate(() => window.actions.map(entry => JSON.stringify(entry)));
 
     await t.test('three sections: projects alphabetically, pinned chats, then the rest (project chats stay in their project)', async () => {
       assert.deepEqual(await order(), ['Proyectos', 'Alfa', 'Zeta', 'Cuadernos', 'Cuaderno de riegos', 'Chats destacados', 'Sevilla en guías de viaje', 'Chats', 'Réplica y cifras', 'Cartografía medieval']);
       await sidebar.getByTestId('research-project-p-a').click();
-      assert.deepEqual((await order()).slice(0, 4), ['Proyectos', 'Alfa', 'Regadío del Tormeral', 'Zeta'], 'a project unfolds its chats');
+      assert.deepEqual((await order()).slice(0, 7), ['Proyectos', 'Alfa', 'Capítulo primero: fuentes, archivos y cartografía del regadío', 'Notas', 'Sin carpeta', 'Regadío del Tormeral', 'Zeta'], 'a project unfolds its folders, then its chats');
       await sidebar.getByTestId('research-project-p-a').click();
       await sidebar.getByTestId('research-project-p-a').getByRole('button', { name: 'Abrir Alfa' }).click();
       await action('openProject', 'p-a');
@@ -157,6 +163,143 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await page.getByRole('menu').waitFor({ state: 'detached' });
     });
 
+    await t.test('folders unfold under their project with counts; a selection filters to its subtree, in both places', async () => {
+      await sidebar.getByTestId('research-project-p-a').click();
+      const count = id => sidebar.getByTestId(id).locator('.research-folder-count').textContent();
+      assert.deepEqual([await count('research-folder-f-1'), await count('research-folder-f-3'), await count('research-folder-unfiled-p-a')], ['1', '0', '0'], 'a folder counts the chats of its subtree');
+      await sidebar.getByTestId('research-folder-f-1').getByRole('button', { name: /^Desplegar/ }).click();
+      const indent = id => sidebar.getByTestId(id).evaluate(row => parseFloat(getComputedStyle(row).paddingLeft));
+      assert.ok(await indent('research-folder-f-2') > await indent('research-folder-f-1'), 'a subfolder sits deeper');
+      assert.deepEqual((await order()).slice(2, 7), ['Capítulo primero: fuentes, archivos y cartografía del regadío', 'Fuentes', 'Notas', 'Sin carpeta', 'Regadío del Tormeral']);
+      await sidebar.getByTestId('research-folder-f-3').getByRole('button', { name: 'Notas' }).click();
+      assert.ok(!(await order()).includes('Regadío del Tormeral'), 'an empty folder shows no chats');
+      await sidebar.getByTestId('research-folder-f-1').getByRole('button', { name: /^Capítulo primero/ }).click();
+      assert.ok((await order()).includes('Regadío del Tormeral'), 'a folder shows the chats of its subfolders too');
+      // The project's page follows the same selection, and answers back.
+      assert.match(await home.getByTestId('research-folder-f-1').getAttribute('class'), /is-active/);
+      assert.equal((await home.locator('.research-project-browser-heading').textContent()).trim(), 'Capítulo primero: fuentes, archivos y cartografía del regadío');
+      assert.deepEqual(await home.getByTestId('research-project-chats').locator('li').allTextContents(), ['Regadío del Tormeral']);
+      await home.getByTestId('research-folder-root-p-a').click();
+      assert.doesNotMatch(await sidebar.getByTestId('research-folder-f-1').getAttribute('class'), /is-active/, 'cleared on the page, cleared in the history');
+    });
+
+    await t.test('a chat dropped on a folder is filed there; dropped outside every folder it leaves it, in both places', async () => {
+      await sidebar.getByTestId('research-conversation-c3').dragTo(sidebar.getByTestId('research-folder-f-3'));
+      await action('file', 'c3', 'f-3');
+      assert.equal(await sidebar.getByTestId('research-folder-f-3').locator('.research-folder-count').textContent(), '1');
+      const rows = await order();
+      assert.ok(rows.slice(rows.indexOf('Alfa'), rows.indexOf('Zeta')).includes('Réplica revisada'), 'a filed chat joins the folder\'s project');
+      await home.getByTestId('home-chat-c3').dragTo(home.getByTestId('research-folder-root-p-a'));
+      await action('file', 'c3', null);
+      await home.getByTestId('home-chat-c2').dragTo(home.getByTestId('research-folder-f-3'));
+      await action('file', 'c2', 'f-3');
+      await home.getByTestId('home-chat-c2').dragTo(home.locator('.research-project-browser-heading'));
+      await action('file', 'c2', null);
+      await sidebar.getByTestId('research-conversation-c2').dragTo(sidebar.getByTestId('research-folder-f-2'));
+      await action('file', 'c2', 'f-2');
+      await sidebar.getByTestId('research-conversation-c2').dragTo(sidebar.getByTestId('research-project-p-a'));
+      await action('file', 'c2', null);
+      await sidebar.getByTestId('research-conversation-c2').dragTo(sidebar.getByTestId('research-folder-f-2'));
+      await action('file', 'c2', 'f-2');
+    });
+
+    await t.test('a folder dropped on a folder nests or reorders; never into its own subtree', async () => {
+      const before = (await logged()).length;
+      await sidebar.getByTestId('research-folder-f-1').dragTo(sidebar.getByTestId('research-folder-f-2'));
+      await page.waitForTimeout(150);
+      assert.ok(!(await logged()).slice(before).some(entry => entry.startsWith('["moveFolder","f-1"')), 'a folder does not move into its own subfolder, nor fall back to the root');
+      await sidebar.getByTestId('research-folder-f-3').dragTo(sidebar.getByTestId('research-folder-f-1'));
+      await action('moveFolder', 'f-3', 'f-1', null);
+      await sidebar.getByTestId('research-folder-f-3').dragTo(sidebar.getByTestId('research-folder-unfiled-p-a'));
+      await action('moveFolder', 'f-3', null, null);
+      const target = await home.getByTestId('research-folder-f-1').boundingBox();
+      await home.getByTestId('research-folder-f-3').dragTo(home.getByTestId('research-folder-f-1'), { targetPosition: { x: target.width / 2, y: 2 } });
+      await action('moveFolder', 'f-3', null, 0);
+      assert.deepEqual((await order()).slice(2, 5), ['Notas', 'Capítulo primero: fuentes, archivos y cartografía del regadío', 'Fuentes'], 'reordered before it');
+    });
+
+    await t.test('folders rename by double click and from their menu, which closes on click-away; an emptied name takes the default', async () => {
+      await sidebar.getByTestId('research-folder-f-3').getByRole('button', { name: 'Notas' }).dblclick();
+      let rename = sidebar.getByRole('textbox', { name: 'Nuevo nombre' });
+      await rename.fill('Lecturas'); await rename.press('Enter');
+      await action('renameFolder', 'f-3', 'Lecturas');
+      await home.getByTestId('research-folder-f-3').getByRole('button', { name: 'Más acciones' }).click();
+      const menu = page.getByRole('menu', { name: 'Lecturas' });
+      assert.deepEqual(await placedTexts(menu), ['Renombrar', 'Nueva subcarpeta', 'Eliminar carpeta']);
+      await page.mouse.click(860, 740);
+      await menu.waitFor({ state: 'detached' });
+      await sidebar.getByTestId('research-folder-f-3').hover();
+      await sidebar.getByTestId('research-folder-f-3').getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Renombrar' }).click();
+      rename = sidebar.getByRole('textbox', { name: 'Nuevo nombre' });
+      await rename.fill('   '); await rename.press('Enter');
+      await action('renameFolder', 'f-3', 'Nueva carpeta');
+      await home.getByTestId('research-new-folder').click();
+      await action('createFolder', 'p-a', null);
+      rename = home.getByRole('textbox', { name: 'Nuevo nombre' });
+      assert.equal(await rename.inputValue(), 'Nueva carpeta 2', 'a new folder is named in place, after its siblings');
+      await rename.press('Escape');
+      await sidebar.getByTestId('research-project-p-a').getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Nueva carpeta' }).click();
+      await action('createFolder', 'p-a', null);
+      await sidebar.getByRole('textbox', { name: 'Nuevo nombre' }).press('Escape');
+    });
+
+    await t.test('deleting a folder asks first, takes its subfolders and unfiles their chats', async () => {
+      await sidebar.getByTestId('research-folder-f-1').getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Eliminar carpeta' }).click();
+      await page.getByRole('dialog').getByText('Sus chats no se borran', { exact: false }).waitFor();
+      await page.getByRole('dialog').getByRole('button', { name: 'Eliminar', exact: true }).click();
+      await action('deleteFolder', 'f-1');
+      await sidebar.getByTestId('research-folder-f-2').waitFor({ state: 'detached' });
+      assert.equal(await sidebar.getByTestId('research-folder-unfiled-p-a').locator('.research-folder-count').textContent(), '2', 'its chat stays in the project, unfiled, beside the one unfiled before');
+      await sidebar.getByTestId('research-folder-unfiled-p-a').getByRole('button', { name: 'Sin carpeta' }).click();
+      const rows = await order();
+      assert.deepEqual(rows.slice(rows.indexOf('Sin carpeta') + 1, rows.indexOf('Zeta')), ['Regadío del Tormeral', 'Réplica revisada'], '"No folder" lists them');
+      await sidebar.getByTestId('research-folder-unfiled-p-a').getByRole('button', { name: 'Sin carpeta' }).click();
+    });
+
+    await t.test('a long name slides on hover only when it overflows; at rest nothing changes', async () => {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await sidebar.getByTestId('research-project-p-z').click();
+      const row = sidebar.getByTestId('research-conversation-c6');
+      const state = () => row.evaluate(element => {
+        const outer = element.querySelector('.research-marquee');
+        const inner = outer.firstElementChild;
+        return { height: element.getBoundingClientRect().height, width: outer.getBoundingClientRect().width, overflow: getComputedStyle(outer).textOverflow,
+          display: getComputedStyle(inner).display, animation: getComputedStyle(inner).animationName, x: new DOMMatrix(getComputedStyle(inner).transform).m41 };
+      });
+      await page.mouse.move(860, 740);
+      const rest = await state();
+      assert.deepEqual([rest.overflow, rest.display, rest.animation], ['ellipsis', 'inline', 'none'], 'at rest it truncates like any row');
+      await row.hover();
+      // It waits a moment at the start, then slides until the end of the name shows.
+      await row.locator('.research-marquee > span').evaluate(inner => new Promise((resolve, reject) => {
+        const started = performance.now();
+        const tick = () => new DOMMatrix(getComputedStyle(inner).transform).m41 < -20 ? resolve() : performance.now() - started > 8000 ? reject(new Error('it never slid')) : requestAnimationFrame(tick);
+        tick();
+      }));
+      const hovered = await state();
+      assert.equal(hovered.animation, 'research-marquee');
+      assert.ok(hovered.x < -20, `it slides sideways (${hovered.x}px)`);
+      assert.equal(hovered.height, rest.height, 'the row keeps its height');
+      assert.equal(hovered.width, rest.width, 'and its layout');
+      await page.mouse.move(860, 740);
+      assert.deepEqual(await state(), rest, 'back at rest when the pointer leaves');
+      // A name that fits never moves.
+      const short = sidebar.getByTestId('research-project-p-z');
+      await short.hover();
+      assert.equal(await short.locator('.research-marquee > span').evaluate(inner => getComputedStyle(inner).animationName), 'none');
+      // The same on the project's page and for a folder name.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await row.hover();
+      assert.equal(await row.locator('.research-marquee > span').evaluate(inner => getComputedStyle(inner).animationName), 'none', 'reduced motion keeps it still');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-research-chat-folders.png') });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await sidebar.getByTestId('research-project-p-z').getByRole('button', { name: 'Zeta', exact: true }).click();
+      await sidebar.getByTestId('research-project-p-a').getByRole('button', { name: 'Alfa', exact: true }).click();
+    });
     await t.test('a new project appears in order and is named in place; its menu sets icon and colour', async () => {
       await sidebar.getByTestId('research-new-project').click();
       await action('newProject');

@@ -1,5 +1,5 @@
 import { associateNotebookConversation, notebookForConversation } from './researchNotebooksRepo';
-import { deleteConversationPlacement, placementFor, setConversationPinned, setConversationProject } from './researchChatProjectsRepo';
+import { deleteConversationPlacement, placementFor, setConversationFolder, setConversationPinned, setConversationProject } from './researchChatProjectsRepo';
 import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -24,6 +24,7 @@ interface ConversationRow {
   model_json: string | null;
   selection_json: string | null;
   project_id?: string | null;
+  folder_id?: string | null;
   pinned_at?: string | null;
 }
 
@@ -52,11 +53,12 @@ function parseJson<T>(value: string | null): T | null {
 }
 
 function toSummary(row: ConversationRow, messageCount: number): ChatConversationSummary {
-  const placement = row.project_id !== undefined ? { projectId: row.project_id ?? null, pinnedAt: row.pinned_at ?? null } : placementFor(row.id);
+  const placement = row.project_id !== undefined ? { projectId: row.project_id ?? null, folderId: row.folder_id ?? null, pinnedAt: row.pinned_at ?? null } : placementFor(row.id);
   return {
     id: row.id,
     notebookId: notebookForConversation(row.id),
     projectId: placement.projectId,
+    folderId: placement.folderId,
     pinnedAt: placement.pinnedAt,
     title: row.title || DEFAULT_TITLE,
     created_at: row.created_at,
@@ -86,7 +88,7 @@ export function listConversations(includeArchived = false): ChatConversationSumm
   const where = includeArchived ? '' : 'WHERE c.archived = 0';
   const rows = db
     .prepare(
-      `SELECT c.*, p.project_id, p.pinned_at, (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id) AS message_count
+      `SELECT c.*, p.project_id, p.folder_id, p.pinned_at, (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id) AS message_count
        FROM chat_conversations c
        LEFT JOIN research_chat_placements p ON p.conversation_id = c.id
        ${where}
@@ -115,6 +117,8 @@ export function createConversation(input: {
   selection?: ResearchContextSelection | null;
   title?: string;
   projectId?: string | null;
+  /** A folder of that project, when the chat starts inside one. */
+  folderId?: string | null;
 }): ChatConversation {
   const db = getDb();
   const now = new Date().toISOString();
@@ -132,6 +136,7 @@ export function createConversation(input: {
   );
   if (input.selection?.notebookId) associateNotebookConversation(input.selection.notebookId, id);
   if (input.projectId) setConversationProject(id, input.projectId);
+  if (input.projectId && input.folderId) setConversationFolder(id, input.folderId);
   return getConversation(id)!;
 }
 
