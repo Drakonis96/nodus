@@ -15,6 +15,13 @@ import { chromium } from 'playwright-core';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
 
+/** The menu mounts hidden and shows once placed; its items have no innerText until then. */
+async function placedTexts(menu) {
+  await menu.waitFor();
+  await menu.page().waitForFunction(element => element && getComputedStyle(element).visibility !== 'hidden', await menu.elementHandle(), { timeout: 10000 });
+  return menu.getByRole('menuitem').allInnerTexts();
+}
+
 test('research chat history: sections, search, pins, menu and projects', { timeout: 180_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-chat-sidebar-'));
@@ -57,7 +64,7 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await notebook.getByRole('button', { name: 'Más acciones' }).click();
       const menu = page.getByRole('menu', { name: 'Cuaderno de riegos' });
       await menu.getByRole('menuitem').first().waitFor();
-      assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Renombrar', 'Icono y color', 'Editar colecciones', 'Eliminar cuaderno']);
+      assert.deepEqual(await placedTexts(menu), ['Renombrar', 'Icono y color', 'Editar colecciones', 'Eliminar cuaderno']);
       await menu.getByRole('menuitem', { name: 'Editar colecciones' }).click();
       await action('editNotebook', 'n1');
       await notebook.getByRole('button', { name: 'Más acciones' }).click();
@@ -128,10 +135,10 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await row.getByRole('button', { name: 'Más acciones' }).click();
       const menu = page.getByRole('menu', { name: 'Cartografía medieval' });
       await menu.getByRole('menuitem').first().waitFor();
-      assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Renombrar', 'Destacar chat', 'Archivar', 'Eliminar', 'Mover a proyecto']);
+      assert.deepEqual(await placedTexts(menu), ['Renombrar', 'Destacar chat', 'Archivar', 'Eliminar', 'Mover a proyecto']);
       await menu.getByRole('menuitem', { name: 'Mover a proyecto' }).click();
       await menu.getByRole('menuitem').first().waitFor();
-      assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Mover a proyecto', 'Alfa', 'Zeta', 'Nuevo proyecto']);
+      assert.deepEqual(await placedTexts(menu), ['Mover a proyecto', 'Alfa', 'Zeta', 'Nuevo proyecto']);
       await menu.getByRole('menuitem', { name: 'Zeta' }).click();
       await action('move', 'c4', 'p-z');
       await menu.waitFor({ state: 'detached' });

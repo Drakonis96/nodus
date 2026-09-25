@@ -506,10 +506,9 @@ test('the delete is wired end to end through one IPC channel', () => {
 
 test('the Library offers the delete with a confirmation that names what goes', async () => {
   const library = await readSource('src/views/Library.tsx');
-  assert.match(library, /data-testid="library-delete-selected"/);
-  // Red in both themes, labelled with an already translated string.
-  assert.match(library, /btn bg-red-600 text-white hover:bg-red-500/);
-  assert.match(library, /\{t\('Eliminar selección'\)\}/);
+  // Red in both themes, labelled with an already translated string, and saying what goes.
+  const button = /<button\s+className="btn bg-red-600[^"]*\btext-white hover:bg-red-500"[\s\S]{0,200}?title=\{t\('Elimina estas obras[^']*'\)\}\s+data-testid="library-delete-selected"\s*>\s*<Icon name="trash"[^>]*\/> \{t\('Eliminar'\)\}/;
+  assert.match(library, button);
   // Destructive actions confirm through the shared danger dialog.
   assert.match(library, /confirm\(\{[\s\S]{0,500}danger: true/);
   assert.match(library, /window\.nodus\.deleteWorks\(ids\)/);
