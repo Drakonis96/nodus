@@ -26,14 +26,29 @@ if (fs.existsSync(ready) && JSON.parse(fs.readFileSync(ready, 'utf8')).inputFing
 
 async function archive(url, expected, name) {
   const file = path.join(cache, name);
-  if (!fs.existsSync(file) || digest(fs.readFileSync(file)) !== expected) {
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Artifact download failed (${response.status})`);
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (digest(bytes) !== expected) throw new Error(`Artifact integrity failed: ${name}`);
-    fs.writeFileSync(file, bytes);
+  if (fs.existsSync(file) && digest(fs.readFileSync(file)) === expected) return file;
+  // A hosted runner closes the connection mid-download often enough that one attempt
+  // turns a transient socket error into a failed job. A truncated body fails the hash
+  // too, so both are retried; a 4xx is not, because a pinned asset that is missing or
+  // moved will not appear on a second try.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        const error = new Error(`Artifact download failed (${response.status})`);
+        if (response.status < 500) error.permanent = true;
+        throw error;
+      }
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (digest(bytes) !== expected) throw new Error(`Artifact integrity failed: ${name}`);
+      fs.writeFileSync(file, bytes);
+      return file;
+    } catch (error) {
+      if (attempt === 3 || error.permanent) throw error;
+      console.warn(`[zotero-mcp] ${name}: ${error.message}. Retrying (${attempt + 1}/3)`);
+      await new Promise(resolve => setTimeout(resolve, attempt * 5_000));
+    }
   }
-  return file;
 }
 
 fs.rmSync(output, { recursive: true, force: true });
