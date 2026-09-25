@@ -119,6 +119,22 @@ test('provider/model transport preserves legacy fields and adapts only incompati
   assert.deepEqual(m.samplingTemperatureBody('anthropic', 'claude-fable-5-1', 0.3), {});
   assert.deepEqual(m.samplingTemperatureBody('anthropic', 'claude-opus-4-8', 0.3), {});
   assert.deepEqual(
+    m.samplingTemperatureBody('anthropic', 'claude-sonnet-5', 0.3),
+    {},
+    'a major-only Claude 5 id never receives the deprecated temperature',
+  );
+  assert.deepEqual(m.samplingTemperatureBody('anthropic', 'claude-opus-5', 0.3), {});
+  assert.deepEqual(
+    m.samplingTemperatureBody('anthropic', 'claude-sonnet-4-7', 0.3),
+    {},
+    'Claude 4.7 deprecates sampling',
+  );
+  assert.deepEqual(
+    m.samplingTemperatureBody('anthropic', 'claude-opus-4-20250514', 0.3),
+    { temperature: 0.3 },
+    'a trailing date is not read as a minor version',
+  );
+  assert.deepEqual(
     m.samplingTemperatureBody('anthropic', 'claude-sonnet-4-5', 0.3),
     { temperature: 0.3 },
     'older Claude models keep temperature',

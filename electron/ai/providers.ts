@@ -123,10 +123,13 @@ function isGemini3Model(modelId: string | undefined): boolean {
 function isAnthropicSamplingDeprecatedModel(modelId: string | undefined): boolean {
   if (!modelId) return false;
   if (/mythos/i.test(modelId)) return true;
-  const version = modelId.match(/^claude-[a-z]+-(\d+)[.-](\d+)(?:[.-]|$)/i);
+  // `claude-sonnet-5` names the major family with no minor, while `claude-opus-4-8` names
+  // 4.8. A trailing date (`-20250929`) is not a minor, so the minor is limited to 1–2 digits
+  // and a missing minor reads as `.0`.
+  const version = modelId.match(/^claude-[a-z]+-(\d+)(?:[.-](\d{1,2}))?(?:[.-]|$)/i);
   if (!version) return false;
   const major = Number(version[1]);
-  const minor = Number(version[2]);
+  const minor = version[2] ? Number(version[2]) : 0;
   return major > 4 || (major === 4 && minor >= 7);
 }
 

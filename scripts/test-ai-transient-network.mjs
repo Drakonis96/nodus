@@ -33,7 +33,7 @@ function load(file) {
   return require(bundle);
 }
 
-const { isTransientNetworkFailure } = load('electron/ai/providerErrors.ts');
+const { isTransientNetworkFailure, rejectsAdaptiveThinking } = load('electron/ai/providerErrors.ts');
 
 /** The exact shape the OpenAI SDK throws for a lost socket. */
 const connectionError = () => Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' });
@@ -69,11 +69,26 @@ test('an ordinary provider rejection is not transient', () => {
   assert.equal(isTransientNetworkFailure('Connection error.'), false, 'only error objects are classified');
 });
 
+test('the adaptive-thinking predicate keys off the model wording, and only on a 400', () => {
+  const disabled = Object.assign(
+    new Error('"thinking.type.disabled" is not supported for this model. Use "thinking.type.adaptive" and "output_config.effort" to control thinking behavior.'),
+    { status: 400 },
+  );
+  assert.equal(rejectsAdaptiveThinking(disabled), true);
+  // The Anthropic SDK nests the provider payload under `error`.
+  assert.equal(rejectsAdaptiveThinking({ status: 400, error: { message: 'thinking.type.disabled is not accepted for this model' } }), true);
+  // Only a 400 counts: a 500 or an untyped throw belongs to another branch.
+  assert.equal(rejectsAdaptiveThinking(Object.assign(new Error('"thinking.type.disabled" is not supported'), { status: 500 })), false);
+  assert.equal(rejectsAdaptiveThinking(new Error('"thinking.type.disabled" is not supported')), false);
+  // An unrelated 400 must keep its own recovery path.
+  assert.equal(rejectsAdaptiveThinking(Object.assign(new Error('`temperature` is deprecated for this model'), { status: 400 })), false);
+});
+
 test('wrapProviderError marks a transient network failure retriable', () => {
   // The heuristic is dead without this call site, and aiClient.ts cannot be imported
   // here (database + native driver), so the wiring is asserted on the source text.
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.match(
     source,
     /if \(isTransientNetworkFailure\(e\)\) \{\s*return new AiError\(message \|\| 'Error de conexión con el proveedor de IA\.', true, false, 'connection'\);/,

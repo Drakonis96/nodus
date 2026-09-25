@@ -273,6 +273,20 @@ const AI_PROVIDER_ERRORS: Record<string, UiTranslations> = {
     it: 'Limite di frequenza del fornitore di IA',
     tr: 'Yapay zekâ sağlayıcısının hız sınırı',
   },
+  // A model that stops with `refusal` (or a filtered completion) returns no text. Reported as
+  // "empty response" it read like a provider outage instead of a decision the user can act on.
+  'El modelo se negó a responder a esta solicitud.': {
+    es: 'El modelo se negó a responder a esta solicitud.',
+    en: 'The model declined to answer this request.',
+    fr: 'Le modèle a refusé de répondre à cette requête.',
+    de: 'Das Modell hat sich geweigert, diese Anfrage zu beantworten.',
+    pt: 'O modelo recusou-se a responder a este pedido.',
+    'pt-BR': 'O modelo se recusou a responder a esta solicitação.',
+    it: 'Il modello ha rifiutato di rispondere a questa richiesta.',
+    tr: 'Model bu isteği yanıtlamayı reddetti.',
+    'zh-CN': '模型拒绝回答此请求。',
+    'zh-TW': '模型拒絕回答此請求。',
+  },
   'El proveedor rechazó la solicitud (400) sin explicar el motivo. Suele ser la clave de IA (revísala en Ajustes) o, con mucho contexto, una petición que supera el límite del modelo.': {
     es: 'El proveedor rechazó la solicitud (400) sin explicar el motivo. Suele ser la clave de IA (revísala en Ajustes) o, con mucho contexto, una petición que supera el límite del modelo.',
     en: 'The provider rejected the request (400) without explaining why. It is usually the AI key (check it in Settings) or, with a lot of context, a request that exceeds the model’s limit.',
@@ -440,6 +454,39 @@ function aiProviderRuntimeError(message: string, language: unknown): string | nu
       tr: `Yapay zekâ sağlayıcısından boş yanıt (${reason}).`,
       'zh-CN': `AI 提供商返回了空响应（${reason}）。`,
       'zh-TW': `AI 提供商返回了空響應（${reason}）。`,
+     });
+  }
+
+  if (message === 'Respuesta vacía del proveedor de IA.') {
+    return uiText(language, {
+      es: message,
+      en: 'The AI provider returned an empty response.',
+      fr: 'Le fournisseur d’IA a renvoyé une réponse vide.',
+      de: 'Der KI-Anbieter hat eine leere Antwort zurückgegeben.',
+      pt: 'O fornecedor de IA devolveu uma resposta vazia.',
+      'pt-BR': 'O provedor de IA retornou uma resposta vazia.',
+      it: 'Il fornitore di IA ha restituito una risposta vuota.',
+      tr: 'Yapay zekâ sağlayıcısı boş bir yanıt döndürdü.',
+      'zh-CN': 'AI 提供商返回了空响应。',
+      'zh-TW': 'AI 提供商返回了空響應。',
+     });
+  }
+
+  // A streamed prose answer cut at the output ceiling, with no JSON to leave incomplete.
+  const truncatedProse = /^La respuesta de «(.+?)» \((.+?)\) se cortó al alcanzar el límite de (.+?) tokens de salida\. Un modelo con razonamiento puede gastar ese presupuesto pensando antes de escribir\.$/.exec(message);
+  if (truncatedProse) {
+    const [, model, provider, tokens] = truncatedProse;
+    return uiText(language, {
+      es: message,
+      en: `The response from «${model}» (${provider}) was cut off at the ${tokens}-output-token limit. A reasoning model can spend that budget thinking before it writes.`,
+      fr: `La réponse de « ${model} » (${provider}) a été coupée à la limite de ${tokens} jetons de sortie. Un modèle de raisonnement peut dépenser ce budget en réflexion avant d’écrire.`,
+      de: `Die Antwort von „${model}“ (${provider}) wurde beim Limit von ${tokens} Ausgabetokens abgeschnitten. Ein Reasoning-Modell kann dieses Budget mit Nachdenken verbrauchen, bevor es schreibt.`,
+      pt: `A resposta de «${model}» (${provider}) foi cortada ao atingir o limite de ${tokens} tokens de saída. Um modelo de raciocínio pode gastar esse orçamento a pensar antes de escrever.`,
+      'pt-BR': `A resposta de «${model}» (${provider}) foi cortada ao atingir o limite de ${tokens} tokens de saída. Um modelo de raciocínio pode gastar esse orçamento pensando antes de escrever.`,
+      it: `La risposta di «${model}» (${provider}) si è interrotta al limite di ${tokens} token di output. Un modello di ragionamento può spendere quel budget pensando prima di scrivere.`,
+      tr: `«${model}» (${provider}) yanıtı ${tokens} çıktı belirteci sınırında kesildi. Bir akıl yürütme modeli yazmadan önce bu bütçeyi düşünmeye harcayabilir.`,
+      'zh-CN': `来自「${model}」（${provider}）的响应在 ${tokens} 个输出词元上限处被截断。推理模型可能会在写出内容前先消耗该预算进行思考。`,
+      'zh-TW': `來自「${model}」（${provider}）的響應在 ${tokens} 個輸出詞元上限處被截斷。推理模型可能會在寫出內容前先消耗該預算進行思考。`,
      });
   }
 
