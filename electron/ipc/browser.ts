@@ -76,7 +76,7 @@ import { addGlobalLibraryAttachments, createGlobalLibraryItem } from '../library
 import { clearAllBrowserData, clearBrowserData, measureBrowserStorage } from '../browser/storage';
 import { cacheWebsiteFavicon } from '../browser/favicon';
 import { setNodiQuoteSelection, setNodiViewContext } from '../ai/nodiChat';
-import { localizeIpcPayload } from '@shared/uiLanguage';
+import { menuLabel } from '@shared/menuLabels';
 import { getSettings } from '../db/settingsRepo';
 import { assertTrustedNodusMainFrame } from './trust';
 import {
@@ -284,7 +284,7 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
       searchEngine: () => getSettings().browserSearchEngine ?? 'google',
       customSearchTemplate: () => getSettings().browserSearchTemplate ?? '',
       // The native menu speaks the app's language through the same table the UI uses.
-      t: (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
+      t: (key: string) => menuLabel(key, getSettings().uiLanguage),
     }, {
       // Cmd/Ctrl+T pressed while a page has focus. Same destination as the
       // toolbar's "+", so the two cannot drift apart.

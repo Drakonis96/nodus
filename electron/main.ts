@@ -47,7 +47,7 @@ import { setCopilotWindowProvider, startCopilotServer, stopCopilotServer } from 
 import { setZoteroPluginWindowProvider, startZoteroPluginServer, stopZoteroPluginServer } from './zotero-plugin/server';
 import { applyMascotWindow, destroyMascotWindow, setMascotTutorialVisible } from './mascotWindow';
 import { installAppEditContextMenu } from './browser/editMenu';
-import { localizeIpcPayload } from '@shared/uiLanguage';
+import { menuLabel } from '@shared/menuLabels';
 import { seedWelcomeNotification } from './notifications';
 import { startRadarScheduler, stopRadarScheduler } from './radar/scheduler';
 import { refreshAnnouncements } from './announcements';
@@ -571,7 +571,7 @@ function createWindow(): void {
   // call preventDefault(), so Electron never raises this event for them.
   installAppEditContextMenu(
     mainWindow.webContents,
-    (key: string) => String(localizeIpcPayload({ v: key }, getSettings().uiLanguage).v),
+    (key: string) => menuLabel(key, getSettings().uiLanguage),
   );
 
   // `nodi:tutorialVisible` is set by a React effect in BasicsTutorial and cleared by
