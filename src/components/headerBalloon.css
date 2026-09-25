@@ -1,0 +1,75 @@
+/* The chat header's balloons (Context, Sources, System prompt, Skills, Concilium): one
+   surface, one header, one footer. The panel portals to <body>, so the light theme is
+   carried by a wrapper class instead of inherited. */
+.header-balloon {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #18191f;
+  border: 1px solid color-mix(in srgb, var(--vault-accent) 22.7%, transparent);
+  box-shadow: 0 24px 80px #0009;
+  color: #e4e4e7;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+  outline: none;
+}
+.header-balloon-head { display: flex; align-items: center; gap: 8px; padding: 12px 12px 12px 16px; border-bottom: 1px solid #27272a; flex-shrink: 0; }
+.header-balloon-icon { display: grid; place-items: center; color: var(--vault-accent); }
+.header-balloon-title { font-size: 14px; font-weight: 600; }
+.header-balloon-meta { font-size: 12px; color: #71717a; }
+.header-balloon-close { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; color: #a1a1aa; }
+.header-balloon-close:hover { background: #27272a; color: #f4f4f5; }
+.header-balloon-body { min-height: 0; flex: 1; overflow-y: auto; padding: 14px 16px; }
+.header-balloon-foot { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid #27272a; flex-shrink: 0; }
+.header-balloon-foot .spacer { flex: 1; }
+.header-balloon-intro { margin-bottom: 12px; color: #a1a1aa; font-size: 12px; }
+.header-balloon-section-label { margin: 0 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #71717a; }
+
+/* A row of the balloon's lists: icon, name and detail, then its actions. */
+.header-balloon-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; border: 1px solid transparent; }
+.header-balloon-row + .header-balloon-row { margin-top: 4px; }
+.header-balloon-row:hover { background: #ffffff08; }
+.header-balloon-row.is-active { border-color: color-mix(in srgb, var(--vault-accent) 45%, transparent); background: color-mix(in srgb, var(--vault-accent) 10%, transparent); }
+.header-balloon-row-icon { display: grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; border-radius: 9px; background: #ffffff0d; color: #a1a1aa; }
+.header-balloon-row.is-active .header-balloon-row-icon { color: var(--vault-accent); background: color-mix(in srgb, var(--vault-accent) 16%, transparent); }
+.header-balloon-row-text { min-width: 0; flex: 1; }
+.header-balloon-row-text strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; color: #f4f4f5; }
+.header-balloon-row-text small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: #8b8b94; }
+.header-balloon-chip { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 500; border: 1px solid #3f3f46; color: #d4d4d8; }
+.header-balloon-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--vault-accent) 60%, transparent); color: var(--vault-accent); }
+.header-balloon-chip.is-on { border-color: transparent; background: var(--vault-accent); color: #fff; }
+.header-balloon-chip:disabled { opacity: .45; cursor: default; }
+/* The active choice is not a disabled button: it keeps its colour. */
+.header-balloon-chip.is-on:disabled { opacity: 1; }
+.header-balloon-icon-button { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; color: #a1a1aa; }
+.header-balloon-icon-button:hover:not(:disabled) { background: #27272a; color: #f4f4f5; }
+.header-balloon-search { position: relative; display: flex; align-items: center; margin-bottom: 10px; }
+.header-balloon-search > svg { position: absolute; left: 11px; color: #71717a; pointer-events: none; }
+.header-balloon-search > input { width: 100%; height: 36px; padding: 0 12px 0 34px; border-radius: 11px; border: 1px solid #2f2f36; background: #111217; color: inherit; font-size: 12.5px; }
+.header-balloon-search > input:focus { outline: none; border-color: color-mix(in srgb, var(--vault-accent) 60%, transparent); }
+
+/* Tabs that name themselves only once chosen: icons at rest, icon and title when active. */
+.header-balloon-tabs { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid #27272a; flex-shrink: 0; }
+.header-balloon-tab { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border-radius: 11px; color: #a1a1aa; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.header-balloon-tab:hover { background: #ffffff0d; color: #f4f4f5; }
+.header-balloon-tab[aria-selected="true"] { background: color-mix(in srgb, var(--vault-accent) 16%, transparent); color: var(--vault-accent); padding-right: 14px; }
+
+.light .header-balloon { background: #fff; border-color: color-mix(in srgb, var(--vault-accent) 55%, white); box-shadow: 0 24px 80px #27272a26; color: #27272a; }
+.light .header-balloon-head, .light .header-balloon-tabs { border-bottom-color: #ececef; }
+.light .header-balloon-foot { border-top-color: #ececef; }
+.light .header-balloon-close { color: #71717a; }
+.light .header-balloon-close:hover { background: #f4f4f5; color: #18181b; }
+.light .header-balloon-intro { color: #52525b; }
+.light .header-balloon-row:hover { background: #f4f4f5; }
+.light .header-balloon-row-icon { background: #f4f4f5; color: #52525b; }
+.light .header-balloon-row-text strong { color: #18181b; }
+.light .header-balloon-row-text small { color: #71717a; }
+.light .header-balloon-chip { border-color: #d4d4d8; color: #3f3f46; }
+.light .header-balloon-chip.is-on { border-color: transparent; color: #fff; }
+.light .header-balloon-icon-button { color: #71717a; }
+.light .header-balloon-icon-button:hover:not(:disabled) { background: #f4f4f5; color: #18181b; }
+.light .header-balloon-search > input { background: #fff; border-color: #e4e4e7; }
+.light .header-balloon-tab { color: #71717a; }
+.light .header-balloon-tab:hover { background: #f4f4f5; color: #18181b; }

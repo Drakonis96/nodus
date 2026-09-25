@@ -25,17 +25,18 @@ try {
     await page.getByRole('button', { name: /Esfuerzo de thinking:/ }).click();
     assert.equal(await color(page.locator('.research-effort-panel')), accent);
     await page.keyboard.press('Escape');
+    // Every header button opens the same balloon, carrying the vault accent.
     await page.getByTestId('research-system-prompt-trigger').click();
-    assert.equal(await color(page.locator('.research-system-prompt-dialog')), accent);
-    assert.equal(await page.locator('.research-system-prompt-dialog .btn-primary').evaluate(el => getComputedStyle(el).backgroundColor), rgb);
+    assert.equal(await color(page.getByTestId('research-system-prompt-panel')), accent);
+    assert.equal(await page.getByTestId('research-system-prompt-panel').locator('.header-balloon-chip.is-on').evaluate(el => getComputedStyle(el).backgroundColor), rgb);
     await page.keyboard.press('Escape');
     if (view === 'embedded') {
       await page.getByTestId('research-context-trigger').click();
       assert.equal(await color(page.locator('.research-context-panel')), accent);
       await page.keyboard.press('Escape');
       await page.getByTestId('research-source-filter-trigger').click();
-      assert.equal(await color(page.locator('.research-source-filter-dialog')), accent);
-      assert.equal(await page.locator('.research-source-filter-dialog input[type=checkbox]').first().evaluate(el => getComputedStyle(el).accentColor), rgb);
+      assert.equal(await color(page.getByTestId('research-source-filter-panel')), accent);
+      assert.equal(await page.getByTestId('research-source-filter-panel').locator('input[type=checkbox]').first().evaluate(el => getComputedStyle(el).accentColor), rgb);
       if (vault === 'prosopography') await page.screenshot({ animations: 'disabled', path: `artifacts/research-assistant/filters-vault-${theme}.png` });
       await page.keyboard.press('Escape');
     }

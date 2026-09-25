@@ -63,13 +63,12 @@ try {
       await page.getByTestId('header-actions').getByRole('button', { name: 'Skills', exact: true }).click();
       await page.getByTestId('skill-marketplace-modal').waitFor();
     }
-    await page.getByRole('button', { name: tab, exact: true }).click();
+    await page.getByTestId('skill-marketplace-modal').getByRole('tab', { name: tab, exact: true }).click();
   };
+  // Repositories are managed in their own tab; the Marketplace only browses them.
+  await openSkills('Repositories');
+  if (!checkout) await page.getByRole('button', { name: /^Update catalog: /, exact: false }).first().click();
   await openSkills('Marketplace');
-  // Which repository the skills come from is folded away until asked for.
-  const sources = page.locator('.skill-marketplace-sources');
-  await sources.getByText('Repositories', { exact: true }).click();
-  if (!checkout) await page.getByRole('button', { name: 'Update catalog', exact: true }).click();
   // waitForFunction treats the pending promise of an async predicate as a truthy result, so it
   // returned before the first scan finished; page.evaluate awaits the value it is polling.
   for (let attempt = 0; !await page.evaluate(async () => Boolean((await window.nodus.getSkillMarketplace()).sources[0]?.commit)); attempt++) {
@@ -138,7 +137,7 @@ try {
   await page.getByRole('button', { name: 'Install skill', exact: true }).click();
   await page.getByText('Skill installed. Enable it in My skills.', { exact: true }).waitFor();
   installedId = await page.evaluate(async () => (await window.nodus.listChatSkills()).find(s => s.origin?.packageId === 'descriptive-statistics').id);
-  await page.getByRole('button', { name: 'My skills', exact: true }).click();
+  await openSkills('My skills');
   // The library: one row per skill, all the same height, in alphabetical order.
   const libraryNames = await page.locator('.chat-skills-list .chat-skill-item .chat-skill-text b').allTextContents();
   assert.deepEqual(libraryNames, [...libraryNames].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })), 'the library is alphabetical');
@@ -163,8 +162,8 @@ try {
   await page.screenshot({ path: path.join(artifacts, 'my-skills-expanded.png') });
   await firstCard.getByRole('button', { name: `Hide details of ${cardName}`, exact: true }).click();
   assert.equal(await firstCard.locator('.chat-skill-details').count(), 0, 'and folds away again');
-  // One switch per surface, because a modal that belongs to no chat cannot leave it unsaid.
-  await page.getByRole('switch', { name: 'Enable Descriptive Statistics \u00b7 Assistant', exact: true }).click();
+  // One switch: a skill is on or off for every chat at once.
+  await page.getByRole('switch', { name: 'Enable Descriptive Statistics', exact: true }).click();
   await page.getByRole('dialog', { name: 'Skills and Marketplace', exact: true }).getByRole('button', { name: 'Close', exact: true }).click();
   await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
   console.log('Installed and enabled', installedId);
@@ -174,26 +173,22 @@ try {
   await page.getByText(/Tool result \(summarize\)/).waitFor();
   await page.getByText(/populationStandardDeviation/).waitFor();
   await page.screenshot({ path: path.join(artifacts, 'assistant-tool-result.png') });
-  const nodiDisabled = await page.evaluate(() => window.nodus.nodiChatStream({ messages: [{ role: 'user', content: 'Summarize 2, 4, 6, 8.' }], contexts: [] }, { onDelta: () => {} }));
-  assert.match(nodiDisabled, /not enabled/);
-  await page.evaluate(async id => { const skill = (await window.nodus.listChatSkills()).find(s => s.id === id); await window.nodus.saveChatSkill({ ...skill, enabled: { assistant: true, nodi: true } }); }, installedId);
+  // The same switch turned it on for Nodi too.
   const nodiEnabled = await page.evaluate(() => window.nodus.nodiChatStream({ messages: [{ role: 'user', content: 'Summarize 2, 4, 6, 8.' }], contexts: [] }, { onDelta: () => {} }));
   assert.match(nodiEnabled, /"mean":5/); assert.match(nodiEnabled, /"count":4/);
   // Source management through the visible UI, using an empty public repository catalog.
-  await openSkills('Marketplace');
-  await page.locator('.skill-marketplace-sources').getByText('Repositories', { exact: true }).click();
+  await openSkills('Repositories');
   await page.getByRole('textbox', { name: 'Repository URL' }).fill('https://github.com/NodusResearch/nodus-research-skill-marketplace');
-  await page.getByRole('button', { name: 'Add source', exact: true }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('alert').filter({ hasText: /already added/ }).waitFor();
   await page.getByRole('textbox', { name: 'Repository URL' }).fill('https://github.com/octocat/Hello-World');
-  await page.getByRole('button', { name: 'Add source', exact: true }).click();
-  await page.getByRole('combobox', { name: 'Skill repository' }).selectOption('octocat/hello-world');
-  await page.getByRole('button', { name: 'Remove source', exact: true }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove source: octocat/hello-world', exact: true }).click();
+  await page.getByRole('button', { name: 'Remove', exact: true }).click();
   await page.getByText('Repository removed. Installed skills remain available.', { exact: true }).waitFor();
   assert.equal((await page.evaluate(() => window.nodus.getSkillMarketplace())).sources.length, 1);
   // Create and export a tool package through the authoring UI and native IPC.
-  await page.getByRole('button', { name: 'My skills', exact: true }).click();
-  await page.getByRole('button', { name: 'Create skill', exact: true }).click();
+  await openSkills('Create');
   await page.getByLabel('Skill name', { exact: true }).fill('QA Tool');
   await page.getByLabel('When to use it', { exact: true }).fill('Double a number supplied by the user.');
   await page.getByLabel('Instructions', { exact: true }).fill('Call the double tool with the number supplied by the user.');
@@ -204,7 +199,7 @@ try {
   await page.getByLabel('Tool id', { exact: true }).fill('double');
   await page.getByLabel('Tool description', { exact: true }).fill('Input { value: number }. Return twice the value.');
   await page.getByLabel('JavaScript function', { exact: true }).fill('(input) => ({ value: input.value * 2 })');
-  await page.getByRole('button', { name: 'Save skill', exact: true }).click();
+  await page.getByRole('button', { name: 'Create skill', exact: true }).click();
   // Export, edit and delete live behind the card's details toggle: the row itself stays a
   // name, a description and a switch, whatever the skill is.
   await page.getByRole('button', { name: 'Show details of QA Tool', exact: true }).click();
@@ -235,13 +230,13 @@ try {
     if (!await page.getByTestId('chat-skills-assistant').isVisible()) await page.getByTestId('header-actions').getByRole('button', { name: 'Assistant', exact: true }).click();
     await openSkills('Marketplace');
     await page.waitForFunction(color => {
-      const tab = document.querySelector('.skill-marketplace-tabs button[aria-pressed="true"]');
+      const tab = document.querySelector('.skills-hub-tabs [role="tab"][aria-selected="true"]');
       return tab && getComputedStyle(tab).getPropertyValue('--vault-accent').trim() === color;
     }, color);
     const computed = await page.evaluate(() => {
-      const tab = document.querySelector('.skill-marketplace-tabs button[aria-pressed="true"]');
+      const tab = document.querySelector('.skills-hub-tabs [role="tab"][aria-selected="true"]');
       const logo = document.querySelector('[data-testid="marketplace-logo"]');
-      return { background: getComputedStyle(tab).backgroundColor, source: decodeURIComponent(logo.src.split(',')[1]) };
+      return { background: getComputedStyle(tab).color, source: decodeURIComponent(logo.src.split(',')[1]) };
     });
     const rgb = color.slice(1).match(/../g).map(c => parseInt(c, 16));
     assert.equal(computed.background, `rgb(${rgb.join(', ')})`);

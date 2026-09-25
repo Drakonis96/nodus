@@ -3,7 +3,7 @@ import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
+import { DEFAULT_CHAT_SKILLS, builtinSkillForPackage, onEverySurface, skillActive, type ChatSkill, type ChatSkillSurface } from '@shared/chatSkills';
 import { normalizeCapabilityId } from '../skill-capabilities/contracts';
 import { capabilityRegistry } from './capabilities/registry';
 import { readTrustedPluginSkills } from './capabilities/bundledSkills';
@@ -150,7 +150,9 @@ const runnable = (skill: ChatSkill) => (skill.capabilities ?? []).every(capabili
 const withCapabilityTools = (skill: ChatSkill): ChatSkill => { const capabilityTools = deriveCapabilityTools(skill); return capabilityTools ? { ...skill, capabilityTools } : { ...skill, capabilityTools: undefined }; };
 
 export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
-  return listChatSkills().filter(skill => skill.enabled[surface] && runnable(skill)).map(withCapabilityTools);
+  // One activation for every chat: the surface is who asks, not a separate switch.
+  void surface;
+  return listChatSkills().filter(skill => skillActive(skill) && runnable(skill)).map(withCapabilityTools);
 }
 
 /** Skills the user named with @ for one message. The per-chat switch does not apply: naming
@@ -167,7 +169,7 @@ export function saveChatSkill(input: ChatSkill): ChatSkill[] {
   const skill: ChatSkill = {
     id: existing?.id ?? randomUUID(),
     name: clean(input.name, 80), description: clean(input.description, 500), instructions: clean(input.instructions, 16000),
-    enabled: { assistant: input.enabled?.assistant === true, nodi: input.enabled?.nodi === true },
+    enabled: onEverySurface(input.enabled?.assistant === true || input.enabled?.nodi === true),
     capabilities: input.capabilities ?? existing?.capabilities ?? (existing?.builtin && ['svg', 'image', 'chemistry'].includes(existing.builtin) ? [existing.builtin as 'svg' | 'image' | 'chemistry'] : []), tools: input.tools ?? existing?.tools ?? [],
     author: input.author ?? existing?.author ?? 'local', category: input.category ?? existing?.category ?? 'Personal',
     version: input.version ?? existing?.version ?? '1.0.0', license: input.license ?? existing?.license ?? 'AGPL-3.0-only',

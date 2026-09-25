@@ -477,3 +477,22 @@
 .research-invoked-skill > button:hover { background: color-mix(in srgb, var(--vault-accent, #6366f1) 25%, transparent); }
 .research-message.research-accent-solid .research-invoked-skill { color: #fff; background: #ffffff26; border-color: #ffffff40; }
 .light .research-skill-mention { background: #fff; border-color: #e5e5e5; box-shadow: 0 18px 50px #0002; color: #27272a; }
+
+/* Sources, as a header balloon: the two lists stack instead of standing side by side. */
+.research-source-filter-panel .research-source-filter-body { padding: 0; overflow: visible; }
+.research-source-filter-panel .research-source-filter-columns { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 14px; }
+.research-source-filter-panel .research-source-filter-results { height: auto; max-height: 190px; }
+.research-source-filter-panel input[type=checkbox] { accent-color: var(--vault-accent); width: 16px; height: 16px; flex-shrink: 0; }
+.research-source-filter-panel .research-source-filter-switch { font-size: 13px; }
+.header-balloon .btn-primary { background: var(--vault-accent); color: white; }
+
+/* A system prompt's editor: title, fields that scroll, and Cancel and Save always in view. */
+.research-prompt-edit-modal { height: auto; max-height: min(720px, calc(100dvh - 40px)); width: min(620px, calc(100vw - 32px)); }
+.research-prompt-edit-modal[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.research-prompt-edit-head { display: flex; align-items: center; gap: 10px; padding: 18px 22px; border-bottom: 1px solid var(--prompt-line); color: var(--prompt-ink); }
+.research-prompt-edit-head h2 { font-size: 17px; font-weight: 600; color: var(--prompt-text); }
+.research-prompt-edit-body { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding: 18px 22px; }
+.research-prompt-edit-body .research-prompt-instructions textarea { min-height: 220px; }
+.research-prompt-edit-foot { margin: 0; padding: 14px 22px; background: var(--prompt-bg); }
+.research-prompt-row .header-balloon-row-text small { white-space: nowrap; }
+.research-prompt-new-button { gap: 6px; }

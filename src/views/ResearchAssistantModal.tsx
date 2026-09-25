@@ -8,6 +8,7 @@ import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
 import { NotebookDialog, ResearchNotebookChip, useResearchNotebooks } from '../components/ResearchNotebookControl';
+import { HeaderBalloon } from '../components/HeaderBalloon';
 import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
 import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
 import { useSkillLibrary } from '../components/skillLibrary';
@@ -18,8 +19,7 @@ import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import type {
   AppSettings,
   ChatConversationSummary,
@@ -302,9 +302,7 @@ export function ResearchAssistantModal({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
-  // The context picker opens as a balloon anchored to its header trigger (like
-  // Skills) instead of a centered modal, so the corpus selection stays in reach.
-  const [contextPanelStyle, setContextPanelStyle] = useState<CSSProperties>({});
+  // The context picker opens as a header balloon, like its neighbours.
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -317,7 +315,6 @@ export function ResearchAssistantModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
-  const contextPanelRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
   const lastConversationTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
@@ -365,61 +362,7 @@ export function ResearchAssistantModal({
     el.style.height = `${Math.min(el.scrollHeight, 224)}px`;
   }, [input]);
 
-  // Anchor the context balloon to its trigger, flipping above when there is no
-  // room below. Mirrors the Skills popover so both header menus feel the same.
-  useLayoutEffect(() => {
-    if (!showContext) return;
-    const place = () => {
-      const rect = contextTriggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const width = Math.min(420, window.innerWidth - 24);
-      const below = window.innerHeight - rect.bottom - 20;
-      const above = rect.top - 20;
-      const upwards = below < 360 && above > below;
-      setContextPanelStyle({
-        '--vault-accent': getComputedStyle(contextTriggerRef.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)',
-        position: 'fixed',
-        width,
-        left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
-        top: upwards ? 'auto' : rect.bottom + 8,
-        bottom: upwards ? window.innerHeight - rect.top + 8 : 'auto',
-        maxHeight: Math.min(720, Math.max(200, upwards ? above : below)),
-        zIndex: 10050,
-      } as CSSProperties);
-    };
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-    return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-    };
-  }, [showContext]);
 
-  useEffect(() => {
-    if (!showContext) return;
-    const close = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        !contextTriggerRef.current?.contains(target) &&
-        !contextPanelRef.current?.contains(target)
-      ) {
-        setShowContext(false);
-      }
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopImmediatePropagation();
-        setShowContext(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', escape, true);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', escape, true);
-    };
-  }, [showContext]);
 
   const isNearBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -1289,27 +1232,18 @@ export function ResearchAssistantModal({
         </div>
       </div>
 
-      {showContext &&
-        createPortal(
-          <div
-            ref={contextPanelRef}
-            role="dialog"
-            aria-label={t('Contexto del asistente')}
-            style={contextPanelStyle}
-            className="research-context-panel"
-          >
-            <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
-              <Icon name="layers" className="research-accent-text" />
-              <span className="text-sm font-semibold">{t('Contexto del asistente')}</span>
-              <span className="text-xs text-neutral-500">
-                {tx('{n} seleccionados', { n: selectedCount })}
-              </span>
-              <div className="flex-1" />
-              <button className="btn btn-ghost" onClick={() => setShowContext(false)} title={t('Cerrar')}>
-                <Icon name="x" />
-              </button>
-            </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <HeaderBalloon
+        open={showContext}
+        anchor={contextTriggerRef}
+        onClose={() => setShowContext(false)}
+        icon={<Icon name="layers" size={18} />}
+        title={t('Contexto del asistente')}
+        meta={tx('{n} seleccionados', { n: selectedCount })}
+        testId="research-context-panel"
+        className="research-context-panel"
+        footer={<button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>{t('Listo')}</button>}
+      >
+            <div>
               <p className="mb-3 text-xs text-neutral-500">
                 {t('Elige un modo o combina las secciones del corpus que el asistente puede leer.')}
               </p>
@@ -1402,14 +1336,7 @@ export function ResearchAssistantModal({
                 />
               </div>
             </div>
-            <footer className="research-composer-footer">
-              <button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>
-                {t('Listo')}
-              </button>
-            </footer>
-          </div>,
-          document.body
-        )}
+      </HeaderBalloon>
 
       {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}
         onClose={() => setEditingNotebook(null)}
