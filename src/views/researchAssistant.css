@@ -391,10 +391,13 @@
 .research-chat-search > input { width: 100%; height: 34px; padding: 0 10px 0 32px; border-radius: 10px; border: 1px solid #2a2a2a; background: #111; color: inherit; font-size: 12.5px; }
 .research-chat-search > input:focus { outline: none; border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 60%, transparent); }
 .research-chat-search > input::-webkit-search-cancel-button { cursor: pointer; }
-.research-history-heading { height: 30px; display: flex; align-items: flex-end; padding: 0 8px 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #737373; }
-.research-history-row { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; margin-top: 2px; padding: 0 6px 0 10px; border-radius: 9px; font-size: 13px; color: #d4d4d4; cursor: pointer; }
+.research-history-heading { height: 30px; display: flex; align-items: flex-end; padding: 0 8px 5px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #8f8f8f; }
+.research-history-row { position: relative; display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; margin-top: 2px; padding: 0 6px 0 10px; border-radius: 9px; font-size: 13px; color: #d4d4d4; }
+/* The row's name is its own button, beside the row's actions rather than around them. */
+.research-history-main { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 100%; text-align: left; color: inherit; border-radius: 7px; cursor: pointer; }
+.research-history-main:focus-visible { outline: 2px solid var(--vault-accent, #6366f1); outline-offset: 1px; }
 .research-history-row.is-nested { padding-left: 30px; }
-.research-history-row:hover, .research-history-row:focus-visible, .research-history-row.is-menu-open { background: #1a1a1a; outline: none; }
+.research-history-row:hover, .research-history-row:focus-within, .research-history-row.is-menu-open { background: #1a1a1a; }
 .research-history-row.is-active { background: color-mix(in srgb, var(--vault-accent, #6366f1) 14%, transparent); color: #f5f5f5; }
 .research-history-row-actions { display: flex; align-items: center; gap: 1px; margin-left: auto; opacity: 0; }
 .research-history-row:hover .research-history-row-actions, .research-history-row:focus-within .research-history-row-actions, .research-history-row.is-menu-open .research-history-row-actions { opacity: 1; }
@@ -411,7 +414,7 @@
 .research-history-menu-separator { margin: 5px 4px; border: 0; border-top: 1px solid #2a2a2a; }
 .light .research-chat-search > input { background: #fff; border-color: #e5e5e5; }
 .light .research-history-row { color: #262626; }
-.light .research-history-row:hover, .light .research-history-row:focus-visible, .light .research-history-row.is-menu-open { background: #f4f4f5; }
+.light .research-history-row:hover, .light .research-history-row:focus-within, .light .research-history-row.is-menu-open { background: #f4f4f5; }
 .light .research-history-row.is-active { color: #171717; }
 .light .research-history-action { color: #71717a; }
 .light .research-history-action:hover { color: #18181b; background: #e4e4e7; }
@@ -534,3 +537,10 @@ p.research-notebook-banner { flex-direction: row; align-items: center; }
 @keyframes research-notebook-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .research-notebook-spin { animation: none; } }
 .light .research-notebook-source { border-color: #e4e4e7; }
+
+/* Text on the vault accent, and accent text on the page, kept readable in both themes. */
+.research-notebook-edit { color: color-mix(in srgb, var(--vault-accent, #6366f1) 70%, white); }
+.light .research-notebook-edit { color: color-mix(in srgb, var(--vault-accent, #6366f1) 72%, black); }
+.research-notebook-banner-action { background: color-mix(in srgb, var(--vault-accent, #6366f1) 82%, black); }
+.light .research-project-empty { color: #52525b; }
+.light .research-history-heading { color: #71717a; }

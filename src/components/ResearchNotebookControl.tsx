@@ -174,12 +174,13 @@ export function NotebookDialog({ notebook, onClose, onSaved }: { notebook: Resea
       <div className="research-notebook-collections">
         <div className="research-notebook-collections-head"><span>{t('Colecciones')}</span>
           <label className="header-balloon-search"><Icon name="search" size={14} /><input type="search" aria-label={t('Buscar colecciones')} placeholder={t('Buscar colecciones')} value={query} onChange={event => setQuery(event.target.value)} /></label></div>
-        <div className="research-notebook-tree" role="tree" aria-label={t('Colecciones')} aria-multiselectable="true">
-          {collections === null && !error && <p role="status" className="research-notebook-empty">{t('Cargando...')}</p>}
-          {collections && !tree.roots.length && <p className="research-notebook-empty">{t('Aún no hay colecciones. Crea una en la Biblioteca o sincroniza las de Zotero.')}</p>}
+        {/* A tree holds tree items only; loading and empty states sit in its frame instead. */}
+        {collections === null && !error && <p role="status" className="research-notebook-tree research-notebook-empty">{t('Cargando...')}</p>}
+        {collections && !tree.roots.length && <p className="research-notebook-tree research-notebook-empty">{t('Aún no hay colecciones. Crea una en la Biblioteca o sincroniza las de Zotero.')}</p>}
+        {visible && !visible.size && <p className="research-notebook-tree research-notebook-empty">{t('Ninguna colección coincide.')}</p>}
+        {tree.roots.length > 0 && (!visible || visible.size > 0) && <div className="research-notebook-tree" role="tree" aria-label={t('Colecciones')} aria-multiselectable="true">
           {tree.roots.map(root => renderNode(root, 0))}
-          {visible && !visible.size && <p className="research-notebook-empty">{t('Ninguna colección coincide.')}</p>}
-        </div>
+        </div>}
       </div>
       <p role="status" className="research-notebook-summary" data-testid="research-notebook-summary">{chosen.length
         ? tx('{n} documentos · {m} ya indexados; el resto se indexará al guardar.', { n: documentIds.size, m: indexed })

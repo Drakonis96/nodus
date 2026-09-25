@@ -20,7 +20,7 @@ import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import type {
   AppSettings,
   ChatConversationSummary,
@@ -759,13 +759,24 @@ export function ResearchAssistantModal({
     }
   };
 
+  const pendingCaretRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current;
+    const field = inputRef.current;
+    if (caret == null || !field) return;
+    pendingCaretRef.current = null;
+    field.focus();
+    field.setSelectionRange(caret, caret);
+  }, [input]);
   const pickSkill = (skill: { id: string; name: string }) => {
     if (!mention) return;
     const next = removeMention(input, mention);
     setInput(next.text);
     setInvokedSkills(current => current.some(item => item.id === skill.id) ? current : [...current, { id: skill.id, name: skill.name }].slice(0, 8));
     setMention(null);
-    window.requestAnimationFrame(() => { const field = inputRef.current; if (field) { field.focus(); field.setSelectionRange(next.caret, next.caret); } });
+    // Placed in the same commit as the new text: a frame later, a key typed straight after
+    // the pick landed before the caret moved.
+    pendingCaretRef.current = next.caret;
   };
 
   const send = async (explicit?: string) => {
@@ -1210,7 +1221,6 @@ export function ResearchAssistantModal({
                   placeholder={notebookHome && activeNotebook ? tx('Nuevo chat en {name}', { name: activeNotebook.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   aria-autocomplete={skillsEnabled ? 'list' : undefined}
                   aria-controls={mention ? 'research-skill-mention' : undefined}
-                  aria-expanded={skillsEnabled ? !!mention : undefined}
                   aria-activedescendant={mention && mentionOptions.length ? `research-skill-option-${mentionIndex}` : undefined}
                   onChange={(e) => {
                     setInput(e.target.value);

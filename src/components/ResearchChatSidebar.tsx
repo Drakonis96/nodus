@@ -194,14 +194,15 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
             const open = () => { setQuery(''); props.onOpenNotebook(notebook.id); };
             return (
               <div className={`research-history-row group ${activeNotebookId === notebook.id && !activeId ? 'is-active' : ''} ${menu?.kind === 'notebook' && menu.notebook.id === notebook.id ? 'is-menu-open' : ''}`}
-                data-testid={searching ? `research-search-notebook-${notebook.id}` : `research-notebook-${notebook.id}`} role="button" tabIndex={0} aria-expanded={searching ? undefined : row.expanded}
-                onClick={() => { if (renaming === key) return; if (searching) open(); else toggleGroup(key); }}
-                onKeyDown={event => { if (renaming !== key && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (searching) open(); else toggleGroup(key); } }}
-                title={tx('{n} chat(s)', { n: row.count })}>
-                <span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
+                data-testid={searching ? `research-search-notebook-${notebook.id}` : `research-notebook-${notebook.id}`}>
                 {renaming === key
-                  ? <RenameField value={notebook.name} onDone={name => { setRenaming(null); if (name && name !== notebook.name) run(() => props.onUpdateNotebook(notebook, { name })); }} />
-                  : <span className="min-w-0 flex-1 truncate">{notebook.name}</span>}
+                  ? <><span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
+                    <RenameField value={notebook.name} onDone={name => { setRenaming(null); if (name && name !== notebook.name) run(() => props.onUpdateNotebook(notebook, { name })); }} /></>
+                  : <button type="button" className="research-history-main" aria-expanded={searching ? undefined : row.expanded} title={tx('{n} chat(s)', { n: row.count })}
+                    onClick={() => { if (searching) open(); else toggleGroup(key); }}>
+                    <span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
+                    <span className="min-w-0 flex-1 truncate">{notebook.name}</span>
+                  </button>}
                 <span className="research-history-row-actions">
                   <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: notebook.name })} title={t('Nuevo chat en el cuaderno')}
                     onClick={event => { event.stopPropagation(); open(); }}><Icon name="edit" size={14} /></button>
@@ -216,14 +217,14 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
             const key = `project:${project.id}`;
             return (
               <div className={`research-history-row group ${activeProjectId === project.id && !activeId ? 'is-active' : ''} ${menu?.kind === 'project' && menu.project.id === project.id ? 'is-menu-open' : ''}`}
-                data-testid={`research-project-${project.id}`} role="button" tabIndex={0} aria-expanded={row.expanded}
-                onClick={() => { if (renaming !== key) toggleGroup(key); }}
-                onKeyDown={event => { if (renaming !== key && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleGroup(key); } }}
-                title={tx('{n} chat(s)', { n: row.count })}>
-                <span className="shrink-0" style={{ color: project.color ?? undefined }}><Icon name={project.icon ?? 'folder'} size={15} /></span>
+                data-testid={`research-project-${project.id}`}>
                 {renaming === key
-                  ? <RenameField value={project.name} onDone={name => { setRenaming(null); if (name && name !== project.name) run(() => props.onUpdateProject(project, { name })); }} />
-                  : <span className="min-w-0 flex-1 truncate">{project.name}</span>}
+                  ? <><span className="shrink-0" style={{ color: project.color ?? undefined }}><Icon name={project.icon ?? 'folder'} size={15} /></span>
+                    <RenameField value={project.name} onDone={name => { setRenaming(null); if (name && name !== project.name) run(() => props.onUpdateProject(project, { name })); }} /></>
+                  : <button type="button" className="research-history-main" aria-expanded={row.expanded} title={tx('{n} chat(s)', { n: row.count })} onClick={() => toggleGroup(key)}>
+                    <span className="shrink-0" style={{ color: project.color ?? undefined }}><Icon name={project.icon ?? 'folder'} size={15} /></span>
+                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                  </button>}
                 <span className="research-history-row-actions">
                   <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: project.name })} title={t('Nuevo chat en el proyecto')}
                     onClick={event => { event.stopPropagation(); props.onOpenProject(project.id); }}><Icon name="edit" size={14} /></button>
@@ -238,13 +239,14 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
           const pinned = !!conversation.pinnedAt && !conversation.archived;
           return (
             <div className={`research-history-row group ${row.nested ? 'is-nested' : ''} ${conversation.id === activeId ? 'is-active' : ''} ${pinned ? 'is-pinned' : ''} ${menu?.kind === 'chat' && menu.conversation.id === conversation.id ? 'is-menu-open' : ''}`}
-              data-testid={`research-conversation-${conversation.id}`} role="button" tabIndex={0}
-              title={`${formatRelative(conversation.updated_at)} · ${tx('{n} mensaje(s)', { n: conversation.messageCount })}`}
-              onClick={() => { if (renaming !== key && !sending) props.onOpenConversation(conversation.id); }}
-              onKeyDown={event => { if (renaming !== key && !sending && event.key === 'Enter') props.onOpenConversation(conversation.id); }}>
+              data-testid={`research-conversation-${conversation.id}`}>
               {renaming === key
                 ? <RenameField value={conversation.title} onDone={title => { setRenaming(null); if (title && title !== conversation.title && props.onRenameConversation) run(() => props.onRenameConversation!(conversation, title)); }} />
-                : <span className={`min-w-0 flex-1 truncate ${conversation.archived ? 'italic text-neutral-500' : ''}`}>{conversation.title}</span>}
+                : <button type="button" className="research-history-main" aria-current={conversation.id === activeId ? 'page' : undefined}
+                  title={`${formatRelative(conversation.updated_at)} · ${tx('{n} mensaje(s)', { n: conversation.messageCount })}`}
+                  onClick={() => { if (!sending) props.onOpenConversation(conversation.id); }}>
+                  <span className={`min-w-0 flex-1 truncate ${conversation.archived ? 'italic text-neutral-500' : ''}`}>{conversation.title}</span>
+                </button>}
               <span className="research-history-row-actions">
                 {supportsProjects && !conversation.archived && <button type="button" className={`research-history-action ${pinned ? 'is-on' : ''}`} aria-pressed={pinned}
                   aria-label={pinned ? t('Quitar de destacados') : t('Destacar chat')} title={pinned ? t('Quitar de destacados') : t('Destacar chat')}

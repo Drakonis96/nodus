@@ -53,8 +53,9 @@ try {
   assert.throws(() => contracts.validateRetrievalSettings({ ...contracts.RETRIEVAL_PRESETS.balanced, threshold: { mode: 'manual', value: .2 } }));
   // How a notebook looks is not what it reads: restyling keeps its revision.
   assert.equal(notebook.icon, 'notebook', 'a notebook starts with the notebook icon');
+  const before = repo.getResearchNotebook(notebook.id).revision;
   const styled = repo.updateResearchNotebookAppearance(notebook.id, { name: 'Renamed', icon: 'flask', color: '#EF4444' });
-  assert.deepEqual([styled.name, styled.icon, styled.color, styled.revision], ['Renamed', 'flask', '#ef4444', notebook.revision]);
+  assert.deepEqual([styled.name, styled.icon, styled.color, styled.revision], ['Renamed', 'flask', '#ef4444', before]);
   assert.throws(() => repo.updateResearchNotebookAppearance(notebook.id, { color: 'red' }), /invalid_color/);
   assert.throws(() => repo.updateResearchNotebookAppearance(notebook.id, { icon: '<svg>' }), /invalid_icon/);
   assert.equal(repo.saveResearchNotebook({ ...styled, sources: [reference('two')] }, ['b']).icon, 'flask', 'saving the selection keeps the look');

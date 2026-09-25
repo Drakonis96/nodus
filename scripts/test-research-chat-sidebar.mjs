@@ -143,7 +143,7 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       const rename = sidebar.getByRole('textbox', { name: 'Nuevo nombre' });
       await rename.fill('Réplica revisada'); await rename.press('Enter');
       await action('rename', 'c3', 'Réplica revisada');
-      await sidebar.getByTestId('research-conversation-c3').focus();
+      await sidebar.getByTestId('research-conversation-c3').hover();
       await sidebar.getByTestId('research-conversation-c3').getByRole('button', { name: 'Más acciones' }).click();
       await page.keyboard.press('Escape');
       await page.getByRole('menu').waitFor({ state: 'detached' });

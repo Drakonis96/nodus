@@ -255,3 +255,6 @@
 .skill-modal .skills-hub { margin-top: 14px; }
 .skill-modal .skills-hub-tabs { padding-left: 0; }
 .skill-modal .skills-hub-panel { padding: 16px 2px 0; }
+
+/* Its label on the tinted trigger meets text contrast in the light theme. */
+:is(.light, .nodi-theme-light) .chat-skills-trigger > span:not(.chat-skills-count) { color: color-mix(in srgb, var(--vault-accent, #6366f1) 72%, black); }

@@ -17,7 +17,7 @@ export async function verifyResearchSkillMention(page, app, root) {
   await input.pressSequentially('Dibuja el ciclo @sv');
   const menu = page.getByTestId('research-skill-mention');
   await menu.waitFor();
-  assert.equal(await input.getAttribute('aria-expanded'), 'true');
+  assert.equal(await input.getAttribute('aria-controls'), 'research-skill-mention', 'the composer points at its list');
   const first = menu.getByRole('option').first();
   assert.match(await first.innerText(), /SVG Studio/);
   assert.equal(await first.getAttribute('aria-selected'), 'true');
