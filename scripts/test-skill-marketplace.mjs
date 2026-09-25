@@ -65,7 +65,7 @@ test('complete lifecycle: refresh, install, activate, edit, export, import, repl
     assert.equal(fs.existsSync(path.join(temporary, 'skills', installed.id, 'tools/sum.js')), true);
     installed = lib.saveChatSkill({ ...installed, enabled: { assistant: true, nodi: false }, instructions: 'My local edit' }).find(s => s.id === installed.id);
     assert.ok(lib.enabledChatSkills('assistant').some(s => s.id === installed.id));
-    assert.ok(!lib.enabledChatSkills('nodi').some(s => s.id === installed.id));
+    assert.ok(lib.enabledChatSkills('nodi').some(s => s.id === installed.id), 'one activation applies to every chat');
     await lib.updateSkillSource(source.id);
     assert.equal(lib.listChatSkills().find(s => s.id === installed.id).instructions, 'My local edit');
     const exports = path.join(temporary, 'exports'); fs.mkdirSync(exports);

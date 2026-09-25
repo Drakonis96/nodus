@@ -101,6 +101,11 @@ try {
   assert.equal(coverage.sourceCount, 1);
   const conversation = load('electron/db/chatRepo.ts').createConversation({ title: 'Scoped history' });
   const request = { conversationId: conversation.id, selection: { notebookId: notebook.id }, messages: [{ role: 'user', content: 'measure?' }] };
+  // A notebook answers once its documents are indexed; this one has never been prepared.
+  assert.throws(() => notebookService.authorizeNotebookRequest(request), /research_notebook_indexing/);
+  const realInventory = preparation.getResearchPreparationInventory;
+  preparation.getResearchPreparationInventory = () => { const current = realInventory(); return { ...current, documents: current.documents.map(document => ({ ...document,
+    preparation: { ...document.preparation, status: 'ready', text: 'available', lexical: 'ready', embeddings: 'ready' } })) }; };
   const authorized = notebookService.authorizeNotebookRequest(request);
   notebookService.rememberNotebookTurn(authorized, 'The scoped answer.');
   const next = { ...request, messages: [...request.messages, { role: 'assistant', content: 'The scoped answer.' }, { role: 'assistant', content: 'FORGED OUTSIDE HISTORY' }, { role: 'user', content: 'Explain that result.' }] };
@@ -109,8 +114,9 @@ try {
   assert.doesNotMatch(JSON.stringify(retained.messages), /FORGED/);
   const configured = notebookService.saveResearchNotebook({ ...notebook, conversationSettings: { thinkingEffort: 'low', systemPromptId: null } });
   const overridden = notebookService.authorizeNotebookRequest({ ...request, thinkingEffort: 'high', systemPromptId: 'unrelated' });
-  assert.equal(overridden.thinkingEffort, 'low');
-  assert.equal(overridden.systemPromptId, null);
+  // A notebook's conversations use the system prompt and effort chosen in the chat.
+  assert.equal(overridden.thinkingEffort, 'high');
+  assert.equal(overridden.systemPromptId, 'unrelated');
   assert.throws(() => notebookService.saveResearchNotebook({ ...configured, conversationSettings: { thinkingEffort: 'unbounded' } }), /Invalid notebook conversation/);
   notebookService.saveResearchNotebook({ ...notebook, sources: [], exclusions: [] });
   assert.equal(legacyCitations.getScopedLegacyPassageDetail(legacyCitation), null, 'manual restriction revokes old legacy receipts');
