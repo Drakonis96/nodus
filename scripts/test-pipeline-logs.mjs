@@ -61,7 +61,7 @@ test('a corrupt or missing file never breaks the log', () => {
   assert.equal(repository.query({}, LIMITS, NOW).total, 0);
   assert.equal(repository.stats().entries, 0);
   // And an entry can still be recorded afterwards, which is the point of surviving it.
-  repository.record(entry('after-corrupt', NOW), LIMITS);
+  repository.record(entry('after-corrupt', NOW), LIMITS, NOW);
   assert.equal(repository.query({}, LIMITS, NOW).total, 1);
 
   const missing = new store.PipelineLogRepository(path.join(dir, 'nope', 'absent.json'), 0);
@@ -272,8 +272,8 @@ test('the exported text carries the numbers, the ids and the provider’s own wo
 test('entries are grouped and capped on write, and flushed to disk on demand', () => {
   const file = path.join(dir, 'store.json');
   const repository = new store.PipelineLogRepository(file, 60_000);
-  repository.record(entry('one', NOW), LIMITS);
-  repository.record(entry('two', NOW + 500), LIMITS);
+  repository.record(entry('one', NOW), LIMITS, NOW);
+  repository.record(entry('two', NOW + 500), LIMITS, NOW + 500);
   // Writes are coalesced, so the file only appears when the timer fires or the app flushes.
   repository.flushSync();
   const written = JSON.parse(readFileSync(file, 'utf8'));
