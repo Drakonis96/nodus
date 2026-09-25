@@ -50,6 +50,7 @@ import { registerAcademicIpc } from './ipc/academic';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { registerRadarIpc } from './ipc/radar';
+import { registerReactionIndexIpc } from './ipc/reactionIndex';
 import { registerCompassIpc } from './ipc/compass';
 import { registerLogsIpc } from './ipc/logs';
 import { setBrowserTheme } from './browser/tabs';
@@ -244,6 +245,7 @@ export function registerIpc(
   registerLibraryIpc(context);
   registerBrowserIpc(context);
   registerRadarIpc(context);
+  registerReactionIndexIpc(context);
   registerCompassIpc(context);
   registerRecordsIpc(context);
   registerPlatformIpc(context);
