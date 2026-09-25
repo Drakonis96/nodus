@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatConversationSummary, ResearchChatProject } from '@shared/types';
 import type { ResearchNotebook } from '@shared/researchCorpus';
@@ -39,7 +39,7 @@ type Row =
   | { kind: 'header'; id: string; label: string }
   | { kind: 'project'; project: ResearchChatProject; expanded: boolean; count: number }
   | { kind: 'chat'; conversation: ChatConversationSummary; nested: boolean }
-  | { kind: 'notebook'; notebook: ResearchNotebook }
+  | { kind: 'notebook'; notebook: ResearchNotebook; expanded: boolean; count: number }
   | { kind: 'empty'; id: string; label: string };
 
 export interface ResearchChatSidebarProps {
@@ -60,7 +60,11 @@ export interface ResearchChatSidebarProps {
   onNewProject: () => Promise<ResearchChatProject | null>;
   onOpenConversation: (id: string) => void;
   onOpenProject: (id: string) => void;
-  onSelectNotebook: (id: string) => void;
+  activeNotebookId: string | null;
+  onOpenNotebook: (id: string) => void;
+  onEditNotebook: (notebook: ResearchNotebook) => void;
+  onUpdateNotebook: (notebook: ResearchNotebook, patch: { name?: string; icon?: string | null; color?: string | null }) => Promise<void>;
+  onDeleteNotebook: (notebook: ResearchNotebook) => Promise<void>;
   onRenameConversation?: (conversation: ChatConversationSummary, title: string) => Promise<void>;
   onPinConversation: (conversation: ChatConversationSummary, pinned: boolean) => Promise<void>;
   onArchiveConversation?: (conversation: ChatConversationSummary) => Promise<void>;
@@ -70,17 +74,21 @@ export interface ResearchChatSidebarProps {
   onDeleteProject: (project: ResearchChatProject) => Promise<void>;
 }
 
-/** The research chat history: tools, search, then Projects, Pinned and the other chats. */
+/** The research chat history: tools, search, then Projects, Notebooks, Pinned and the other chats. */
 export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
-  const { conversations, projects, notebooks, supportsProjects, notebooksOn, activeId, activeProjectId, sending } = props;
+  const { conversations, projects, notebooks, supportsProjects, notebooksOn, activeId, activeProjectId, activeNotebookId, sending } = props;
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ kind: 'chat'; conversation: ChatConversationSummary; anchor: DOMRect } | { kind: 'project'; project: ResearchChatProject; anchor: DOMRect } | null>(null);
-  const [styling, setStyling] = useState<ResearchChatProject | null>(null);
+  const [menu, setMenu] = useState<{ kind: 'chat'; conversation: ChatConversationSummary; anchor: DOMRect } | { kind: 'project'; project: ResearchChatProject; anchor: DOMRect } | { kind: 'notebook'; notebook: ResearchNotebook; anchor: DOMRect } | null>(null);
+  const [styling, setStyling] = useState<{ kind: 'project' | 'notebook'; id: string } | null>(null);
   const [deletingProject, setDeletingProject] = useState<ResearchChatProject | null>(null);
+  const [deletingNotebook, setDeletingNotebook] = useState<ResearchNotebook | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const projectById = useMemo(() => new Map(projects.map(project => [project.id, project])), [projects]);
+  const notebookById = useMemo(() => new Map((notebooksOn ? notebooks : []).map(notebook => [notebook.id, notebook])), [notebooks, notebooksOn]);
+  // A chat that reads a notebook lives in it, like a project's chats in their project.
+  const inNotebook = (conversation: ChatConversationSummary) => !!conversation.notebookId && notebookById.has(conversation.notebookId);
 
   const rows = useMemo<Row[]>(() => {
     const needle = fold(query.trim());
@@ -89,9 +97,10 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       const matchedProjects = supportsProjects ? projects.filter(project => fold(project.name).includes(needle)) : [];
       const matchedNotebooks = notebooksOn ? notebooks.filter(notebook => fold(notebook.name).includes(needle)) : [];
       const matchedChats = conversations.filter(conversation => fold(conversation.title).includes(needle)
-        || (conversation.projectId && fold(projectById.get(conversation.projectId)?.name ?? '').includes(needle)));
+        || (conversation.projectId && fold(projectById.get(conversation.projectId)?.name ?? '').includes(needle))
+        || (conversation.notebookId && fold(notebookById.get(conversation.notebookId)?.name ?? '').includes(needle)));
       if (matchedProjects.length) out.push({ kind: 'header', id: 'h-projects', label: t('Proyectos') }, ...matchedProjects.map(project => ({ kind: 'project' as const, project, expanded: false, count: 0 })));
-      if (matchedNotebooks.length) out.push({ kind: 'header', id: 'h-notebooks', label: t('Cuadernos') }, ...matchedNotebooks.map(notebook => ({ kind: 'notebook' as const, notebook })));
+      if (matchedNotebooks.length) out.push({ kind: 'header', id: 'h-notebooks', label: t('Cuadernos') }, ...matchedNotebooks.map(notebook => ({ kind: 'notebook' as const, notebook, expanded: false, count: 0 })));
       if (matchedChats.length) out.push({ kind: 'header', id: 'h-chats', label: t('Chats') }, ...matchedChats.map(conversation => ({ kind: 'chat' as const, conversation, nested: false })));
       if (!out.length) out.push({ kind: 'empty', id: 'no-results', label: t('Sin resultados') });
       return out;
@@ -105,8 +114,19 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       out.push({ kind: 'header', id: 'h-projects', label: t('Proyectos') });
       for (const project of projects) {
         const chats = inProject.get(project.id) ?? [];
-        const open = expanded.has(project.id);
+        const open = expanded.has(`project:${project.id}`);
         out.push({ kind: 'project', project, expanded: open, count: chats.length });
+        if (open) out.push(...chats.map(conversation => ({ kind: 'chat' as const, conversation, nested: true })));
+      }
+    }
+    if (notebooksOn && notebooks.length) {
+      const inNotebooks = new Map<string, ChatConversationSummary[]>();
+      for (const conversation of conversations) if (inNotebook(conversation)) inNotebooks.set(conversation.notebookId!, [...(inNotebooks.get(conversation.notebookId!) ?? []), conversation]);
+      out.push({ kind: 'header', id: 'h-notebooks', label: t('Cuadernos') });
+      for (const notebook of [...notebooks].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))) {
+        const chats = inNotebooks.get(notebook.id) ?? [];
+        const open = expanded.has(`notebook:${notebook.id}`);
+        out.push({ kind: 'notebook', notebook, expanded: open, count: chats.length });
         if (open) out.push(...chats.map(conversation => ({ kind: 'chat' as const, conversation, nested: true })));
       }
     }
@@ -114,15 +134,15 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       .sort((a, b) => (a.pinnedAt ?? '').localeCompare(b.pinnedAt ?? '')) : [];
     if (pinned.length) out.push({ kind: 'header', id: 'h-pinned', label: t('Chats destacados') }, ...pinned.map(conversation => ({ kind: 'chat' as const, conversation, nested: false })));
     const rest = conversations.filter(conversation => !(supportsProjects && conversation.pinnedAt && !conversation.archived)
-      && !(supportsProjects && conversation.projectId && projectById.has(conversation.projectId)));
+      && !(supportsProjects && conversation.projectId && projectById.has(conversation.projectId)) && !inNotebook(conversation));
     if (rest.length) {
       if (out.length) out.push({ kind: 'header', id: 'h-chats', label: t('Chats') });
       out.push(...rest.map(conversation => ({ kind: 'chat' as const, conversation, nested: false })));
     }
     return out;
-  }, [query, conversations, projects, notebooks, supportsProjects, notebooksOn, projectById, expanded]);
+  }, [query, conversations, projects, notebooks, supportsProjects, notebooksOn, projectById, notebookById, expanded]);
 
-  const toggleProject = (id: string) => setExpanded(current => {
+  const toggleGroup = (id: string) => setExpanded(current => {
     const next = new Set(current);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
@@ -167,20 +187,38 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         renderItem={row => {
           if (row.kind === 'header') return <div className="research-history-heading">{row.label}</div>;
           if (row.kind === 'empty') return <div className="research-history-empty px-2 py-2 text-xs text-neutral-500">{row.label}</div>;
-          if (row.kind === 'notebook') return (
-            <button type="button" className="research-history-row" data-testid={`research-search-notebook-${row.notebook.id}`} onClick={() => { setQuery(''); props.onSelectNotebook(row.notebook.id); }}>
-              <Icon name="notebook" size={14} className="shrink-0 text-neutral-500" />
-              <span className="min-w-0 flex-1 truncate text-left">{row.notebook.name}</span>
-            </button>
-          );
+          if (row.kind === 'notebook') {
+            const { notebook } = row;
+            const key = `notebook:${notebook.id}`;
+            const searching = !!query.trim();
+            const open = () => { setQuery(''); props.onOpenNotebook(notebook.id); };
+            return (
+              <div className={`research-history-row group ${activeNotebookId === notebook.id && !activeId ? 'is-active' : ''} ${menu?.kind === 'notebook' && menu.notebook.id === notebook.id ? 'is-menu-open' : ''}`}
+                data-testid={searching ? `research-search-notebook-${notebook.id}` : `research-notebook-${notebook.id}`} role="button" tabIndex={0} aria-expanded={searching ? undefined : row.expanded}
+                onClick={() => { if (renaming === key) return; if (searching) open(); else toggleGroup(key); }}
+                onKeyDown={event => { if (renaming !== key && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); if (searching) open(); else toggleGroup(key); } }}
+                title={tx('{n} chat(s)', { n: row.count })}>
+                <span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
+                {renaming === key
+                  ? <RenameField value={notebook.name} onDone={name => { setRenaming(null); if (name && name !== notebook.name) run(() => props.onUpdateNotebook(notebook, { name })); }} />
+                  : <span className="min-w-0 flex-1 truncate">{notebook.name}</span>}
+                <span className="research-history-row-actions">
+                  <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: notebook.name })} title={t('Nuevo chat en el cuaderno')}
+                    onClick={event => { event.stopPropagation(); open(); }}><Icon name="edit" size={14} /></button>
+                  <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
+                    onClick={event => { event.stopPropagation(); setMenu({ kind: 'notebook', notebook, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
+                </span>
+              </div>
+            );
+          }
           if (row.kind === 'project') {
             const { project } = row;
             const key = `project:${project.id}`;
             return (
               <div className={`research-history-row group ${activeProjectId === project.id && !activeId ? 'is-active' : ''} ${menu?.kind === 'project' && menu.project.id === project.id ? 'is-menu-open' : ''}`}
                 data-testid={`research-project-${project.id}`} role="button" tabIndex={0} aria-expanded={row.expanded}
-                onClick={() => { if (renaming !== key) toggleProject(project.id); }}
-                onKeyDown={event => { if (renaming !== key && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleProject(project.id); } }}
+                onClick={() => { if (renaming !== key) toggleGroup(key); }}
+                onKeyDown={event => { if (renaming !== key && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); toggleGroup(key); } }}
                 title={tx('{n} chat(s)', { n: row.count })}>
                 <span className="shrink-0" style={{ color: project.color ?? undefined }}><Icon name={project.icon ?? 'folder'} size={15} /></span>
                 {renaming === key
@@ -190,7 +228,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
                   <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: project.name })} title={t('Nuevo chat en el proyecto')}
                     onClick={event => { event.stopPropagation(); props.onOpenProject(project.id); }}><Icon name="edit" size={14} /></button>
                   <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
-                    onClick={event => { event.stopPropagation(); setMenu({ kind: 'project', project, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="menu" size={14} /></button>
+                    onClick={event => { event.stopPropagation(); setMenu({ kind: 'project', project, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
                 </span>
               </div>
             );
@@ -212,7 +250,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
                   aria-label={pinned ? t('Quitar de destacados') : t('Destacar chat')} title={pinned ? t('Quitar de destacados') : t('Destacar chat')}
                   onClick={event => { event.stopPropagation(); run(() => props.onPinConversation(conversation, !pinned)); }}><Icon name="pin" size={14} /></button>}
                 <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
-                  onClick={event => { event.stopPropagation(); setMenu({ kind: 'chat', conversation, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="menu" size={14} /></button>
+                  onClick={event => { event.stopPropagation(); setMenu({ kind: 'chat', conversation, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
               </span>
             </div>
           );
@@ -228,12 +266,29 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         onRename={() => setRenaming(`chat:${menu.conversation.id}`)} run={run} />}
       {menu?.kind === 'project' && <FloatingMenu anchor={menu.anchor} label={menu.project.name} onClose={() => setMenu(null)}>
         <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`project:${menu.project.id}`); }} />
-        <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling(menu.project); }} />
+        <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'project', id: menu.project.id }); }} />
         <hr className="research-history-menu-separator" />
         <MenuItem icon="trash" danger label={t('Eliminar proyecto')} onSelect={() => { setMenu(null); setDeletingProject(menu.project); }} />
       </FloatingMenu>}
-      {styling && <ProjectStyleDialog project={projectById.get(styling.id) ?? styling} onClose={() => setStyling(null)}
-        onChange={patch => run(() => props.onUpdateProject(projectById.get(styling.id) ?? styling, patch))} />}
+      {menu?.kind === 'notebook' && <FloatingMenu anchor={menu.anchor} label={menu.notebook.name} onClose={() => setMenu(null)}>
+        <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`notebook:${menu.notebook.id}`); }} />
+        <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'notebook', id: menu.notebook.id }); }} />
+        <MenuItem icon="folder" label={t('Editar colecciones')} onSelect={() => { setMenu(null); props.onEditNotebook(menu.notebook); }} />
+        <hr className="research-history-menu-separator" />
+        <MenuItem icon="trash" danger label={t('Eliminar cuaderno')} onSelect={() => { setMenu(null); setDeletingNotebook(menu.notebook); }} />
+      </FloatingMenu>}
+      {styling?.kind === 'project' && projectById.has(styling.id) && <AppearanceDialog value={projectById.get(styling.id)!} fallbackIcon="folder" onClose={() => setStyling(null)}
+        onChange={patch => run(() => props.onUpdateProject(projectById.get(styling.id)!, patch))} />}
+      {styling?.kind === 'notebook' && notebookById.has(styling.id) && <AppearanceDialog value={notebookById.get(styling.id)!} fallbackIcon="notebook" onClose={() => setStyling(null)}
+        onChange={patch => run(() => props.onUpdateNotebook(notebookById.get(styling.id)!, patch))} />}
+      {deletingNotebook && <ConfirmModal
+        title={t('Eliminar cuaderno')}
+        message={tx('Se eliminará «{name}». Sus chats no se borran: vuelven al historial general, y sus colecciones siguen en la Biblioteca.', { name: deletingNotebook.name })}
+        confirmLabel={t('Eliminar')}
+        danger
+        onConfirm={() => { const notebook = deletingNotebook; setDeletingNotebook(null); run(() => props.onDeleteNotebook(notebook)); }}
+        onCancel={() => setDeletingNotebook(null)}
+      />}
       {deletingProject && <ConfirmModal
         title={t('Eliminar proyecto')}
         message={tx('Se eliminará «{name}». Sus chats no se borran: vuelven al historial general.', { name: deletingProject.name })}
@@ -267,6 +322,8 @@ function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supp
 }) {
   const [moving, setMoving] = useState(false);
   const pinned = !!conversation.pinnedAt && !conversation.archived;
+  // A notebook's chat belongs to its notebook; it is not moved into a project.
+  const movable = supportsProjects && !(conversation.notebookId && props.notebooksOn && props.notebooks.some(notebook => notebook.id === conversation.notebookId));
   const act = (action: () => Promise<unknown> | void) => { onClose(); run(async () => { await action(); }); };
   return <FloatingMenu anchor={anchor} label={conversation.title} onClose={onClose}>
     {moving ? <>
@@ -285,7 +342,7 @@ function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supp
       {supportsProjects && !conversation.archived && <MenuItem icon="pin" label={pinned ? t('Quitar de destacados') : t('Destacar chat')} onSelect={() => act(() => props.onPinConversation(conversation, !pinned))} />}
       {props.onArchiveConversation && <MenuItem icon="archive" label={conversation.archived ? t('Desarchivar') : t('Archivar')} onSelect={() => act(() => props.onArchiveConversation!(conversation))} />}
       <MenuItem icon="trash" danger label={t('Eliminar')} onSelect={() => { onClose(); props.onDeleteConversation(conversation); }} />
-      {supportsProjects && <>
+      {movable && <>
         <hr className="research-history-menu-separator" />
         <MenuItem icon="folderMove" label={t('Mover a proyecto')} trailing={<Icon name="chevronRight" size={13} />} keepOpen onSelect={() => setMoving(true)} />
       </>}
@@ -295,17 +352,19 @@ function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supp
 
 function FloatingMenu({ anchor, label, onClose, children }: { anchor: DOMRect; label: string; onClose: () => void; children: ReactNode }) {
   const ref = useDismissableLayer<HTMLDivElement>({ open: true, onDismiss: onClose, group: 'research-history-menu' });
-  const [position, setPosition] = useState({ top: anchor.bottom + 4, left: anchor.left });
-  useEffect(() => {
+  // Placed before the first paint and hidden until then: measured after painting, the menu
+  // showed for a frame hanging to the right of its button and then jumped to the left.
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
     const menu = ref.current;
     if (!menu) return;
     const { width, height } = menu.getBoundingClientRect();
-    setPosition({
-      top: anchor.bottom + 4 + height > window.innerHeight - 8 ? Math.max(8, anchor.top - height - 4) : anchor.bottom + 4,
-      left: Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8)),
-    });
-    menu.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const top = anchor.bottom + 4 + height > window.innerHeight - 8 ? Math.max(8, anchor.top - height - 4) : anchor.bottom + 4;
+    const left = Math.max(8, Math.min(anchor.right - width, window.innerWidth - width - 8));
+    // Re-measured when the content changes (the project list), set only when it moved.
+    setPosition(current => current && current.top === top && current.left === left ? current : { top, left });
   }, [anchor, children, ref]);
+  useLayoutEffect(() => { ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus(); }, [ref]);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (!['ArrowDown', 'ArrowUp'].includes(event.key)) return;
     event.preventDefault();
@@ -314,7 +373,7 @@ function FloatingMenu({ anchor, label, onClose, children }: { anchor: DOMRect; l
     items[(index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus();
   };
   return createPortal(
-    <div ref={ref} role="menu" aria-label={label} className="research-history-menu" style={{ top: position.top, left: position.left }} onKeyDown={onKeyDown}>{children}</div>,
+    <div ref={ref} role="menu" aria-label={label} className="research-history-menu" style={position ? { top: position.top, left: position.left } : { top: 0, left: 0, visibility: 'hidden' }} onKeyDown={onKeyDown}>{children}</div>,
     document.body,
   );
 }
@@ -330,8 +389,8 @@ function MenuItem({ icon, label, onSelect, danger = false, checked = false, colo
   </button>;
 }
 
-/** Colour and icon of a project; each choice applies at once. */
-function ProjectStyleDialog({ project, onClose, onChange }: { project: ResearchChatProject; onClose: () => void; onChange: (patch: { icon?: string; color?: string | null }) => void }) {
+/** Colour and icon of a project or a notebook; each choice applies at once. */
+function AppearanceDialog({ value: project, fallbackIcon, onClose, onChange }: { value: { icon?: string | null; color?: string | null }; fallbackIcon: string; onClose: () => void; onChange: (patch: { icon?: string; color?: string | null }) => void }) {
   const ref = useDismissableLayer<HTMLDivElement>({ open: true, onDismiss: onClose, group: 'research-project-style' });
   const custom = project.color && !PROJECT_COLORS.includes(project.color);
   return createPortal(
@@ -347,8 +406,8 @@ function ProjectStyleDialog({ project, onClose, onChange }: { project: ResearchC
         </div>
         <hr className="research-history-menu-separator" />
         <div className="research-project-icons">
-          {PROJECT_ICONS.map(icon => <button key={icon} type="button" className={`research-project-icon ${(project.icon ?? 'folder') === icon ? 'is-selected' : ''}`}
-            aria-label={icon} aria-pressed={(project.icon ?? 'folder') === icon} onClick={() => onChange({ icon })}><Icon name={icon} size={18} /></button>)}
+          {PROJECT_ICONS.map(icon => <button key={icon} type="button" className={`research-project-icon ${(project.icon ?? fallbackIcon) === icon ? 'is-selected' : ''}`}
+            aria-label={icon} aria-pressed={(project.icon ?? fallbackIcon) === icon} onClick={() => onChange({ icon })}><Icon name={icon} size={18} /></button>)}
         </div>
         <hr className="research-history-menu-separator" />
         <button type="button" className="research-history-menu-item" onClick={onClose}>{t('Cerrar')}</button>

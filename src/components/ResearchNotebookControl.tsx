@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { RETRIEVAL_PRESETS, type ResearchCorpusCollection, type ResearchCorpusDocument, type ResearchNotebook, type ResearchNotebookInput, type ResearchPreparationInventory, type ResearchSourceReference } from '@shared/researchCorpus';
-import { ResearchZoteroControl } from './ResearchZoteroControl';
-import { ResearchSystemPromptControl } from './ResearchSystemPromptControl';
-import type { ResearchSystemPrompt } from '@shared/researchSystemPrompts';
+import type { ResearchCorpusCollection, ResearchNotebook, ResearchPreparationInventory, ResearchSourceReference } from '@shared/researchCorpus';
+import { CollectionSourceIcon } from './CollectionSourceIcon';
 import { Icon } from './ui';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 
 /** The vault's research notebooks (academic vaults only) and a way to refresh them. */
 export function useResearchNotebooks(enabled = true) {
@@ -41,153 +39,157 @@ export function ResearchNotebookControl({ value, onChange }: { value?: string | 
   </div>;
 }
 
-/** The notebook a conversation reads from, in the header: its name, edit and leave. */
-export function ResearchNotebookChip({ notebook, onEdit, onClear, disabled }: { notebook: ResearchNotebook; onEdit: () => void; onClear: () => void; disabled?: boolean }) {
-  return <div className="research-notebook-chip" data-testid="research-notebook-chip">
-    <button type="button" className="research-notebook-chip-name" onClick={onEdit} disabled={disabled} aria-label={`${t('Editar cuaderno')}: ${notebook.name}`} title={t('Editar cuaderno')}>
-      <Icon name="notebook" size={15} /><span className="truncate">{notebook.name}</span>
-    </button>
-    <button type="button" className="research-notebook-chip-clear" onClick={onClear} disabled={disabled} aria-label={t('Volver al chat general')} title={t('Volver al chat general')}><Icon name="x" size={13} /></button>
-  </div>;
+const referenceKey = (source: ResearchSourceReference) => JSON.stringify([source.kind, source.id, source.libraryType, source.libraryId]);
+const collectionKind = (kind: ResearchSourceReference['kind']) => kind === 'library-collection' || kind === 'zotero-collection';
+const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
+
+interface CollectionNode { key: string; collection: ResearchCorpusCollection; origin: 'nodus' | 'zotero'; parent: string | null; children: string[]; documents: Set<string> }
+
+/** The corpus collections as a tree: Nodus first, then Zotero, alphabetical at each level. */
+export function collectionTree(collections: ResearchCorpusCollection[]): { nodes: Map<string, CollectionNode>; roots: string[] } {
+  const nodes = new Map<string, CollectionNode>();
+  const byIdentity = new Map<string, string>();
+  const identity = (reference: ResearchSourceReference, id: string) => JSON.stringify([reference.kind, reference.libraryType, reference.libraryId, id]);
+  for (const collection of collections) {
+    const key = referenceKey(collection.reference);
+    nodes.set(key, { key, collection, origin: collection.origin ?? (collection.reference.kind === 'zotero-collection' ? 'zotero' : 'nodus'), parent: null, children: [], documents: new Set(collection.documentIds) });
+    byIdentity.set(identity(collection.reference, collection.reference.id), key);
+  }
+  for (const node of nodes.values()) {
+    const parent = node.collection.parentId ? byIdentity.get(identity(node.collection.reference, node.collection.parentId)) : undefined;
+    if (parent && parent !== node.key) { node.parent = parent; nodes.get(parent)!.children.push(node.key); }
+  }
+  // Documents of a folder include its subfolders', counted once.
+  const gather = (key: string, seen = new Set<string>()): Set<string> => {
+    const node = nodes.get(key)!;
+    if (seen.has(key)) return node.documents;
+    seen.add(key);
+    for (const child of node.children) for (const id of gather(child, seen)) node.documents.add(id);
+    return node.documents;
+  };
+  const order = (a: string, b: string) => {
+    const left = nodes.get(a)!, right = nodes.get(b)!;
+    return (left.origin === right.origin ? 0 : left.origin === 'nodus' ? -1 : 1) || left.collection.name.localeCompare(right.collection.name, undefined, { sensitivity: 'base', numeric: true });
+  };
+  for (const node of nodes.values()) node.children.sort(order);
+  const roots = [...nodes.values()].filter(node => !node.parent).map(node => node.key).sort(order);
+  for (const root of roots) gather(root);
+  return { nodes, roots };
 }
 
-const referenceKey = (source: ResearchSourceReference) => JSON.stringify([source.kind, source.id, source.libraryType, source.libraryId]);
+/**
+ * A notebook is a name and the collections it reads: Nodus or Zotero folders, each with
+ * everything below it. What they hold and is not indexed yet is queued on saving; how the
+ * assistant answers (prompt, effort) is chosen in each conversation, like any other chat.
+ */
 export function NotebookDialog({ notebook, onClose, onSaved }: { notebook: ResearchNotebook | null; onClose: () => void; onSaved: (id: string | null) => Promise<void> }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [draft, setDraft] = useState<ResearchNotebookInput>(notebook ?? { name: '', description: '', sources: [], exclusions: [], mode: 'fixed', settings: { ...RETRIEVAL_PRESETS.balanced } });
-  const [documents, setDocuments] = useState<ResearchCorpusDocument[]>([]);
-  const [collections, setCollections] = useState<ResearchCorpusCollection[]>([]);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const [name, setName] = useState(notebook?.name ?? '');
+  const [selected, setSelected] = useState<Set<string>>(() => new Set((notebook?.sources ?? []).filter(source => collectionKind(source.kind)).map(referenceKey)));
+  const [collections, setCollections] = useState<ResearchCorpusCollection[] | null>(null);
   const [inventory, setInventory] = useState<ResearchPreparationInventory | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [membershipChanges, setMembershipChanges] = useState<{ added: string[]; removed: string[] }>({ added: [], removed: [] });
-  const [prompts, setPrompts] = useState<ResearchSystemPrompt[]>([]);
-  const refreshPrompts = async () => setPrompts((await window.nodus.getResearchSystemPrompts()).prompts);
+  const [accent, setAccent] = useState('var(--a-500)');
+  const looseSources = (notebook?.sources ?? []).some(source => !collectionKind(source.kind));
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    nameRef.current?.focus();
+    const surface = document.querySelector('.research-chat-surface');
+    if (surface) setAccent(getComputedStyle(surface).getPropertyValue('--vault-accent').trim() || 'var(--a-500)');
+    return () => element?.close();
+  }, []);
   useEffect(() => {
-    dialog.current?.showModal();
-    void refreshPrompts().catch(reason => setError(String(reason)));
     let active = true;
     void Promise.all([window.nodus.getResearchCorpusSources(), window.nodus.getResearchPreparationInventory()]).then(([sources, preparation]) => {
-      if (active) { setDocuments(sources.documents); setCollections(sources.collections); setInventory(preparation); }
-    }).catch(reason => { if (active) setError(String(reason)); });
-    if (notebook?.mode === 'linked') void window.nodus.resolveResearchNotebook(notebook.id).then(scope => {
-      if (active) setMembershipChanges(scope.changes);
+      if (active) { setCollections(sources.collections); setInventory(preparation); }
     }).catch(reason => { if (active) setError(String(reason)); });
     return () => { active = false; };
-  }, [notebook?.id, notebook?.mode]);
-  const selected = new Set<string>();
-  for (const source of draft.sources) {
-    if (source.kind === 'work' || source.kind === 'library-item' || source.kind === 'note' || source.kind === 'conversation-attachment') {
-      documents.filter(document => (source.kind === 'conversation-attachment' ? document.conversationAttachment && document.id : source.kind === 'work' ? document.workId : source.kind === 'note' ? document.noteId : document.libraryItemId) === source.id).forEach(document => selected.add(document.id));
-    } else {
-      const stack = collections.filter(collection => referenceKey(collection.reference) === referenceKey(source));
-      const visited = new Set<string>();
-      while (stack.length) {
-        const collection = stack.pop()!;
-        const key = referenceKey(collection.reference);
-        if (visited.has(key)) continue;
-        visited.add(key);
-        collection.documentIds.forEach(id => selected.add(id));
-        if (source.includeDescendants) stack.push(...collections.filter(child => child.parentId === collection.reference.id
-          && child.reference.kind === source.kind && child.reference.libraryType === source.libraryType && child.reference.libraryId === source.libraryId));
-      }
-    }
-  }
-  if (notebook?.mode === 'fixed' && draft.mode === 'fixed'
-    && JSON.stringify([draft.sources, draft.exclusions]) === JSON.stringify([notebook.sources, notebook.exclusions])) {
-    selected.clear();
-    notebook.resolvedDocumentIds.filter(id => documents.some(document => document.id === id)).forEach(id => selected.add(id));
-  }
-  draft.exclusions.forEach(id => selected.delete(id));
-  const act = async (action: () => Promise<void>) => { setBusy(true); setError(''); try { await action(); } catch (reason) { setError(String(reason)); } finally { setBusy(false); } };
-  const settings = draft.settings ?? RETRIEVAL_PRESETS.balanced;
-  return createPortal(<dialog ref={dialog} onCancel={onClose} aria-labelledby="research-notebook-title" className="card-modal text-neutral-100 p-5 w-[min(760px,94vw)] max-h-[88vh] overflow-auto backdrop:bg-black/60">
-    <form onSubmit={event => { event.preventDefault(); void act(async () => { const saved = await window.nodus.saveResearchNotebook(draft); await onSaved(saved.id); }); }}>
-      <h2 id="research-notebook-title" className="text-lg font-semibold mb-4">{t('Cuaderno de investigación')}</h2>
-      <label className="block mb-3">{t('Nombre')}<input autoFocus required maxLength={160} className="input block w-full" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
-      <label className="block mb-3">{t('Descripción')}<textarea className="input block w-full" maxLength={10000} value={draft.description ?? ''} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
-      <label className="block mb-3">{t('Selección de fuentes')}
-        <select className="input ml-2" value={draft.mode} onChange={event => setDraft({ ...draft, mode: event.target.value as 'fixed' | 'linked' })}>
-          <option value="fixed">{t('Selección fija')}</option><option value="linked">{t('Colecciones vinculadas')}</option>
-        </select>
-      </label>
-      {draft.mode === 'linked' && (membershipChanges.added.length > 0 || membershipChanges.removed.length > 0) && <p role="status" className="text-sm mb-3">
-        {t('Cambios en las colecciones')}: +{membershipChanges.added.length} / −{membershipChanges.removed.length}. {t('Se aplicarán en la próxima ejecución.')}
-      </p>}
-      <fieldset className="border border-neutral-700 rounded p-3 mb-3"><legend>{t('Colecciones')}</legend>
-        {collections.map(collection => { const source = draft.sources.find(item => referenceKey(item) === referenceKey(collection.reference)); return <div key={referenceKey(collection.reference)} className="flex flex-wrap gap-3 mb-1">
-          <label><input type="checkbox" checked={!!source} onChange={event => setDraft({ ...draft, sources: event.target.checked ? [...draft.sources, collection.reference] : draft.sources.filter(item => referenceKey(item) !== referenceKey(collection.reference)) })} /> {collection.name}</label>
-          {source && <label className="text-xs"><input type="checkbox" checked={source.includeDescendants === true} onChange={event => setDraft({ ...draft, sources: draft.sources.map(item => referenceKey(item) === referenceKey(source) ? { ...item, includeDescendants: event.target.checked } : item) })} /> {t('Incluir subcolecciones')}</label>}
-        </div>; })}
-      </fieldset>
-      <label className="block">{t('Buscar')}<input type="search" className="input w-full" value={query} onChange={event => setQuery(event.target.value)} /></label>
-      <fieldset className="my-3 max-h-56 overflow-auto"><legend>{t('Fuentes')} · {selected.size}</legend>
-        {documents.filter(document => document.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(document => {
-          const reference: ResearchSourceReference = document.conversationAttachment ? { kind: 'conversation-attachment', id: document.id } : document.noteId ? { kind: 'note', id: document.noteId } : document.libraryItemId ? { kind: 'library-item', id: document.libraryItemId } : { kind: 'work', id: document.workId! };
-          const state = inventory?.documents.find(item => item.id === document.id)?.preparation;
-          return <label key={document.id} className="flex items-start gap-2 py-1 text-sm"><input type="checkbox" checked={selected.has(document.id)} onChange={event => setDraft({ ...draft,
-            sources: event.target.checked && !draft.sources.some(item => referenceKey(item) === referenceKey(reference)) ? [...draft.sources, reference] : draft.sources,
-            exclusions: event.target.checked ? draft.exclusions.filter(id => id !== document.id) : [...new Set([...draft.exclusions, document.id])],
-          })} /><span>{document.title}{document.noteId && <small className="ml-2">· {t(document.authoredKind === 'generated-report' ? 'Informe' : 'Nota')}</small>}<small className="block text-neutral-400">{state?.unpreparedAttachmentIds?.length ? `${t('Cobertura parcial')} · ` : ''}{state?.lexical === 'stale' ? t('Disponible: revisión anterior') : state?.lexical === 'ready' ? t('Disponible para consultar') : t('Preparación pendiente')}</small></span></label>;
-        })}
-      </fieldset>
-      <div className="flex flex-wrap items-center gap-3 mb-3">
-        <label>{t('Profundidad')} <select className="input" value={settings.preset} onChange={event => setDraft({ ...draft, settings: event.target.value === 'custom' ? { ...settings, preset: 'custom' } : RETRIEVAL_PRESETS[event.target.value as keyof typeof RETRIEVAL_PRESETS] })}>
-          <option value="fast">{t('Rápido')}</option><option value="balanced">{t('Equilibrado')}</option><option value="deep">{t('Profundo')}</option>
-          <option value="custom">{t('Personalizado')}</option>
-        </select></label>
-        <label><input type="checkbox" checked={settings.autoExpand} onChange={event => setDraft({ ...draft, settings: { ...settings, autoExpand: event.target.checked } })} /> {t('Ampliar contexto automáticamente')}</label>
+  }, []);
+  const tree = useMemo(() => collectionTree(collections ?? []), [collections]);
+  const ancestors = (key: string) => { const out: string[] = []; let current = tree.nodes.get(key)?.parent ?? null; while (current) { out.push(current); current = tree.nodes.get(current)?.parent ?? null; } return out; };
+  const includedBy = (key: string) => ancestors(key).find(parent => selected.has(parent)) ?? null;
+  const toggle = (key: string) => setSelected(current => {
+    const next = new Set(current);
+    if (next.has(key)) { next.delete(key); return next; }
+    // A folder brings everything below it: its own choices underneath become implied.
+    const stack = [...(tree.nodes.get(key)?.children ?? [])];
+    while (stack.length) { const child = stack.pop()!; next.delete(child); stack.push(...(tree.nodes.get(child)?.children ?? [])); }
+    next.add(key);
+    return next;
+  });
+  const chosen = [...selected].filter(key => tree.nodes.has(key));
+  const documentIds = new Set(chosen.flatMap(key => [...tree.nodes.get(key)!.documents]));
+  const indexed = inventory ? inventory.documents.filter(document => documentIds.has(document.id) && document.preparation.status === 'ready').length : 0;
+  const needle = fold(query.trim());
+  const visible = useMemo(() => {
+    if (!needle) return null;
+    const keep = new Set<string>();
+    for (const node of tree.nodes.values()) if (fold(node.collection.name).includes(needle)) { keep.add(node.key); for (const parent of ancestors(node.key)) keep.add(parent); }
+    return keep;
+  }, [needle, tree]);
+  const save = async () => {
+    setBusy(true); setError('');
+    try {
+      const sources = chosen.map(key => ({ ...tree.nodes.get(key)!.collection.reference, includeDescendants: true }));
+      const saved = await window.nodus.saveResearchNotebook({ id: notebook?.id, name, description: '', mode: 'linked', sources, exclusions: [],
+        ...(notebook?.settings ? { settings: notebook.settings } : {}), icon: notebook?.icon ?? 'notebook', color: notebook?.color ?? null });
+      await onSaved(saved.id);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); setBusy(false); }
+  };
+  const renderNode = (key: string, depth: number): ReactNode => {
+    const node = tree.nodes.get(key)!;
+    if (visible && !visible.has(key)) return null;
+    const parent = includedBy(key);
+    const checked = selected.has(key) || !!parent;
+    const open = !!visible || expanded.has(key);
+    return <div key={key} role="treeitem" aria-expanded={node.children.length ? open : undefined} aria-selected={checked}>
+      <div className={`research-notebook-row ${checked ? 'is-checked' : ''} ${parent ? 'is-implied' : ''}`} style={{ paddingLeft: 6 + depth * 18 }} data-testid={`notebook-collection-${node.collection.reference.id}`}>
+        <button type="button" className={`research-notebook-twisty ${node.children.length ? '' : 'invisible'}`} aria-label={open ? t('Plegar') : t('Desplegar')}
+          onClick={() => setExpanded(current => { const next = new Set(current); if (next.has(key)) next.delete(key); else next.add(key); return next; })}>
+          <Icon name="chevronRight" size={12} className={open ? 'rotate-90' : ''} />
+        </button>
+        <label className="research-notebook-pick" title={parent ? tx('Incluida en «{name}»', { name: tree.nodes.get(parent)!.collection.name }) : node.collection.name}>
+          <input type="checkbox" checked={checked} disabled={!!parent || busy} onChange={() => toggle(key)} />
+          <CollectionSourceIcon origin={node.origin} size={18} />
+          <span className="research-notebook-name">{node.collection.name}</span>
+          <span className="research-notebook-count">{node.documents.size}</span>
+        </label>
       </div>
-      {settings.preset === 'custom' && <fieldset className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3"><legend>{t('Presupuesto de recuperación')}</legend>
-        {([
-          ['candidates', 'Candidatos por búsqueda', 1, 500], ['passagesPerRound', 'Pasajes por ronda', 1, settings.candidates],
-          ['evidenceTokens', 'Tokens de evidencia', 256, 64000], ['rounds', 'Rondas máximas', 1, 16],
-        ] as const).map(([key, label, min, max]) => <label key={key}>{t(label)}<input className="input block w-full" type="number" required min={min} max={max} step={1} value={settings[key]}
-          onChange={event => setDraft({ ...draft, settings: { ...settings, [key]: Number(event.target.value) } })} /></label>)}
-      </fieldset>}
-      <details className="mb-3 text-sm"><summary>{t('Ajustes de conversación')}</summary>
-        <label className="block my-2"><input type="checkbox" checked={!!draft.conversationSettings} onChange={event => setDraft({ ...draft,
-          conversationSettings: event.target.checked ? { systemPromptId: null, thinkingEffort: 'standard' } : undefined })} /> {t('Usar ajustes del cuaderno')}</label>
-        {draft.conversationSettings && <div className="flex flex-wrap items-center gap-3">
-          <ResearchSystemPromptControl prompts={prompts} selectedId={draft.conversationSettings.systemPromptId ?? null} disabled={busy} refresh={refreshPrompts}
-            onSelect={async systemPromptId => setDraft({ ...draft, conversationSettings: { ...draft.conversationSettings, systemPromptId } })} />
-          <label>{t('Esfuerzo de thinking')}<select className="input block" value={draft.conversationSettings.thinkingEffort ?? 'standard'} onChange={event => setDraft({ ...draft,
-            conversationSettings: { ...draft.conversationSettings, thinkingEffort: event.target.value as NonNullable<ResearchNotebookInput['conversationSettings']>['thinkingEffort'] } })}>
-            {([['standard', 'Estándar'], ['low', 'Bajo'], ['medium', 'Medio'], ['high', 'Alto']] as const).map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
-          </select></label>
-        </div>}
-      </details>
-      <details className="mb-3 text-sm"><summary>{t('Umbral vectorial avanzado')}</summary>
-        <label className="block my-2"><input type="checkbox" checked={settings.threshold.mode === 'automatic'} disabled={!inventory?.embeddingSpaces?.length}
-          onChange={event => setDraft({ ...draft, settings: { ...settings, threshold: event.target.checked ? { mode: 'automatic' } : { mode: 'manual', value: 0.3, metric: 'cosine', embeddingSpace: inventory!.embeddingSpaces![0].id } } })} /> {t('Umbral automático')}</label>
-        {settings.threshold.mode === 'manual' && <div className="flex flex-wrap gap-3">
-          <label>{t('Espacio de embeddings')}<select className="input block max-w-full" value={settings.threshold.embeddingSpace} onChange={event => {
-            if (settings.threshold.mode === 'manual') setDraft({ ...draft, settings: { ...settings, threshold: { ...settings.threshold, embeddingSpace: event.target.value } } });
-          }}>{inventory?.embeddingSpaces?.map(space => <option key={space.id} value={space.id}>{space.provider} · {space.model} · {space.dimensions} · cosine · {space.id.slice(0, 8)}</option>)}</select></label>
-          <label>{t('Similitud mínima')}<input type="number" className="input block" min={-1} max={1} step={0.01} required value={settings.threshold.value} onChange={event => {
-            if (settings.threshold.mode === 'manual') setDraft({ ...draft, settings: { ...settings, threshold: { ...settings.threshold, value: Number(event.target.value) } } });
-          }} /></label>
-        </div>}
-        <p>{t('El umbral manual solo se aplica al espacio seleccionado.')}</p>
-      </details>
-      <div className="rounded border border-neutral-700 p-3 text-sm mb-3">
-        <p>{t('Preparar las fuentes permite consultarlas sin generar Ideas ni perfiles.')}</p>
-        <label className="block my-2"><input type="checkbox" checked={inventory?.enabled ?? false} disabled={busy} onChange={event => { const enabled = event.target.checked; void act(async () => { await window.nodus.setResearchPreparationEnabled(enabled); setInventory(await window.nodus.getResearchPreparationInventory()); }); }} /> {t('Preparar nuevas incorporaciones')}</label>
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn btn-ghost" disabled={busy || !selected.size} onClick={() => void act(async () => { await window.nodus.prepareResearchDocuments([...selected]); setInventory(await window.nodus.getResearchPreparationInventory()); })}>{t('Preparar fuentes')}</button>
-          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(() => window.nodus.setResearchPreparationPaused(true))}>{t('Pausar')}</button>
-          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(() => window.nodus.setResearchPreparationPaused(false))}>{t('Reanudar')}</button>
-          <button type="button" className="btn btn-ghost" disabled={busy || !selected.size} onClick={() => void act(async () => { await window.nodus.cancelResearchDocuments([...selected]); setInventory(await window.nodus.getResearchPreparationInventory()); })}>{t('Cancelar preparación')}</button>
-          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => void act(async () => setInventory(await window.nodus.getResearchPreparationInventory()))}>{t('Actualizar')}</button>
+      {open && node.children.length > 0 && <div role="group">{node.children.map(child => renderNode(child, depth + 1))}</div>}
+    </div>;
+  };
+  const title = notebook ? t('Editar cuaderno') : t('Nuevo cuaderno');
+  return createPortal(<dialog ref={dialog} className="research-system-prompt-dialog research-prompt-edit-modal research-notebook-modal" aria-label={title} data-testid="research-notebook-dialog"
+    style={{ '--vault-accent': accent } as CSSProperties}
+    onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
+    <header className="research-prompt-edit-head"><Icon name="notebook" size={18} /><div><h2 id="research-notebook-title">{title}</h2><p>{t('Elige las colecciones que leerá. Cada una incluye sus subcolecciones.')}</p></div></header>
+    <form className="research-prompt-edit-body" id="research-notebook-form" onSubmit={event => { event.preventDefault(); void save(); }}>
+      <label className="research-prompt-field">{t('Nombre')}<input ref={nameRef} className="input" required maxLength={160} value={name} disabled={busy} onChange={event => setName(event.target.value)} placeholder={t('Por ejemplo: Tesis, capítulo 2')} /></label>
+      {looseSources && <p role="status" className="research-notebook-note">{t('Este cuaderno tenía documentos sueltos. Al guardar se conservarán solo sus colecciones.')}</p>}
+      <div className="research-notebook-collections">
+        <div className="research-notebook-collections-head"><span>{t('Colecciones')}</span>
+          <label className="header-balloon-search"><Icon name="search" size={14} /><input type="search" aria-label={t('Buscar colecciones')} placeholder={t('Buscar colecciones')} value={query} onChange={event => setQuery(event.target.value)} /></label></div>
+        <div className="research-notebook-tree" role="tree" aria-label={t('Colecciones')} aria-multiselectable="true">
+          {collections === null && !error && <p role="status" className="research-notebook-empty">{t('Cargando...')}</p>}
+          {collections && !tree.roots.length && <p className="research-notebook-empty">{t('Aún no hay colecciones. Crea una en la Biblioteca o sincroniza las de Zotero.')}</p>}
+          {tree.roots.map(root => renderNode(root, 0))}
+          {visible && !visible.size && <p className="research-notebook-empty">{t('Ninguna colección coincide.')}</p>}
         </div>
       </div>
-      {notebook && <ResearchZoteroControl notebookId={notebook.id} />}
-      {error && <p role="alert" className="text-red-400 mb-3">{error}</p>}
-      <div className="flex gap-2 justify-end">
-        {notebook && <button type="button" className="btn btn-ghost mr-auto" disabled={busy} title={t('Las conversaciones y las fuentes se conservarán.')} onClick={() => void act(async () => { await window.nodus.deleteResearchNotebook(notebook.id); await onSaved(null); })}>{t('Eliminar')}</button>}
-        <button type="button" className="btn btn-ghost" onClick={onClose}>{t('Cancelar')}</button><button type="submit" className="btn btn-primary" disabled={busy}>{t('Guardar')}</button>
-      </div>
+      <p role="status" className="research-notebook-summary" data-testid="research-notebook-summary">{chosen.length
+        ? tx('{n} documentos · {m} ya indexados; el resto se indexará al guardar.', { n: documentIds.size, m: indexed })
+        : t('Elige al menos una colección.')}</p>
+      {error && <p className="research-prompt-error" role="alert">{error}</p>}
     </form>
+    <footer className="research-prompt-footer research-prompt-edit-foot">
+      <span />
+      <button type="button" className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
+      <button type="submit" form="research-notebook-form" className="btn btn-primary" disabled={busy || !name.trim() || !chosen.length}>{busy ? t('Guardando…') : notebook ? t('Guardar') : t('Crear cuaderno')}</button>
+    </footer>
   </dialog>, document.body);
 }

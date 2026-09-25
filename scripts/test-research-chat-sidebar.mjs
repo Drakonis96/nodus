@@ -38,12 +38,58 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
     const order = () => sidebar.locator('.research-history-heading, .research-history-row, .research-history-empty').evaluateAll(nodes => nodes.map(node => node.textContent.trim()));
 
     await t.test('three sections: projects alphabetically, pinned chats, then the rest (project chats stay in their project)', async () => {
-      assert.deepEqual(await order(), ['Proyectos', 'Alfa', 'Zeta', 'Chats destacados', 'Sevilla en guías de viaje', 'Chats', 'Réplica y cifras', 'Cartografía medieval']);
+      assert.deepEqual(await order(), ['Proyectos', 'Alfa', 'Zeta', 'Cuadernos', 'Cuaderno de riegos', 'Chats destacados', 'Sevilla en guías de viaje', 'Chats', 'Réplica y cifras', 'Cartografía medieval']);
       await sidebar.getByTestId('research-project-p-a').click();
       assert.deepEqual((await order()).slice(0, 4), ['Proyectos', 'Alfa', 'Regadío del Tormeral', 'Zeta'], 'a project unfolds its chats');
       await sidebar.getByTestId('research-project-p-a').click();
       await sidebar.getByTestId('research-project-p-a').getByRole('button', { name: 'Abrir Alfa' }).click();
       await action('openProject', 'p-a');
+    });
+
+    await t.test('notebooks have their own section; their chats live inside them and the page opens from the pencil', async () => {
+      const notebook = sidebar.getByTestId('research-notebook-n1');
+      await notebook.click();
+      assert.deepEqual((await order()).slice(3, 6), ['Cuadernos', 'Cuaderno de riegos', 'Pozos y norias'], 'a notebook unfolds its chats');
+      await notebook.click();
+      await notebook.getByRole('button', { name: 'Abrir Cuaderno de riegos' }).click();
+      await action('notebook', 'n1');
+      await notebook.hover();
+      await notebook.getByRole('button', { name: 'Más acciones' }).click();
+      const menu = page.getByRole('menu', { name: 'Cuaderno de riegos' });
+      await menu.getByRole('menuitem').first().waitFor();
+      assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Renombrar', 'Icono y color', 'Editar colecciones', 'Eliminar cuaderno']);
+      await menu.getByRole('menuitem', { name: 'Editar colecciones' }).click();
+      await action('editNotebook', 'n1');
+      await notebook.getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Icono y color' }).click();
+      await page.getByTestId('research-project-style').getByRole('button', { name: 'flask' }).click();
+      await action('updateNotebook', 'n1', { icon: 'flask' });
+      await page.getByTestId('research-project-style').getByRole('button', { name: 'Cerrar', exact: true }).click();
+    });
+
+    await t.test('the menu handle is three vertical dots and the menu opens in place, with no jump', async () => {
+      const handle = sidebar.getByTestId('research-conversation-c3').getByRole('button', { name: 'Más acciones' });
+      assert.equal(await handle.locator('circle').count(), 3, 'three dots, not six');
+      const xs = await handle.locator('circle').evaluateAll(circles => [...new Set(circles.map(circle => circle.getAttribute('cx')))]);
+      assert.equal(xs.length, 1, 'stacked vertically');
+      // The menu's first painted frame is already its final place.
+      const frames = await page.evaluate(async () => {
+        const button = document.querySelector('[data-testid="research-conversation-c3"] button[aria-label="Más acciones"]');
+        const seen = [];
+        const observer = new MutationObserver(() => {
+          const menu = document.querySelector('[role="menu"]');
+          if (menu && getComputedStyle(menu).visibility !== 'hidden') seen.push(Math.round(menu.getBoundingClientRect().left));
+        });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style'] });
+        button.click();
+        for (let i = 0; i < 6; i++) { await new Promise(resolve => requestAnimationFrame(resolve)); const menu = document.querySelector('[role="menu"]'); if (menu && getComputedStyle(menu).visibility !== 'hidden') seen.push(Math.round(menu.getBoundingClientRect().left)); }
+        observer.disconnect();
+        return { seen, anchorRight: Math.round(button.getBoundingClientRect().right), width: Math.round(document.querySelector('[role="menu"]').getBoundingClientRect().width) };
+      });
+      assert.equal(new Set(frames.seen).size, 1, `the menu never moves once shown (${frames.seen.join(', ')})`);
+      assert.ok(frames.seen[0] <= frames.anchorRight - frames.width + 1, 'it opens aligned to the right edge of its button');
+      await page.keyboard.press('Escape');
+      await page.getByRole('menu').waitFor({ state: 'detached' });
     });
 
     await t.test('the search bar finds chats, projects and notebooks, accents aside', async () => {
@@ -55,7 +101,7 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await search.fill('replica');
       assert.deepEqual(await order(), ['Chats', 'Réplica y cifras']);
       await search.fill('riego');
-      assert.deepEqual(await order(), ['Cuadernos', 'Cuaderno de riegos']);
+      assert.deepEqual(await order(), ['Cuadernos', 'Cuaderno de riegos', 'Chats', 'Pozos y norias'], 'a notebook, and its chats by its name');
       await sidebar.getByTestId('research-search-notebook-n1').click();
       await action('notebook', 'n1');
       await search.fill('alf');
@@ -70,7 +116,7 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await row.hover();
       await row.getByRole('button', { name: 'Destacar chat' }).click();
       await action('pin', 'c3', true);
-      assert.deepEqual((await order()).slice(3, 6), ['Chats destacados', 'Sevilla en guías de viaje', 'Réplica y cifras']);
+      assert.deepEqual((await order()).slice(5, 8), ['Chats destacados', 'Sevilla en guías de viaje', 'Réplica y cifras']);
       await page.evaluate(() => { window.pinLimitReached = true; });
       await sidebar.getByTestId('research-conversation-c4').getByRole('button', { name: 'Destacar chat' }).click();
       await sidebar.getByRole('alert').getByText('Solo puedes destacar 5 chats. Quita uno para destacar otro.').waitFor();
@@ -81,8 +127,10 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       const row = sidebar.getByTestId('research-conversation-c4');
       await row.getByRole('button', { name: 'Más acciones' }).click();
       const menu = page.getByRole('menu', { name: 'Cartografía medieval' });
+      await menu.getByRole('menuitem').first().waitFor();
       assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Renombrar', 'Destacar chat', 'Archivar', 'Eliminar', 'Mover a proyecto']);
       await menu.getByRole('menuitem', { name: 'Mover a proyecto' }).click();
+      await menu.getByRole('menuitem').first().waitFor();
       assert.deepEqual(await menu.getByRole('menuitem').allInnerTexts(), ['Mover a proyecto', 'Alfa', 'Zeta', 'Nuevo proyecto']);
       await menu.getByRole('menuitem', { name: 'Zeta' }).click();
       await action('move', 'c4', 'p-z');

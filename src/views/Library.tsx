@@ -17,6 +17,7 @@ import type {
   DocumentUnderstandingState,
 } from '@shared/types';
 import { Icon } from '../components/ui';
+import { CollectionSourceIcon } from '../components/CollectionSourceIcon';
 import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
@@ -1474,6 +1475,8 @@ export function Library({
                                 >
                                   {checked && <Icon name="check" size={12} />}
                                 </span>
+                                {/* The vault's collections are Zotero's: the folder carries its Z. */}
+                                <CollectionSourceIcon origin="zotero" size={16} />
                                 <span className="min-w-0 flex-1 truncate">{collection.name}</span>
                                 <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
                               </button>

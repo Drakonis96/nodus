@@ -54,8 +54,9 @@ try {
     await search.waitFor({ timeout: 15000 }).catch(async error => { await page.screenshot({ path: path.join(harness.root, `artifacts/a11y-${theme}-no-control.png`) }); throw error; });
     await search.fill(notebook.name);
     await page.getByTestId(`research-search-notebook-${notebook.id}`).click();
+    await page.getByTestId('research-notebook-home').waitFor();
     await audit(page, 'research-chat', theme, null);
-    await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
+    await page.getByTestId('research-notebook-title').getByRole('button', { name: /Editar colecciones|Edit collections/ }).click();
     const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
     await editor.waitFor();
     await audit(page, 'notebook-editor', theme, 'closest:#research-notebook-title');

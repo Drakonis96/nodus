@@ -328,14 +328,23 @@ try {
   // Notebooks live at the top of the chat history.
   await page.locator('.research-assistant-header').waitFor({ timeout: 30000 });
   if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
+  // A notebook reads collections: A and B go into one Nodus collection first.
+  const collection = await page.evaluate(async ids => {
+    const created = await window.nodus.createGlobalLibraryCollection('Tormeral', null);
+    await window.nodus.patchGlobalLibraryItemCollections(ids, { add: [created.id] });
+    return created;
+  }, [itemA.id, itemB.id]);
   await page.getByTestId('research-new-notebook').click({ timeout: 30000 });
-  const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
+  const editor = page.getByTestId('research-notebook-dialog');
   await editor.waitFor();
   await editor.getByRole('textbox', { name: 'Nombre', exact: true }).fill('Regadío del Tormeral');
-  for (const title of [itemA.title, DOCUMENTS.B.title]) await editor.getByRole('checkbox', { name: new RegExp(title.slice(0, 24).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) }).check();
+  await editor.getByTestId(`notebook-collection-${collection.id}`).getByRole('checkbox').check();
   await shot('06-notebook');
-  await editor.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await editor.getByRole('button', { name: 'Crear cuaderno', exact: true }).click();
   await editor.waitFor({ state: 'detached' });
+  // The notebook opens on its page and is usable once its collections are indexed.
+  await page.getByTestId('research-notebook-home').waitFor();
+  await page.waitForFunction(() => !document.querySelector('[data-testid="research-notebook-banner"][data-state="indexing"], [data-testid="research-notebook-banner"][data-state="checking"]'), null, { timeout: 600000 });
   const notebook = (await page.evaluate(() => window.nodus.listResearchNotebooks?.()))?.find?.(item => item.name === 'Regadío del Tormeral') ?? null;
   evidence.steps.notebook = { name: 'Regadío del Tormeral', documents: [itemA.id, itemB.id], saved: notebook };
 

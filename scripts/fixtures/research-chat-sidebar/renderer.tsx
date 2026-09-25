@@ -18,19 +18,24 @@ function App() {
     chat('c2', 'Regadío del Tormeral', { projectId: 'p-a' }),
     chat('c3', 'Réplica y cifras'),
     chat('c4', 'Cartografía medieval'),
+    chat('c5', 'Pozos y norias', { notebookId: 'n1' }),
   ]);
+  const [notebooks, setNotebooks] = useState<any[]>([{ id: 'n1', name: 'Cuaderno de riegos', icon: 'notebook', color: null, sources: [], exclusions: [], mode: 'linked', revision: 1, resolvedDocumentIds: [], createdAt: now, updatedAt: now }]);
   const log = (...entry: unknown[]) => fixture.actions.push(entry);
   return <aside style={{ width: 280, height: 640, display: 'flex', flexDirection: 'column' }} data-testid="research-history-sidebar" className="research-chat-history">
     <ResearchChatSidebar
-      conversations={conversations} projects={projects} notebooks={[{ id: 'n1', name: 'Cuaderno de riegos' } as any]}
-      supportsProjects notebooksOn activeId={null} activeProjectId={null} sending={false} archivedCount={0} showArchived={false}
+      conversations={conversations} projects={projects} notebooks={notebooks}
+      supportsProjects notebooksOn activeId={null} activeProjectId={null} activeNotebookId={null} sending={false} archivedCount={0} showArchived={false}
       onToggleArchived={() => log('toggleArchived')}
       onNewConversation={() => log('new')}
       onNewNotebook={() => log('newNotebook')}
       onNewProject={async () => { const created = project(`p-${projects.length}`, 'Nuevo proyecto'); setProjects(current => [...current, created].sort((a, b) => a.name.localeCompare(b.name))); log('newProject'); return created; }}
       onOpenConversation={id => log('open', id)}
       onOpenProject={id => log('openProject', id)}
-      onSelectNotebook={id => log('notebook', id)}
+      onOpenNotebook={id => log('notebook', id)}
+      onEditNotebook={notebook => log('editNotebook', notebook.id)}
+      onUpdateNotebook={async (notebook, patch) => { log('updateNotebook', notebook.id, patch); setNotebooks(current => current.map(item => item.id === notebook.id ? { ...item, ...patch } : item)); }}
+      onDeleteNotebook={async notebook => { log('deleteNotebook', notebook.id); setNotebooks(current => current.filter(item => item.id !== notebook.id)); }}
       onRenameConversation={async (conversation, title) => { log('rename', conversation.id, title); setConversations(current => current.map(item => item.id === conversation.id ? { ...item, title } : item)); }}
       onPinConversation={async (conversation, pinned) => {
         log('pin', conversation.id, pinned);

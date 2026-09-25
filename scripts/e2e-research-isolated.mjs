@@ -106,7 +106,8 @@ try {
     if (await page.getByTestId('research-history-toggle').count() && !(await page.getByTestId('research-history-sidebar').isVisible())) await page.getByTestId('research-history-toggle').click();
     await page.getByTestId('research-chat-search').fill(corpus.notebook.name);
     await page.getByTestId(`research-search-notebook-${corpus.notebook.id}`).click();
-    await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
+    await page.getByTestId('research-notebook-home').waitFor();
+    await page.getByTestId('research-notebook-title').getByRole('button', { name: /Editar colecciones|Edit collections/ }).click();
     await page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') }).waitFor();
     await page.screenshot({ path: path.join(root, 'artifacts/notebook-editor.png') });
     await page.keyboard.press('Escape');
@@ -115,7 +116,7 @@ try {
     for (const theme of ['dark', 'light']) for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 640 }]) {
       await page.evaluate(theme => window.nodus.updateSettings({ theme }), theme);
       await page.setViewportSize(viewport);
-      await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
+      await page.getByTestId('research-notebook-title').getByRole('button', { name: /Editar colecciones|Edit collections/ }).click();
       const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
       await editor.waitFor();
       await editor.getByRole('textbox', { name: 'Nombre', exact: true }).focus();
@@ -130,6 +131,8 @@ try {
       await page.keyboard.press('Escape');
     }
     report.notebooks.layouts = layouts;
+    // Back to a general chat, which reads the whole vault, for the checks that follow.
+    await page.getByTestId('research-new-conversation').click();
   }
   if (process.argv.includes('--activity')) report.activity = await (await import('./verify-research-activity-ui.mjs')).verifyResearchActivityUi(page, app, root);
   if (process.argv.includes('--skills')) report.skills = await (await import('./verify-research-skill-mention.mjs')).verifyResearchSkillMention(page, app, root);

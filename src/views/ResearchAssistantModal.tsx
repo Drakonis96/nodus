@@ -7,12 +7,13 @@ import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptC
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
-import { NotebookDialog, ResearchNotebookChip, useResearchNotebooks } from '../components/ResearchNotebookControl';
+import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNotebookControl';
+import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
 import { HeaderBalloon } from '../components/HeaderBalloon';
 import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
 import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
 import { useSkillLibrary } from '../components/skillLibrary';
-import type { ResearchNotebook } from '@shared/researchCorpus';
+import type { ResearchNotebook, ResearchNotebookPreparation } from '@shared/researchCorpus';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
 import { ResearchCoverage } from '../components/ResearchCoverage';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
@@ -293,7 +294,13 @@ export function ResearchAssistantModal({
   const projectHome = supportsProjects && !!activeProjectId && !activeId;
   const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
   const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
-  const activeNotebook = researchNotebooks.notebooks.find(notebook => notebook.id === selection.notebookId) ?? null;
+  // A notebook's page, like a project's: shown while it is open and no chat has started in it.
+  const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
+  const activeNotebook = researchNotebooks.notebooks.find(notebook => notebook.id === activeNotebookId) ?? null;
+  const notebookHome = !!activeNotebook && !activeId;
+  const [notebookPreparation, setNotebookPreparation] = useState<ResearchNotebookPreparation | null>(null);
+  // A notebook is read once its collections are indexed; until then it says so and waits.
+  const notebookBlocked = !!activeNotebook && (!notebookPreparation || notebookPreparation.pending > 0);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
@@ -438,7 +445,8 @@ export function ResearchAssistantModal({
     if (attachmentBusyRef.current) return;
     setAttachments([]);
     setAttachmentError('');
-    setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
+    setSelection(current => { const { sourceFilter: _sourceFilter, notebookId: _notebookId, ...rest } = current; return rest; });
+    setActiveNotebookId(null);
     adapter?.reset?.();
     if (!activeId) void systemPrompts.select(null);
     setActiveProjectId(null);
@@ -486,6 +494,7 @@ export function ResearchAssistantModal({
     setConcilium(council ? { chairman: council.chairman, models: council.members.map(member => member.model) } : null);
     setStoppedMessageId(null);
     setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
+    setActiveNotebookId(conversation.selection?.notebookId ?? conversation.notebookId ?? null);
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(conversation.title || null);
     setInput('');
@@ -556,17 +565,42 @@ export function ResearchAssistantModal({
     await window.nodus.setConversationProject!(conversation.id, projectId);
     await refreshConversations();
   };
-  const changeNotebook = (notebookId: string | null) => {
-    if (sending) void api.cancelResearchChat();
-    const next = { ...selection, notebookId };
-    setSelection(next);
-    if (activeId) void api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
-  };
-  // A notebook chosen from the history search starts a conversation that reads from it.
-  const selectNotebook = (notebookId: string) => {
+  // A notebook opens on its own page; the first message there starts a chat inside it.
+  const openNotebook = (notebookId: string) => {
     if (sending) return;
     startNewConversation();
+    setActiveNotebookId(notebookId);
     setSelection(current => ({ ...current, notebookId }));
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const activeNotebookRef = useRef<string | null>(null);
+  activeNotebookRef.current = activeNotebookId;
+  const refreshNotebookPreparation = useCallback(async (notebookId: string) => {
+    try {
+      const status = await window.nodus.getResearchNotebookPreparation(notebookId);
+      setNotebookPreparation(current => activeNotebookRef.current === notebookId ? status : current);
+    } catch { /* The page shows its last known state; the next progress event retries. */ }
+  }, []);
+  useEffect(() => {
+    setNotebookPreparation(null);
+    if (!activeNotebookId) return;
+    void refreshNotebookPreparation(activeNotebookId);
+    let timer: number | null = null;
+    const off = window.nodus.onResearchPreparationProgress(() => {
+      if (timer != null) return;
+      timer = window.setTimeout(() => { timer = null; void refreshNotebookPreparation(activeNotebookId); }, 1200);
+    });
+    return () => { off(); if (timer != null) window.clearTimeout(timer); };
+  }, [activeNotebookId, refreshNotebookPreparation]);
+  const updateNotebook = async (notebook: ResearchNotebook, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+    await window.nodus.updateResearchNotebookAppearance(notebook.id, patch);
+    await researchNotebooks.refresh();
+  };
+  const deleteNotebook = async (notebook: ResearchNotebook) => {
+    await window.nodus.deleteResearchNotebook(notebook.id);
+    if (activeNotebookId === notebook.id) startNewConversation();
+    await researchNotebooks.refresh();
+    await refreshConversations();
   };
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
@@ -705,7 +739,9 @@ export function ResearchAssistantModal({
         const errorMessage: UiMessage = {
           id: assistantId,
           role: 'assistant',
-          content: e instanceof Error ? e.message : String(e),
+          content: (e instanceof Error ? e.message : String(e)).includes('research_notebook_indexing')
+            ? t('El cuaderno aún está indexando sus colecciones. Podrás usarlo cuando termine.')
+            : e instanceof Error ? e.message : String(e),
           selectionKey,
           error: true,
           concilium: councilResult,
@@ -734,7 +770,7 @@ export function ResearchAssistantModal({
 
   const send = async (explicit?: string) => {
     const content = (explicit ?? input).trim() || (attachments.length ? t('Analiza los archivos adjuntos.') : '');
-    if (!content || sending || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
+    if (!content || sending || notebookBlocked || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
 
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
@@ -922,7 +958,6 @@ export function ResearchAssistantModal({
               <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
             </button>
           )}
-          {!adapter && !isGenealogy && activeNotebook && <ResearchNotebookChip notebook={activeNotebook} disabled={sending} onEdit={() => setEditingNotebook(activeNotebook)} onClear={() => changeNotebook(null)} />}
           {!adapter && !isGenealogy && !selection.notebookId && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
             const next = { ...selection, sourceFilter };
             if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
@@ -930,7 +965,7 @@ export function ResearchAssistantModal({
             setShowContext(false);
           }} />}
           <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
-          {!selection.notebookId && <ChatSkillsControl surface="assistant" disabled={sending} />}
+          <ChatSkillsControl surface="assistant" disabled={sending} />
           {!adapter && <ResearchConciliumControl value={concilium} models={availableModels} selectedModel={selectedModel} disabled={sending} onChange={next => {
             setConcilium(next);
             if (next) setSelectedModel(next.models[next.chairman]);
@@ -963,7 +998,11 @@ export function ResearchAssistantModal({
               onNewProject={createProject}
               onOpenConversation={(id) => void loadConversation(id)}
               onOpenProject={openProject}
-              onSelectNotebook={selectNotebook}
+              activeNotebookId={activeNotebookId}
+              onOpenNotebook={openNotebook}
+              onEditNotebook={notebook => setEditingNotebook(notebook)}
+              onUpdateNotebook={updateNotebook}
+              onDeleteNotebook={deleteNotebook}
               onRenameConversation={!adapter ? renameConversation : undefined}
               onPinConversation={pinConversation}
               onArchiveConversation={api.archiveConversation ? archiveConversation : undefined}
@@ -974,7 +1013,8 @@ export function ResearchAssistantModal({
             />
           </aside>
 
-          <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${projectHome ? 'research-project-home' : ''}`} data-testid={projectHome ? 'research-project-home' : undefined}>
+          <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${projectHome || notebookHome ? 'research-project-home' : ''}`} data-testid={projectHome ? 'research-project-home' : notebookHome ? 'research-notebook-home' : undefined}>
+            {notebookHome && activeNotebook && <NotebookHomeHeader notebook={activeNotebook} onEdit={() => setEditingNotebook(activeNotebook)} />}
             {projectHome && activeProject && <header className="research-project-title">
               <span style={{ color: activeProject.color ?? undefined }}><Icon name={activeProject.icon ?? 'folder'} size={30} /></span>
               <h2>{activeProject.name}</h2>
@@ -991,7 +1031,12 @@ export function ResearchAssistantModal({
                   conversations={visibleConversations.filter(conversation => conversation.projectId === activeProjectId)}
                   onOpen={(id) => { if (!sending) void loadConversation(id); }}
                 />}
-                {!projectHome && messages.length === 0 && (
+                {notebookHome && messages.length === 0 && <ProjectChatList
+                  conversations={visibleConversations.filter(conversation => conversation.notebookId === activeNotebookId)}
+                  onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                  empty={t('Los chats que empieces aquí leerán las colecciones de este cuaderno.')}
+                />}
+                {!projectHome && !notebookHome && messages.length === 0 && (
                   <div className="research-empty-state h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
@@ -1148,6 +1193,7 @@ export function ResearchAssistantModal({
               {attachmentError && <p className="research-attachment-error" role="alert">{attachmentError}</p>}
               {attachments.some(file => file.warning) && <p className="research-attachment-error" role="status">{attachments.filter(file => file.warning).map(file => `${file.name}: ${file.warning}`).join(' · ')}</p>}
               {attaching && <p className="research-attachment-status" role="status">{t('Preparando archivos…')}</p>}
+              {activeNotebook && <NotebookIndexingBanner preparation={notebookPreparation} />}
               <div className="research-composer-shell">
               {mention && skillsEnabled && <SkillMentionMenu options={mentionOptions} activeIndex={mentionIndex}
                 onHover={setMentionIndex} onPick={pickSkill} />}
@@ -1161,7 +1207,7 @@ export function ResearchAssistantModal({
                   aria-label={t('Pregunta al asistente...')}
                   rows={1}
                   value={input}
-                  placeholder={projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={notebookHome && activeNotebook ? tx('Nuevo chat en {name}', { name: activeNotebook.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   aria-autocomplete={skillsEnabled ? 'list' : undefined}
                   aria-controls={mention ? 'research-skill-mention' : undefined}
                   aria-expanded={skillsEnabled ? !!mention : undefined}
@@ -1207,7 +1253,7 @@ export function ResearchAssistantModal({
                     aria-label={t('Enviar')}
                     title={t('Enviar')}
                     onClick={() => void send()}
-                    disabled={attaching || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
+                    disabled={attaching || notebookBlocked || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                   >
                     <Icon name="arrowUp" size={23} />
                   </button>
@@ -1340,7 +1386,13 @@ export function ResearchAssistantModal({
 
       {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}
         onClose={() => setEditingNotebook(null)}
-        onSaved={async (id) => { await researchNotebooks.refresh(); setEditingNotebook(null); if (id) { if (editingNotebook === 'new') selectNotebook(id); else changeNotebook(id); } else changeNotebook(null); }} />}
+        onSaved={async (id) => {
+          const created = editingNotebook === 'new';
+          await researchNotebooks.refresh();
+          setEditingNotebook(null);
+          if (id && created) openNotebook(id);
+          else if (id && id === activeNotebookId) void refreshNotebookPreparation(id);
+        }} />}
       {pendingDelete && (
         <ConfirmModal
           title={t('Eliminar conversación')}
@@ -1390,8 +1442,8 @@ function deriveNoteTitle(content: string, contextTitle: string | null): string {
 }
 
 /** The chats of an open project, under its composer. */
-function ProjectChatList({ conversations, onOpen }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void }) {
-  if (!conversations.length) return <p className="research-project-empty">{t('Los chats que empieces aquí quedarán en este proyecto.')}</p>;
+function ProjectChatList({ conversations, onOpen, empty }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void; empty?: string }) {
+  if (!conversations.length) return <p className="research-project-empty">{empty ?? t('Los chats que empieces aquí quedarán en este proyecto.')}</p>;
   return <ul className="research-project-chats" data-testid="research-project-chats">
     {conversations.map(conversation => <li key={conversation.id}>
       <button type="button" onClick={() => onOpen(conversation.id)}>
