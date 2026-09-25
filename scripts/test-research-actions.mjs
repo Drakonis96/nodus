@@ -53,6 +53,26 @@ try {
   await foreign.investigate('Known evidence');
   assert.ok(foreign.evidence.size > 0);
   assert.ok(foreign.coverage().limitations.includes('research_decision_outside_scope'), 'invalid model identifiers execute nothing and preserve valid evidence');
+  // A source without an index cannot be found by search. The supervisor is told which one
+  // it is, and a source whose title matches the question is read in the original even when
+  // the supervisor finishes without it (the integral run's unindexed A3 and Z3).
+  db.prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES('pleito','pleito','El pleito de las aguas de Sarbela','[]','book','text')").run();
+  const withUnindexed = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
+  const unindexedId = withUnindexed.documents.find(document => document.workId === 'pleito').id;
+  const payloads = [];
+  ai.completeJson = async options => { payloads.push(JSON.parse(options.user)); return { action: 'finish' }; };
+  const originals = [];
+  const guarded = new ResearchCorpusRun(withUnindexed, settings);
+  guarded.readOriginal = async (documentId, read) => { originals.push({ documentId, read }); return { evidence: [], scopeId: withUnindexed.id, partial: false }; };
+  await guarded.investigate('¿Quién fue el árbitro del pleito de las aguas de Sarbela?');
+  assert.equal(payloads[0].sources.find(source => source.id === unindexedId)?.searchable, false, 'the supervisor sees which source has no index');
+  assert.deepEqual(originals, [{ documentId: unindexedId, read: { kind: 'pages', from: 1, to: 4 } }], 'the matching unindexed source is read in the original');
+  originals.length = 0;
+  await new ResearchCorpusRun(withUnindexed, settings).investigate('Known evidence about climate').then(() => undefined);
+  const unrelated = new ResearchCorpusRun(withUnindexed, settings);
+  unrelated.readOriginal = async (documentId, read) => { originals.push({ documentId, read }); return { evidence: [], scopeId: withUnindexed.id, partial: false }; };
+  await unrelated.investigate('Known evidence about climate');
+  assert.deepEqual(originals, [], 'an unrelated unindexed source is not opened');
   const { ResearchRetrievalBudget } = load('shared/researchRetrievalBudget.ts');
   // A supervisor decision is its own provider call: it must not take the evidence the
   // answer needs. Each has a finite allowance of the same size.
