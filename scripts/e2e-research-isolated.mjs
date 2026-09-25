@@ -23,7 +23,7 @@ try {
   app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', repoRoot], cwd: root,
     env: researchTestEnvironment(root), timeout: 60_000 });
   const page = await app.firstWindow();
-  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60_000 });
+  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), null, { timeout: 60_000 });
   const paths = await app.evaluate(({ app }) => ({
     userData: app.getPath('userData'), sessionData: app.getPath('sessionData'), temp: app.getPath('temp'),
     appData: app.getPath('appData'), downloads: app.getPath('downloads'),

@@ -19,7 +19,7 @@ try {
   app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', repoRoot], cwd: root,
     env: researchTestEnvironment(root), timeout: 60000 });
   const page = await app.firstWindow();
-  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), null, { timeout: 60000 });
   await page.evaluate(async ({ root, version }) => {
     await window.nodus.setResearchPreparationPolicy({ welcomeVersion: 1, decision: 'pending' });
     await window.nodus.updateSettings({ autoLightScan: false, autoDeepScanOnReadTag: false, autoSummaryAfterDeep: false,

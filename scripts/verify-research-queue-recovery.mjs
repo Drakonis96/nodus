@@ -32,7 +32,7 @@ report.options = { documents: DOCUMENTS, pages: PAGES, kill: KILL };
 async function launch() {
   const app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', repoRoot], cwd: root, env: researchTestEnvironment(root), timeout: 60000 });
   const page = await app.firstWindow();
-  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+  await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), null, { timeout: 60000 });
   return { app, page };
 }
 const inventory = async (page, ids) => (await page.evaluate(() => window.nodus.getResearchPreparationInventory())).documents.filter(document => ids.includes(document.id));

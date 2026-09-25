@@ -103,7 +103,7 @@ async function launch(legacy = false) {
   for (const stream of ['stdout', 'stderr']) app.process()[stream]?.on('data', data => { diagnostics[stream] = (diagnostics[stream] + data.toString()).slice(-64000); });
   try {
     const page = await app.firstWindow();
-    await page.waitForFunction(() => Boolean(window.nodus && document.getElementById('root')?.children.length), { timeout: 60000 });
+    await page.waitForFunction(() => Boolean(window.nodus && document.getElementById('root')?.children.length), null, { timeout: 60000 });
     const actual = await app.evaluate(({ app, BrowserWindow }) => ({ packaged: app.isPackaged, userData: app.getPath('userData'),
       resources: process.resourcesPath, version: app.getVersion(), title: BrowserWindow.getAllWindows()[0].getTitle() }));
     assert.equal(actual.packaged, true); assert.equal(actual.userData, profile);

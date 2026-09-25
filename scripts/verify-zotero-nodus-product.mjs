@@ -20,7 +20,7 @@ export async function verifyZoteroNodusProduct(root, endpoint, corpus, { provide
   let externalLog;
   try {
     const page = await app.firstWindow();
-    await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+    await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), null, { timeout: 60000 });
     await app.evaluate(({ utilityProcess }) => {
       globalThis.researchOwnedWorkers = [];
       const original = utilityProcess.fork.bind(utilityProcess);
