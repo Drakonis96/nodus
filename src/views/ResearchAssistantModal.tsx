@@ -1140,6 +1140,9 @@ export function ResearchAssistantModal({
                 <span className="min-w-0 flex-1 truncate text-left">{t('Sin carpeta')}</span>
                 <span className="text-[10px] text-neutral-600">{unfiledCount}</span>
               </button>
+              {folders.some((folder) => folder.parentId === null) && (
+                <div className="mt-3 mb-1 px-2 text-[10px] font-medium uppercase tracking-wide text-neutral-600">{t('Carpetas')}</div>
+              )}
               {renderFolderBranch(null, 0)}
             </div>
 
