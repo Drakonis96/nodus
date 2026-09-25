@@ -54,10 +54,18 @@ try {
   assert.ok(foreign.evidence.size > 0);
   assert.ok(foreign.coverage().limitations.includes('research_decision_outside_scope'), 'invalid model identifiers execute nothing and preserve valid evidence');
   const { ResearchRetrievalBudget } = load('shared/researchRetrievalBudget.ts');
+  // A supervisor decision is its own provider call: it must not take the evidence the
+  // answer needs. Each has a finite allowance of the same size.
   const budget = new ResearchRetrievalBudget({ ...settings, evidenceTokens: 4000 });
   assert.ok(budget.reserveDecision('system', 'question', 200));
-  assert.equal(budget.accept('oversized', 'a'.repeat(3000)), false, 'supervisor and evidence share one budget');
-  console.log('Structured actions, invalid decisions, independent source search, shared budget, explicit reads and scope rejection passed.');
+  assert.equal(budget.decisionTokens, 1238);
+  assert.equal(budget.accept('evidence', 'a'.repeat(3000)), true, 'a decision leaves the evidence allowance whole');
+  assert.equal(budget.accept('oversized', 'a'.repeat(1500)), false, 'evidence stays within its own allowance');
+  assert.ok(budget.reserveDecision('system', 'question', 200));
+  assert.ok(budget.reserveDecision('system', 'question', 200));
+  assert.equal(budget.reserveDecision('system', 'question', 200), false, 'decisions have a finite allowance of their own');
+  assert.equal(budget.partial, true);
+  console.log('Structured actions, invalid decisions, independent source search, separate evidence and decision allowances, explicit reads and scope rejection passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
   load('electron/db/database.ts').closeDb();

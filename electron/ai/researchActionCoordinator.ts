@@ -18,9 +18,9 @@ export async function deepenResearch(run: ResearchCorpusRun, question: string, m
       attachments: doc.attachments?.slice(0, 4).map(item => item.id),
     })), evidence: [...run.evidence.values()].slice(-3).map(item => ({ id: item.id, source: item.nodus_id, text: item.summary?.slice(0, 160), page: item.pageLabel })),
       coverage: { sources: run.scope.documents.length, matched: run.matchedDocuments.size, read: run.readDocuments.size, limitations: [...run.limitations] }, attempted: [...attempted].slice(-4) };
-    const availableInput = run.budget.evidenceTokenLimit - run.budget.usedEvidenceTokens - Buffer.byteLength(SYSTEM) - 384 - 1024 - 512;
+    const availableInput = run.budget.decisionTokenLimit - run.budget.decisionTokens - Buffer.byteLength(SYSTEM) - 384 - 1024;
     // Do not serialize the full traversal/source list into every decision.
-    // Keep a bounded source menu and enough allowance for the resulting read.
+    // Keep a bounded source menu within the decision allowance.
     while (Buffer.byteLength(JSON.stringify(payload)) > availableInput && payload.evidence.length) payload.evidence.shift();
     while (Buffer.byteLength(JSON.stringify(payload)) > availableInput && payload.sources.length > 1) payload.sources.pop();
     const user = JSON.stringify(payload);

@@ -11,7 +11,9 @@ export class ResearchRetrievalBudget {
   candidates = 0;
   partial = false;
   readonly visited = new Set<string>();
-  constructor(settings: RetrievalSettings, public evidenceTokenLimit = settings.evidenceTokens) {
+  /** Supervisor decisions are separate provider calls: they have their own allowance, of
+   * the same size as the evidence one, instead of taking evidence the answer needs. */
+  constructor(settings: RetrievalSettings, public evidenceTokenLimit = settings.evidenceTokens, public decisionTokenLimit = settings.evidenceTokens) {
     this.settings = validateRetrievalSettings(settings);
   }
   constrainToWindow(window: number, reservedTokens: number): void {
@@ -20,9 +22,8 @@ export class ResearchRetrievalBudget {
   }
   reserveDecision(system: string, user: string, output: number): boolean {
     const bound = new TextEncoder().encode(system + user).length + output + 1024;
-    if (this.usedEvidenceTokens + bound > this.evidenceTokenLimit) { this.partial = true; return false; }
+    if (this.decisionTokens + bound > this.decisionTokenLimit) { this.partial = true; return false; }
     this.decisionTokens += bound;
-    this.evidenceTokenLimit -= bound;
     return true;
   }
   nextRound(explicit = false): boolean {

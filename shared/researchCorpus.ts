@@ -179,6 +179,44 @@ export interface ResearchTraversal {
   queries: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }>;
 }
 
+/** What each limitation code means, for a model prompt. Codes and field names are
+ * internal: an answer that quotes them tells the reader nothing. */
+const RESEARCH_LIMITATION_NOTES: Readonly<Record<string, string>> = {
+  budget_exhausted: 'The research used its evidence or decision allowance, so it could not search or read further; relevant passages may remain unread.',
+  embedding_provider_unavailable: 'Semantic search was unavailable, so only word matching was used.',
+  research_decision_unavailable: 'The step that chooses further searches failed, so no further search was made.',
+  research_decision_outside_scope: 'A proposed further search pointed outside the authorized sources and was not run.',
+  repeated_action: 'A further search would only have repeated an earlier one.',
+  original_revision_changed: 'An original changed during the research and was not read.',
+  ocr_pending: 'Some scanned pages have no recognized text yet.',
+  ocr_required: 'This source needs character recognition before its text can be searched.',
+  research_read_unavailable: 'A requested reading of a source could not be completed.',
+  no_matches: 'A search inside a source found no matching passage; this does not show that the source lacks the information.',
+  local_original_unavailable: 'The local copy of an original was unavailable.',
+  original_unavailable: 'An original could not be read.',
+  no_readable_text: 'An original was opened but had no readable text.',
+  abstract_only: 'Only the abstract of this source is available.',
+  text_pending: 'This source has no search index yet; its content is only available by reading its original.',
+  embeddings_pending: 'This source has no semantic index yet.',
+  previous_indexed_revision: 'Evidence comes from an older indexed version of this source.',
+  no_model: 'No embedding model is available for this source.',
+  provider_failed: 'Indexing this source failed at the embedding provider.',
+  extraction_failed: 'The text of this source could not be extracted.',
+};
+export function describeResearchLimitation(code: string): string {
+  return RESEARCH_LIMITATION_NOTES[code] ?? 'Another retrieval limit applied to this research.';
+}
+/** The run's coverage as a model should read it: titles and plain descriptions, without
+ * identifiers, counters or codes. The stored record keeps the codes for the interface. */
+export function researchScopeForPrompt(coverage: ResearchTraversal): { sources: Array<{ title: string; passages_found: boolean; original_read: boolean; notes?: string[] }>; search_may_be_incomplete: boolean; limits?: string[] } {
+  const matched = new Set(coverage.matchedDocumentIds ?? []);
+  const read = new Set(coverage.readDocumentIds ?? []);
+  const limits = [...new Set(coverage.limitations ?? [])].map(describeResearchLimitation);
+  return { sources: (coverage.sourceCoverage ?? []).map(source => ({ title: source.title, passages_found: matched.has(source.documentId), original_read: read.has(source.documentId),
+    ...(source.reasons.length ? { notes: [...new Set(source.reasons)].map(describeResearchLimitation) } : {}) })),
+  search_may_be_incomplete: coverage.partial, ...(limits.length ? { limits } : {}) };
+}
+
 export type ResearchDocumentRead =
   | { kind: 'search'; query: string }
   | { kind: 'pages'; from: number; to?: number; attachmentId?: string }

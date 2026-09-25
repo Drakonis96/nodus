@@ -1,6 +1,6 @@
 import { researchActivityStep, startResearchActivity } from './researchActivity';
 import type { ResearchDocumentRead, ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
-import { RETRIEVAL_PRESETS, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
+import { RETRIEVAL_PRESETS, describeResearchLimitation, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
 import { textWithPageStarts } from '@shared/retrievalChunks';
 import type { DeepResearchRequest, WritingWorkshopBrief, WritingWorkshopIdeaCandidate, WritingWorkshopPassageCandidate, WritingWorkshopSnapshot } from '@shared/types';
@@ -371,7 +371,7 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
     // Basic searchable documents are independent from optional enriched analyses.
     preparePlanEvidence: undefined,
     finalize: input => deps.finalize({ ...input, supportConcerns: [...(input.supportConcerns ?? []),
-      ...(run.budget.partial ? ['Documentary coverage is partial; do not infer absence from missing evidence.'] : []), ...run.limitations] }) };
+      ...(run.budget.partial ? ['Documentary coverage is partial; do not infer absence from missing evidence.'] : []), ...[...run.limitations].map(describeResearchLimitation)] }) };
   return new Proxy(bounded, { get(target, property) {
     const value = Reflect.get(target, property);
     if (typeof value !== 'function') return value;
