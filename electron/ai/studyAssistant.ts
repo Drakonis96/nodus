@@ -3,7 +3,7 @@ import { deleteResearchAttachments } from '../researchAttachments';
 import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract } from '@shared/chatSkills';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { vaultChatSkillSession } from './chatSkillSession';
@@ -243,7 +243,7 @@ export function buildStudyAssistantPrompt(request: StudyAssistantRequest, citati
   const language = request.language === 'auto' ? pack.responseLanguage : selectedLanguage;
   const external = request.allowExternalKnowledge ? pack.system.externalAllowed : pack.system.externalForbidden;
   const system = [pack.system.intro, '', pack.system.rulesHeading, `- ${pack.system.corpus}`, `- ${pack.system.cite}`, `- ${pack.system.exact}`, `- ${external}`, `- ${pack.system.contradiction}`, `- ${pack.system.language(language, request.level, request.tone)}`, `- ${pack.system.markdown} ${pack.taskInstruction[request.task]}`].join('\n');
-  const user = JSON.stringify({ fuentes_seleccionadas: sources, conversacion: history.map(({ role, content }) => ({ role, content })) }, null, 2);
+  const user = JSON.stringify({ fuentes_seleccionadas: sources, conversacion: history.map(({ role, content }) => ({ role, content: role === 'assistant' ? chatProseForHistory(content) : content })) }, null, 2);
   return { system, user };
 }
 
@@ -266,7 +266,8 @@ export async function streamStudyAssistant(
   const sourceChars = availableCitations.reduce((sum, citation) => sum + citation.quote.length, 0);
   const stats = {
     sourceCount: availableCitations.length, sourceChars,
-    estimatedInputTokens: Math.ceil((sourceChars + request.messages.reduce((sum, message) => sum + message.content.length, 0)) / 3.5),
+    // Count what is actually replayed: assistant history is stripped of rendered blocks.
+    estimatedInputTokens: Math.ceil((sourceChars + request.messages.reduce((sum, message) => sum + (message.role === 'assistant' ? chatProseForHistory(message.content) : message.content).length, 0)) / 3.5),
     truncated, provider: configuredModel?.provider ?? '', model: configuredModel?.model ?? '',
   };
   if (!availableCitations.length && !request.allowExternalKnowledge && !attachments.text) {

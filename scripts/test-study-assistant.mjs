@@ -75,6 +75,21 @@ try {
   assert.match(prompt.system, /No inventes ids/);
   assert.match(prompt.user, /exact_fragment/);
 
+  // Replayed assistant history keeps the prose and the package summary, and drops the rendered
+  // control blocks: they are the app's, and echoing them back wastes tokens (and can look like
+  // injected instructions to a provider's safety classifier).
+  const withHistory = assistant.buildStudyAssistantPrompt({
+    messages: [
+      { id: 'u0', role: 'user', content: '¿Qué es la memoria de trabajo?', createdAt: new Date().toISOString() },
+      { id: 'a0', role: 'assistant', content: 'La memoria de trabajo retiene datos breves.\n\n```nodus-view\n<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>\n```\n\n```nodus-artifact\n{"summary":"Verified document"}\n```', createdAt: new Date().toISOString() },
+      { id: 'u1', role: 'user', content: '¿Y el bucle fonológico?', createdAt: new Date().toISOString() },
+    ],
+    selection: { scope: 'manual', sourceKeys: [`document:${document.id}`] }, task: 'answer', level: 'standard', tone: 'clear', language: 'es', allowExternalKnowledge: false,
+  }, [citation]);
+  assert.match(withHistory.user, /La memoria de trabajo retiene datos breves\./);
+  assert.match(withHistory.user, /Verified document/, 'a package artifact keeps its summary');
+  assert.doesNotMatch(withHistory.user, /nodus-view|nodus-artifact|<svg/);
+
   const settingsRepo = require(path.join(repoRoot, 'electron/db/settingsRepo.ts'));
   const { studyAssistantPromptPack } = require(path.join(repoRoot, 'shared/studyAssistantPromptPacks.ts'));
   const promptLanguages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];

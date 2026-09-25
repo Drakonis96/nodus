@@ -67,6 +67,46 @@ test('visual parser recognizes raw, SVG, XML and tilde fences, preserving ordina
   assert.equal(lib.splitChatVisuals('\\chemfig{H_3C-CH_3}')[0].kind, 'markdown');
 });
 
+test('history replay keeps the model prose and drops the app’s own control blocks', () => {
+  const answer = [
+    'Step 12 changes; steps 1–11 stay the same.',
+    '',
+    '```nodus-route-fix',
+    JSON.stringify({ label: 'Fix step 12', prompt: 'Correction needed for step 12. Re-output the complete route.' }),
+    '```',
+    '',
+    '```nodus-view',
+    '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>',
+    '```',
+    '',
+    '```nodus-artifact',
+    JSON.stringify({ summary: 'Verified chemistry document', view: {} }),
+    '```',
+  ].join('\n');
+  const prose = lib.chatProseForHistory(answer);
+  // The model's own prose survives, so the correction still has the route to fix.
+  assert.match(prose, /Step 12 changes; steps 1–11 stay the same\./);
+  // A package artifact collapses to its one-line summary; commands, drawings and SVG go.
+  assert.match(prose, /Verified chemistry document/);
+  assert.doesNotMatch(prose, /nodus-route-fix|Correction needed|nodus-view|<svg|nodus-artifact/);
+});
+
+test('every chat surface replays only model prose in history', () => {
+  // The helper is dead unless each surface routes its stored assistant turns through it.
+  const seams = [
+    ['electron/ai/researchAssistant.ts', /chatProseForHistory\(m\.content\)/],
+    ['electron/ai/studyAssistant.ts', /role === 'assistant' \? chatProseForHistory\(content\)/],
+    ['electron/ai/nodiChat.ts', /chatProseForHistory\(message\.content\)/],
+    ['electron/ai/characterChat.ts', /role === 'character' \? chatProseForHistory\(content\)/],
+    ['electron/ai/worldChat.ts', /chatProseForHistory\(turn\.content\)/],
+    ['electron/ai/databaseChat.ts', /chatProseForHistory\(turn\.content\)/],
+  ];
+  for (const [file, pattern] of seams) {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.match(source, pattern, `${file} must strip rendered blocks from replayed history`);
+  }
+});
+
 
 
 

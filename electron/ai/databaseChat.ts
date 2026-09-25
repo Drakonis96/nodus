@@ -2,7 +2,7 @@ import { prepareResearchAttachments, withResearchAttachmentFallback } from './re
 import { withResearchSystemPrompt } from './researchSystemPrompt';
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability } from '@shared/chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract } from '@shared/chatSkills';
 import { vaultChatSkillSession } from './chatSkillSession';
 import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
 import { getDatabaseChatConversation } from '../db/databaseChatRepo';
@@ -132,7 +132,9 @@ export async function streamDatabaseChat(
   const attachments = await prepareResearchAttachments(request, 'database', request.model ?? settings.chatModel ?? settings.synthesisModel);
   const language = settings.promptLanguage ?? 'es';
   const { context } = buildDatabaseChatContext(request.databaseIds, language);
-  const user = buildDbChatUser(context, request.question, request.history ?? [], language);
+  // Replay only the model's prose; rendered blocks (charts, artifacts) are the app's.
+  const history = (request.history ?? []).map((turn) => (turn.role === 'assistant' ? { ...turn, content: chatProseForHistory(turn.content) } : turn));
+  const user = buildDbChatUser(context, request.question, history, language);
 
   const stream =
     deps.stream ??

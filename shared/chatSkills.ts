@@ -241,6 +241,27 @@ export function chatVisualTitleSummary(content: string): string {
   }).join('');
 }
 
+/**
+ * What the model actually wrote, for replaying the conversation back to it.
+ *
+ * The `nodus-*` fences and SVG are the app's, not the model's: route-fix chips carry
+ * imperative correction instructions, and package results/drawings are rendered, not read.
+ * Echoing those blocks back as assistant text made a long conversation look like a stack of
+ * nested commands the assistant had issued — a shape a provider's safety classifier reads as
+ * prompt injection and declines. The model only needs its own prose; a package artifact is
+ * replaced by the one-line summary its package wrote.
+ */
+export function chatProseForHistory(content: string): string {
+  return splitChatVisuals(content).map(part => {
+    if (part.kind === 'markdown') return part.content;
+    if (part.kind === 'capability-artifact') {
+      try { return `${(JSON.parse(part.content) as { summary?: string }).summary ?? ''} `; }
+      catch { return ''; }
+    }
+    return '';
+  }).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /** Citation repair operates on prose; visual code and image production briefs are opaque. */
 export function transformChatProse(content: string, transform: (prose: string) => string): string {
   const visuals: string[] = [];
