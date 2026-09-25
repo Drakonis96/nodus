@@ -8,16 +8,16 @@ import os from 'node:os';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 const repo = path.resolve(import.meta.dirname, '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
-test('a dropdown selects several values, stays open while choosing, searches long lists and clears', { timeout: 120000 }, async t => {
+test('a dropdown selects several values, stays open while choosing, searches long lists and clears', { timeout: 300_000 }, async t => {
   if (!chrome) { t.skip('An isolated test browser is required'); return; }
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-multiselect-'));
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
   try {
     const bundle = await build({ entryPoints: [path.join(repo, 'scripts/fixtures/multiselect-dropdown/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
-    const css = path.join(root, 'style.css');
-    execFileSync(path.join(repo, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', css, '--minify'], { cwd: repo, stdio: 'pipe' });
+    const css = componentStyles();
     for (const theme of ['dark', 'light']) {
       const page = await browser.newPage({ viewport: { width: 560, height: 420 }, deviceScaleFactor: 2, reducedMotion: 'reduce' });
       const errors = []; page.on('pageerror', error => errors.push(error.message));

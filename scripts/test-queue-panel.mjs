@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
@@ -31,8 +32,7 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
   let page;
   try {
     const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/queue-panel/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
-    const css = path.join(dir, 'style.css');
-    execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', css, '--minify'], { cwd: root, stdio: 'pipe' });
+    const css = componentStyles();
     const errors = [];
     async function mount(initial = {}, hold = []) {
       await page.addStyleTag({ content: await readFile(css, 'utf8') });

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
@@ -29,8 +30,7 @@ test('capability views render in both themes without overflowing the message col
       // Stylesheets are injected separately, compiled the way the app compiles them.
       loader: { '.ttf': 'empty', '.woff': 'empty', '.woff2': 'empty', '.css': 'empty' },
     });
-    const cssFile = path.join(dir, 'style.css');
-    execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', cssFile, '--minify'], { cwd: root, stdio: 'pipe' });
+    const cssFile = componentStyles();
     // Tailwind for the utilities, plus the component stylesheets the fixture's imports
     // are standing in for.
     const css = [

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [
@@ -40,8 +41,7 @@ test('the log modal filters, sorts, copies, downloads and manages retention', { 
       jsx: 'automatic',
       define: { 'process.env.NODE_ENV': '"production"' },
     });
-    const css = path.join(dir, 'style.css');
-    execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', css, '--minify'], { cwd: root, stdio: 'pipe' });
+    const css = componentStyles();
     const stylesheet = await readFile(css, 'utf8');
     const errors = [];
 
