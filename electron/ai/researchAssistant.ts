@@ -14,6 +14,7 @@ import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
 import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
 import { researchModelContextWindow } from './aiClient';
+import { researchAnswerTokens } from '@shared/researchRetrievalBudget';
 import { ResearchCorpusRun } from './researchCorpusRun';
 import { RETRIEVAL_PRESETS, researchScopeForPrompt, validateRetrievalSettings } from '@shared/researchCorpus';
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
@@ -557,11 +558,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.
-  let maxTokens = skills.length ? 10_000 : 6000;
+  let maxTokens = researchAnswerTokens(window, skills.length > 0);
   let contextBudget = MAX_TOTAL_CONTEXT_CHARS;
   if (window != null) {
     const margin = Math.max(96, Math.round(window * 0.05));
-    maxTokens = Math.min(6000, Math.max(320, Math.floor((window - margin) * 0.3)));
     if (compact) maxTokens = Math.min(maxTokens, LOCAL_MAX_OUTPUT_TOKENS);
     // Chars the whole prompt (system + history + context + JSON scaffolding) may use.
     const promptChars = Math.max(0, window - maxTokens - margin) * LOCAL_CHARS_PER_TOKEN;
