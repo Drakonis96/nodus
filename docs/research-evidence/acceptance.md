@@ -409,3 +409,65 @@ screenshots `2026-09-24-end-to-end-queue.png` and `2026-09-24-end-to-end-quote-p
 - **Cost.** Final run 32 calls, 55,510 input and 12,280 output tokens, USD 0.0306; the
   three earlier runs of this campaign USD 0.0425. Ledger 1,872 calls, USD 3.961772227,
   21 unresolved reservations from earlier campaigns.
+
+### Integral verification through the interface (25 September, application code `99b46fe7`)
+
+Evidence: `2026-09-25-integral.json` (roots, the five isolation proofs before each of the
+two launches and for the Zotero root, corpus with hashes, collections, notebooks,
+indexing samples, every question with its answer, citations, quotations found in the
+corpus, ordered activity, layers, calls, tokens and ledger cost, and a manual review of
+each answer); screenshots `2026-09-25-integral-notebook-indexing.png`,
+`-zotero-original.png` and `-svg-skill.png`. Script: `scripts/verify-research-integral.mjs`;
+corpus: `scripts/lib/research-integral-corpus.mjs`. The later head `2f80d6c2` changes only
+two test scripts; the application code is that of `99b46fe7`, rebuilt before the run.
+
+- **Real integration.** Electron driven through its interface with Playwright; DeepSeek
+  Flash and OpenRouter bge-m3 through the cost-reserving proxy; a disposable Zotero
+  10.0.3 and the managed Zotero MCP started by the chat itself. **Fixtures:** nine
+  synthetic PDFs in three invented disciplines (a literal quotation per page, a relation
+  inside each group), the OS file picker stub, a decoy Zotero record, and the removal of
+  two published indexes in the closed profile with `DocumentaryStore.removeDocument`'s
+  statements (no interface exists for it). **Simulated provider:** none.
+- **Flow.** Welcome accepted with automatic indexing. Collection A built in the Global
+  Library ("Nueva colección", "Añadir archivos", the metadata editor, "Usar en un
+  vault"): indexed with nothing pressed. Collection B was given to a notebook before it
+  joined the vault, so the notebook queued its own indexing: the banner showed "0 de 3
+  documentos listos", Send was disabled, "Ver cola" opened the Queue. The notebook dialog
+  lists only collections, as a tree with N and Z marks; the notebook balloon shows only
+  "Enfoque", the general one "Enfoque" and "Biblioteca". The Zotero subcollection was
+  monitored into this vault and synchronised: its three items only, not the parent's
+  decoy, indexed automatically. Ideas and document profiles were built for B.
+- **Answers (manual review, fourteen questions, all correct).** Exact quotation with
+  page; the 1,160/890 ha comparison with sources and reason; the three Sarbela works
+  chained; an absent datum stated without inference from silence; each notebook refuses
+  the other group's question and answers its own; the general chat uses both groups;
+  ideas, gaps and passages together; the Zotero group with a cross-document objection.
+  A document of A without index is read from its Global Library original (nodus/pages);
+  one of Z without index or Library copy is read from Zotero through the managed MCP
+  (zotero/pages, completed, no settings). Activity order held in every answer (scope →
+  profiles/nodus/ideas → context → reading → graph → response); no layer failed; no
+  renderer error.
+- **Skills.** In the academic vault, enabled skills are not loaded without `@` (a
+  timeline request is answered as cited text): kept as designed, since the academic
+  chat answers from its corpus under the citation contract, and `@` is the explicit
+  way to add an artefact. `@SVG Studio` sends `skillIds`, puts the invoked-skill rule and
+  the skill in the prompt, and renders one SVG.
+- **Defects found and fixed** (each with a test that failed first): `10de28e0`
+  supervisor decisions consumed the evidence allowance (a search returned nothing and an
+  answer denied an existing correction) and internal codes reached answers; `de630bed`
+  the supervisor could not tell which source had no index and never read unindexed
+  originals, so Zotero was never consulted; `ae0133b3` answers doubted passages they
+  quoted in full; `99b46fe7` `@`-invoked skill answers were capped at 6,000 tokens and
+  could fail; `2811516b` `SCHEMA_VERSION` stayed 181 with migrations to 185 (no recovery
+  snapshot on upgrade; 61 CI failures); `dad39b75` stale generated modules; test and
+  harness corrections in `3bdabb08`, `4e342abf`, `d35401df`, `1b39ab27`, `f1f8979a`,
+  `2f80d6c2`; `272aeb77` the ledger ceiling raised to USD 7 as authorized.
+- **Outside this PR, recorded only.** File import ignores the PDF's embedded title and
+  author; "Nueva colección" nests under the selected collection; the work status shows
+  idea search "0/1" after extraction because its hash includes themes linked later.
+- **Still open.** Answers are long and add limitation paragraphs even with complete
+  coverage; in the Balanced preset a second supervisor decision may not fit its own
+  allowance. One real run per question on a synthetic corpus is not a guarantee.
+- **Cost.** Final run 122 calls, 177,970 input and 46,400 output tokens, USD 0.107.
+  This campaign's work from USD 3.9906 to 4.9395 (USD 0.949, development runs included).
+  Ledger: 2,961 calls, USD 4.939499, 23 retained reservations, limit USD 7, guard 6.80.
