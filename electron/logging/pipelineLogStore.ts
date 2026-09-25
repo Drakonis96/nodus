@@ -132,10 +132,15 @@ export class PipelineLogRepository {
     this.writeNow();
   }
 
-  /** Append one line. Returns the stored entry, or null when the line was dropped. */
-  record(entry: PipelineLogEntry, limits: PipelineLogLimits): PipelineLogEntry | null {
+  /**
+   * Append one line. Returns the stored entry, or null when the line was dropped.
+   *
+   * `now` stamps a grouped repeat and anchors the horizon the append prunes against, so a
+   * caller (or a test) can pin the clock the way `prune`/`query`/`delete` already allow.
+   */
+  record(entry: PipelineLogEntry, limits: PipelineLogLimits, now = Date.now()): PipelineLogEntry | null {
     this.readOnce();
-    const next = appendPipelineLogEntries(this.store, [entry], limits);
+    const next = appendPipelineLogEntries(this.store, [entry], limits, now);
     const stored = next.entries.find((item) => item.id === entry.id) ?? null;
     if (next.revision !== this.store.revision) {
       this.store = next;
