@@ -61,6 +61,8 @@ import type {
   ChapterSuggestionStatus,
   ChatConversation,
   ChatConversationSummary,
+  ChatFolder,
+  ChatFolderSurface,
   ChatMessageRecord,
   CitationPreview,
   CitationRef,
@@ -794,6 +796,16 @@ export interface AcademicApi {
   renameConversation(id: string, title: string): Promise<void>;
   archiveConversation(id: string, archived: boolean): Promise<void>;
   deleteConversation(id: string): Promise<void>;
+
+  // conversation folders: one shared tree per chat surface, one folder per conversation
+  listChatFolders(surface: ChatFolderSurface): Promise<ChatFolder[]>;
+  createChatFolder(surface: ChatFolderSurface, name: string, parentId?: string | null): Promise<ChatFolder>;
+  renameChatFolder(folderId: string, name: string): Promise<ChatFolder | null>;
+  moveChatFolder(folderId: string, parentId: string | null, position?: number): Promise<ChatFolder | null>;
+  deleteChatFolder(folderId: string): Promise<void>;
+  /** conversation id → folder id (or null) for the surface, used to stamp the list. */
+  chatFolderMemberships(surface: ChatFolderSurface): Promise<Record<string, string | null>>;
+  setConversationFolder(surface: ChatFolderSurface, conversationId: string, folderId: string | null): Promise<void>;
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   /** Load every folder and note in one payload; the renderer builds the tree. */

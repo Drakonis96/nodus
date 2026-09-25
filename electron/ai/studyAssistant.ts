@@ -127,6 +127,31 @@ export function deleteStudyAssistantConversation(id: string): void {
   deleteChatAssets(chatAssetOwner('study', id, getActiveVault().id));
 }
 
+/** conversation id → folder id (or null) for the JSON store. Study has no membership table. */
+export function listStudyConversationFolders(): Record<string, string | null> {
+  return Object.fromEntries(readStore().conversations.map((conversation) => [conversation.id, conversation.folderId ?? null]));
+}
+
+/** File a study chat, or un-file it with `null`; deliberately does not touch `updatedAt`. */
+export function setStudyConversationFolder(id: string, folderId: string | null): void {
+  const store = readStore();
+  const index = store.conversations.findIndex((conversation) => conversation.id === id);
+  if (index < 0) return;
+  store.conversations[index] = { ...store.conversations[index], folderId };
+  writeStore(store);
+}
+
+/** Clear JSON folder ids that no longer exist in the tree — the store has no FK to do it. */
+export function unfileMissingStudyFolders(existingFolderIds: readonly string[]): void {
+  const valid = new Set(existingFolderIds);
+  const store = readStore();
+  let changed = false;
+  for (const conversation of store.conversations) {
+    if (conversation.folderId && !valid.has(conversation.folderId)) { conversation.folderId = null; changed = true; }
+  }
+  if (changed) writeStore(store);
+}
+
 /**
  * One fully local conversation per demo vault, so the chat is useful before an AI key
  * is configured. The teaching variant exists because the study one cites a study-demo

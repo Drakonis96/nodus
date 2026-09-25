@@ -347,6 +347,13 @@ const NOT_SYNCED_TABLES = new Set([
   'testimony_agreements',
   'testimony_contrasts',
   'testimony_contrast_items',
+  // Conversation folders organise a device's chat list. They are local for now: syncing them
+  // safely needs a merge decision (folder identity, membership conflicts) that this release
+  // does not make. A synced conversation simply arrives unfiled on another device.
+  'chat_folders',
+  'chat_conversation_folders',
+  'database_conversation_folders',
+  'world_conversation_folders',
 ]);
 
 export function localTableNames(db: Database.Database = getDb()): Set<string> {

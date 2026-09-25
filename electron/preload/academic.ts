@@ -683,6 +683,14 @@ export const academicApi: AcademicApi = {
   archiveConversation: (id, archived) => ipcRenderer.invoke('chat:archive', id, archived).then(() => undefined),
   deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
 
+  listChatFolders: (surface) => ipcRenderer.invoke('chat:folders:list', surface),
+  createChatFolder: (surface, name, parentId) => ipcRenderer.invoke('chat:folders:create', surface, name, parentId ?? null),
+  renameChatFolder: (folderId, name) => ipcRenderer.invoke('chat:folders:rename', folderId, name),
+  moveChatFolder: (folderId, parentId, position) => ipcRenderer.invoke('chat:folders:move', folderId, parentId, position),
+  deleteChatFolder: (folderId) => ipcRenderer.invoke('chat:folders:delete', folderId).then(() => undefined),
+  chatFolderMemberships: (surface) => ipcRenderer.invoke('chat:folders:memberships', surface),
+  setConversationFolder: (surface, conversationId, folderId) => ipcRenderer.invoke('chat:folders:set', surface, conversationId, folderId).then(() => undefined),
+
   getNotesTree: (includeTrashed) => ipcRenderer.invoke('notes:tree', includeTrashed),
   createNoteFolder: (input) => ipcRenderer.invoke('notes:folders:create', input),
   renameNoteFolder: (id, name) => ipcRenderer.invoke('notes:folders:rename', id, name),

@@ -6076,6 +6076,20 @@ export interface ChatConversationSummary {
   archived: boolean;
   model: ModelRef | null;
   messageCount: number;
+  /** The folder this conversation is filed under, or null/absent when unfiled. */
+  folderId?: string | null;
+}
+
+/** The chat surfaces that own a folder tree. Study stores chats as JSON, not a table. */
+export type ChatFolderSurface = 'research' | 'study' | 'database' | 'world';
+
+export interface ChatFolder {
+  folderId: string;
+  surface: ChatFolderSurface;
+  name: string;
+  parentId: string | null;
+  position: number;
+  createdAt: string;
 }
 
 /** A full conversation with its messages and the context selection it was using. */
