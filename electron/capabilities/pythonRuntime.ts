@@ -30,9 +30,31 @@ export interface RuntimeLock { schemaVersion: 1; python: string; platform: strin
 const READY = 'READY';
 const MAX_WHEEL_BYTES = 256 * 1024 * 1024;
 
-const runtimeDir = (runtime: TrustedWorkerRuntime, runtimeId: string) => path.join(pluginsRuntimesRoot(), runtime.plugin.id, runtimeId);
-const readyFile = (runtime: TrustedWorkerRuntime, runtimeId: string) => path.join(runtimeDir(runtime, runtimeId), READY);
+/** Environments are shared by lock digest: two capabilities that pin the same dependencies build
+ *  and reuse one environment instead of a private copy each. */
+const sharedRuntimeDir = (lockDigest: string) => path.join(pluginsRuntimesRoot(), 'shared', lockDigest);
+/** A pointer naming the shared environment a capability's runtime resolves to. It lives under the
+ *  plugin's own directory, so uninstalling the plugin drops the reference while the shared
+ *  environment survives for any other plugin whose lock matches. */
+const pointerFile = (runtime: TrustedWorkerRuntime, runtimeId: string) => path.join(pluginsRuntimesRoot(), runtime.plugin.id, `${runtimeId}.json`);
 const interpreter = (root: string) => process.platform === 'win32' ? path.join(root, 'venv', 'Scripts', 'python.exe') : path.join(root, 'venv', 'bin', 'python');
+
+function writePointer(file: string, lockDigest: string, python: string): void {
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify({ schemaVersion: 1, lockDigest, python }), { mode: 0o600 });
+  fs.renameSync(tmp, file);
+}
+
+function readPointer(file: string): string | null {
+  try {
+    const record = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (record?.schemaVersion !== 1 || !/^[a-f0-9]{64}$/.test(String(record.lockDigest))) return null;
+    return String(record.lockDigest);
+  } catch {
+    return null;
+  }
+}
 
 export function validateRuntimeLock(input: unknown): RuntimeLock {
   const value = input as RuntimeLock;
@@ -86,8 +108,7 @@ export interface EnsureRuntimeContext {
 }
 
 export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtimeId: string, context: EnsureRuntimeContext): Promise<{ ready: boolean; detail?: string }> {
-  const root = runtimeDir(runtime, runtimeId);
-  const marker = readyFile(runtime, runtimeId);
+  const pointer = pointerFile(runtime, runtimeId);
 
   const python = await findSystemPython(context.minVersion);
   if (!python) return { ready: false, detail: `Python ${context.minVersion} or newer was not found on this machine.` };
@@ -96,6 +117,8 @@ export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtime
   const lock = context.selectLock(minor);
   if (!lock) return { ready: false, detail: `This package publishes no pinned dependency set for Python ${minor} on ${process.platform}-${process.arch}.` };
   const lockDigest = createHash('sha256').update(JSON.stringify(lock)).digest('hex');
+  const root = sharedRuntimeDir(lockDigest);
+  const marker = path.join(root, READY);
 
   // The marker records which lock produced the environment: a package that changes its
   // dependencies, or a user who changed interpreter, gets a rebuild instead of an
@@ -103,6 +126,7 @@ export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtime
   try {
     if (fs.readFileSync(marker, 'utf8').trim() === lockDigest) {
       await run(interpreter(root), ['--version'], { timeout: 10_000 });
+      writePointer(pointer, lockDigest, python.version);
       return { ready: true };
     }
   } catch { /* not built, or built from a different lock */ }
@@ -132,6 +156,7 @@ export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtime
     fs.mkdirSync(path.dirname(root), { recursive: true, mode: 0o700 });
     fs.renameSync(staging, root);
     fs.writeFileSync(marker, lockDigest, { mode: 0o600 });
+    writePointer(pointer, lockDigest, python.version);
     return { ready: true };
   } catch (error) {
     fs.rmSync(staging, { recursive: true, force: true });
@@ -151,8 +176,9 @@ export interface PythonRunRequest {
 
 export async function runInPythonRuntime(runtime: TrustedWorkerRuntime, request: PythonRunRequest, signal: AbortSignal): Promise<{ code: number; stdout: string; stderr: string }> {
   signal.throwIfAborted();
-  const root = runtimeDir(runtime, request.runtimeId);
-  if (!fs.existsSync(readyFile(runtime, request.runtimeId))) throw new Error('That capability runtime is not installed.');
+  const lockDigest = readPointer(pointerFile(runtime, request.runtimeId));
+  const root = lockDigest ? sharedRuntimeDir(lockDigest) : null;
+  if (!root || !fs.existsSync(path.join(root, READY))) throw new Error('That capability runtime is not installed.');
   if (request.args.some(argument => typeof argument !== 'string' || argument.length > 4_000)) throw new Error('Invalid runtime argument.');
 
   return new Promise((resolve, reject) => {
