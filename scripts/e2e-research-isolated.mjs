@@ -132,6 +132,7 @@ try {
     report.notebooks.layouts = layouts;
   }
   if (process.argv.includes('--activity')) report.activity = await (await import('./verify-research-activity-ui.mjs')).verifyResearchActivityUi(page, app, root);
+  if (process.argv.includes('--skills')) report.skills = await (await import('./verify-research-skill-mention.mjs')).verifyResearchSkillMention(page, app, root);
   if (process.argv.includes('--pdf')) report.pdf = await (await import('./verify-research-pdf.mjs')).verifyResearchPdf(page, app, root);
   Object.assign(report, { completed: true, paths, databaseOpens: audit.length });
 } finally {

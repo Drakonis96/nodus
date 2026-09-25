@@ -5869,6 +5869,8 @@ export interface ResearchChatRequest {
   messages: ResearchChatMessage[];
   selection: ResearchContextSelection;
   model?: ModelRef | null;
+  /** Skills invoked with @ for this turn only; applied even when switched off for the chat. */
+  skillIds?: string[];
 }
 
 export interface ResearchContextStats {
@@ -6070,6 +6072,8 @@ export interface ChatMessageRecord {
   selectionKey?: string | null;
   stats?: ResearchContextStats | null;
   error?: boolean;
+  /** Skills the user invoked with @ for this message (name kept for display). */
+  skills?: { id: string; name: string }[];
 }
 
 /** Conversation list entry (no messages) for the history sidebar. */

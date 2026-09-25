@@ -9,6 +9,8 @@ import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapt
 import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
 import { NotebookDialog, ResearchNotebookChip, useResearchNotebooks } from '../components/ResearchNotebookControl';
 import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
+import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
+import { useSkillLibrary } from '../components/skillLibrary';
 import type { ResearchNotebook } from '@shared/researchCorpus';
 import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
 import { ResearchCoverage } from '../components/ResearchCoverage';
@@ -281,6 +283,13 @@ export function ResearchAssistantModal({
   // A project's page: shown while it is open and no conversation has started in it.
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [editingNotebook, setEditingNotebook] = useState<ResearchNotebook | 'new' | null>(null);
+  // Skills invoked with @ for the next message: typed in the composer, sent with the turn.
+  const skillsEnabled = !adapter;
+  const skillLibrary = useSkillLibrary();
+  const [invokedSkills, setInvokedSkills] = useState<InvokedSkill[]>([]);
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionOptions = skillsEnabled && mention ? rankSkillMentions(skillLibrary.skills, mention.query) : [];
   const projectHome = supportsProjects && !!activeProjectId && !activeId;
   const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
   const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
@@ -657,11 +666,11 @@ export function ResearchAssistantModal({
   // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
   // the composer (send) and the regenerate action, which only differ in how they
   // pick the prior history and the user prompt.
-  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = []) => {
+  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = [], skills: InvokedSkill[] = []) => {
     if (!selectedModel) return;
     const selectionKey = adapter?.contextKey ?? serializeSelection(selection);
     const isFirstExchange = priorMessages.length === 0;
-    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files };
+    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files, ...(skills.length ? { skills } : {}) };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
       ...priorMessages.filter((m) => (m.selectionKey === selectionKey || (adapter && !m.selectionKey)) && !m.error && m.content.trim()),
@@ -685,7 +694,7 @@ export function ResearchAssistantModal({
     try {
       if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
       const response = await api.researchChatStream(
-        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined },
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined, ...(skillsEnabled && skills.length ? { skillIds: skills.map(skill => skill.id) } : {}) },
         {
           // A terminal event may arrive after the turn settled (it travels on another IPC pipe
           // than the reply); it then replaces the placeholder the settlement wrote.
@@ -771,6 +780,15 @@ export function ResearchAssistantModal({
     }
   };
 
+  const pickSkill = (skill: { id: string; name: string }) => {
+    if (!mention) return;
+    const next = removeMention(input, mention);
+    setInput(next.text);
+    setInvokedSkills(current => current.some(item => item.id === skill.id) ? current : [...current, { id: skill.id, name: skill.name }].slice(0, 8));
+    setMention(null);
+    window.requestAnimationFrame(() => { const field = inputRef.current; if (field) { field.focus(); field.setSelectionRange(next.caret, next.caret); } });
+  };
+
   const send = async (explicit?: string) => {
     const content = (explicit ?? input).trim() || (attachments.length ? t('Analiza los archivos adjuntos.') : '');
     if (!content || sending || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
@@ -789,7 +807,9 @@ export function ResearchAssistantModal({
     if (!explicit) setInput('');
     const files = explicit ? [] : attachments;
     if (!explicit) setAttachments([]);
-    await generate(conversationId, messagesRef.current, content, files);
+    const turnSkills = explicit ? [] : invokedSkills;
+    if (!explicit) { setInvokedSkills([]); setMention(null); }
+    await generate(conversationId, messagesRef.current, content, files, turnSkills);
   };
 
   // One click on a route-fix prompt sends the checker's correction request as the user's
@@ -816,7 +836,7 @@ export function ResearchAssistantModal({
     }
     const conversationId = activeIdRef.current;
     if (lastUserIdx < 0 || !conversationId) return;
-    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments);
+    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments, current[lastUserIdx].skills);
   };
 
   const addAttachments = async (filePaths?: string[]) => {
@@ -1124,6 +1144,7 @@ export function ResearchAssistantModal({
                         </button>
                       </div>
                       {message.attachments?.length ? renderAttachments(message.attachments) : null}
+                      {message.skills?.length ? <InvokedSkillPills skills={message.skills} /> : null}
                       {message.concilium && <ConciliumResponses result={message.concilium} onCitation={handleCitation} />}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
                         <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
@@ -1185,7 +1206,10 @@ export function ResearchAssistantModal({
               {attachments.some(file => file.warning) && <p className="research-attachment-error" role="status">{attachments.filter(file => file.warning).map(file => `${file.name}: ${file.warning}`).join(' · ')}</p>}
               {attaching && <p className="research-attachment-status" role="status">{t('Preparando archivos…')}</p>}
               <div className="research-composer-shell">
+              {mention && skillsEnabled && <SkillMentionMenu options={mentionOptions} activeIndex={mentionIndex}
+                onHover={setMentionIndex} onPick={pickSkill} />}
               {attachments.length > 0 && renderAttachments(attachments, true)}
+              <InvokedSkillPills skills={invokedSkills} onRemove={id => setInvokedSkills(current => current.filter(skill => skill.id !== id))} />
               <div className="research-composer">
                 <button className="research-composer-attach" aria-label={t('Añadir archivos')} title={t('Añadir archivos')} disabled={sending || attaching} onClick={() => void addAttachments()}><Icon name="plus" size={23} /></button>
                 <textarea
@@ -1195,8 +1219,29 @@ export function ResearchAssistantModal({
                   rows={1}
                   value={input}
                   placeholder={projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
-                  onChange={(e) => setInput(e.target.value)}
+                  aria-autocomplete={skillsEnabled ? 'list' : undefined}
+                  aria-controls={mention ? 'research-skill-mention' : undefined}
+                  aria-expanded={skillsEnabled ? !!mention : undefined}
+                  aria-activedescendant={mention && mentionOptions.length ? `research-skill-option-${mentionIndex}` : undefined}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (skillsEnabled) { setMention(findSkillMention(e.target.value, e.target.selectionStart ?? e.target.value.length)); setMentionIndex(0); }
+                  }}
+                  onBlur={() => setMention(null)}
                   onKeyDown={(e) => {
+                    if (mention && !e.nativeEvent.isComposing) {
+                      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMention(null); return; }
+                      if (mentionOptions.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                        e.preventDefault();
+                        setMentionIndex(index => (index + (e.key === 'ArrowDown' ? 1 : -1) + mentionOptions.length) % mentionOptions.length);
+                        return;
+                      }
+                      if (mentionOptions.length && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey) {
+                        e.preventDefault();
+                        pickSkill(mentionOptions[Math.min(mentionIndex, mentionOptions.length - 1)]);
+                        return;
+                      }
+                    }
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void send();

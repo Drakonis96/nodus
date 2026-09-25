@@ -146,11 +146,19 @@ export function deriveCapabilityTools(skill: ChatSkill): ChatSkill['capabilityTo
   return tools.length ? tools : undefined;
 }
 
+const runnable = (skill: ChatSkill) => (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability)));
+const withCapabilityTools = (skill: ChatSkill): ChatSkill => { const capabilityTools = deriveCapabilityTools(skill); return capabilityTools ? { ...skill, capabilityTools } : { ...skill, capabilityTools: undefined }; };
+
 export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
-  return listChatSkills()
-    .filter(skill => skill.enabled[surface]
-      && (skill.capabilities ?? []).every(capability => installedCapabilityAvailable(normalizeCapabilityId(capability))))
-    .map(skill => { const capabilityTools = deriveCapabilityTools(skill); return capabilityTools ? { ...skill, capabilityTools } : { ...skill, capabilityTools: undefined }; });
+  return listChatSkills().filter(skill => skill.enabled[surface] && runnable(skill)).map(withCapabilityTools);
+}
+
+/** Skills the user named with @ for one message. The per-chat switch does not apply: naming
+ * a skill is the request to use it. Unknown ids and unavailable capabilities are dropped. */
+export function invokedChatSkills(ids: unknown): ChatSkill[] {
+  if (!Array.isArray(ids) || !ids.length) return [];
+  const wanted = new Set(ids.filter((id): id is string => typeof id === 'string').slice(0, 8));
+  return listChatSkills().filter(skill => wanted.has(skill.id) && runnable(skill)).map(withCapabilityTools);
 }
 export function saveChatSkill(input: ChatSkill): ChatSkill[] {
   const skills = listChatSkills();

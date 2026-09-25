@@ -37,6 +37,7 @@ interface MessageRow {
   stats_json: string | null;
   attachments_json: string | null;
   concilium_json: string | null;
+  skills_json?: string | null;
   error: number;
   created_at: string;
 }
@@ -73,6 +74,7 @@ function toMessage(row: MessageRow): ChatMessageRecord {
     content: row.content,
     attachments: parseJson(row.attachments_json) ?? undefined,
     concilium: parseJson(row.concilium_json) ?? undefined,
+    skills: parseJson<{ id: string; name: string }[]>(row.skills_json ?? null) ?? undefined,
     selectionKey: row.selection_key,
     stats: parseJson(row.stats_json),
     error: row.error === 1,
@@ -146,8 +148,8 @@ export function saveMessages(
     if (!exists) return;
     db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(id);
     const insert = db.prepare(
-      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at, attachments_json, concilium_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at, attachments_json, concilium_json, skills_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     messages.forEach((message, index) => {
       insert.run(
@@ -161,7 +163,8 @@ export function saveMessages(
         message.error ? 1 : 0,
         now,
         message.attachments?.length ? JSON.stringify(message.attachments) : null,
-        message.concilium ? JSON.stringify(message.concilium) : null
+        message.concilium ? JSON.stringify(message.concilium) : null,
+        message.skills?.length ? JSON.stringify(message.skills.slice(0, 8).map(skill => ({ id: String(skill.id), name: String(skill.name).slice(0, 120) }))) : null
       );
     });
     const sets: string[] = ['updated_at = @now'];

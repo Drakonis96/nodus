@@ -9357,6 +9357,7 @@ export const migrations: Migration[] = [
     );
     CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
   ` },
+  { version: 183, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
 ];
 
 /**
