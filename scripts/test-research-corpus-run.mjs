@@ -159,5 +159,7 @@ try {
   // The corpus inventory opens the Global Library catalog; Windows cannot delete it open.
   load('electron/library/libraryService.ts').closeGlobalLibrary();
   load('electron/db/database.ts').closeDb();
-  fs.rmSync(scratch, { recursive: true, force: true });
+  // Windows releases SQLite and WAL handles a moment after close; retry instead of
+  // failing the run on EPERM (every native Windows run since f4ce96fb).
+  fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
 }
