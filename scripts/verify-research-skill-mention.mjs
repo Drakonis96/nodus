@@ -21,6 +21,9 @@ export async function verifyResearchSkillMention(page, app, root) {
   const first = menu.getByRole('option').first();
   assert.match(await first.innerText(), /SVG Studio/);
   assert.equal(await first.getAttribute('aria-selected'), 'true');
+  // The list is on top of everything in the chat, the activity panel included.
+  const box = await first.boundingBox();
+  assert.equal(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-testid="research-skill-mention"]') !== null, { x: box.x + box.width / 2, y: box.y + box.height / 2 }), true, 'the @ list is not covered');
   await page.screenshot({ path: path.join(root, 'artifacts', 'skill-mention-menu.png') });
   await page.keyboard.press('Enter');
   await menu.waitFor({ state: 'detached' });
