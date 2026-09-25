@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from './database';
+import { cleanAppearanceColor, cleanAppearanceIcon } from './chatAppearance';
 import { RESEARCH_CHAT_PIN_LIMIT, type ResearchChatProject } from '@shared/types';
 
 type ProjectRow = { id: string; name: string; icon: string | null; color: string | null; created_at: string; updated_at: string };
@@ -9,16 +10,8 @@ const cleanName = (name: unknown): string => {
   if (typeof name !== 'string' || !name.trim() || name.trim().length > 120) throw new Error('research_chat_project_invalid_name');
   return name.trim();
 };
-const cleanIcon = (icon: unknown): string | null => {
-  if (icon == null) return null;
-  if (typeof icon !== 'string' || !/^[a-zA-Z]{1,40}$/.test(icon)) throw new Error('research_chat_project_invalid_icon');
-  return icon;
-};
-const cleanColor = (color: unknown): string | null => {
-  if (color == null) return null;
-  if (typeof color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error('research_chat_project_invalid_color');
-  return color.toLowerCase();
-};
+const cleanIcon = cleanAppearanceIcon;
+const cleanColor = cleanAppearanceColor;
 
 /** Projects in alphabetical order, the way the history lists them. */
 export function listChatProjects(): ResearchChatProject[] {

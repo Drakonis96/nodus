@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from './database';
+import { cleanAppearanceColor, cleanAppearanceIcon } from './chatAppearance';
 import { validateRetrievalSettings, type ResearchNotebook, type ResearchNotebookInput, type ResolvedResearchScope } from '@shared/researchCorpus';
 
-type NotebookRow = { id: string; name: string; description: string; revision: number; mode: 'fixed' | 'linked'; sources_json: string; exclusions_json: string; resolved_ids_json: string; settings_json: string | null; notes_json: string; conversation_settings_json: string | null; created_at: string; updated_at: string };
+type NotebookRow = { id: string; name: string; description: string; revision: number; mode: 'fixed' | 'linked'; sources_json: string; exclusions_json: string; resolved_ids_json: string; settings_json: string | null; notes_json: string; conversation_settings_json: string | null; icon?: string | null; color?: string | null; created_at: string; updated_at: string };
 function decode(row: NotebookRow): ResearchNotebook {
   return { id: row.id, name: row.name, description: row.description, revision: row.revision, mode: row.mode,
     sources: JSON.parse(row.sources_json), exclusions: JSON.parse(row.exclusions_json), resolvedDocumentIds: JSON.parse(row.resolved_ids_json),
     settings: row.settings_json ? JSON.parse(row.settings_json) : undefined, noteIds: JSON.parse(row.notes_json),
     conversationSettings: row.conversation_settings_json ? JSON.parse(row.conversation_settings_json) : undefined,
+    icon: row.icon ?? 'notebook', color: row.color ?? null,
     createdAt: row.created_at, updatedAt: row.updated_at };
 }
 export function listResearchNotebooks(): ResearchNotebook[] {
@@ -38,16 +40,31 @@ export function saveResearchNotebook(input: ResearchNotebookInput, resolvedIds: 
   const id = existing?.id ?? randomUUID();
   const now = new Date().toISOString();
   getDb().prepare(`INSERT INTO research_notebooks
-    (id,name,description,revision,mode,sources_json,exclusions_json,resolved_ids_json,settings_json,notes_json,conversation_settings_json,created_at,updated_at)
-    VALUES (@id,@name,@description,@revision,@mode,@sources,@exclusions,@resolved,@settings,@notes,@conversation,@created,@now)
+    (id,name,description,revision,mode,sources_json,exclusions_json,resolved_ids_json,settings_json,notes_json,conversation_settings_json,icon,color,created_at,updated_at)
+    VALUES (@id,@name,@description,@revision,@mode,@sources,@exclusions,@resolved,@settings,@notes,@conversation,@icon,@color,@created,@now)
     ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,revision=excluded.revision,mode=excluded.mode,
     sources_json=excluded.sources_json,exclusions_json=excluded.exclusions_json,resolved_ids_json=excluded.resolved_ids_json,
-    settings_json=excluded.settings_json,notes_json=excluded.notes_json,conversation_settings_json=excluded.conversation_settings_json,updated_at=excluded.updated_at`).run({
+    settings_json=excluded.settings_json,notes_json=excluded.notes_json,conversation_settings_json=excluded.conversation_settings_json,icon=excluded.icon,color=excluded.color,updated_at=excluded.updated_at`).run({
     id, name: input.name.trim(), description: input.description ?? '', revision: (existing?.revision ?? 0) + 1, mode: input.mode,
     sources: JSON.stringify(input.sources), exclusions: JSON.stringify([...new Set(input.exclusions)]), resolved: JSON.stringify([...new Set(resolvedIds)].sort()),
     settings: input.settings ? JSON.stringify(validateRetrievalSettings(input.settings)) : null, notes: JSON.stringify(input.noteIds ?? []),
-    conversation: input.conversationSettings ? JSON.stringify(input.conversationSettings) : null, created: existing?.createdAt ?? now, now,
+    conversation: input.conversationSettings ? JSON.stringify(input.conversationSettings) : null,
+    icon: 'icon' in input ? cleanAppearanceIcon(input.icon) : existing?.icon ?? null, color: 'color' in input ? cleanAppearanceColor(input.color) : existing?.color ?? null,
+    created: existing?.createdAt ?? now, now,
   });
+  return getResearchNotebook(id)!;
+}
+/** Name, icon and colour only: how the notebook looks is not what it reads, so its
+ * revision, and every scope pinned to it, stay as they are. */
+export function updateResearchNotebookAppearance(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): ResearchNotebook {
+  const existing = getResearchNotebook(id);
+  if (!existing) throw new Error('Notebook not found');
+  if ('name' in patch && (typeof patch.name !== 'string' || !patch.name.trim() || patch.name.length > 160)) throw new Error('Invalid notebook name');
+  getDb().prepare('UPDATE research_notebooks SET name=?, icon=?, color=?, updated_at=? WHERE id=?').run(
+    'name' in patch ? patch.name!.trim() : existing.name,
+    'icon' in patch ? cleanAppearanceIcon(patch.icon) : existing.icon ?? null,
+    'color' in patch ? cleanAppearanceColor(patch.color) : existing.color ?? null,
+    new Date().toISOString(), id);
   return getResearchNotebook(id)!;
 }
 export function deleteResearchNotebook(id: string): void {

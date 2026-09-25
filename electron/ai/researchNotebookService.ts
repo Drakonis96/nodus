@@ -1,6 +1,6 @@
-import type { ResearchNotebookInput, ResolvedResearchScope } from '@shared/researchCorpus';
+import type { ResearchNotebookInput, ResearchNotebookPreparation, ResolvedResearchScope } from '@shared/researchCorpus';
 import type { ResearchChatRequest } from '@shared/types';
-import { RETRIEVAL_PRESETS, validateRetrievalSettings } from '@shared/researchCorpus';
+import { RETRIEVAL_PRESETS, notebookPreparationStatus, validateRetrievalSettings } from '@shared/researchCorpus';
 import { getDb } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import * as notebooks from '../db/researchNotebooksRepo';
@@ -8,7 +8,8 @@ import { researchCorpusInventory } from './researchCorpusInventory';
 import { researchFingerprint, resolveNotebookScope, selectResearchDocuments } from './researchCorpusScope';
 import { resolveResearchSourceScope } from './researchSourceScope';
 import { notifyAuthoredResearchSourceChanged } from './researchCorpusEvents';
-import { pinPublishedResearchDocument } from './documentaryPreparation';
+import { embeddingConfigurationUsable, getResearchPreparationInventory, pinPublishedResearchDocument, prepareResearchDocuments } from './documentaryPreparation';
+import { effectiveEmbeddingConfig } from './aiClient';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
 
 const active = new Map<string, Set<AbortController>>();
@@ -26,7 +27,29 @@ export function saveResearchNotebook(input: ResearchNotebookInput) {
   const result = notebooks.saveResearchNotebook(input, ids);
   for (const controller of active.get(key(result.id)) ?? []) controller.abort();
   notifyAuthoredResearchSourceChanged();
+  // What the collections hold and is not indexed yet goes to the queue straight away.
+  void ensureNotebookPrepared(result.id).catch(() => undefined);
   return result;
+}
+export function updateResearchNotebookAppearance(id: string, patch: { name?: string; icon?: string | null; color?: string | null }) {
+  if (getActiveVault().type !== 'academic') throw new Error('Research notebooks require an academic vault');
+  return notebooks.updateResearchNotebookAppearance(id, patch);
+}
+
+/** Whether an embedding model can run now; without one, searchable text is enough. */
+function embeddingsExpected(): boolean {
+  try { return embeddingConfigurationUsable(effectiveEmbeddingConfig()); } catch { return false; }
+}
+/** Where the notebook's documents stand: usable once nothing is pending. */
+export function getResearchNotebookPreparation(id: string): ResearchNotebookPreparation {
+  const scope = resolveResearchNotebook(id);
+  return notebookPreparationStatus(scope.documents.map(document => document.id), getResearchPreparationInventory().documents, embeddingsExpected());
+}
+/** Queues what the notebook's collections hold and nobody has asked to index yet. */
+export async function ensureNotebookPrepared(id: string): Promise<ResearchNotebookPreparation> {
+  const status = getResearchNotebookPreparation(id);
+  if (status.unprepared.length) await prepareResearchDocuments(status.unprepared, embeddingsExpected() ? 'embeddings' : 'text');
+  return status.unprepared.length ? getResearchNotebookPreparation(id) : status;
 }
 export function deleteResearchNotebook(id: string) {
   if (getActiveVault().type !== 'academic') throw new Error('Research notebooks require an academic vault');
@@ -76,9 +99,11 @@ export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequ
   const scope = prior ?? (input.selection.notebookId ? resolveResearchNotebook(input.selection.notebookId) : resolveAcademicResearchScope(input.selection.sourceFilter, input));
   const notebook = input.selection.notebookId ? notebooks.getResearchNotebook(input.selection.notebookId) : null;
   if (scope.vaultId !== getActiveVault().id || (notebook && notebook.revision !== scope.notebookRevision)) throw new Error('research_scope_changed');
+  // A notebook is read once its collections are indexed; until then the chat says so.
+  if (notebook && !prior && notebookPreparationStatus(scope.documents.map(document => document.id), getResearchPreparationInventory().documents, embeddingsExpected()).pending > 0) throw new Error('research_notebook_indexing');
   if (notebook && input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
+  // The conversation's own system prompt and effort apply, chosen in the chat like any other.
   return { ...input, [pinnedScope]: scope, attachmentIds: input.selection.notebookId ? [] : input.attachmentIds,
-    ...(notebook?.conversationSettings ?? {}),
     messages: authorizedNotebookHistory(input, scope),
     selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
       sourceFilter: { enabled: true, authorIds: [], workIds: scope.documents.flatMap(document => document.workId ? [document.workId] : []) } } };

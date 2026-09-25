@@ -9358,6 +9358,9 @@ export const migrations: Migration[] = [
     CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
   ` },
   { version: 183, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
+  // A notebook shows in the chat history like a project: its own icon and colour.
+  { version: 184, up: `ALTER TABLE research_notebooks ADD COLUMN icon TEXT;` },
+  { version: 185, up: `ALTER TABLE research_notebooks ADD COLUMN color TEXT;` },
 ];
 
 /**

@@ -225,7 +225,7 @@ import type {
 } from '../types';
 
 export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCorpusApi,
-  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'searchResearchNotebook' | 'readResearchDocument'
+  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'updateResearchNotebookAppearance' | 'getResearchNotebookPreparation' | 'searchResearchNotebook' | 'readResearchDocument'
   | 'getResearchPreparationPolicy' | 'setResearchPreparationPolicy' | 'previewResearchPreparation' | 'startResearchPreparationCampaign' | 'getResearchPreparationProgress' | 'onResearchPreparationProgress' | 'controlResearchPreparationCampaign' | 'controlAllResearchPreparation'
   | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'indexResearchWorks' | 'cancelResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'
   | 'setResearchZoteroAutomatic' | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {

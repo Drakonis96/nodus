@@ -1647,6 +1647,8 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));
   h('research:notebooks:delete', async (_e, id: string) => researchNotebooks.deleteResearchNotebook(id));
   h('research:notebooks:resolve', async (_e, id: string) => researchNotebooks.resolveResearchNotebook(id));
+  h('research:notebooks:appearance', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => researchNotebooks.updateResearchNotebookAppearance(id, patch));
+  h('research:notebooks:preparation', async (_e, id: string) => researchNotebooks.ensureNotebookPrepared(id));
   h('research:notebooks:search', async (_e, id: string, query: string) => {
     if (typeof query !== 'string' || query.length > 10000) throw new Error('Invalid research query');
     const scope = researchNotebooks.resolveResearchNotebook(id);

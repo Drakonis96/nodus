@@ -49,6 +49,9 @@ export interface ResearchNotebookInput {
   settings?: RetrievalSettings;
   noteIds?: string[];
   conversationSettings?: { systemPromptId?: string | null; thinkingEffort?: import('./researchReasoning').ResearchEffort };
+  /** How the notebook shows in the chat history, like a project. */
+  icon?: string | null;
+  color?: string | null;
 }
 export interface ResearchNotebook extends ResearchNotebookInput {
   id: string;
@@ -96,6 +99,44 @@ export interface ResearchCorpusCollection {
   name: string;
   parentId: string | null;
   documentIds: string[];
+  /** Where the collection lives: a Nodus collection, or one of Zotero's. */
+  origin?: 'nodus' | 'zotero';
+}
+
+/** Where a notebook's documents stand: it is usable once nothing is pending. */
+export interface ResearchNotebookPreparation {
+  total: number;
+  ready: number;
+  pending: number;
+  /** Documents that could not be indexed; they do not hold the notebook back. */
+  failed: Array<{ documentId: string; title: string; reason: DocumentPreparationState['reason']; error: string | null }>;
+  /** Documents nobody has asked to index yet; the notebook queues them. */
+  unprepared: string[];
+  paused: boolean;
+}
+
+/** One notebook's readiness from the preparation inventory. A document is done once its text
+ * is searchable and, when an embedding model can run, its vectors are too; a document that
+ * failed is reported and left behind rather than holding the notebook forever. */
+export function notebookPreparationStatus(documentIds: readonly string[], documents: ReadonlyArray<{ id: string; title: string; preparation: DocumentPreparationState }>, embeddingsExpected: boolean): ResearchNotebookPreparation {
+  const byId = new Map(documents.map(document => [document.id, document]));
+  const status: ResearchNotebookPreparation = { total: 0, ready: 0, pending: 0, failed: [], unprepared: [], paused: false };
+  for (const id of new Set(documentIds)) {
+    const document = byId.get(id);
+    if (!document) continue;
+    const preparation = document.preparation;
+    status.total++;
+    const fail = () => status.failed.push({ documentId: id, title: document.title, reason: preparation.reason, error: preparation.error });
+    if (preparation.status === 'blocked' || preparation.status === 'failed' || preparation.status === 'cancelled') fail();
+    else if (preparation.status === 'queued' || preparation.status === 'running') status.pending++;
+    else if (preparation.status === 'paused') { status.pending++; status.paused = true; }
+    else if (preparation.status === 'catalogued') { status.pending++; status.unprepared.push(id); }
+    else if (!embeddingsExpected || preparation.embeddings === 'ready' || preparation.text === 'missing') status.ready++;
+    else if (preparation.embeddings === 'queued' || preparation.embeddings === 'running') status.pending++;
+    else if (preparation.embeddings === 'failed') fail();
+    else { status.pending++; status.unprepared.push(id); }
+  }
+  return status;
 }
 
 /** Every parameter affecting vector comparability belongs in this identity. */
@@ -229,6 +270,10 @@ export interface ResearchCorpusApi {
   saveResearchNotebook(input: ResearchNotebookInput): Promise<ResearchNotebook>;
   deleteResearchNotebook(id: string): Promise<void>;
   resolveResearchNotebook(id: string): Promise<ResolvedResearchScope>;
+  /** Rename or restyle a notebook without touching what it reads. */
+  updateResearchNotebookAppearance(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchNotebook>;
+  /** Where the notebook's documents stand; anything not asked for yet is queued first. */
+  getResearchNotebookPreparation(id: string): Promise<ResearchNotebookPreparation>;
   searchResearchNotebook(id: string, query: string): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   readResearchDocument(input: { notebookId?: string | null; documentId: string; operation: ResearchDocumentRead }): Promise<{ evidence: ResearchEvidence[]; scopeId: string; partial: boolean }>;
   getResearchPreparationInventory(): Promise<ResearchPreparationInventory>;

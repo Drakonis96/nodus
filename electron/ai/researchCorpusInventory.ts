@@ -45,10 +45,15 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
     }
     if (offset + page.items.length >= page.total || !page.items.length) break;
   }
-  for (const collection of listGlobalLibraryCollections()) collections.push({
-    reference: { kind: 'library-collection', id: collection.id }, name: collection.name, parentId: collection.parentId,
-    documentIds: globalMembership.get(collection.id) ?? [],
-  });
+  // Nodus collections are the Global Library's own. Its mirrors of Zotero collections are
+  // kept aside: the vault's Zotero collections below are the same folders, and a mirror is
+  // only listed when the vault does not hold that collection itself.
+  const zoteroMirrors: Array<{ collection: ReturnType<typeof listGlobalLibraryCollections>[number] }> = [];
+  for (const collection of listGlobalLibraryCollections()) {
+    if (collection.source !== 'nodus') { zoteroMirrors.push({ collection }); continue; }
+    collections.push({ reference: { kind: 'library-collection', id: collection.id }, name: collection.name, parentId: collection.parentId,
+      documentIds: globalMembership.get(collection.id) ?? [], origin: 'nodus' });
+  }
   for (const work of works) {
     if (linkedWorks.has(work.nodus_id)) continue;
     const match = /^groups:([^:]+):(.+)$/.exec(work.zotero_key);
@@ -67,8 +72,14 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
   for (const row of rows) {
     const match = /^groups:([^:]+):(.+)$/.exec(row.collection_key);
     collections.push({ reference: { kind: 'zotero-collection', id: match?.[2] ?? row.collection_key, libraryType: match ? 'group' : 'user', libraryId: match?.[1] ?? userId },
-      name: row.name, parentId: row.parent_key?.replace(/^groups:[^:]+:/, '') ?? null,
+      name: row.name, parentId: row.parent_key?.replace(/^groups:[^:]+:/, '') ?? null, origin: 'zotero',
       documentIds: members.filter(member => member.collection_key === row.collection_key).flatMap(member => documents.filter(document => document.workId === member.nodus_id).map(document => document.id)) });
+  }
+  const vaultZoteroKeys = new Set(rows.map(row => row.collection_key.replace(/^groups:[^:]+:/, '')));
+  for (const { collection } of zoteroMirrors) {
+    if (collection.sourceKey && vaultZoteroKeys.has(collection.sourceKey)) continue;
+    collections.push({ reference: { kind: 'library-collection', id: collection.id }, name: collection.name, parentId: collection.parentId,
+      documentIds: globalMembership.get(collection.id) ?? [], origin: 'zotero' });
   }
   // A selectable note is not an implicit corpus member. General chat selects
   // linked works only; notebooks must explicitly select a note reference.
