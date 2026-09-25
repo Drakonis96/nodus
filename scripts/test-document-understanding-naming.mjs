@@ -60,4 +60,7 @@ test('the work status explains the document record in a balloon that any outside
   assert.match(status, /useDismissableLayer<HTMLSpanElement>\(\{ open, onDismiss: \(\) => setOpen\(false\)/, 'an outside click or Escape closes it');
   assert.match(status, /aria-label=\{t\('¿Qué es la ficha documental\?'\)\}/);
   assert.match(status, /\{t\('La ficha documental es una lectura completa de la obra:/);
+  // The row is the last one in the modal's scrolling body: opening the balloon
+  // downward leaves a third of the paragraph behind its container's edge.
+  assert.match(status, /className="absolute bottom-full left-0 z-20 mb-1\.5 w-72/, 'the balloon opens upward, clear of the scrolling body');
 });

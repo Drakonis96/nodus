@@ -400,8 +400,10 @@ function DocumentProfileHelp() {
         <Icon name="help" size={14} />
       </button>
       {open && (
+        // Opens upward: this row is the last one in the modal's scrolling body, so a
+        // balloon below it is cut off by that container.
         <span role="tooltip" data-testid="document-profile-help-bubble"
-          className="absolute left-0 top-full z-20 mt-1.5 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-xs font-normal leading-5 text-neutral-700 shadow-xl dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+          className="absolute bottom-full left-0 z-20 mb-1.5 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-xs font-normal leading-5 text-neutral-700 shadow-xl dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
           {t('La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.')}
         </span>
       )}
