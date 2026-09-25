@@ -7,9 +7,12 @@ import { spawn } from 'node:child_process';
 import AdmZip from 'adm-zip';
 import { researchTestEnvironment } from '../research-isolation.mjs';
 
-/** records: [{ title, abstract, file, sha256 }]; `policy` is the sandbox profile already
- * verified for `root`, and must allow `port`. Resolves once the seeded corpus is written. */
-export async function launchIndependentZotero({ root, port, policy, records }) {
+/** records: [{ title, abstract, file, sha256, collection?, creators?, date?, itemType? }];
+ * `policy` is the sandbox profile already verified for `root`, and must allow `port`.
+ * Without `collections`, each record gets a collection of its own. With `collections`
+ * ([{ name, parent? }], parents first), a record lives in the collection it names and a
+ * record without `file` has no attachment. Resolves once the seeded corpus is written. */
+export async function launchIndependentZotero({ root, port, policy, records, collections: layout = null }) {
   const profile = path.join(root, 'zotero/profile');
   const data = path.join(root, 'zotero/data');
   fs.mkdirSync(path.join(profile, 'extensions'), { recursive: true });
@@ -46,21 +49,38 @@ export async function launchIndependentZotero({ root, port, policy, records }) {
       if (Zotero.DataDirectory.dir !== ${JSON.stringify(data)}) throw new Error('unexpected_data_directory');
       await Zotero.Libraries.get(Zotero.Libraries.userLibraryID).waitForDataLoad('item');
       const collections = [], items = [];
-      for (const [index, record] of ${JSON.stringify(records)}.entries()) {
+      const layout = ${JSON.stringify(layout)};
+      const byName = new Map();
+      for (const entry of layout ?? []) {
         const collection = new Zotero.Collection();
         collection.libraryID = Zotero.Libraries.userLibraryID;
-        collection.name = 'Nodus synthetic collection ' + (index + 1);
+        collection.name = entry.name;
+        if (entry.parent) collection.parentID = byName.get(entry.parent).id;
         await collection.saveTx();
-        collections.push({ id: collection.id, key: collection.key });
-        const item = new Zotero.Item('report');
+        byName.set(entry.name, collection);
+        collections.push({ id: collection.id, key: collection.key, name: entry.name, parentKey: entry.parent ? byName.get(entry.parent).key : null });
+      }
+      for (const [index, record] of ${JSON.stringify(records)}.entries()) {
+        let collection = layout ? byName.get(record.collection) : null;
+        if (!collection) {
+          collection = new Zotero.Collection();
+          collection.libraryID = Zotero.Libraries.userLibraryID;
+          collection.name = 'Nodus synthetic collection ' + (index + 1);
+          await collection.saveTx();
+          collections.push({ id: collection.id, key: collection.key });
+        }
+        const item = new Zotero.Item(record.itemType ?? 'report');
         item.libraryID = Zotero.Libraries.userLibraryID;
         item.setField('title', record.title);
         item.setField('abstractNote', record.abstract);
+        if (record.date) item.setField('date', record.date);
+        if (record.creators) item.setCreators(record.creators);
         item.setCollections([collection.id]);
         await item.saveTx();
+        if (!record.file) { items.push({ id: item.id, key: item.key, version: item.version, collection: collection.key, attachment: null }); continue; }
         const attachment = await Zotero.Attachments.importFromFile({ file: record.file, parentItemID: item.id });
         await Zotero.Fulltext.indexItems([attachment.id]);
-        items.push({ id: item.id, key: item.key, version: item.version, attachment: { key: attachment.key, version: attachment.version, path: await attachment.getFilePathAsync(), sha256: record.sha256 } });
+        items.push({ id: item.id, key: item.key, version: item.version, collection: collection.key, attachment: { key: attachment.key, version: attachment.version, path: await attachment.getFilePathAsync(), sha256: record.sha256 } });
       }
       await Zotero.File.putContentsAsync(${JSON.stringify(output)}, JSON.stringify({ version: Zotero.version, dataDirectory: Zotero.DataDirectory.dir, libraryID: Zotero.Libraries.userLibraryID, collections, items }));
       Zotero.getMainWindow().document.title = 'Zotero · Nodus Research · Desarrollo';

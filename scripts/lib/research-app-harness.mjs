@@ -64,13 +64,15 @@ export function simulatedUpstream(behaviour = () => null) {
 }
 
 /** `realProvider.campaignRoot` sends requests to the real providers through the
- * shared cost-reserving proxy and ledger of that campaign root. `extraEnv` reaches only
- * the application (for example an explicit disposable Zotero endpoint). */
+ * shared cost-reserving proxy and ledger of that campaign root; `realProvider.dispatch`
+ * may wrap the real fetch to observe requests (it must still send them). `extraEnv`
+ * reaches only the application (for example an explicit disposable Zotero endpoint).
+ * Every launch, not only the first, re-proves the five isolation guarantees. */
 export async function createResearchApp({ provider = null, realProvider = null, extraPorts = [], extraEnv = {} } = {}) {
   const root = createResearchTestRoot();
   let proxy = null;
   if (provider) proxy = await startResearchProviderProxy(root, { dispatch: provider.dispatch });
-  else if (realProvider) proxy = await startResearchProviderProxy(realProvider.campaignRoot);
+  else if (realProvider) proxy = await startResearchProviderProxy(realProvider.campaignRoot, realProvider.dispatch ? { dispatch: realProvider.dispatch } : {});
   const ports = [...extraPorts, ...(proxy ? [Number(new URL(proxy.url).port)] : [])];
   const sandbox = macResearchSandbox(root, ports);
   const proof = { ...verifyResearchSandbox(root, sandbox), allowedLoopbackPorts: ports };
@@ -80,11 +82,14 @@ export async function createResearchApp({ provider = null, realProvider = null, 
   const environment = { ...researchTestEnvironment(root), ...extraEnv, ...(proxy ? { NODUS_RESEARCH_PROVIDER_PROXY: proxy.url } : {}) };
   let app = null;
   const harness = {
-    root, proof, proxy,
+    root, proof, proxy, launchProofs: [],
     async launch() {
+      // The boundary is inherited from the OS, so prove it again before every start.
+      const launchProof = { ...verifyResearchSandbox(root, sandbox), allowedLoopbackPorts: ports, at: new Date().toISOString() };
+      harness.launchProofs.push(launchProof);
       app = await _electron.launch({ executablePath: wrapper, args: ['--no-sandbox', '--disable-gpu', repoRoot], cwd: root, env: environment, timeout: 60000 });
       const page = await app.firstWindow();
-      await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), { timeout: 60000 });
+      await page.waitForFunction(() => Boolean(document.getElementById('root')?.children.length), null, { timeout: 60000 });
       harness.app = app; harness.page = page;
       return { app, page };
     },
