@@ -1,5 +1,5 @@
 import { skillHasCapability } from '@shared/chatSkills';
-import { buildChatSkillsPrompt, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
+import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract, transformChatProse } from '@shared/chatSkills';
 import { enabledChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getNodiConversation } from '../nodiConversations';
@@ -377,7 +377,7 @@ export async function streamNodiChat(
     : skills;
   const context = await buildContext(request, question, chatModel && isLocalProvider(chatModel.provider) ? 'localAi' : 'externalAi', docs);
   const pack = getPromptPack();
-  const history = messages.slice(0, Math.max(0, latestUserIndex)).map((message) => `${message.role === 'user' ? pack.historyUser : pack.historyAssistant}: ${clip(message.content, 6_000)}`).join('\n\n');
+  const history = messages.slice(0, Math.max(0, latestUserIndex)).map((message) => `${message.role === 'user' ? pack.historyUser : pack.historyAssistant}: ${clip(message.role === 'assistant' ? chatProseForHistory(message.content) : message.content, 6_000)}`).join('\n\n');
   const user = [
     context.text || `<${pack.contextLabels.contextTag}>${pack.contextLabels.noSelectedSource}</${pack.contextLabels.contextTag}>`,
     history ? `<${pack.contextLabels.historyTag}>\n${history}\n</${pack.contextLabels.historyTag}>` : '',

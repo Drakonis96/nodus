@@ -102,12 +102,15 @@ test('both transports drop the knob on that signal and keep the rest of the requ
   const go = readFileSync(path.join(repoRoot, 'electron/ai/openCodeGoCompletion.ts'), 'utf8');
   // The session memory is shared, not duplicated per transport, so a model learned on one
   // route does not have to fail again on the other.
-  assert.match(source, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
+  assert.match(source, /import \{ adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
   assert.match(go, /import \{ rememberTemperatureUnsupported, temperatureUnsupported \} from '\.\/samplingSupport';/);
   assert.doesNotMatch(source, /const temperatureUnsupportedModels = new Set<string>\(\)/);
   // The generic transport replays without the field in both the non-streaming and the
-  // streaming path, and both keep the optional body.
-  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 2);
+  // streaming path, and the Anthropic native transport does the same in both of its paths.
+  // The Anthropic replay re-reads `requestSamplingBody`, which now omits the field, so only
+  // the generic transport needs the explicit `bodyFor(true)` body.
+  assert.equal((source.match(/rejectsTemperatureParameter\(e\)/g) ?? []).length, 4);
+  assert.equal((source.match(/rememberTemperatureUnsupported\(model\);/g) ?? []).length, 4);
   assert.equal((source.match(/bodyFor\(true\)/g) ?? []).length, 2);
   // OpenCode Go speaks its own HTTP, so it needs its own recovery — the one in aiClient
   // never ran on that route.
@@ -117,10 +120,56 @@ test('both transports drop the knob on that signal and keep the rest of the requ
   assert.match(go, /if \(temperatureUnsupported\(ref\)\) return \{\};/);
 });
 
+test('newer Claude models replay with adaptive thinking when they reject thinking-off', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const errors = readFileSync(path.join(repoRoot, 'electron/ai/providerErrors.ts'), 'utf8');
+  const sampling = readFileSync(path.join(repoRoot, 'electron/ai/samplingSupport.ts'), 'utf8');
+  // The predicate keys off the provider's own wording, not just a 400 status.
+  assert.match(errors, /export function rejectsAdaptiveThinking\(error: unknown\): boolean \{/);
+  assert.ok(errors.includes(String.raw`thinking\.type\.disabled`));
+  assert.ok(errors.includes('thinking.type.adaptive'));
+  // Both Anthropic native paths recover, force adaptive, and remember the model for the session.
+  assert.equal((source.match(/rejectsAdaptiveThinking\(e\)/g) ?? []).length, 2);
+  assert.equal((source.match(/rememberAdaptiveThinking\(model\);/g) ?? []).length, 2);
+  assert.match(source, /function adaptiveThinkingBody\(model: ModelRef, opts: CallOpts\): Record<string, unknown> \{/);
+  assert.match(source, /return \{ \.\.\.body, thinking: \{ type: 'adaptive' \} \};/);
+  // The recovered request still carries the effort mapping, and both paths short-circuit to it
+  // once the model has been learned.
+  assert.equal((source.match(/\.\.\.\(adaptive \|\| adaptiveThinkingRequired\(model\) \? adaptiveThinkingBody\(model, opts\) : researchBody\(model, opts\)\)/g) ?? []).length, 2);
+  // Session memory is shared with the temperature memory, so a restart costs one failed request.
+  assert.match(sampling, /export function adaptiveThinkingRequired\(model: ModelRef\): boolean \{/);
+  assert.match(sampling, /export function rememberAdaptiveThinking\(model: ModelRef\): void \{/);
+});
+
+test('a streamed answer cut at the output ceiling is reported, not stored', () => {
+  const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
+  const options = readFileSync(path.join(repoRoot, 'electron/ai/researchGenerationOptions.ts'), 'utf8');
+  // The Anthropic stream reads the only truncation signal it has — `stop_reason` on the final
+  // `message_delta`, plus the thinking-token breakdown — and refuses to store the fragment.
+  assert.match(source, /stopReason = event\.delta\.stop_reason/);
+  assert.match(source, /event\.usage\?\.output_tokens_details/);
+  assert.match(source, /if \(stopReason === 'max_tokens'\) \{/);
+  assert.match(source, /truncatedOutputMessage\(model, opts\.maxTokens \?\? 8000\), false, false, 'output_truncated'/);
+  // A safety refusal returns no text and its own stop reason, so it must be named, not read
+  // as an empty response — on both the streaming and the non-streaming Anthropic path.
+  assert.equal((source.match(/El modelo se negó a responder a esta solicitud\./g) ?? []).length, 4);
+  assert.match(source, /if \(stopReason === 'refusal'\) \{/);
+  assert.match(source, /\(res as any\)\.stop_reason === 'refusal'/);
+  // The OpenAI-compatible stream has the same gap, keyed off `finish_reason`.
+  assert.match(source, /finishReason = choice\.finish_reason/);
+  assert.match(source, /test\(finishReason \?\? ''\)/);
+  assert.match(source, /truncatedOutputMessage\(model, maxTokens\), false, false, 'output_truncated'/);
+  // Adaptive models cannot disable thinking and its tokens count against `max_tokens`, so the
+  // request reserves the documented depth instead of the manual `budget_tokens` allowance.
+  assert.match(options, /const ADAPTIVE_THINKING_ALLOWANCE/);
+  assert.match(options, /profile\.mode === 'anthropic-adaptive'/);
+  assert.match(options, /ADAPTIVE_THINKING_ALLOWANCE\[native \?\? 'none'\] \?\? researchThinkingAllowance\(native\)/);
+});
+
 test('the transport recovers by dropping only the reasoning field, keeping JSON mode', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
   // The predicates are imported, not reimplemented locally.
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.doesNotMatch(source, /^function rejectsOptionalTransportField/m);
   // Both the non-streaming and the streaming transport mark whether the field was sent…
   assert.equal((source.match(/const sentReasoning = \(extras as any\)\.reasoning_effort !== undefined;/g) ?? []).length, 2);

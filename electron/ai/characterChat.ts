@@ -1,4 +1,4 @@
-import { skillHasCapability } from '@shared/chatSkills';
+import { chatProseForHistory, skillHasCapability } from '@shared/chatSkills';
 import type { CharacterChatSendResult } from '@shared/types';
 import type { InterviewTurn } from '@shared/characterInterview';
 import { appendCharacterChatMessage, getCharacterChatConversation } from '../db/characterChatRepo';
@@ -17,7 +17,7 @@ export async function sendCharacterChatMessage(conversationId: string, question:
   const model = settings.chatModel ?? settings.synthesisModel ?? settings.extractionModel ?? null;
   const execution = vaultChatSkillSession('character', conversationId, trimmed, model, getCharacterChatConversation);
   assertChatSkillSession(execution);
-  const history: InterviewTurn[] = before.messages.map(({ role, content }) => ({ role, content }));
+  const history: InterviewTurn[] = before.messages.map(({ role, content }) => ({ role, content: role === 'character' ? chatProseForHistory(content) : content }));
   appendCharacterChatMessage(conversationId, 'author', trimmed);
   const raw = await interviewCharacter(before.personId, trimmed, history, {
     canSendImages: execution.skills.some(skill => skillHasCapability(skill, 'image')), skills: execution.skills,

@@ -770,6 +770,34 @@ test('legacy Spanish Electron errors cannot leak into a non-Spanish interface', 
 // and `tr()` would replace the second kind with "this message could not be translated" — the
 // auditor answers in the prompt language, so its Spanish notes are not a leak, they are the
 // finding. `knownText` is the gate that translates the first kind and leaves the second alone.
+/**
+ * A streamed answer cut at the output ceiling and an empty stream used to collapse
+ * into "The operation could not be completed." — the same generic sentence for two
+ * different failures. Both are now named, so a truncated route is not mistaken for
+ * a provider outage.
+ */
+test('a truncated stream and an empty stream name their cause in every language', () => {
+  const { localizeRuntimeError } = loadModule('shared/uiLanguage.ts');
+  const generic = 'The operation could not be completed.';
+  const truncated = 'La respuesta de «claude-opus-5-5» (Anthropic) se cortó al alcanzar el límite de 26.000 tokens de salida. Un modelo con razonamiento puede gastar ese presupuesto pensando antes de escribir.';
+  const empty = 'Respuesta vacía del proveedor de IA.';
+  const refused = 'El modelo se negó a responder a esta solicitud.';
+  assert.equal(
+    localizeRuntimeError(truncated, 'en'),
+    'The response from «claude-opus-5-5» (Anthropic) was cut off at the 26.000-output-token limit. A reasoning model can spend that budget thinking before it writes.',
+  );
+  assert.equal(localizeRuntimeError(empty, 'en'), 'The AI provider returned an empty response.');
+  assert.equal(localizeRuntimeError(refused, 'en'), 'The model declined to answer this request.');
+  for (const failure of [truncated, empty, refused]) {
+    assert.equal(localizeRuntimeError(failure, 'es'), failure, 'Spanish must keep the message verbatim');
+    for (const language of ['en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'unknown']) {
+      const localized = localizeRuntimeError(failure, language);
+      assert.notEqual(localized, generic, `${language} erased "${failure}" into the generic error`);
+      assert.notEqual(localized, failure, `${language} leaked Spanish for "${failure}"`);
+    }
+  }
+});
+
 test('a stored audit translates our sentences and keeps the auditor’s own prose', () => {
   const { knownText, setActiveLang, getActiveLang } = loadModule('src/i18n.ts');
   setActiveLang('en');
