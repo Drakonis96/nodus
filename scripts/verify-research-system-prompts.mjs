@@ -36,6 +36,8 @@ try {
     await page.locator(`[data-testid="research-system-prompt-trigger"][aria-label="System prompt: ${'Tutor socrático'}"]`).waitFor();
     assert.equal(await balloon.locator('.research-prompt-row.is-active').count(), 1, 'activating one deactivates the rest');
     assert.match(await balloon.locator('.research-prompt-row.is-active').innerText(), /Tutor socrático/);
+    assert.equal(await balloon.getByRole('button', { name: 'Eliminar prompt: Tutor socrático', exact: true }).isEnabled(), true, 'the active prompt can be deleted from the list');
+    assert.equal(await balloon.getByTestId('research-prompt-default').getByRole('button', { name: /^Eliminar prompt/ }).count(), 0, 'Default cannot be deleted');
     if (view === 'study') await page.screenshot({ animations: 'disabled', path: 'artifacts/research-assistant/system-prompts-light.png' });
     await page.keyboard.press('Escape');
     await balloon.waitFor({ state: 'detached' });
@@ -92,6 +94,11 @@ try {
     await confirmation.getByRole('button', { name: 'Eliminar', exact: true }).click();
     await edit.waitFor({ state: 'detached' });
     assert.deepEqual(await balloon.locator('.research-prompt-row strong').allTextContents(), ['Default', 'Analista crítico']);
+    // Deleting straight from the list, confirmed first.
+    await balloon.getByRole('button', { name: 'Eliminar prompt: Analista crítico', exact: true }).click();
+    await confirmation.getByRole('button', { name: 'Eliminar', exact: true }).click();
+    await confirmation.waitFor({ state: 'detached' });
+    assert.deepEqual(await balloon.locator('.research-prompt-row strong').allTextContents(), ['Default']);
     await page.keyboard.press('Escape');
   }
   assert.deepEqual(errors, []);

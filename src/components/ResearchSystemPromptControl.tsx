@@ -11,6 +11,7 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ResearchSystemPrompt | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<ResearchSystemPrompt | null>(null);
   const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -30,13 +31,15 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
     const id = prompt?.id ?? null;
     const active = selectedId === id;
     return <div key={id ?? 'default'} role="listitem" className={`header-balloon-row research-prompt-row ${active ? 'is-active' : ''}`} data-testid={`research-prompt-${id ?? 'default'}`}>
-      <span className="header-balloon-row-icon"><Icon name={prompt ? 'edit' : 'layers'} size={15} /></span>
+      <span className="header-balloon-row-icon"><Icon name={prompt ? 'brain' : 'layers'} size={15} /></span>
       <span className="header-balloon-row-text"><strong>{prompt?.name ?? 'Default'}</strong><small>{prompt?.instructions ?? t('Prompt original de Nodus')}</small></span>
       <button type="button" className={`header-balloon-chip ${active ? 'is-on' : ''}`} aria-pressed={active} disabled={busy || active}
         aria-label={`${active ? t('Activo') : t('Activar')}: ${prompt?.name ?? 'Default'}`} onClick={() => void activate(id)}>
         {active && <Icon name="check" size={13} />}{active ? t('Activo') : t('Activar')}
       </button>
       {prompt && <button type="button" className="header-balloon-icon-button" disabled={busy} aria-label={`${t('Editar')}: ${prompt.name}`} title={t('Editar')} onClick={() => setEditing(prompt)}><Icon name="edit" size={15} /></button>}
+      {/* Deleting stays one click away even for the active prompt; its conversations return to Default. */}
+      {prompt && <button type="button" className="header-balloon-icon-button is-danger" disabled={busy} aria-label={`${t('Eliminar prompt')}: ${prompt.name}`} title={t('Eliminar prompt')} onClick={() => setDeleting(prompt)}><Icon name="trash" size={15} /></button>}
     </div>;
   };
   return <>
@@ -44,10 +47,10 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
       data-testid="research-system-prompt-trigger" disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
       aria-label={`${t('System prompt')}: ${selected?.name ?? 'Default'}`}
       title={`${t('System prompt')}: ${selected?.name ?? 'Default'}`} onClick={() => setOpen(current => !current)}>
-      <Icon name="edit" size={14} /><span className="research-system-prompt-name">{t('System prompt')}</span><Icon name="chevronDown" size={13} />
+      <Icon name="brain" size={14} /><span className="research-system-prompt-name">{t('System prompt')}</span><Icon name="chevronDown" size={13} />
     </button>
-    <HeaderBalloon open={open} anchor={trigger} onClose={() => { if (!editing) setOpen(false); }} width={440}
-      icon={<Icon name="edit" size={18} />} title={t('System prompts')} meta={selected?.name ?? 'Default'} testId="research-system-prompt-panel"
+    <HeaderBalloon open={open} anchor={trigger} onClose={() => { if (!editing && !deleting) setOpen(false); }} width={440}
+      icon={<Icon name="brain" size={18} />} title={t('System prompts')} meta={selected?.name ?? 'Default'} testId="research-system-prompt-panel"
       footer={<button type="button" className="btn btn-ghost research-prompt-new-button" disabled={busy} onClick={() => setEditing('new')}><Icon name="plus" size={14} />{t('Nuevo prompt')}</button>}>
       <p className="header-balloon-intro">{t('Elige cómo quieres que te acompañe el asistente.')}</p>
       {prompts.length > 5 && <label className="header-balloon-search"><Icon name="search" size={14} /><input aria-label={t('Buscar prompts')} placeholder={t('Buscar prompts')} value={query} onChange={e => setQuery(e.target.value)} /></label>}
@@ -59,6 +62,17 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
       {!prompts.length && <p className="research-prompt-empty">{t('Crea un prompt para personalizar tus conversaciones.')}</p>}
       {error && <p className="research-prompt-error" role="alert">{error}</p>}
     </HeaderBalloon>
+    {deleting && <DeletePromptConfirmation name={deleting.name} busy={busy} error={error} accent={accent()}
+      onCancel={() => setDeleting(null)}
+      onConfirm={async () => {
+        setBusy(true); setError('');
+        try {
+          await window.nodus.deleteResearchSystemPrompt(deleting.id);
+          if (selectedId === deleting.id) await onSelect(null);
+          await refresh();
+          setDeleting(null);
+        } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+      }} />}
     {editing && <PromptEditor prompt={editing === 'new' ? null : editing} accent={accent()} refresh={refresh}
       onClose={() => setEditing(null)}
       onDeleted={async id => { if (selectedId === id) await onSelect(null); }} />}
@@ -98,7 +112,7 @@ function PromptEditor({ prompt, accent, refresh, onClose, onDeleted }: {
     style={{ '--vault-accent': accent } as CSSProperties}
     onKeyDown={event => { if (event.key === 'Escape') event.stopPropagation(); }}
     onCancel={event => { event.preventDefault(); if (!busy && !confirmDelete) onClose(); }}>
-    <header className="research-prompt-edit-head"><Icon name="edit" size={18} /><h2>{title}</h2></header>
+    <header className="research-prompt-edit-head"><Icon name="brain" size={18} /><h2>{title}</h2></header>
     <div className="research-prompt-edit-body">
       <div className="research-prompt-contract"><Icon name="check" size={16} /><div><strong>{t('Las capacidades de Nodus siguen activas')}</strong><p>{t('Contexto, ideas, citas y skills conservan sus reglas. Tus instrucciones personalizan el enfoque, no sustituyen estas capacidades.')}</p></div></div>
       <label className="research-prompt-field">{t('Nombre del prompt')}<input ref={titleInput} className="input" maxLength={RESEARCH_PROMPT_NAME_LIMIT} disabled={busy} value={name} onChange={e => setName(e.target.value)} placeholder={t('Por ejemplo: Revisor crítico')} /></label>

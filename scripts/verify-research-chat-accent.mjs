@@ -34,7 +34,8 @@ try {
       await page.getByTestId('research-context-trigger').click();
       assert.equal(await color(page.locator('.research-context-panel')), accent);
       await page.keyboard.press('Escape');
-      await page.getByTestId('research-source-filter-trigger').click();
+      await page.getByTestId('research-context-trigger').click();
+      await page.getByTestId('research-context-tab-library').click();
       assert.equal(await color(page.getByTestId('research-source-filter-panel')), accent);
       assert.equal(await page.getByTestId('research-source-filter-panel').locator('input[type=checkbox]').first().evaluate(el => getComputedStyle(el).accentColor), rgb);
       if (vault === 'prosopography') await page.screenshot({ animations: 'disabled', path: `artifacts/research-assistant/filters-vault-${theme}.png` });

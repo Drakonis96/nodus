@@ -1,34 +1,14 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import { HeaderBalloon } from './HeaderBalloon';
+import { useEffect, useState } from 'react';
 import { matchingResearchWorkIds, normalizeResearchSourceFilter, type ResearchContextSources, type ResearchSourceFilter } from '@shared/researchContextFilters';
 import { Icon } from './ui';
 import { t, tx } from '../i18n';
 
-export function ResearchSourceFilterControl({ value, disabled, onChange }: {
-  value?: ResearchSourceFilter; disabled: boolean; onChange: (value: ResearchSourceFilter) => Promise<void>;
+/** Which authors and works the assistant may read: the Library tab of the context balloon,
+ * its own list and its own Apply, Cancel and Reset. */
+export function SourceFilterPanel({ value, onClose, onApply }: {
+  value?: ResearchSourceFilter; onClose: () => void; onApply: (value: ResearchSourceFilter) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const filter = normalizeResearchSourceFilter(value);
-  const count = filter.authorIds.length + filter.workIds.length;
-  return <>
-    <button ref={trigger} type="button" disabled={disabled} data-testid="research-source-filter-trigger"
-      className={`btn btn-ghost border gap-1.5 text-xs py-1 research-source-filter-trigger ${filter.enabled ? 'is-active' : 'border-neutral-700'}`}
-      title={t('Filtrar contexto')} aria-label={t('Filtrar contexto')} aria-haspopup="dialog" aria-expanded={open}
-      onClick={() => setOpen(current => !current)}>
-      <Icon name="filter" size={15} /><span className="truncate">{t('Fuentes')}</span>
-      {filter.enabled && <span className="research-source-filter-count">{count}</span>}
-    </button>
-    {open && <SourceFilterBalloon anchor={trigger} value={filter} onClose={() => setOpen(false)}
-      onApply={async next => { await onChange(next); setOpen(false); trigger.current?.focus(); }} />}
-  </>;
-}
-
-/** Which authors and works the assistant may read, as a header balloon like its neighbours. */
-function SourceFilterBalloon({ anchor, value, onClose, onApply }: {
-  anchor: RefObject<HTMLButtonElement>; value: ResearchSourceFilter; onClose: () => void; onApply: (value: ResearchSourceFilter) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(() => normalizeResearchSourceFilter(value));
   const [sources, setSources] = useState<ResearchContextSources | null>(null);
   const [authorQuery, setAuthorQuery] = useState('');
   const [workQuery, setWorkQuery] = useState('');
@@ -51,19 +31,8 @@ function SourceFilterBalloon({ anchor, value, onClose, onApply }: {
     { key: 'workIds' as const, title: t('Obras'), query: workQuery, setQuery: setWorkQuery, placeholder: t('Buscar obras'),
       items: sources.works.map(work => ({ id: work.id, title: work.title, detail: [...work.authors, work.year].filter(Boolean).join(' · ') })) },
   ];
-  const selectedCount = draft.authorIds.length + draft.workIds.length;
-  return <HeaderBalloon open anchor={anchor} onClose={() => { if (!saving) onClose(); }} width={460}
-    icon={<Icon name="filter" size={18} />} title={t('Filtrar contexto')} meta={tx('{n} seleccionados', { n: selectedCount })}
-    testId="research-source-filter-panel" className="research-source-filter-panel"
-    footer={<>
-      <button className="btn btn-ghost" disabled={saving} onClick={() => setDraft({ enabled: false, authorIds: [], workIds: [] })}>{t('Restablecer')}</button>
-      <span className="spacer" />
-      <button className="btn btn-ghost" disabled={saving} onClick={onClose}>{t('Cancelar')}</button>
-      <button className="btn btn-primary" disabled={saving || (draft.enabled && !sources)} onClick={async () => {
-        setSaving(true); setError('');
-        try { await onApply(normalizeResearchSourceFilter(draft)); } catch (reason) { setError(String(reason)); setSaving(false); }
-      }}>{t('Aplicar')}</button>
-    </>}>
+  return <div className="research-source-filter-panel context-tab-panel" data-testid="research-source-filter-panel" role="tabpanel" aria-label={t('Biblioteca')}>
+    <div className="context-tab-scroll">
     <div className="research-source-filter-body">
       <label className="research-source-filter-switch"><input type="checkbox" checked={draft.enabled} disabled={saving}
         onChange={event => setDraft(current => ({ ...current, enabled: event.target.checked }))} />{t('Limitar el contexto a las fuentes seleccionadas')}</label>
@@ -90,5 +59,15 @@ function SourceFilterBalloon({ anchor, value, onClose, onApply }: {
         : t('Filtro desactivado: se consultará todo el corpus.')}</p>
       {error && <p role="alert" className="text-red-500">{error}</p>}
     </div>
-  </HeaderBalloon>;
+    </div>
+    <footer className="header-balloon-foot">
+      <button className="btn btn-ghost" disabled={saving} onClick={() => setDraft({ enabled: false, authorIds: [], workIds: [] })}>{t('Restablecer')}</button>
+      <span className="spacer" />
+      <button className="btn btn-ghost" disabled={saving} onClick={onClose}>{t('Cancelar')}</button>
+      <button className="btn btn-primary" disabled={saving || (draft.enabled && !sources)} onClick={async () => {
+        setSaving(true); setError('');
+        try { await onApply(normalizeResearchSourceFilter(draft)); } catch (reason) { setError(String(reason)); setSaving(false); }
+      }}>{t('Aplicar')}</button>
+    </footer>
+  </div>;
 }

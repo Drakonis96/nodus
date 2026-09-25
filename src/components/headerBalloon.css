@@ -73,3 +73,10 @@
 .light .header-balloon-search > input { background: #fff; border-color: #e4e4e7; }
 .light .header-balloon-tab { color: #71717a; }
 .light .header-balloon-tab:hover { background: #f4f4f5; color: #18181b; }
+.header-balloon-icon-button.is-danger:hover:not(:disabled) { color: #f87171; background: #ef444418; }
+.light .header-balloon-icon-button.is-danger:hover:not(:disabled) { color: #dc2626; background: #ef444414; }
+
+/* A balloon whose tabs each bring their own scrolling body and footer (Context). */
+.header-balloon-body.context-balloon-body { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.context-tab-panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.context-tab-scroll { min-height: 0; flex: 1; overflow-y: auto; padding: 14px 16px; }

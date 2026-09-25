@@ -6,7 +6,7 @@ import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/rese
 import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
 import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
-import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
+import { SourceFilterPanel } from '../components/ResearchSourceFilterControl';
 import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNotebookControl';
 import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
 import { HeaderBalloon } from '../components/HeaderBalloon';
@@ -309,6 +309,8 @@ export function ResearchAssistantModal({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
+  // The context balloon's two tabs: how the assistant approaches the corpus, and which of it.
+  const [contextTab, setContextTab] = useState<'focus' | 'library'>('focus');
   // The context picker opens as a header balloon, like its neighbours.
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
@@ -425,6 +427,9 @@ export function ResearchAssistantModal({
       ].filter(Boolean).length,
     [selection]
   );
+  const sourceFilterOn = !!selection.sourceFilter?.enabled && !selection.notebookId;
+  // A notebook's chats read its collections: the Library tab is only for general chats.
+  const shownContextTab = contextTab === 'library' && !selection.notebookId ? 'library' : 'focus';
 
   const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter' | 'notebookId' | 'retrieval'>, value: boolean) => {
     setSelection((current) => ({ ...current, [key]: value }));
@@ -958,23 +963,18 @@ export function ResearchAssistantModal({
               type="button"
               ref={contextTriggerRef}
               data-testid="research-context-trigger"
-              className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text"
-              title={t('Elegir qué partes del corpus ve el asistente')}
+              className={`chat-skills-trigger research-context-trigger ${sourceFilterOn ? 'is-filtered' : ''}`}
+              title={sourceFilterOn ? `${t('Elegir qué partes del corpus ve el asistente')} · ${t('Biblioteca filtrada')}` : t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
               onClick={() => setShowContext((value) => !value)}
             >
-              <Icon name="layers" size={15} className="research-accent-text" />
+              <Icon name="layers" size={15} />
               <span className="hidden min-w-0 truncate sm:inline">{t('Contexto')}</span>
-              <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
+              {sourceFilterOn && <Icon name="library" size={12} aria-label={t('Biblioteca filtrada')} />}
+              <span className="chat-skills-count">{selectedCount}</span>
             </button>
           )}
-          {!adapter && !isGenealogy && !selection.notebookId && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
-            const next = { ...selection, sourceFilter };
-            if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
-            setSelection(next);
-            setShowContext(false);
-          }} />}
           <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
           <ChatSkillsControl surface="assistant" disabled={sending} />
           {!adapter && <ResearchConciliumControl value={concilium} models={availableModels} selectedModel={selectedModel} disabled={sending} onChange={next => {
@@ -1278,6 +1278,11 @@ export function ResearchAssistantModal({
                 <span>+</span>
                 <kbd className="composer-kbd">Enter</kbd>
                 <span>{t('salto de línea')}</span>
+                {skillsEnabled && <>
+                  <span className="text-neutral-700">·</span>
+                  <kbd className="composer-kbd">@</kbd>
+                  <span>{t('para usar skills')}</span>
+                </>}
               </div>
             </footer>
           </section>
@@ -1297,8 +1302,23 @@ export function ResearchAssistantModal({
         meta={tx('{n} seleccionados', { n: selectedCount })}
         testId="research-context-panel"
         className="research-context-panel"
-        footer={<button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>{t('Listo')}</button>}
+        bodyClassName="context-balloon-body"
       >
+        <div className="header-balloon-tabs" role="tablist" aria-label={t('Contexto del asistente')}>
+          {([['focus', 'layers', t('Enfoque')], ...(selection.notebookId ? [] : [['library', 'library', t('Biblioteca')]])] as Array<['focus' | 'library', string, string]>).map(([id, icon, label]) => (
+            <button key={id} type="button" role="tab" className="header-balloon-tab" data-testid={`research-context-tab-${id}`} aria-selected={shownContextTab === id}
+              aria-label={label} title={label} onClick={() => setContextTab(id)}>
+              <Icon name={icon} size={16} />{shownContextTab === id && <span>{label}</span>}
+            </button>
+          ))}
+        </div>
+        {shownContextTab === 'library' ? <SourceFilterPanel key={activeId ?? 'new'} value={selection.sourceFilter} onClose={() => setShowContext(false)} onApply={async sourceFilter => {
+          const next = { ...selection, sourceFilter };
+          if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+          setSelection(next);
+          setShowContext(false);
+        }} /> : <div className="context-tab-panel" role="tabpanel" aria-label={t('Enfoque')}>
+          <div className="context-tab-scroll">
             <div>
               <p className="mb-3 text-xs text-neutral-500">
                 {t('Elige un modo o combina las secciones del corpus que el asistente puede leer.')}
@@ -1392,6 +1412,9 @@ export function ResearchAssistantModal({
                 />
               </div>
             </div>
+          </div>
+          <footer className="header-balloon-foot"><button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>{t('Listo')}</button></footer>
+        </div>}
       </HeaderBalloon>
 
       {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}

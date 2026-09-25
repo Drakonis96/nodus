@@ -1,4 +1,6 @@
 import type { ChatSkill } from '@shared/chatSkills';
+import type { CSSProperties } from 'react';
+import { skillGlyph } from './skillGlyph';
 import { Icon } from './ui';
 import { t } from '../i18n';
 
@@ -45,7 +47,8 @@ export function SkillMentionMenu({ options, activeIndex, onPick, onHover }: {
         onMouseDown={event => event.preventDefault()}
         onMouseEnter={() => onHover(index)}
         onClick={() => onPick(skill)}>
-        <Icon name="sparkles" size={15} className="shrink-0" />
+        {/* Each skill's own icon and colour, as in the library. */}
+        <SkillSymbol skill={skill} />
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{skill.name}</span>
           {skill.description && <span className="block truncate text-[11px] opacity-70">{skill.description}</span>}
@@ -53,6 +56,11 @@ export function SkillMentionMenu({ options, activeIndex, onPick, onHover }: {
       </button>
     )) : <p className="px-3 py-2 text-xs opacity-70">{t('Ninguna skill coincide.')}</p>}
   </div>;
+}
+
+function SkillSymbol({ skill }: { skill: ChatSkill }) {
+  const glyph = skillGlyph({ packageId: skill.origin?.packageId, id: skill.id, name: skill.name, description: skill.description, category: skill.category, builtin: skill.builtin });
+  return <span className="research-skill-mention-symbol" aria-hidden="true" style={{ '--skill-hue': glyph.hue } as CSSProperties}><Icon name={glyph.icon} size={15} /></span>;
 }
 
 /** The skills invoked for the next message, as removable pills in the composer, or as

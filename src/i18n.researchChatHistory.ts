@@ -111,4 +111,20 @@ const notebookTranslations: Record<string, string[]> = {
   ja: ["Nodus のコレクション", "Zotero のコレクション", "コレクションを編集", "ノートブックで新しいチャット", "「{name}」を削除します。チャットは残って通常の履歴に戻り、コレクションはライブラリに残ります。", "まだコレクションがありません。ライブラリで作成するか、Zotero のコレクションを同期してください。", "コレクションを 1 つ以上選んでください。", "読み込むコレクションを選びます。各コレクションにはサブコレクションが含まれます。", "このノートブックには個別の文書がありました。保存するとコレクションだけが残ります。", "「{name}」に含まれています", "一致するコレクションはありません。", "例：論文 第 2 章", "文書 {n} 件 · {m} 件はインデックス化済み。残りは保存時にインデックス化します。", "コレクションを利用できません", "ノートブックのコレクションを確認しています…", "コレクションをインデックス化しています：{total} 件中 {ready} 件が準備完了。完了したらノートブックを使えます。", "インデックス化は一時停止中です：{total} 件中 {ready} 件が準備完了。", "このノートブックのコレクションにはまだ文書がありません。", "キューを表示", "{n} 件の文書はインデックス化できず、参照されません。", "ノートブックはまだコレクションをインデックス化しています。完了したら使えます。", "ここで始めたチャットは、このノートブックのコレクションを読みます。"],
 };
 for (const [language, values] of Object.entries(notebookTranslations)) translations[language].push(...values);
+// Composer hint and the context balloon's tabs.
+keys.push('Biblioteca filtrada', 'Enfoque', 'para usar skills');
+const contextTranslations: Record<string, string[]> = {
+  en: ["Library filtered", "Focus", "to use skills"],
+  fr: ["Bibliothèque filtrée", "Approche", "pour utiliser des skills"],
+  de: ["Bibliothek gefiltert", "Fokus", "um Skills zu nutzen"],
+  pt: ["Biblioteca filtrada", "Abordagem", "para usar skills"],
+  'pt-BR': ["Biblioteca filtrada", "Abordagem", "para usar skills"],
+  it: ["Biblioteca filtrata", "Approccio", "per usare le skill"],
+  tr: ["Kitaplık filtrelendi", "Odak", "skill'leri kullanmak için"],
+  'zh-CN': ["文献库已筛选", "侧重点", "使用技能"],
+  'zh-TW': ["文獻庫已篩選", "側重點", "使用技能"],
+  ko: ["라이브러리 필터링됨", "초점", "스킬 사용"],
+  ja: ["ライブラリを絞り込み中", "方針", "でスキルを使う"],
+};
+for (const [language, values] of Object.entries(contextTranslations)) translations[language].push(...values);
 export const RESEARCH_CHAT_HISTORY_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));
