@@ -156,6 +156,8 @@ try {
   console.log('Corpus run: pre-ranking scope, mixed Ideas, lexical-only retrieval, shared section budget, no profile barrier and selection revocation passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
+  // The corpus inventory opens the Global Library catalog; Windows cannot delete it open.
+  load('electron/library/libraryService.ts').closeGlobalLibrary();
   load('electron/db/database.ts').closeDb();
   fs.rmSync(scratch, { recursive: true, force: true });
 }

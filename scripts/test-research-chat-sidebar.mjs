@@ -15,11 +15,12 @@ import { chromium } from 'playwright-core';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
 
-/** The menu mounts hidden and shows once placed; its items have no innerText until then. */
+/** The menu mounts hidden and shows once placed. Its labels are read as text content:
+ * innerText depends on layout and came back empty on CI runners for a visible menu. */
 async function placedTexts(menu) {
   await menu.waitFor();
   await menu.page().waitForFunction(element => element && getComputedStyle(element).visibility !== 'hidden', await menu.elementHandle(), { timeout: 10000 });
-  return menu.getByRole('menuitem').allInnerTexts();
+  return (await menu.getByRole('menuitem').allTextContents()).map(text => text.trim());
 }
 
 test('research chat history: sections, search, pins, menu and projects', { timeout: 180_000 }, async (t) => {
