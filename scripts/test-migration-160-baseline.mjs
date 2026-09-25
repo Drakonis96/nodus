@@ -140,6 +140,8 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
+  db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   const rawRichTitle = '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions';
   db.prepare(`INSERT INTO works(nodus_id,zotero_key,zotero_version,zotero_fingerprint,title,summary_status)
     VALUES('migration-173-rich','RICH',0,'stable-fingerprint',?,'failed')`).run(rawRichTitle);
@@ -203,6 +205,8 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
+  db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   db.pragma('user_version = 161');
   runMigrations(db);
   assert.ok(
@@ -254,6 +258,8 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN attachments_json;');
   db.exec('ALTER TABLE chat_messages DROP COLUMN concilium_json;');
   db.exec('ALTER TABLE document_profile_fields DROP COLUMN confidence_source;');
+  db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
+  db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   db.pragma('user_version = 163');
   runMigrations(db);
   const recoveredJob = db.prepare("SELECT status, phase, progress, attempts, error FROM document_index_jobs WHERE job_id='migration-164-recover-job'").get();
