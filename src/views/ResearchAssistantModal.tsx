@@ -687,7 +687,9 @@ export function ResearchAssistantModal({
       const response = await api.researchChatStream(
         { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined },
         {
-          onActivity: event => setActivityRun(current => current?.turnId === assistantId && current.outcome === 'active' ? { ...current, activities: updateResearchActivities(current.activities, event) } : current),
+          // A terminal event may arrive after the turn settled (it travels on another IPC pipe
+          // than the reply); it then replaces the placeholder the settlement wrote.
+          onActivity: event => setActivityRun(current => current?.turnId === assistantId && (current.outcome === 'active' || event.status !== 'active') ? { ...current, activities: updateResearchActivities(current.activities, event) } : current),
           onConcilium: (result) => {
             councilResult = result;
             if (activeIdRef.current !== conversationId) return;

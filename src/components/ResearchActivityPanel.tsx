@@ -48,7 +48,7 @@ export function ResearchActivityPanel({ activities, outcome }: { activities: Res
   if (!activities.length) return null;
   const status = outcome === 'active' ? tx('{n} operaciones activas', { n: active.length }) : t(statuses[outcome]);
   const announcement = `${status}${current ? ` · ${t(layers[current.layer][0])} · ${t(operations[current.operation])}` : ''}`;
-  return <section className={`research-activity ${minimized ? 'is-minimized' : ''}`} aria-label={t('Actividad del Research chat')} data-testid="research-activity" onKeyDown={event => {
+  return <section className={`research-activity ${minimized ? 'is-minimized' : ''}`} aria-label={t('Actividad del Research chat')} data-testid="research-activity" data-outcome={outcome} onKeyDown={event => {
     if (event.key === 'Escape' && !minimized) { event.stopPropagation(); toggle(); }
   }}>
     <span className="sr-only" role="status" aria-live="polite">{announcement}</span>

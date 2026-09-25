@@ -115,7 +115,7 @@ try {
     for (const theme of ['dark', 'light']) for (const viewport of [{ width: 1280, height: 800 }, { width: 800, height: 640 }]) {
       await page.evaluate(theme => window.nodus.updateSettings({ theme }), theme);
       await page.setViewportSize(viewport);
-      await control.getByRole('button', { name: /Editar|Edit/ }).click();
+      await page.getByTestId('research-notebook-chip').getByRole('button', { name: /Editar cuaderno|Edit notebook/ }).click();
       const editor = page.getByRole('dialog').filter({ has: page.locator('#research-notebook-title') });
       await editor.waitFor();
       await editor.getByRole('textbox', { name: 'Nombre', exact: true }).focus();

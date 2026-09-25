@@ -9,6 +9,8 @@ import type { AcademicApi } from '@shared/api/academic';
 // button can abort it without the renderer having to juggle request ids. One
 // stream at a time per surface (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
+/** How long a finished research turn still accepts its late activity events. */
+const ACTIVITY_GRACE_MS = 2000;
 let activeLibraryReaderChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
@@ -614,7 +616,9 @@ export const academicApi: AcademicApi = {
       return response;
     } finally {
       if (activeChatRequestId === requestId) activeChatRequestId = null;
-      ipcRenderer.removeListener('research:chatStream:activity', onActivity);
+      // Activity events and the invoke reply travel on different IPC pipes, so the reply can
+      // overtake the last events of the turn. Keep listening briefly for those stragglers.
+      setTimeout(() => ipcRenderer.removeListener('research:chatStream:activity', onActivity), ACTIVITY_GRACE_MS);
       ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);

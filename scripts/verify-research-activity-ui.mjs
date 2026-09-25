@@ -65,23 +65,24 @@ export async function verifyResearchActivityUi(page, app, root) {
       { id: `${fixture.turns}-${layer}`, layer, operation: layer === 'nodus' ? 'search' : 'fulltext', status: 'completed', count: 2, startedAt: Date.now(), finishedAt: Date.now() });
     pending.resolve({ answer: 'Synthetic UI transport complete.', stats: { sections: [], works: 2, documents: 2, summaries: 0, passages: 2, contextChars: 100, truncated: false } });
   });
-  await page.waitForFunction(() => !document.querySelector('[data-testid="research-activity"] li[data-status="active"]'));
+  await page.locator('[data-testid="research-activity"][data-outcome="completed"]').waitFor();
   assert.equal(await panel.locator('li[data-status="active"]').count(), 0);
-  assert.equal(await panel.locator('li[data-status="completed"]').count(), 5, 'green once a layer has contributed');
+  const settledLayers = await panel.locator('li').evaluateAll(items => items.map(item => `${item.dataset.layer}:${item.dataset.status}`));
+  assert.equal(settledLayers.filter(entry => entry.endsWith(':completed')).length, 5, `green once a layer has contributed: ${settledLayers.join(', ')}`);
   await send('Synthetic activity fixture request two');
   await panel.locator('li[data-layer="zotero"][data-status="active"]').waitFor();
   assert.equal(await panel.locator('li').count(), 10, 'the list stays fixed');
   assert.equal(await panel.locator('li[data-layer="nodus"][data-status="active"]').count(), 1, 'each new request starts every layer over');
   assert.equal(await panel.locator('li[data-status="idle"]').count(), 5);
   await app.evaluate(() => globalThis.__researchActivityFixture.pending.reject(new Error('Synthetic UI failure')));
-  await page.waitForFunction(() => !document.querySelector('[data-testid="research-activity"] li[data-status="active"]'));
+  await page.locator('[data-testid="research-activity"][data-outcome="failed"]').waitFor();
   assert.equal(await panel.locator('li[data-status="failed"]').count(), 2, 'a failed IPC request cannot leave active spinners');
   assert.equal(await panel.getByRole('button', { name: 'Cerrar actividad' }).count(), 0, 'the panel minimises; it is never closed');
   assert.equal(await panel.locator('header button').count(), 1, 'minimise is the only header control');
   await send('Synthetic activity fixture request three');
   await panel.locator('li[data-layer="zotero"]').waitFor();
   await page.getByRole('button', { name: 'Detener generación' }).click();
-  await page.waitForFunction(() => !document.querySelector('[data-testid="research-activity"] li[data-status="active"]'));
+  await page.locator('[data-testid="research-activity"][data-outcome="cancelled"]').waitFor();
   assert.equal(await panel.locator('li[data-status="cancelled"]').count(), 2);
   return { passed: true, mode: 'deterministic IPC/UI fixture, no live model or Zotero calls', turns: 3, layouts,
     requestFiltering: true, simultaneousOperations: true, keyboard: true, minimizeExpand: true, neverClosed: true, failure: true, cancellation: true };
