@@ -23,7 +23,7 @@ test('the Auto Library guide is seen once; Manual keeps its own guidance', async
   assert.match(shell, /if \(autoPresented\.current\) markLibraryTutorialSeen\(\);/);
   assert.match(shell, /<LibraryTutorialModal/);
 
-  // The «?» lives beside Colecciones and Índice documental, and ignores the flag.
+  // The «?» lives beside Colecciones and Ficha documental, and ignores the flag.
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?onClick=\{academicMode === 'manual' \? \(\) => toast\([\s\S]*?: onOpenTutorial\}/);
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?<Icon name="help"/);
   // Glyph-only among labelled buttons, so it wears the vault's accent to be findable.
@@ -61,10 +61,10 @@ test('the first tab walks the collections → monitor → process route', async 
     'En Zotero, pulsa «Monitorizar» en cada colección que quieras traer.',
     'Analizar las seleccionadas',
     'Procesar biblioteca',
-    'Para qué sirve el «Índice documental»',
+    'Para qué sirve la «Ficha documental»',
   ]) assert.ok(modal.includes(key), `missing guide copy: ${key}`);
   // Whole-document understanding is beta wherever it is named.
-  assert.match(modal, /title=\{t\('Para qué sirve el «Índice documental»'\)\} badge="BETA"/);
+  assert.match(modal, /title=\{t\('Para qué sirve la «Ficha documental»'\)\} badge="BETA"/);
   assert.ok(modal.includes('Está en beta: en documentos muy largos puede tardar bastante'));
   // Nodus Library is beta on both sides of the fork.
   assert.match(modal, /badge="BETA" badgeTone="beta"/);

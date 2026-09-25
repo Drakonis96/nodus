@@ -1,5 +1,7 @@
 export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
   "en": {
+    "¿Qué es la ficha documental?": "What is the document record?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "The document record is a complete reading of the work: Nodus rebuilds its structure by chapters and sections, summarizes each part, synthesizes the whole and audits every field before publishing it. Chat, Nodi and Deep Research use it to find their way through the work, but citations still point to the original text. It is optional: searching and citing rely on indexing, not on the record.",
     "Disponible: revisión anterior": "Available: previous revision",
     "Cuaderno de investigación": "Research notebook",
     "Chat general": "General chat",
@@ -116,6 +118,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "Extraction is manual: extract Ideas and relations from the whole library or from selected works whenever you want. This analysis uses generative models."
   },
   "fr": {
+    "¿Qué es la ficha documental?": "Qu’est-ce que la fiche documentaire ?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "La fiche documentaire est une lecture complète de l’œuvre : Nodus reconstruit sa structure par chapitres et sections, résume chaque partie, synthétise l’ensemble et vérifie chaque champ avant de le publier. Le chat, Nodi et Deep Research s’en servent pour s’orienter dans l’œuvre, mais les citations renvoient toujours au texte original. Elle est facultative : la recherche et les citations reposent sur l’indexation, pas sur la fiche.",
     "Disponible: revisión anterior": "Disponible : révision précédente",
     "Cuaderno de investigación": "Carnet de recherche",
     "Chat general": "Discussion générale",
@@ -232,6 +236,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "L’extraction est manuelle : extrayez les Idées et les relations de toute la bibliothèque ou des œuvres sélectionnées quand vous le souhaitez. Cette analyse utilise des modèles génératifs."
   },
   "de": {
+    "¿Qué es la ficha documental?": "Was ist der Dokumentdatensatz?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "Der Dokumentdatensatz ist eine vollständige Lektüre des Werks: Nodus rekonstruiert seine Struktur nach Kapiteln und Abschnitten, fasst jeden Teil zusammen, synthetisiert das Ganze und prüft jedes Feld, bevor es veröffentlicht wird. Chat, Nodi und Deep Research nutzen ihn zur Orientierung im Werk, doch Zitate verweisen weiterhin auf den Originaltext. Er ist optional: Suchen und Zitieren beruhen auf der Indexierung, nicht auf dem Datensatz.",
     "Disponible: revisión anterior": "Verfügbar: vorherige Revision",
     "Cuaderno de investigación": "Forschungsnotizbuch",
     "Chat general": "Allgemeiner Chat",
@@ -348,6 +354,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "Die Extraktion ist manuell: Extrahiere Ideen und Beziehungen aus der ganzen Bibliothek oder aus ausgewählten Werken, wann du willst. Diese Analyse nutzt generative Modelle."
   },
   "it": {
+    "¿Qué es la ficha documental?": "Che cos’è la scheda documentale?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "La scheda documentale è una lettura completa dell’opera: Nodus ricostruisce la struttura per capitoli e sezioni, riassume ogni parte, sintetizza l’insieme e verifica ogni campo prima di pubblicarlo. Chat, Nodi e Deep Research la usano per orientarsi nell’opera, ma le citazioni rimandano sempre al testo originale. È facoltativa: la ricerca e le citazioni si basano sull’indicizzazione, non sulla scheda.",
     "Disponible: revisión anterior": "Disponibile: revisione precedente",
     "Cuaderno de investigación": "Quaderno di ricerca",
     "Chat general": "Chat generale",
@@ -464,6 +472,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "L’estrazione è manuale: estrai Idee e relazioni da tutta la biblioteca o dalle opere selezionate quando vuoi. Questa analisi usa modelli generativi."
   },
   "pt": {
+    "¿Qué es la ficha documental?": "O que é a ficha documental?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "A ficha documental é uma leitura completa da obra: o Nodus reconstrói a sua estrutura por capítulos e secções, resume cada parte, sintetiza o conjunto e audita cada campo antes de o publicar. O chat, o Nodi e o Deep Research usam-na para se orientarem na obra, mas as citações continuam a apontar para o texto original. É opcional: pesquisar e citar dependem da indexação, não da ficha.",
     "Disponible: revisión anterior": "Disponível: revisão anterior",
     "Cuaderno de investigación": "Caderno de investigação",
     "Chat general": "Conversa geral",
@@ -580,6 +590,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "A extração é manual: extraia Ideias e relações de toda a biblioteca ou das obras selecionadas quando quiser. Esta análise utiliza modelos generativos."
   },
   "pt-BR": {
+    "¿Qué es la ficha documental?": "O que é a ficha documental?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "A ficha documental é uma leitura completa da obra: o Nodus reconstrói sua estrutura por capítulos e seções, resume cada parte, sintetiza o conjunto e audita cada campo antes de publicá-lo. O chat, o Nodi e o Deep Research a usam para se orientar na obra, mas as citações continuam apontando para o texto original. É opcional: pesquisar e citar dependem da indexação, não da ficha.",
     "Disponible: revisión anterior": "Disponível: revisão anterior",
     "Cuaderno de investigación": "Caderno de pesquisa",
     "Chat general": "Chat geral",
@@ -696,6 +708,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "A extração é manual: extraia Ideias e relações de toda a biblioteca ou das obras selecionadas quando quiser. Esta análise usa modelos generativos."
   },
   "tr": {
+    "¿Qué es la ficha documental?": "Belge kaydı nedir?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "Belge kaydı eserin eksiksiz bir okumasıdır: Nodus yapısını bölüm ve kısımlara göre yeniden kurar, her bölümü özetler, bütünü sentezler ve yayımlamadan önce her alanı denetler. Sohbet, Nodi ve Deep Research eserde yol bulmak için onu kullanır, ancak alıntılar yine özgün metne işaret eder. İsteğe bağlıdır: arama ve alıntılama kayda değil, dizinlemeye dayanır.",
     "Disponible: revisión anterior": "Kullanılabilir: önceki sürüm",
     "Cuaderno de investigación": "Araştırma defteri",
     "Chat general": "Genel sohbet",
@@ -812,6 +826,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "Çıkarma el ile yapılır: Fikirleri ve ilişkileri istediğin zaman tüm kitaplıktan ya da seçili eserlerden çıkar. Bu analiz üretken modeller kullanır."
   },
   "zh-CN": {
+    "¿Qué es la ficha documental?": "什么是文档记录？",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "文档记录是对作品的完整阅读：Nodus 按章节重建其结构，概括每个部分，综合整体，并在发布前审核每个字段。聊天、Nodi 和 Deep Research 用它来把握作品，但引用仍指向原文。它是可选的：搜索和引用依赖索引，而不是文档记录。",
     "Disponible: revisión anterior": "可查询：先前版本",
     "Cuaderno de investigación": "研究笔记本",
     "Chat general": "常规聊天",
@@ -928,6 +944,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "提取需手动进行：随时从整个文献库或所选作品中提取观点和关系。此分析使用生成式模型。"
   },
   "zh-TW": {
+    "¿Qué es la ficha documental?": "什麼是文件記錄？",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "文件記錄是對作品的完整閱讀：Nodus 按章節重建其結構，概括每個部分，綜合整體，並在發布前審核每個欄位。聊天、Nodi 和 Deep Research 用它來掌握作品，但引用仍指向原文。它是選用的：搜尋和引用依賴索引，而不是文件記錄。",
     "Disponible: revisión anterior": "可查詢：先前版本",
     "Cuaderno de investigación": "研究筆記本",
     "Chat general": "一般聊天",
@@ -1044,6 +1062,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "擷取需手動進行：隨時從整個文獻庫或所選作品中擷取觀點和關係。此分析使用生成式模型。"
   },
   "ja": {
+    "¿Qué es la ficha documental?": "文書記録とは何ですか？",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "文書記録は作品の完全な読解です。Nodus は章やセクションごとに構造を再構築し、各部分を要約し、全体を統合し、公開前にすべての項目を監査します。チャット、Nodi、Deep Research は作品を把握するためにこれを使いますが、引用は常に原文を指します。任意の機能です。検索と引用は索引作成に基づいており、文書記録には依存しません。",
     "Disponible: revisión anterior": "利用可能：以前の版",
     "Cuaderno de investigación": "研究ノートブック",
     "Chat general": "一般チャット",
@@ -1160,6 +1180,8 @@ export const RESEARCH_NOTEBOOK_TRANSLATIONS = {
     "La extracción es manual: extrae Ideas y relaciones de toda la biblioteca o de las obras seleccionadas cuando quieras. Este análisis utiliza modelos generativos.": "抽出は手動です。ライブラリ全体または選択した作品から、いつでもアイデアと関係を抽出できます。この分析には生成モデルを使います。"
   },
   "ko": {
+    "¿Qué es la ficha documental?": "문서기록이란 무엇인가요?",
+    "La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.": "문서기록은 작품 전체를 읽은 결과입니다. Nodus는 장과 섹션별로 구조를 재구성하고, 각 부분을 요약하며, 전체를 종합하고, 게시하기 전에 모든 항목을 검토합니다. 채팅, Nodi, Deep Research는 작품을 파악하는 데 이를 사용하지만 인용은 항상 원문을 가리킵니다. 선택 사항입니다. 검색과 인용은 문서기록이 아니라 색인에 의존합니다.",
     "Disponible: revisión anterior": "사용 가능: 이전 버전",
     "Cuaderno de investigación": "연구 노트북",
     "Chat general": "일반 채팅",

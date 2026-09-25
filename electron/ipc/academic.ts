@@ -671,7 +671,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     // works, so let it reconcile instead of discovering the gap on its next poll.
     if (vaultId) {
       void documentIndexQueue.refreshVault(vaultId).catch((error) => {
-        console.error('[works:delete] no se pudo reconciliar el índice documental', error);
+        console.error('[works:delete] no se pudo reconciliar la ficha documental', error);
       });
     }
     await documentaryPreparation.reconcileResearchDocumentOwnership();

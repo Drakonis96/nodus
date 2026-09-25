@@ -69,7 +69,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
       </Task>;
     })}
     {activity.documents?.campaigns.filter((job) => !DOCUMENT_LIVE.has(job.status)).slice(0, limit).map((job) => <Task key={job.campaignId} testId={`document-result-${job.campaignId}`}
-      title={t('Índice documental')} detail={`${t(job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')} · ${tx('{done} de {total} obras', { done: job.completedJobs, total: job.totalJobs })}`}
+      title={t('Ficha documental')} detail={`${t(job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')} · ${tx('{done} de {total} obras', { done: job.completedJobs, total: job.totalJobs })}`}
       error={job.status === 'cancelled' ? null : job.error ?? activity.documents?.jobs.find((item) => item.campaignId === job.campaignId && item.error)?.error ?? (job.failedJobs > 0 ? `${job.failedJobs} ${t('fallidos')}` : null)}>
       <Action label={t('Ocultar')} run={() => activity.dismiss(`documents:${job.campaignId}`, `${job.status}:${job.updatedAt}`)} />
     </Task>)}

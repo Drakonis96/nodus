@@ -109,8 +109,8 @@ function LegacyAnalysisTab() {
         </div>
       </Step>
 
-      <Step number={4} title={t('Para qué sirve el «Índice documental»')} badge="BETA">
-        <p>{t('Es la lectura profunda de un documento entero: Nodus recorre todo el texto, reconstruye su estructura por capítulos y secciones y deja un índice que el asistente puede consultar. Se gestiona desde el botón de la cabecera.')}</p>
+      <Step number={4} title={t('Para qué sirve la «Ficha documental»')} badge="BETA">
+        <p>{t('Es la lectura profunda de un documento entero: Nodus recorre todo el texto, reconstruye su estructura por capítulos y secciones y deja una ficha que el asistente puede consultar. Se crea desde el estado del análisis de cada obra.')}</p>
         <p>{t('Está en beta: en documentos muy largos puede tardar bastante y no siempre acierta con la estructura.')}</p>
       </Step>
     </div>

@@ -1161,7 +1161,7 @@ export function Library({
           >
             {/* Whole-document understanding is still beta: slow on long texts, and
                 not always right about the structure. The badge says so up front. */}
-            <Icon name="layers" /> {t('Índice documental')}
+            <Icon name="layers" /> {t('Ficha documental')}
             <em data-testid="document-index-beta" className="library-action-menu-badge is-beta">BETA</em>
           </button>}
           <div className="relative z-40" ref={collectionsMenuRef}>
@@ -1836,7 +1836,7 @@ export function Library({
                           onClick: () => void summarizeWork(w),
                         },
                         {
-                          label: t('Índice documental'),
+                          label: t('Ficha documental'),
                           icon: 'layers',
                           onClick: () => setDocumentWork(w),
                         },
