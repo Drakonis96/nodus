@@ -2509,6 +2509,7 @@ export function ComposerModal({
             <div className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Esfuerzo de thinking')}</span>
               <ResearchEffortControl variant="field" className="w-full !py-2 text-sm" testId="deep-research-thinking" model={model ?? null} value={thinkingEffort} onChange={onThinkingEffort} disabled={!model} />
+              {isAcademic && <p className="mt-1 text-xs text-neutral-500">{t('La planificación y la redacción usan este nivel; las verificaciones usan Estándar.')}</p>}
             </div>
           </div>
           {!isAcademic && <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />}

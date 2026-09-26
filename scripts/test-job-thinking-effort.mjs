@@ -42,7 +42,7 @@ try {
   load('electron/secrets/secretStore.ts').getApiKey = () => 'test-key';
   load('electron/ai/providers.ts').openAiCompatBase = () => base;
   const ai = load('electron/ai/aiClient.ts');
-  const { withJobThinkingEffort, currentJobThinkingEffort } = load('electron/ai/thinkingEffort.ts');
+  const { withJobThinkingEffort, withResearchValidationThinking, currentJobThinkingEffort } = load('electron/ai/thinkingEffort.ts');
   const gpt = { provider: 'openai', model: 'gpt-5.4' };
   const other = { provider: 'openai', model: 'gpt-5.2' };
   const plain = { provider: 'openai', model: 'gpt-4o' };
@@ -80,6 +80,30 @@ try {
   const deepseekStandard = await withJobThinkingEffort('standard', deepseek, () => call(deepseek, 'DeepSeek standard', 'json'));
   assert.equal(deepseekStandard.thinking.type, 'disabled');
   assert.equal(budget(deepseekStandard), 1000, 'Standard does not reserve thinking tokens');
+
+  // Academic validation is a nested Standard scope; the chosen writer level survives
+  // awaits and failures, while concurrent jobs and other models stay independent.
+  await withJobThinkingEffort('low', deepseek, async () => {
+    const checked = await withResearchValidationThinking(deepseek, () => call(deepseek, 'validator', 'json'));
+    assert.equal(checked.thinking.type, 'disabled');
+    assert.equal(budget(checked), 1000);
+    assert.equal(currentJobThinkingEffort(deepseek), 'low');
+    await assert.rejects(withResearchValidationThinking(deepseek, async () => { throw new Error('validation failed'); }), /validation failed/);
+    const writer = await call(deepseek, 'writer after validator');
+    assert.equal(writer.reasoning_effort, 'low');
+    await withResearchValidationThinking(other, async () => assert.equal(currentJobThinkingEffort(deepseek), 'low'));
+  });
+  await withResearchValidationThinking(deepseek, async () => assert.equal(currentJobThinkingEffort(deepseek), undefined));
+  await Promise.all([
+    withJobThinkingEffort('low', deepseek, () => withResearchValidationThinking(deepseek, async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+      assert.equal(currentJobThinkingEffort(deepseek), 'standard');
+    })),
+    withJobThinkingEffort('high', deepseek, async () => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      assert.equal(currentJobThinkingEffort(deepseek), 'high');
+    }),
+  ]);
 
   // Only the job's model: a call to another model in the same job keeps its usual reasoning.
   const audit = await withJobThinkingEffort('high', gpt, () => call(other, 'audit model'));

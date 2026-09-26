@@ -61,7 +61,8 @@ export async function thinkingCatalogInfo(model: ModelRef, signal?: AbortSignal)
 
 /**
  * A long job's thinking level: the level chosen in the Deep Research or Immersion form, for
- * every call the job makes to the model it was chosen for. It follows the job's asynchronous
+ * generation calls to the model it was chosen for. Academic validators use a nested
+ * Standard scope to keep their bounded JSON reviews predictable. It follows the job's asynchronous
  * call chain, so a concurrent chat or another job keeps its own level, and a call to any
  * other model (an audit model, say) keeps that model's usual reasoning.
  */
@@ -81,6 +82,15 @@ export async function withJobThinkingEffort<T>(effort: unknown, model: ModelRef 
   // A subscription's ladder arrives with its own catalogue; its transport maps the level itself.
   if (!levels && !(researchReasoningNeedsCatalog(model) && !info)) return job();
   return active.run({ effort, model, info }, job);
+}
+
+/** Academic validation uses the same model at Standard without changing the
+ * surrounding writer, concurrent jobs, or legacy calls without a chosen level.
+ * Keep the catalogue entry so models with mandatory thinking retain their reserve. */
+export function withResearchValidationThinking<T>(model: ModelRef | null | undefined, validate: () => Promise<T>): Promise<T> {
+  const job = active.getStore();
+  if (!job || !model || !sameModel(job.model, model)) return validate();
+  return active.run({ ...job, effort: 'standard' }, validate);
 }
 
 /** The call options with the job's level applied, when this call belongs to a job that set
