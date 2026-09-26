@@ -110,12 +110,7 @@
 
 /* Tool-backed capabilities retain their own identity even while switched off. */
 .chat-skills-panel,.chat-skills-panel * { box-sizing: border-box; }
-.chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 25.9%, transparent); background: color-mix(in srgb, var(--vault-accent, #6366f1) 2.4%, transparent); }
-.chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45.9%, transparent); background: linear-gradient(135deg,color-mix(in srgb, var(--vault-accent, #6366f1) 7.5%, transparent),color-mix(in srgb, var(--vault-accent, #6366f1) 2.0%, transparent)); }
 .chat-skill-tool-badge { display: table; margin-top: 5px; padding: 1px 6px; border-radius: 5px; font-size: 9px; line-height: 1.6; font-weight: 600; color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 9.4%, transparent); border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); }
-.tool-skill .chat-skill-switch[aria-checked='true'] { background: var(--vault-accent, #6366f1); }
-:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
-:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 :is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: var(--vault-accent, #6366f1); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 
 .skill-marketplace-tabs { display: flex; gap: 6px; margin: 16px 0; padding: 4px; border-radius: 10px; background: color-mix(in srgb, var(--vault-accent, #6366f1) 6.3%, transparent); }
