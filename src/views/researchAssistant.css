@@ -247,6 +247,31 @@
 .research-chat-surface .suggestion-chip:hover { border-color: var(--vault-accent); background-color: var(--research-accent-surface); }
 .research-source-filter-trigger.is-active { color: var(--research-accent-ink); }
 
+/* Focus tab: three layers to switch, then the authorized sources the Library tab sets. */
+.research-context-intro { margin-bottom: 10px; font-size: 11.5px; color: #a1a1aa; }
+.research-context-layers { display: flex; flex-direction: column; overflow: hidden; border: 1px solid #ffffff14; border-radius: 12px; }
+.research-context-layer, .research-context-sources { display: flex; width: 100%; align-items: center; gap: 10px; padding: 9px 11px; text-align: left; color: inherit; }
+.research-context-layer + .research-context-layer { border-top: 1px solid #ffffff14; }
+.research-context-layer > svg, .research-context-sources > svg { flex-shrink: 0; color: #a1a1aa; }
+.research-context-layer[aria-checked=true] > svg { color: var(--research-accent-ink); }
+.research-context-layer > span:not(.research-context-switch), .research-context-sources > span { display: flex; min-width: 0; flex: 1; flex-direction: column; }
+:is(.research-context-layer, .research-context-sources) strong { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+:is(.research-context-layer, .research-context-sources) small { font-size: 10.5px; line-height: 1.35; color: #a1a1aa; }
+.research-context-layer:hover:not(:disabled), button.research-context-sources:hover { background: #ffffff0a; }
+.research-context-layer:disabled { cursor: not-allowed; opacity: .6; }
+.research-context-switch { display: flex; flex-shrink: 0; width: 30px; height: 18px; padding: 2px; border-radius: 18px; background: #52525b; transition: background-color .15s ease; }
+.research-context-switch > span { width: 14px; height: 14px; border-radius: 50%; background: white; transition: transform .15s ease; }
+.research-context-layer[aria-checked=true] .research-context-switch { background: var(--vault-accent); }
+.research-context-layer[aria-checked=true] .research-context-switch > span { transform: translateX(12px); }
+.research-context-sources { margin-top: 8px; border: 1px solid #ffffff14; border-radius: 12px; }
+.research-context-empty { margin-top: 10px; padding: 8px 10px; border-radius: 10px; font-size: 11px; line-height: 1.45; color: #d8913c; background: #d8913c14; }
+:is(.light, .nodi-theme-light) .research-context-panel :is(.research-context-layers, .research-context-sources, .research-context-layer + .research-context-layer) { border-color: #e4e4e7; }
+:is(.light, .nodi-theme-light) .research-context-panel :is(.research-context-intro, .research-context-layer > svg, .research-context-sources > svg, small) { color: #71717a; }
+:is(.light, .nodi-theme-light) .research-context-panel :is(.research-context-layer:hover:not(:disabled), button.research-context-sources:hover) { background: #f4f4f5; }
+:is(.light, .nodi-theme-light) .research-context-panel .research-context-switch { background: #d4d4d8; }
+:is(.light, .nodi-theme-light) .research-context-panel .research-context-layer[aria-checked=true] .research-context-switch { background: var(--vault-accent); }
+:is(.light, .nodi-theme-light) .research-context-panel .research-context-empty { color: #b45309; background: #fef3c7; }
+
 /* User prompts are vault-scoped; portal surfaces carry the same accent explicitly. */
 .research-system-prompt-name { max-width: 145px; overflow: hidden; text-overflow: ellipsis; }
 .research-system-prompt-dialog {

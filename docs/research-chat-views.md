@@ -18,6 +18,46 @@ The academic source filter remains opt-in. Native source panels keep their exist
 
 These checks use local fixtures and simulated generation; they make no paid inference calls.
 
+## The context balloon
+
+The **Contexto** balloon of Research chat has two tabs. **Enfoque** offers three switches,
+in the order the activity balloon lists what they read:
+
+- **Ideas**: ideas, themes, contradictions, gaps, reading paths, authors and the graph that
+  relates them, together.
+- **Documentos**: the text of the works in the Nodus library and in Zotero, and their
+  document profiles.
+- **Búsqueda web**: the same setting as the composer's Web button.
+
+Under them, **Fuentes autorizadas** summarises the works the **Biblioteca** tab allows
+("Toda la biblioteca", or how many works the filter keeps) and opens that tab. In a
+notebook's chat it names the notebook's sources instead. The former modes (Síntesis,
+Huecos, Contradicciones, Lecturas, Autores, Documentos) and the per-section checkboxes are
+gone; the trigger's count is the number of switches that are on.
+
+The choice travels with the turn as `selection.layers` (`shared/researchContextLayers.ts`),
+with the older section flags set to match, so every path that reads sections keeps working.
+A layer that is off is not consulted at all, not merely left out of the prompt: with
+Documentos off the corpus run asks neither the documentary store nor the supervisor, and
+with Ideas off it reads no ideas and no graph. The activity balloon shows those layers as
+**Desactivada**. With every switch off the answer comes from general knowledge, and the
+model is told to say so at the start of the answer and to cite nothing.
+
+Selections saved before layers existed have no `layers` and are read from their sections;
+in an academic vault their documents were always read, so that layer reads as on. A new
+chat starts with every layer on. Deep Research does not use the balloon and reads both
+layers.
+
+The activity balloon lists one slim row per layer: its mark, its name, its state and a
+single line of detail (the operation, its count and the subject), cut with an ellipsis.
+
+Validation: `node scripts/test-research-corpus-run.mjs` (each layer off, and all off,
+against the real corpus run), `node scripts/test-research-system-prompts.mjs` (the
+general-knowledge instruction), and `node scripts/verify-research-context-layers.mjs`
+against the renderer-only harness on localhost:5198 (the switches by mouse and keyboard,
+the request each turn sends, the shared web setting, the no-sources note, the authorized
+sources row and the activity balloon's rows, in light and dark).
+
 ## File attachments
 
 Research chat alone exposes an integrated + button for conversation-owned files. All four native engines consume the same extracted document/table content and provider-specific vision parts. See [Research chat attachments](research-chat-attachments.md) for formats, persistence, bounds and the verification matrix.

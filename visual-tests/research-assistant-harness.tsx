@@ -136,6 +136,8 @@ window.nodus = new Proxy({
   updateSettings: async (patch: any) => { win.updates.push(patch); return Object.assign(settings, patch); },
   researchChatStream: async (request: any, handlers: any) => {
     win.requests.push(request);
+    // A test may script the turn's activity, as the activity balloon receives it.
+    for (const event of win.activityScript ?? []) handlers.onActivity?.({ startedAt: Date.now(), ...(event.status !== 'active' ? { finishedAt: Date.now() } : {}), ...event });
     if (win.conciliumLiveRequest) { win.conciliumHandlers = handlers; return win.conciliumLiveRequest(request); }
     handlers.onDelta('Respuesta de prueba.');
     return { answer: 'Respuesta de prueba.', stats: { sections: [], works: 0, documents: 0, passages: 0, contextChars: 0, truncated: false } };
@@ -145,4 +147,4 @@ setActiveLang(params.get('lang') === 'en' || params.get('concilium') ? 'en' : 'e
 document.documentElement.className = `${params.get('theme') === 'dark' ? 'dark' : 'light'} ${vaultType}`;
 if (params.get('fallback') === 'chat') delete (settings as any).synthesisModel;
 const onEvidence = (id: string) => { win.openedEvidence = id; };
-ReactDOM.createRoot(document.getElementById('root')!).render(<div style={{ height: '100vh', '--vault-accent': params.get('accent') || vaultTypeColor(vaultType) } as React.CSSProperties}>{view === 'database' ? <DatabasesChatView settings={settings} initialDatabaseId="database-1" /> : view === 'study' || view === 'teaching' ? <StudyChatView settings={settings} variant={view === 'teaching' ? 'teaching' : 'study'} onOpenDocument={onEvidence} onOpenMaterial={onEvidence} onOpenRecording={onEvidence} /> : view === 'world' ? <WorldChatView settings={settings} onNavigate={onEvidence} /> : <ResearchAssistantModal settings={settings} embedded={view === 'embedded'} isGenealogy={params.get('genealogy') === '1'} onClose={() => {}} />}</div>);
+ReactDOM.createRoot(document.getElementById('root')!).render(<div style={{ height: '100vh', '--vault-accent': params.get('accent') || vaultTypeColor(vaultType) } as React.CSSProperties}>{view === 'database' ? <DatabasesChatView settings={settings} initialDatabaseId="database-1" /> : view === 'study' || view === 'teaching' ? <StudyChatView settings={settings} variant={view === 'teaching' ? 'teaching' : 'study'} onOpenDocument={onEvidence} onOpenMaterial={onEvidence} onOpenRecording={onEvidence} /> : view === 'world' ? <WorldChatView settings={settings} onNavigate={onEvidence} /> : <ResearchAssistantModal settings={settings} embedded={view === 'embedded'} isGenealogy={params.get('genealogy') === '1'} isAcademic={vaultType === 'academic'} onClose={() => {}} />}</div>);

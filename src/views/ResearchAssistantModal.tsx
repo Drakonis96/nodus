@@ -20,7 +20,8 @@ import { UNFILED_FOLDER, nextFolderName } from '@shared/researchChatFolders';
 import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
 import { useSkillLibrary } from '../components/skillLibrary';
 import type { ResearchNotebook, ResearchNotebookPreparation } from '@shared/researchCorpus';
-import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
+import { matchingResearchWorkIds, normalizeResearchSourceFilter, type ResearchContextSources } from '@shared/researchContextFilters';
+import { researchContextLayers, withResearchContextLayers } from '@shared/researchContextLayers';
 import { ResearchCoverage } from '../components/ResearchCoverage';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { ChatMarkdown } from '../components/ChatMarkdown';
@@ -35,7 +36,6 @@ import type {
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
-  ResearchGraphPartsSelection,
   NoteSource,
   ResearchWebSearchMode,
 } from '@shared/types';
@@ -45,7 +45,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal, type StudyNoteDestination } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
-import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
+import type { AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { useResearchEffort } from '../hooks/useResearchEffort';
@@ -70,141 +70,17 @@ const DEFAULT_SELECTION: ResearchContextSelection = {
   },
 };
 
-const ALL_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: true,
-  contradictions: true,
-  gaps: true,
-  readingPath: true,
-  authors: true,
-  documents: true,
-  passages: true,
-  graph: true,
-  graphParts: {
-    ideaNodes: true,
-    themeNodes: true,
-    ideaEdges: true,
-    authorGraph: true,
-  },
-};
+/** A new chat reads both layers of the corpus, ideas and documents, and the web while it is on. */
+const LAYERED_SELECTION = withResearchContextLayers(DEFAULT_SELECTION, { ideas: true, documents: true });
 
-type AssistantModeId = 'synthesis' | 'gaps' | 'contradictions' | 'reading' | 'authors' | 'documents';
-type ActiveAssistantModeId = AssistantModeId | 'custom';
-
-const AUTHOR_SELECTION: ResearchContextSelection = {
-  ideas: false,
-  themes: true,
-  contradictions: false,
-  gaps: false,
-  readingPath: false,
-  authors: true,
-  documents: true,
-  passages: true,
-  graph: true,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: true,
-  },
-};
-
-const DOCUMENT_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: true,
-  contradictions: false,
-  gaps: false,
-  readingPath: false,
-  authors: false,
-  documents: true,
-  passages: true,
-  graph: false,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: false,
-  },
-};
-
-const SYNTHESIS_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: false,
-  contradictions: true,
-  gaps: true,
-  readingPath: false,
-  authors: false,
-  documents: false,
-  passages: false,
-  graph: false,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: false,
-  },
-};
-
-const ASSISTANT_MODES: {
-  id: AssistantModeId;
-  label: string;
-  icon: string;
-  description: string;
-  selection: ResearchContextSelection;
-  starter: string;
-}[] = [
-  {
-    id: 'synthesis',
-    label: 'Síntesis',
-    icon: 'layers',
-    description: 'Ideas, huecos y contradicciones básicas.',
-    selection: SYNTHESIS_SELECTION,
-    starter: 'Dame una síntesis crítica del corpus: ideas principales, contradicciones, huecos y próximos pasos.',
-  },
-  {
-    id: 'gaps',
-    label: 'Huecos',
-    icon: 'gap',
-    description: 'Preguntas abiertas, limitaciones y trabajo futuro.',
-    selection: ASSISTANT_CONTEXTS.gap,
-    starter: 'Prioriza los huecos de investigación del corpus y propón cómo atacarlos con lecturas o análisis.',
-  },
-  {
-    id: 'contradictions',
-    label: 'Contradicciones',
-    icon: 'alert',
-    description: 'Refutaciones, tensiones y evidencia asociada.',
-    selection: ASSISTANT_CONTEXTS.contradiction,
-    starter: 'Resume las contradicciones más relevantes y distingue tensiones reales de diferencias de marco o método.',
-  },
-  {
-    id: 'reading',
-    label: 'Lecturas',
-    icon: 'route',
-    description: 'Ruta de lectura, documentos, autores y grafo completo.',
-    selection: ASSISTANT_CONTEXTS.reading,
-    starter: 'Construye una ruta de lectura razonada para avanzar en la investigación y explica la prioridad de cada bloque.',
-  },
-  {
-    id: 'authors',
-    label: 'Autores',
-    icon: 'graduation',
-    description: 'Autores, documentos y red autoral.',
-    selection: AUTHOR_SELECTION,
-    starter: 'Analiza los autores centrales, sus relaciones y qué zonas del corpus dependen de cada grupo autoral.',
-  },
-  {
-    id: 'documents',
-    label: 'Documentos',
-    icon: 'book',
-    description: 'Obras relacionadas, ideas y temas sin grafo completo.',
-    selection: DOCUMENT_SELECTION,
-    starter: 'Compara los documentos más relevantes y señala qué aporta cada uno al argumento general.',
-  },
-];
+/** The context balloon's layers, in the order the activity balloon lists what they read. */
+const CONTEXT_LAYERS = [
+  { id: 'ideas', icon: 'bulb', label: 'Ideas', description: 'Ideas, temas, contradicciones, huecos, rutas de lectura, autores y el grafo que los relaciona.' },
+  { id: 'documents', icon: 'book', label: 'Documentos', description: 'El texto de las obras en la biblioteca de Nodus y en Zotero, y sus perfiles documentales.' },
+] as const;
 
 // Starter prompts offered as clickable chips on an empty chat. They run against
-// whatever context is currently selected (Síntesis by default), so they read as
+// whatever context is currently selected (every layer by default), so they read as
 // general research openers rather than mode switches.
 const CHAT_SUGGESTIONS = [
   '¿Cuáles son las ideas más centrales del corpus y por qué?',
@@ -230,6 +106,7 @@ export function ResearchAssistantModal({
   settings,
   initialTarget,
   isGenealogy = false,
+  isAcademic = false,
   onClose,
   embedded = false,
   adapter,
@@ -243,6 +120,9 @@ export function ResearchAssistantModal({
   /** Genealogy vault: the assistant answers over the family (people, kinship, events,
    *  documents, evidence), so the academic context selector is not shown. */
   isGenealogy?: boolean;
+  /** Academic vault: its chats always read the documents of its corpus, so a selection saved
+   *  before the context balloon had layers shows its documents layer on. */
+  isAcademic?: boolean;
   onClose?: () => void;
   embedded?: boolean;
   adapter?: ResearchChatAdapter;
@@ -260,7 +140,7 @@ export function ResearchAssistantModal({
   const [contextOpen, setContextOpen] = useState(() => embedded && !!adapter && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
   const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
   const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
-  const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
+  const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(LAYERED_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ResearchAttachment[]>([]);
@@ -273,7 +153,6 @@ export function ResearchAssistantModal({
   const canUseAttachments = attachments.length > 0 || messages.some(message => message.attachments?.length);
 
   const [contextTitle, setContextTitle] = useState<string | null>(null);
-  const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
   const [concilium, setConcilium] = useState<ConciliumConfig | null>(null);
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
@@ -439,39 +318,28 @@ export function ResearchAssistantModal({
     }, 1400);
   }, []);
 
-  const selectedCount = useMemo(
-    () =>
-      [
-        selection.ideas,
-        selection.themes,
-        selection.contradictions,
-        selection.gaps,
-        selection.readingPath,
-        selection.authors,
-        selection.documents,
-        selection.passages,
-        selection.graph,
-      ].filter(Boolean).length,
-    [selection]
-  );
+  // What the balloon offers: the corpus layers and the web. A selection saved before layers
+  // existed is read from its sections, as the backend reads it.
+  const contextLayers = useMemo(() => researchContextLayers(selection, isAcademic), [selection, isAcademic]);
+  const selectedCount = Number(contextLayers.ideas) + Number(contextLayers.documents) + Number(webSearch !== 'off');
   const sourceFilterOn = !!selection.sourceFilter?.enabled && !selection.notebookId;
+  // The works the Library tab authorizes, counted for the Focus tab's summary while it is open.
+  const [contextSources, setContextSources] = useState<ResearchContextSources | null>(null);
+  useEffect(() => {
+    if (!showContext || !sourceFilterOn) return;
+    let active = true;
+    void window.nodus.listResearchContextSources().then(sources => { if (active) setContextSources(sources); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [showContext, sourceFilterOn]);
+  const authorizedWorks = sourceFilterOn && contextSources ? matchingResearchWorkIds(contextSources, normalizeResearchSourceFilter(selection.sourceFilter)).length : null;
+  const authorizedSourcesSummary = !sourceFilterOn ? t('Toda la biblioteca')
+    : authorizedWorks === null ? t('Biblioteca filtrada')
+      : authorizedWorks === 1 ? t('1 obra autorizada') : tx('{n} obras autorizadas', { n: authorizedWorks });
   // A notebook's chats read its collections: the Library tab is only for general chats.
   const shownContextTab = contextTab === 'library' && !selection.notebookId ? 'library' : 'focus';
 
-  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter' | 'notebookId' | 'retrieval'>, value: boolean) => {
-    setSelection((current) => ({ ...current, [key]: value }));
-  };
-
-  const updateGraphPart = (key: keyof ResearchGraphPartsSelection, value: boolean) => {
-    setSelection((current) => ({ ...current, graphParts: { ...current.graphParts, [key]: value } }));
-  };
-
-  const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
-    setActiveModeId(mode.id);
-    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
-    setContextTitle(t(mode.label));
-    if (!input.trim()) setInput(t(mode.starter));
-  };
+  const setContextLayer = (layer: (typeof CONTEXT_LAYERS)[number]['id'], on: boolean) =>
+    setSelection(current => withResearchContextLayers(current, { ...researchContextLayers(current, isAcademic), [layer]: on }));
 
   const startNewConversation = () => {
     if (attachmentBusyRef.current) return;
@@ -486,7 +354,7 @@ export function ResearchAssistantModal({
     setMessages([]);
     setInput('');
     setStoppedMessageId(null);
-    setContextTitle(t(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? '') || null);
+    setContextTitle(null);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
   };
@@ -500,7 +368,6 @@ export function ResearchAssistantModal({
     setMessages([]);
     setStoppedMessageId(null);
     setContextTitle(initialTarget.title ?? null);
-    setActiveModeId('custom');
     setSelection(current => cloneSelection(initialTarget.selection ?? { ...current, sourceFilter: undefined }));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
     setShowJumpToBottom(false);
@@ -525,7 +392,7 @@ export function ResearchAssistantModal({
     const council = loadedMessages.filter(message => message.role === 'assistant').at(-1)?.concilium;
     setConcilium(council ? { chairman: council.chairman, models: council.members.map(member => member.model) } : null);
     setStoppedMessageId(null);
-    setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
+    setSelection(cloneSelection(conversation.selection ?? LAYERED_SELECTION));
     setActiveNotebookId(conversation.selection?.notebookId ?? conversation.notebookId ?? null);
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(conversation.title || null);
@@ -954,7 +821,6 @@ export function ResearchAssistantModal({
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
-  const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   // Citations open their evidence workspace without replacing the conversation.
   const handleCitation = useCallback((c: MarkdownCitation) => {
@@ -1101,7 +967,7 @@ export function ResearchAssistantModal({
               <h2>{activeProject.name}</h2>
             </header>}
             <div className="relative flex-1 min-h-0">
-              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} webDisabled={webSearch === 'off'} />}
+              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} webDisabled={webSearch === 'off'} disabledLayers={[...(contextLayers.ideas ? [] : ['ideas', 'graph'] as const), ...(contextLayers.documents ? [] : ['profiles', 'nodus', 'zotero', 'context'] as const)]} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {conversationNotice && (
                   <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
@@ -1294,7 +1160,7 @@ export function ResearchAssistantModal({
                   aria-label={t('Pregunta al asistente...')}
                   rows={1}
                   value={input}
-                  placeholder={notebookHome && (activeNotebook ?? adapterNotebook) ? tx('Nuevo chat en {name}', { name: (activeNotebook ?? adapterNotebook)!.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={notebookHome && (activeNotebook ?? adapterNotebook) ? tx('Nuevo chat en {name}', { name: (activeNotebook ?? adapterNotebook)!.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : t('Pregunta al asistente...')}
                   aria-autocomplete={skillsEnabled ? 'list' : undefined}
                   aria-controls={mention ? 'research-skill-mention' : undefined}
                   aria-activedescendant={mention && mentionOptions.length ? `research-skill-option-${mentionIndex}` : undefined}
@@ -1396,99 +1262,22 @@ export function ResearchAssistantModal({
           setShowContext(false);
         }} /> : <div className="context-tab-panel" role="tabpanel" aria-label={t('Enfoque')}>
           <div className="context-tab-scroll">
-            <div>
-              <p className="mb-3 text-xs text-neutral-500">
-                {t('Elige un modo o combina las secciones del corpus que el asistente puede leer.')}
-              </p>
-              <div className="mb-4">
-                <div className="mb-2 text-[11px] uppercase text-neutral-500">{t('Modo')}</div>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {ASSISTANT_MODES.map((mode) => (
-                    <button
-                      key={mode.id}
-                      className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
-                        activeModeId === mode.id
-                          ? 'research-accent-soft'
-                          : 'border-neutral-800 hover:bg-neutral-900'
-                      }`}
-                      title={t(mode.description)}
-                      onClick={() => applyMode(mode)}
-                    >
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Icon
-                          name={mode.icon}
-                          size={13}
-                          className={activeModeId === mode.id ? 'research-accent-text' : 'text-neutral-500'}
-                        />
-                        <span>{t(mode.label)}</span>
-                      </div>
-                      <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{t(mode.description)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="mb-3 flex gap-2">
-                <button
-                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
-                  onClick={() => {
-                    setActiveModeId('custom');
-                    setContextTitle(t('Todo'));
-                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
-                  }}
-                >
-                  {t('Todo')}
-                </button>
-                <button
-                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
-                  onClick={() => {
-                    setActiveModeId('custom');
-                    setContextTitle(t('Manual'));
-                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter, notebookId: current.notebookId, retrieval: current.retrieval }));
-                  }}
-                >
-                  {t('Nada')}
-                </button>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <ContextCheckbox label={t('Ideas generadas')} checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
-                <ContextCheckbox label={t('Temas principales')} checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
-                <ContextCheckbox label={t('Contradicciones')} checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
-                <ContextCheckbox label={t('Huecos de investigación')} checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
-                <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
-                <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
-                <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
-                <ContextCheckbox label={t('Pasajes de texto completo')} checked={selection.passages} onChange={(v) => updateSelection('passages', v)} />
-                <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
-              </div>
-
-              <div className={`mt-3 space-y-2 border-l border-neutral-800 pl-3 ${selection.graph ? '' : 'opacity-45'}`}>
-                <ContextCheckbox
-                  label={t('Nodos de ideas')}
-                  checked={selection.graphParts.ideaNodes}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('ideaNodes', v)}
-                />
-                <ContextCheckbox
-                  label={t('Nodos de temas')}
-                  checked={selection.graphParts.themeNodes}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('themeNodes', v)}
-                />
-                <ContextCheckbox
-                  label={t('Relaciones de ideas')}
-                  checked={selection.graphParts.ideaEdges}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('ideaEdges', v)}
-                />
-                <ContextCheckbox
-                  label={t('Grafo de autores')}
-                  checked={selection.graphParts.authorGraph}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('authorGraph', v)}
-                />
-              </div>
+            <p className="research-context-intro">{t('Elige qué consulta el asistente antes de responder.')}</p>
+            <div className="research-context-layers" data-testid="research-context-layers">
+              {CONTEXT_LAYERS.map(layer => <ContextLayerSwitch key={layer.id} testId={`research-context-layer-${layer.id}`} icon={layer.icon} label={t(layer.label)}
+                description={t(layer.description)} checked={contextLayers[layer.id]} disabled={sending} onChange={on => setContextLayer(layer.id, on)} />)}
+              <ContextLayerSwitch testId="research-context-layer-web" icon="globe" label={t('Búsqueda web')}
+                description={t('Páginas públicas de Internet, cuando la biblioteca no basta o se lo pides.')} checked={webSearch !== 'off'} disabled={sending}
+                onChange={on => setWebSearch(on ? 'auto' : 'off')} />
             </div>
+            {selection.notebookId ? <div className="research-context-sources" data-testid="research-context-sources">
+              <Icon name="notebook" size={15} /><span><strong>{t('Fuentes autorizadas')}</strong><small>{t('Las del cuaderno de este chat.')}</small></span>
+            </div> : <button type="button" className="research-context-sources" data-testid="research-context-sources" onClick={() => setContextTab('library')}>
+              <Icon name="filter" size={15} /><span><strong>{t('Fuentes autorizadas')}</strong><small>{authorizedSourcesSummary}</small></span>
+              <Icon name="chevronRight" size={14} />
+            </button>}
+            {!contextLayers.ideas && !contextLayers.documents && webSearch === 'off' && <p className="research-context-empty" role="status" data-testid="research-context-empty">
+              {t('Sin fuentes: el asistente responderá con conocimiento general y lo dirá en la respuesta.')}</p>}
           </div>
           <footer className="header-balloon-foot"><button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>{t('Listo')}</button></footer>
         </div>}
@@ -1565,29 +1354,16 @@ function ProjectChatList({ conversations, onOpen, empty, draggable = false }: { 
   </ul>;
 }
 
-function ContextCheckbox({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (value: boolean) => void;
+/** One layer of the context balloon: what it reads, and a switch. */
+function ContextLayerSwitch({ testId, icon, label, description, checked, disabled, onChange }: {
+  testId: string; icon: string; label: string; description: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void;
 }) {
-  return (
-    <label className={`flex items-center gap-2 text-sm ${disabled ? 'cursor-not-allowed text-neutral-600' : 'text-neutral-300'}`}>
-      <input
-        type="checkbox"
-        className="h-4 w-4 research-accent-checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>{label}</span>
-    </label>
-  );
+  return <button type="button" role="switch" aria-checked={checked} disabled={disabled} className="research-context-layer" data-testid={testId}
+    onClick={() => onChange(!checked)}>
+    <Icon name={icon} size={16} />
+    <span><strong>{label}</strong><small>{description}</small></span>
+    <span className="research-context-switch" aria-hidden="true"><span /></span>
+  </button>;
 }
 
 function serializeModel(model: ModelRef): string {

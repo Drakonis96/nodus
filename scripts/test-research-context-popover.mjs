@@ -1,4 +1,4 @@
-// The assistant's context picker ("Síntesis" and friends) used to open as a
+// The assistant's context picker (its layers and its Library tab) used to open as a
 // centered modal that covered the conversation. It now behaves like the Skills
 // menu: a balloon anchored to its header trigger. This guards the regression.
 import assert from 'node:assert/strict';
