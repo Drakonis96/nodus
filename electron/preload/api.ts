@@ -29,6 +29,7 @@ import { academicApi } from './academic';
 import { libraryApi } from './library';
 import { browserApi } from './browser';
 import { radarApi } from './radar';
+import { reactionIndexApi } from './reactionIndex';
 import { compassApi } from './compass';
 import { logsApi } from './logs';
 
@@ -73,6 +74,7 @@ export const nodusApi: NodusApi = {
   ...browserApi,
   ...logsApi,
   ...radarApi,
+  ...reactionIndexApi,
   ...compassApi,
   ...prosopographyApi,
   ...academicApi,
