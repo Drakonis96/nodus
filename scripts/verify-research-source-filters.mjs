@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
+const base = process.env.NODUS_VISUAL_URL ?? 'http://127.0.0.1:5198';
 await mkdir('artifacts/research-assistant', { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -8,7 +9,7 @@ const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
 try {
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html`);
   const input = page.locator('.research-composer-input');
   await input.fill('Pregunta sin filtro'); await input.press('Enter');
   await page.waitForFunction(() => window.requests.length === 1 && window.saved.length > 0);
@@ -48,7 +49,7 @@ try {
   assert.equal((await trigger.getAttribute('class')).includes('is-filtered'), false);
   await page.getByText('Conversación de prueba 1', { exact: true }).click();
   assert.ok((await trigger.getAttribute('class')).includes('is-filtered'), 'loading restores persisted filters');
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981`);
   await openLibrary(); await enable.check();
   await dialog.getByRole('checkbox', { name: 'Hannah Arendt 2 obras' }).check();
   await dialog.getByRole('checkbox', { name: /Vigilar y castigar/ }).check();

@@ -2,13 +2,14 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 const output = 'artifacts/research-assistant';
+const base = process.env.NODUS_VISUAL_URL ?? 'http://127.0.0.1:5198';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 try {
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?accent=%238951ef');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?accent=%238951ef`);
   const input = page.locator('.research-composer-input');
   await input.fill('Ejemplo');
   // A model never set opens on the middle of its ladder: GPT-5.4 publishes none … xhigh.
@@ -56,7 +57,7 @@ try {
   await input.fill('Pregunta estándar'); await input.press('Enter');
   await page.waitForFunction(() => window.requests.length === 2);
   assert.equal(await page.evaluate(() => window.requests[1].thinkingEffort), 'standard');
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981`);
   await input.fill('Compara las fuentes y explica las diferencias.');
   await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
   await slider.press('End');
@@ -75,7 +76,7 @@ try {
   assert.ok(inputBounds.x >= bounds.x && inputBounds.x + inputBounds.width <= bounds.x + bounds.width);
   // A relaunch: the page starts from the map the previous session left on disk, so the
   // composer opens on the remembered level and that is the level the request carries.
-  await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'openai:gpt-5.4': 'xhigh', 'deepseek:deepseek-flash': 'max' }))}`);
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'openai:gpt-5.4': 'xhigh', 'deepseek:deepseek-flash': 'max' }))}`);
   await page.getByRole('button', { name: 'Esfuerzo de thinking: Muy alto', exact: true }).click();
   await page.screenshot({ path: `${output}/memory-restored.png` });
   await slider.press('Escape');
@@ -90,7 +91,7 @@ try {
   // A remembered level the model no longer publishes — a catalogue that changed under the
   // memory — is never shown or sent: the model opens on its middle level instead, and the
   // store is left alone until the user picks.
-  await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'codex:gpt-6-astra': 'minimal' }))}`);
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'codex:gpt-6-astra': 'minimal' }))}`);
   const staleModels = page.locator('select').first();
   await staleModels.selectOption('codex::gpt-6-astra');
   await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
