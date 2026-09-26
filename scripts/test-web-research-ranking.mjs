@@ -30,7 +30,9 @@ test('scholarly and institutional sources outrank ordinary pages', () => {
   assert.equal(webDomainPrior('https://www.scielo.org.mx/scielo.php?pid=1'), 0.8, 'open-access networks count whatever their country domain');
   assert.equal(webDomainPrior('https://www.cepc.gob.es/a.html'), 0.8);
   assert.equal(webDomainPrior('https://www.cambridge.org/core/journals/x/article/y'), 0.8);
-  assert.equal(webDomainPrior('https://www.dialnet.unirioja.es/servlet/articulo?codigo=1'), 0.8);
+  assert.ok(webDomainPrior('https://dialnet.unirioja.es/servlet/articulo?codigo=1') < 0.8, 'a bibliographic index is not an open text source');
+  assert.equal(isWalledSource('https://dialnet.unirioja.es/servlet/articulo?codigo=1'), true, 'a record index is listed but never read');
+  assert.equal(isWalledSource('https://zaguan.unizar.es/record/56640'), false, 'an institutional repository is read');
   assert.ok(webDomainPrior('https://es.wikipedia.org/wiki/Represi%C3%B3n_franquista') > 0);
   assert.equal(webDomainPrior('https://example.com/blog/post'), 0);
 });

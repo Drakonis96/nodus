@@ -30,6 +30,23 @@ included alongside them. The runtime carries the Python sources for Unidecode
 instructions and pinned hashes are in `runtime/zotero-mcp/` in the corresponding
 Nodus source tree. No semantic model weights are included.
 
+## Managed SearXNG and private CPython
+
+The application includes SearXNG (AGPL-3.0-or-later), pinned to the upstream
+commit recorded in `runtime/searxng/manifest.json`, running on the same private
+CPython 3.12.14 build described below. Its runtime is private to Nodus, listens
+only on the loopback interface, is started on demand by Research Chat's web step
+and stopped with the application; it does not replace an installed SearXNG, does
+not expose a public instance and never retries around an engine's bot check.
+
+`resources/zotero-mcp/searxng/legal/THIRD_PARTY_NOTICES.md` and `inventory.json`
+describe the exact installed distributions, including every transitive
+dependency, and the license texts travel alongside them. Nodus's modifications
+to the vendored sources (the Windows path and `pwd` shims, the frozen version
+module) are listed in the runtime's `searx/NODUS_MODIFICATIONS.txt`, as AGPL requires.
+Rebuild instructions, the pinned upstream hash and the hashed dependency lock
+are in `runtime/searxng/` in the corresponding Nodus source tree.
+
 ## AlphaGenome — Apache 2.0 client; separate service/output terms
 
 AlphaGenome interoperates with Google DeepMind's AlphaGenome through a

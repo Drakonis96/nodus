@@ -71,8 +71,14 @@ const STRONG = ['doi.org', 'arxiv.org', 'nih.gov', 'europepmc.org', 'semanticsch
   'springer.com', 'wiley.com', 'oup.com', 'tandfonline.com', 'sagepub.com', 'cambridge.org', 'cairn.info'];
 /** Open-access networks that publish under a country domain each (scielo.org.mx,
  * scielo.cl, redalyc.org…): the Spanish and Portuguese American literature lives
- * here, so they count as scholarly whatever their TLD. */
-const OPEN_NETWORK = /(^|\.)(scielo|redalyc|dialnet|latindex)\.[a-z]{2,3}(\.[a-z]{2})?$/;
+ * here, so they count as scholarly whatever their TLD. Bibliographic indexes
+ * (Dialnet, Latindex) are deliberately absent: their pages are records, not text,
+ * and promoting them filled the evidence with entries nobody can quote. */
+const OPEN_NETWORK = /(^|\.)(scielo|redalyc)\.[a-z]{2,3}(\.[a-z]{2})?$/;
+/** Bibliographic indexes: their pages are records, not text, so they are listed as
+ * found and never read. Dialnet lives under a university's domain, so the match is
+ * on the host, not on the registrable domain. */
+const RECORD_INDEX = /^(dialnet|latindex|rebiun|worldcat)\./;
 /** Hosts that answer a reader with a login, a paywall or a bot check: they rank
  * below everything else and are never read, because the text is not there. */
 const WALLED = ['jstor.org', 'sciencedirect.com', 'ssrn.com', 'researchgate.net', 'academia.edu'];
@@ -90,7 +96,7 @@ export function webDomainPrior(raw: string): number {
   try { host = new URL(raw).hostname.toLowerCase(); } catch { return -1; }
   const matches = (list: string[]) => list.some(entry => domain === entry || host === entry || host.endsWith(`.${entry}`));
   if (matches(WEAK)) return -0.7;
-  if (matches(WALLED)) return -0.2;
+  if (matches(WALLED) || RECORD_INDEX.test(host)) return -0.2;
   if (OPEN_NETWORK.test(host)) return 0.8;
   if (matches(STRONG) || /\.(edu|gov|mil|int)$/.test(host) || /\.(ac|edu|gov|gob|gouv)\.[a-z]{2}$/.test(host) || /(^|\.)(gob|gouv|gov)\.[a-z]{2,3}$/.test(host)) return 0.8;
   if (matches(GOOD) || /\.(org)$/.test(host)) return 0.35;
@@ -197,6 +203,7 @@ export function rankWebResults(runs: WebQueryRun[], question: string, weights = 
 export function isWalledSource(raw: string): boolean {
   let host = '';
   try { host = new URL(raw).hostname.toLowerCase(); } catch { return true; }
+  if (RECORD_INDEX.test(host)) return true;
   const domain = webDomain(raw);
   return WALLED.some(entry => domain === entry || host === entry || host.endsWith(`.${entry}`));
 }

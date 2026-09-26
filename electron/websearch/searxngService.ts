@@ -129,7 +129,8 @@ async function slot(): Promise<() => void> {
 /** SearXNG query syntax (`!bang`, `:lang`, `<`/`>` tokens) could redirect a query
  * to an external site or change engines; model-written queries are plain text. */
 export function plainSearchQuery(query: string): string {
-  return query.replace(/[\u0000-\u001f]/g, ' ').split(/\s+/).filter(token => token && !/^[!:<>]/.test(token)).join(' ').slice(0, 300);
+  const printable = [...query].map(character => (character.codePointAt(0)! < 32 ? ' ' : character)).join('');
+  return printable.split(/\s+/).filter(token => token && !/^[!:<>]/.test(token)).join(' ').slice(0, 300);
 }
 
 function text(value: unknown, limit: number): string { return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : ''; }

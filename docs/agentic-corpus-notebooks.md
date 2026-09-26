@@ -38,8 +38,17 @@ are not factual acceptance. No release, tag or merge has been created.
 
 This work extends academic Research Chat and Deep Research. Other vault engines
 retain their contracts. Documents and compatible passage indexes are shared;
-ideas, profiles and notebooks retain their vault ownership. Internet discovery
-is outside this implementation.
+ideas, profiles and notebooks retain their vault ownership. Internet discovery is
+part of Research Chat as one more step of the same flow: a SearXNG runtime
+packaged with the application (private CPython, loopback only, started on demand
+and stopped with the app) discovers candidate pages, Nodus merges and deduplicates
+them, reads the ones worth reading, extracts passages and keeps their provenance,
+so every web source can be cited and opened in the app's Browser. It runs when the
+library is not enough, when the evidence needs contrasting or updating, or when
+the user asks for it — never on every message, never as a substitute for the
+library, and it never retries around an engine's bot check. The retrieval-quality
+bar, the measured campaigns and what is still open are in
+[the web search acceptance](research-evidence/web-search-acceptance.md).
 
 The implementation starts from `f54995e7` on a dedicated branch. The pull request
 must remain draft, with incremental verified commits and pushes. No release,

@@ -81,6 +81,16 @@ async function install(installer = artifact, legacy = false) {
   const pythonArgs = ['-I', '-B', '-c', 'import sys,runpy; assert sys.version_info[:3] == (3,12,14); runpy.run_path(sys.argv[1]); print("packaged-runtime-ready")', path.join(runtime, 'serve.py')];
   const output = policy ? run('/usr/bin/sandbox-exec', ['-p', policy, python, ...pythonArgs], { env: environment }) : run(python, pythonArgs, { env: environment });
   assert.match(output, /packaged-runtime-ready/);
+  // The web step's runtime travels in the same bundle: the pinned upstream, the
+  // searx package with Nodus's modifications disclosed, its own dependency target
+  // and the licence inventory collected from the installed bytes.
+  const searxng = path.join(runtime, 'searxng');
+  assert.ok(fs.existsSync(path.join(searxng, 'serve.py')), 'the installer must carry the SearXNG service');
+  assert.ok(fs.existsSync(path.join(searxng, 'searx', 'NODUS_MODIFICATIONS.txt')), 'the installer must disclose the modifications to the vendored sources');
+  assert.ok(fs.existsSync(path.join(searxng, 'dependencies', 'flask')), 'the installer must carry SearXNG’s own dependency target');
+  assert.ok(fs.existsSync(path.join(searxng, 'legal', 'inventory.json')), 'the installer must carry the SearXNG licence inventory');
+  assert.equal(manifest.searxng?.upstreamCommit?.length, 40, 'runtime.json must pin the SearXNG commit the bundle was built from');
+  assert.ok(fs.readFileSync(path.join(searxng, 'legal', 'inventory.json'), 'utf8').includes('searxng'), 'the licence inventory must name SearXNG');
 }
 async function launch(legacy = false) {
   // The released app predates the isolation bootstrap. Its sole allowed host is
