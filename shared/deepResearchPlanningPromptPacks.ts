@@ -1222,12 +1222,16 @@ function normalizeLanguage(language: PromptLanguage): PromptLanguage {
   return LANGUAGES.includes(language) ? language : 'es';
 }
 
+// Reviews receive a plan inside an evidence envelope. Show the output object explicitly
+// so “the same shape” cannot be read as an instruction to echo that whole envelope.
+const PLAN_REVIEW_OUTPUT = '{"title":"...","abstract":"...","sections":[{"id":"s1","role":"intro|body|synthesis","dependsOn":[],"title":"...","purpose":"...","keyClaims":["..."],"ideaIds":[],"workIds":[],"gapIds":[],"contradictionIds":[],"passageIds":[],"coverageQuestions":[]}]}';
+
 export function decomposeObjectivePlanningPrompt(language: PromptLanguage = 'es', maxCoverageQuestions = 12): string {
   return DECOMPOSE[normalizeLanguage(language)](maxCoverageQuestions);
 }
 
 export function auditPlanCoveragePlanningPrompt(language: PromptLanguage = 'es'): string {
-  return COVERAGE[normalizeLanguage(language)];
+  return `${COVERAGE[normalizeLanguage(language)]} ${PLAN_REVIEW_OUTPUT}`;
 }
 
 export function planReportPlanningPrompt(
@@ -1242,11 +1246,11 @@ export function planReportPlanningPrompt(
 }
 
 export function reviewPlanPlanningPrompt(language: PromptLanguage = 'es', approachRules: readonly string[] = [], documentary = false): string {
-  return REVIEW[normalizeLanguage(language)](approachRules, documentary);
+  return `${REVIEW[normalizeLanguage(language)](approachRules, documentary)} ${PLAN_REVIEW_OUTPUT}`;
 }
 
 export function adversarialPlanReviewPlanningPrompt(language: PromptLanguage = 'es', approachRules: readonly string[] = [], documentary = false): string {
-  return ADVERSARIAL[normalizeLanguage(language)](approachRules, documentary);
+  return `${ADVERSARIAL[normalizeLanguage(language)](approachRules, documentary)} ${PLAN_REVIEW_OUTPUT}`;
 }
 
 export function deepResearchPlanningPromptPack(
