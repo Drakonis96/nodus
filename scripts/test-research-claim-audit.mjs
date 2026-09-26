@@ -33,6 +33,21 @@ try {
   const repairedCitation = applyResearchProseVerdicts('The north field measured 23 units ([Old attribution](nodus://passage/foreign)).', sources, [verdict(0, [north])]);
   assert.equal(repairedCitation.markdown, 'The north field measured 23 units. [Synthetic source](nodus://passage/inside)', 'replacing an attribution leaves no empty citation parentheses');
   assert.equal(applyResearchProseVerdicts('An unsupported source.', sources, [verdict(0, [premise('x', sources[0].text, { id: 'foreign' })])]).claims[0].status, 'removed');
+  // Live regression: report organization and a recommendation are not claims
+  // that the source itself numbers its findings or recommends further research.
+  for (const sentence of ['The second point discussed here is that the north field measured 23 units.',
+    'Investigate why the north field measured 23 units.']) {
+    const editorial = applyResearchProseVerdicts(sentence, sources, [verdict(0, [north])]);
+    assert.equal(editorial.claims[0].status, 'supported');
+    assert.ok(editorial.markdown.includes(sentence));
+    assert.match(editorial.markdown, /nodus:\/\/passage\/inside/);
+  }
+  const historicalOrder = applyResearchProseVerdicts('In the second historical stage, the north field measured 23 units.', sources,
+    [verdict(0, [north, premise('This was the second historical stage', '', { entailed: false })], { supported: false })]);
+  assert.equal(historicalOrder.markdown, '', 'world chronology still needs evidence even when the measurement is supported');
+  const presupposedCause = applyResearchProseVerdicts('Investigate why the intervention caused the north field to measure 23 units.', sources,
+    [verdict(0, [north, premise('The intervention caused that measurement', '', { type: 'relation', entailed: false })], { supported: false })]);
+  assert.equal(presupposedCause.markdown, '', 'a recommendation does not exempt its causal presupposition');
   // One malformed item leaves only its own sentence without a verdict.
   const normalized = normalizeResearchProseVerdicts({ claims: [verdict(0, [north]), verdict(1, [north]), verdict(1, [north]),
     verdict(2, [premise('a', 'The north field measured 23 units.', { type: 'inference', from: [0] })]),
