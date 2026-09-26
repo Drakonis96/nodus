@@ -11,7 +11,7 @@ import {
 } from './deepResearchSectionLength';
 
 /** Bump whenever a prompt contract changes; it is stored in provenance. */
-export const DATABASE_DEEP_RESEARCH_PROMPT_VERSION = '1.0.1';
+export const DATABASE_DEEP_RESEARCH_PROMPT_VERSION = '1.0.2';
 
 export type DatabaseDeepResearchPromptRole =
   | 'planner'
@@ -639,6 +639,15 @@ export function buildDatabaseDeepResearchPrompt(input: DatabaseDeepResearchPromp
     context: input.context ?? '',
     ...(lengthGuidance ? { guidelineWordsPerSection: lengthWords } : {}),
     outputContract: outputContracts[input.role],
+    ...(input.role === 'verifier' ? {
+      verificationContract: {
+        coverage: 'Return a review for EVERY approved artifact hash, including separate hashes with identical results. The host checks coverage by artifactRef; a summary that omits a hash cannot pass.',
+        references: 'Use the exact approved artifactRef hash as claimId and include it in artifactRefs. Never invent a reference. Review each artifact once.',
+        scope: 'Judge the numeric or boolean results the artifact actually establishes. Redacted identifiers cannot support identity claims but do not invalidate visible counts or descriptive statistics.',
+        status: 'Use unverifiable for failed, unusable or unsupported results, sensitive for assumption-dependent results and exploratory for exploratory results. Do not upgrade uncertainty to verified to complete coverage.',
+        reason: 'Give a concise reason per artifact; avoid repeating its complete output.',
+      },
+    } : {}),
     ...((input.role === 'writer' || input.role === 'editor') ? {
       narrativeContract: {
         placeholderSyntax: '{{artifact:<artifactRef>:<numericOrBooleanOutputPath>}}',
