@@ -2,8 +2,8 @@
  * Descriptor for the published ORD reaction-index artifact.
  *
  * The index is built offline (see tools/reaction-index) and published as a GitHub Release asset;
- * it is far too large to ship inside the application or a capability package (about 254 MB across
- * the five files below), so it is downloaded on demand and verified by size + SHA-256.
+ * it is far too large to ship inside the application or a capability package (about 263 MB across
+ * the six files below), so it is downloaded on demand and verified by size + SHA-256.
  *
  * Pin exactly one revision of one build. The `sha256` values come straight from the build's
  * manifest.json and are the authority for integrity; `bytes` is an early size guard. When a new
@@ -42,17 +42,18 @@ export interface ReactionIndexRelease {
 export const REACTION_INDEX: ReactionIndexRelease = {
   id: 'ord-reaction-index',
   version: '1.0.0',
-  formatVersion: 2,
+  formatVersion: 3,
   revision: '93475c46949f9218e1dfb6624096025135db2add',
   releaseUrl: null,
   licence: 'CC-BY-SA-4.0',
   citation: 'Kearnes et al., J. Am. Chem. Soc. 2021, 143 (45), 18820-18826, doi:10.1021/jacs.1c09820',
   files: [
     { name: 'exact.tsv.zst', bytes: 54456029, sha256: 'e33a5863d9e35e0b3d436b3991d30317fc6ed387242a92aa59c57e6f378ef238' },
-    { name: 'templates.tsv.zst', bytes: 29106982, sha256: 'a16350723e496773a817d290d707d40b97ed057b2ae5bd6eec72ae9b03649dd0' },
+    { name: 'templates.tsv.zst', bytes: 29091076, sha256: 'e5f48b93e887802ae2de703687c4cc6e73b25c6e809900b2d9983332c078172f' },
     { name: 'products.tsv.zst', bytes: 35884037, sha256: '348d2471384b4f1c7b3772caa5e6e4eb0c39cafcaf54a960e71ded77b08793e9' },
-    { name: 'reactions.faiss.zst', bytes: 108837567, sha256: '9acae893092c494f900f9331283aa3c51086a4172a3646d55b6eabc3b4e9bec4' },
-    { name: 'reaction-keys.txt.zst', bytes: 25273123, sha256: 'fa84f3e3d6d65de5e3bfc32c5be1fe64c91efa6c60806c8b0d1f60b3cecb36b0' },
+    { name: 'reaction-smiles.tsv.zst', bytes: 62211963, sha256: '2de7c5949193207618e2eeb8d75a3efd349d6fdce1aff28d62afda00ceebfe45' },
+    { name: 'reactions.faiss.zst', bytes: 56399151, sha256: '92ea4d92a2566ff3ef3e792f9bcb0fe22ba8b31c4063366418e7b78d9bd34c5d' },
+    { name: 'reaction-keys.txt.zst', bytes: 25188968, sha256: 'b18fae699932ed917859e7689ed7696245fbde726c5826ac9eec2018de1a7b9a' },
   ],
 };
 

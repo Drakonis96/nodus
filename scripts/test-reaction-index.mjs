@@ -21,15 +21,15 @@ async function bundle(entry, name) {
 try {
   // --- descriptor integrity ---
   const { REACTION_INDEX, reactionIndexTotalBytes } = await bundle('shared/reactionIndex.ts', 'descriptor.mjs');
-  assert.equal(REACTION_INDEX.formatVersion, 2);
+  assert.equal(REACTION_INDEX.formatVersion, 3);
   assert.equal(REACTION_INDEX.licence, 'CC-BY-SA-4.0');
   assert.match(REACTION_INDEX.revision, /^[a-f0-9]{40}$/, 'the ORD revision is pinned');
   assert.deepEqual(REACTION_INDEX.files.map((file) => file.name), [
-    'exact.tsv.zst', 'templates.tsv.zst', 'products.tsv.zst', 'reactions.faiss.zst', 'reaction-keys.txt.zst',
+    'exact.tsv.zst', 'templates.tsv.zst', 'products.tsv.zst', 'reaction-smiles.tsv.zst', 'reactions.faiss.zst', 'reaction-keys.txt.zst',
   ]);
   assert.ok(REACTION_INDEX.files.every((file) => Number.isInteger(file.bytes) && file.bytes > 0), 'every file has a byte size');
   assert.ok(REACTION_INDEX.files.every((file) => /^[a-f0-9]{64}$/.test(file.sha256)), 'every file is pinned by SHA-256');
-  assert.equal(reactionIndexTotalBytes(), 253557738, 'total size matches the built artifact');
+  assert.equal(reactionIndexTotalBytes(), 263231224, 'total size matches the built artifact');
 
   // --- downloader: fresh, resume (Range), and corruption ---
   const { downloadAsset } = await bundle('electron/network/assetDownload.ts', 'assetDownload.mjs');
