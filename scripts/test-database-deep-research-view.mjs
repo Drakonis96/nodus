@@ -85,7 +85,7 @@ test("renderer preserves stale/partial status, shows all eight phases and eviden
   ])
     assert.match(view, new RegExp(`\\b${phase}\\b`));
   assert.match(view, /status: progress\.status/);
-  assert.match(view, /\["failed", "cancelled", "stale", "partial"\]\.includes\(job\.status\)/);
+  assert.match(view, /\["failed", "cancelled", "stale"\]\.includes\(job\.status\)/);
   assert.match(view, /report\.qualityStatus === ["']partial["']/);
   for (const metric of [
     "method",

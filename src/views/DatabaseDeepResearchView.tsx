@@ -1099,8 +1099,10 @@ export function DatabaseDeepResearchView({
       const phase = PHASE_LABELS[job.phase as DatabaseResearchStepKind];
       return { id: job.id, title: job.title, status: job.status === "running" ? "running" : "queued", progress: null, percent: job.status === "running" ? progressPercent(job.progress) : null, detail: job.status === "running" && phase ? t(phase) : null, error: null, origin: "app", enqueuedAt: job.createdAt };
     });
+  // Partial runs already have a saved report with a visible quality badge.
+  // They must not also appear as failed generation jobs.
   const queueFailed: QueueStripItem[] = jobs
-    .filter((job) => ["failed", "cancelled", "stale", "partial"].includes(job.status))
+    .filter((job) => ["failed", "cancelled", "stale"].includes(job.status))
     .map((job) => ({ id: job.id, title: job.title, status: "failed", progress: null, error: job.error, origin: "app", enqueuedAt: job.createdAt }));
 
   const allSelected = visibleReports.length > 0 && visibleReports.every((report) => selectedReports.has(report.id));
