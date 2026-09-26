@@ -4,6 +4,7 @@ import { MAX_GROUP_SIZE, clampExpectedSize, type TeachingGroup } from '@shared/t
 import { Icon, Spinner } from '../components/ui';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LongTextCell, TextCell } from '../components/dbGrid';
+import { TeachingAttendancePanel } from '../components/TeachingAttendancePanel';
 import { t, tx, errorText, getActiveLang } from '../i18n';
 
 /**
@@ -18,6 +19,10 @@ import { t, tx, errorText, getActiveLang } from '../i18n';
  * and day-to-day references without repeating a student's name. It lives in its own column
  * rather than on the name, because the name cell is an editable field and a click
  * there has to mean "edit".
+ *
+ * A group opens on two tabs: the roster, and attendance ("pasar lista"), which reuses
+ * the same students and keeps its week or month while the teacher hops between the
+ * groups of the same subject and year.
  */
 export function TeachingGroupsView() {
   const [groups, setGroups] = useState<TeachingGroup[]>([]);
@@ -31,6 +36,7 @@ export function TeachingGroupsView() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<TeachingGroup | null>(null);
+  const [tab, setTab] = useState<'roster' | 'attendance'>('roster');
 
   const reload = useCallback(async () => setGroups(await window.nodus.listTeachingGroups()), []);
 
@@ -143,7 +149,7 @@ export function TeachingGroupsView() {
                   <th className="px-3 py-2 font-medium">{t('Curso académico')}</th>
                   <th className="px-3 py-2 font-medium">{t('Alumnado')}</th>
                   <th className="px-3 py-2 font-medium">{t('Actualizado')}</th>
-                  <th className="w-[60px] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
+                  <th className="w-[150px] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -152,7 +158,7 @@ export function TeachingGroupsView() {
                     key={entry.id}
                     data-testid={`group-row-${entry.id}`}
                     className="cursor-pointer border-b border-neutral-200 hover:bg-neutral-100 dark:border-neutral-800/60 dark:hover:bg-neutral-900/40"
-                    onClick={() => void guard(async () => setGroup(await window.nodus.getTeachingGroup(entry.id)))}
+                    onClick={() => void guard(async () => { setTab('roster'); setGroup(await window.nodus.getTeachingGroup(entry.id)); })}
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex max-w-[290px] items-center gap-2">
@@ -167,7 +173,19 @@ export function TeachingGroupsView() {
                     <td className="px-3 py-2.5 text-neutral-500">{yearLabel(entry.academicYearId)}</td>
                     <td className="px-3 py-2.5 text-neutral-500">{entry.studentCount ?? 0}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-neutral-500">{new Date(entry.updatedAt).toLocaleDateString(getActiveLang())}</td>
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="whitespace-nowrap px-3 py-2.5 text-right">
+                      <button
+                        type="button"
+                        data-testid={`group-attendance-${entry.id}`}
+                        className="btn btn-ghost mr-1 h-7 px-2 text-xs"
+                        title={t('Pasar lista')}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void guard(async () => { setTab('attendance'); setGroup(await window.nodus.getTeachingGroup(entry.id)); });
+                        }}
+                      >
+                        <Icon name="calendar" size={12} />{t('Pasar lista')}
+                      </button>
                       <button
                         className="btn btn-ghost h-7 w-7 p-0 text-red-500"
                         title={t('Eliminar')}
@@ -193,6 +211,7 @@ export function TeachingGroupsView() {
                 const created = await window.nodus.createTeachingGroup(input);
                 setCreating(false);
                 await reload();
+                setTab('roster');
                 setGroup(created);
               });
             }}
@@ -218,6 +237,8 @@ export function TeachingGroupsView() {
 
   /* ------------------------------------------------------- roster (detail) --- */
   const students = group.students ?? [];
+  // The groups a teacher hops between while taking attendance: same subject, same year.
+  const siblings = groups.filter((g) => g.subjectId === group.subjectId && g.academicYearId === group.academicYearId);
   return (
     <div className="flex h-full min-h-0 flex-col bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100" data-testid="group-detail">
       <header className="border-b border-neutral-200 bg-white px-5 py-4 dark:border-neutral-800 dark:bg-neutral-950">
@@ -232,9 +253,22 @@ export function TeachingGroupsView() {
             <h1 className="truncate text-xl font-semibold">{group.name}</h1>
             <p className="mt-1 text-xs text-neutral-500">{tx('{n} alumnos en el listado.', { n: students.length })}</p>
           </div>
-          <button className="btn btn-ghost h-8" data-testid="group-import" onClick={() => setImporting(true)}>
-            <Icon name="copy" size={13} />{t('Importar de otro grupo')}
-          </button>
+          {siblings.length > 1 && (
+            <select
+              className="input h-8 min-w-40 text-xs"
+              data-testid="group-switch"
+              aria-label={t('Cambiar de grupo')}
+              value={group.id}
+              onChange={(event) => void guard(async () => setGroup(await window.nodus.getTeachingGroup(event.target.value)))}
+            >
+              {siblings.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          )}
+          {tab === 'roster' && (
+            <button className="btn btn-ghost h-8" data-testid="group-import" onClick={() => setImporting(true)}>
+              <Icon name="copy" size={13} />{t('Importar de otro grupo')}
+            </button>
+          )}
         </div>
 
         {/* The no-AI-evaluation boundary is visible where student data lives. */}
@@ -244,112 +278,142 @@ export function TeachingGroupsView() {
         >
           <Icon name="shield" size={14} className="mt-0.5 shrink-0" />
           <span>
-            <span className="font-medium">{t('La IA no accede a este listado, a las notas ni a las respuestas del alumnado.')}</span>{' '}
+            <span className="font-medium">{t('La IA no accede a este listado, a la asistencia, a las notas ni a las respuestas del alumnado.')}</span>{' '}
             {t('Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.')}
           </span>
         </div>
+
+        <div className="-mb-4 mt-3 flex gap-1" role="tablist" aria-label={t('Secciones del grupo')}>
+          {([
+            ['roster', 'users', t('Alumnado')],
+            ['attendance', 'calendar', t('Asistencia')],
+          ] as const).map(([id, icon, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              data-testid={`group-tab-${id}`}
+              className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium ${
+                tab === id
+                  ? 'border-indigo-500 text-neutral-900 dark:text-neutral-100'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200'
+              }`}
+              onClick={() => setTab(id)}
+            >
+              <Icon name={icon} size={13} />{label}
+            </button>
+          ))}
+        </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-auto p-5">
-        {error && <p className="pb-3 text-sm text-red-500">{error}</p>}
-        {message && <p className="pb-3 text-sm text-emerald-600 dark:text-emerald-400">{message}</p>}
-
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full min-w-[720px] table-fixed border-collapse text-xs" data-testid="student-table">
-            <thead className="study-browser-table-head">
-              <tr className="text-left">
-                {/* All widths are percentages on purpose. Mixing px with % under
-                    table-fixed overflows: the fixed columns are added ON TOP of the
-                    percentage share, so the last column gets clipped on a wide window. */}
-                <th className="w-[5%] px-3 py-2 font-medium">#</th>
-                <th className="w-[13%] px-3 py-2 font-medium">{t('Identificador')}</th>
-                <th className="w-[19%] px-3 py-2 font-medium">{t('Nombre')}</th>
-                <th className="w-[23%] px-3 py-2 font-medium">{t('Apellidos')}</th>
-                <th className="px-3 py-2 font-medium">{t('Comentarios')}</th>
-                <th className="w-[9%] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((student, index) => (
-                <tr key={student.id} data-testid={`student-row-${student.id}`} className="border-t border-neutral-200 dark:border-neutral-800/60">
-                  <td className="px-3 py-1 text-neutral-500">{index + 1}</td>
-                  <td className="px-2 py-1">
-                    <button
-                      type="button"
-                      data-testid={`student-code-${student.id}`}
-                      onClick={() => void guard(() => copyCode(student.pseudonymCode))}
-                      title={t('Copiar identificador')}
-                      aria-label={tx('Copiar el identificador {code}', { code: student.pseudonymCode })}
-                      className="rounded-md bg-indigo-600/15 px-2 py-1 font-mono text-[10px] text-indigo-300 hover:bg-indigo-600/20"
-                    >
-                      {student.pseudonymCode}
-                    </button>
-                  </td>
-                  <td className="h-9 px-0 py-0">
-                    <TextCell
-                      value={student.givenNames || null}
-                      inputType="text"
-                      onChange={(raw) => void guard(async () => {
-                        await window.nodus.updateTeachingStudent(student.id, { givenNames: raw ?? '' });
-                        await refreshGroup(group.id);
-                      })}
-                    />
-                  </td>
-                  <td className="h-9 px-0 py-0">
-                    <TextCell
-                      value={student.surnames || null}
-                      inputType="text"
-                      onChange={(raw) => void guard(async () => {
-                        await window.nodus.updateTeachingStudent(student.id, { surnames: raw ?? '' });
-                        await refreshGroup(group.id);
-                      })}
-                    />
-                  </td>
-                  <td className="h-9 px-0 py-0">
-                    <LongTextCell
-                      value={student.comments || null}
-                      markdown={false}
-                      emptyLabel={t('Añadir comentario')}
-                      onChange={(raw) => void guard(async () => {
-                        await window.nodus.updateTeachingStudent(student.id, { comments: raw ?? '' });
-                        await refreshGroup(group.id);
-                      })}
-                    />
-                  </td>
-                  <td className="px-2 py-1 text-right">
-                    <button
-                      className="btn btn-ghost h-7 w-7 p-0 text-red-500"
-                      title={t('Eliminar alumno')}
-                      aria-label={t('Eliminar alumno')}
-                      onClick={() => void guard(async () => {
-                        await window.nodus.deleteTeachingStudent(student.id);
-                        await refreshGroup(group.id);
-                      })}
-                    >
-                      <Icon name="trash" size={12} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {students.length === 0 && (
-            <p className="px-3 py-6 text-center text-xs text-neutral-500">{t('Este grupo todavía no tiene alumnado.')}</p>
-          )}
+      {tab === 'attendance' && workspace ? (
+        <div className="flex min-h-0 flex-1 flex-col p-5">
+          {error && <p className="pb-3 text-sm text-red-500">{error}</p>}
+          <TeachingAttendancePanel group={group} groups={groups} workspace={workspace} onOpenRoster={() => setTab('roster')} />
         </div>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-auto p-5">
+          {error && <p className="pb-3 text-sm text-red-500">{error}</p>}
+          {message && <p className="pb-3 text-sm text-emerald-600 dark:text-emerald-400">{message}</p>}
 
-        <button
-          className="btn btn-primary mt-3"
-          data-testid="student-add"
-          disabled={students.length >= MAX_GROUP_SIZE}
-          onClick={() => void guard(async () => {
-            await window.nodus.addTeachingStudent(group.id, 1);
-            await refreshGroup(group.id);
-          })}
-        >
-          <Icon name="plus" />{t('Añadir alumno')}
-        </button>
-      </div>
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
+            <table className="w-full min-w-[720px] table-fixed border-collapse text-xs" data-testid="student-table">
+              <thead className="study-browser-table-head">
+                <tr className="text-left">
+                  {/* All widths are percentages on purpose. Mixing px with % under
+                      table-fixed overflows: the fixed columns are added ON TOP of the
+                      percentage share, so the last column gets clipped on a wide window. */}
+                  <th className="w-[5%] px-3 py-2 font-medium">#</th>
+                  <th className="w-[13%] px-3 py-2 font-medium">{t('Identificador')}</th>
+                  <th className="w-[19%] px-3 py-2 font-medium">{t('Nombre')}</th>
+                  <th className="w-[23%] px-3 py-2 font-medium">{t('Apellidos')}</th>
+                  <th className="px-3 py-2 font-medium">{t('Comentarios')}</th>
+                  <th className="w-[9%] px-3 py-2 text-right font-medium">{t('Acciones')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((student, index) => (
+                  <tr key={student.id} data-testid={`student-row-${student.id}`} className="border-t border-neutral-200 dark:border-neutral-800/60">
+                    <td className="px-3 py-1 text-neutral-500">{index + 1}</td>
+                    <td className="px-2 py-1">
+                      <button
+                        type="button"
+                        data-testid={`student-code-${student.id}`}
+                        onClick={() => void guard(() => copyCode(student.pseudonymCode))}
+                        title={t('Copiar identificador')}
+                        aria-label={tx('Copiar el identificador {code}', { code: student.pseudonymCode })}
+                        className="rounded-md bg-indigo-600/15 px-2 py-1 font-mono text-[10px] text-indigo-300 hover:bg-indigo-600/20"
+                      >
+                        {student.pseudonymCode}
+                      </button>
+                    </td>
+                    <td className="h-9 px-0 py-0">
+                      <TextCell
+                        value={student.givenNames || null}
+                        inputType="text"
+                        onChange={(raw) => void guard(async () => {
+                          await window.nodus.updateTeachingStudent(student.id, { givenNames: raw ?? '' });
+                          await refreshGroup(group.id);
+                        })}
+                      />
+                    </td>
+                    <td className="h-9 px-0 py-0">
+                      <TextCell
+                        value={student.surnames || null}
+                        inputType="text"
+                        onChange={(raw) => void guard(async () => {
+                          await window.nodus.updateTeachingStudent(student.id, { surnames: raw ?? '' });
+                          await refreshGroup(group.id);
+                        })}
+                      />
+                    </td>
+                    <td className="h-9 px-0 py-0">
+                      <LongTextCell
+                        value={student.comments || null}
+                        markdown={false}
+                        emptyLabel={t('Añadir comentario')}
+                        onChange={(raw) => void guard(async () => {
+                          await window.nodus.updateTeachingStudent(student.id, { comments: raw ?? '' });
+                          await refreshGroup(group.id);
+                        })}
+                      />
+                    </td>
+                    <td className="px-2 py-1 text-right">
+                      <button
+                        className="btn btn-ghost h-7 w-7 p-0 text-red-500"
+                        title={t('Eliminar alumno')}
+                        aria-label={t('Eliminar alumno')}
+                        onClick={() => void guard(async () => {
+                          await window.nodus.deleteTeachingStudent(student.id);
+                          await refreshGroup(group.id);
+                        })}
+                      >
+                        <Icon name="trash" size={12} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {students.length === 0 && (
+              <p className="px-3 py-6 text-center text-xs text-neutral-500">{t('Este grupo todavía no tiene alumnado.')}</p>
+            )}
+          </div>
+
+          <button
+            className="btn btn-primary mt-3"
+            data-testid="student-add"
+            disabled={students.length >= MAX_GROUP_SIZE}
+            onClick={() => void guard(async () => {
+              await window.nodus.addTeachingStudent(group.id, 1);
+              await refreshGroup(group.id);
+            })}
+          >
+            <Icon name="plus" />{t('Añadir alumno')}
+          </button>
+        </div>
+      )}
 
       {importing && (
         <ImportModal
