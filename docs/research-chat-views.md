@@ -52,3 +52,150 @@ and `node scripts/verify-study-source-picker.mjs` against the renderer-only harn
 on port 5197 (or `NODUS_VISUAL_URL`). The UI check uses 5,000 material fixtures in
 Study/light and Teaching/dark, including keyboard navigation, selection, folder
 management, failed/successful relocation, requests and citation navigation.
+
+## Chat history: projects, folders, pins, notebooks
+
+Every chat history that has a store of its own organizes its conversations the same
+way Research Chat does, through the same history sidebar and the same rules. The history
+has projects (flat: name, icon and colour), folders nested inside each project, up to five
+pinned chats, archived chats kept out of the normal list, a notebook section, and search
+across chats, projects and notebooks.
+
+### Where each surface keeps its history
+
+| Vault / surface | Conversation store | Projects, folders, pins | Notebook-equivalent |
+| --- | --- | --- | --- |
+| Academic, Genealogy, Primary sources, Prosopography, Testimonies (Research Chat) | `chat_conversations` in the vault's database | `research_chat_projects`, `research_chat_project_folders`, `research_chat_placements` | Research notebooks (collections of the research corpus); not offered in Genealogy |
+| Databases | `database_chat_conversations` | `database_chat_projects`, `database_chat_project_folders`, `database_chat_placements` | `database_chat_notebooks`: a named set of databases |
+| Worldbuilding | `world_chat_conversations` | `world_chat_projects`, `world_chat_project_folders`, `world_chat_placements` | `world_chat_notebooks`: a named set of world entries |
+| Study | `study-chat-history.json` in the vault's folder | `projects` and `folders` in the same file; each conversation record carries its own `projectId`, `folderId` and `pinnedAt` | The vault's Courses → Subjects → Topics |
+| Teaching | The same JSON store, in the teaching vault's own folder | As Study | As Study |
+
+Genealogy has no chat store of its own: its chat is Research Chat with the family as
+context, so its conversations, projects and folders are Research Chat's, in the genealogy
+vault's database. Teaching's chat is the Study chat (`StudyChatView` with the teaching
+variant), so it uses the Study store in the teaching vault.
+
+The table-backed stores share one implementation (`electron/db/chatOrganizerRepo.ts`),
+handed each surface's tables; the Study store implements the same operations over the
+file (`electron/ai/studyChatHistory.ts`). All of them refuse with the same error codes
+(`research_chat_folder_cycle`, `research_chat_folder_wrong_project`,
+`research_chat_folder_not_found`, `research_chat_project_not_found`,
+`research_chat_pin_limit`, …). Databases, Worldbuilding and Study are reached through the
+`chatHistory:*` channels, which name their surface and refuse any other; Research Chat
+keeps its `chat:*` channels.
+
+### Folder rules
+
+- A project is flat; its folders nest. A folder never moves into its own subtree, and a
+  subfolder always stays in its parent's project.
+- A chat's folder always belongs to the chat's project. Filing a chat in a folder puts it
+  in that folder's project; moving it to another project (or out of projects) clears its
+  folder; removing it from its folder keeps it in the project.
+- **Deleting a folder** takes its subfolders with it and unfiles every chat that was in
+  any of them: the chats stay in the project, under "No folder". It never deletes a
+  conversation.
+- **Deleting a conversation** removes its membership: its placement (project, folder,
+  pin, notebook) goes with it, and it cannot be placed again.
+- **Creating a folder** never moves an existing conversation into it; a new folder is
+  empty until a chat is filed there (from the chat's menu, "Move to folder…", or by
+  dragging it onto the folder).
+- Deleting a project takes its folders and returns its chats to the general history;
+  deleting a notebook returns its chats to the general history too. Neither deletes a
+  conversation.
+- At most five unarchived chats are pinned; pinning a sixth is refused with
+  `research_chat_pin_limit`. Archiving a chat unpins it.
+
+Every chat's menu has "Move to project" and, for a chat in a project with folders,
+"Move to folder…": the project's folders in tree order, indented by depth, the current
+one checked, and "Remove from folder" when the chat is in one. The menu works from the
+keyboard: it takes the focus when it opens, arrow keys, Home and End move through it,
+ArrowRight opens a submenu and ArrowLeft returns, Escape or a click outside closes it,
+and the focus returns to the row it came from.
+
+### Across devices
+
+Folders, placements and the conversation tables are synced. Folders and placements carry
+`updated_at` (migration 187 for Research Chat; the Databases and Worldbuilding tables were
+created with it), so a chat filed or moved, or a folder renamed or reordered, travels by
+the merge's newest-wins rule like any other row, and a deletion travels as a tombstone.
+
+**When one device deletes a folder and another, before hearing of it, files a chat into
+that folder, the deletion wins.** After the devices sync, in either order and whichever
+edit was made later on the clock, the folder (and its subfolders) stays deleted on both
+and the chat sits in the same project with no folder, on both. The chat is never lost and
+never hidden. `scripts/test-chat-history-sync.mjs` runs the four orderings for each
+table-backed history and checks, after every merge, that every conversation still exists,
+that no placement names a missing folder or a folder of another project, and that each
+chat is reachable in the history's own filter (a folder or "No folder").
+
+A folder renamed or moved on one device after another deleted it follows the general
+merge policy: the later edit brings the folder back, empty of the chats the deletion had
+already unfiled.
+
+The pin limit is enforced when a chat is pinned; two devices that each pinned chats while
+apart can, after merging, show more than five until some are unpinned. No pin is dropped
+automatically.
+
+### The repair pass
+
+A reference that does not resolve is repaired, not tolerated:
+
+- **On initial load.** When a vault's database opens, every table-backed history is
+  checked (`repairAllChatPlacements` in `electron/db/chatHistoryTables.ts`). The Study
+  store repairs itself on every read of `study-chat-history.json` and writes the repair
+  back, so the file on disk is sound after the first read.
+- **After synchronization.** The same pass runs inside every merge (a `.nodussync`
+  package or Nodus Server mutations), before the deferred foreign keys are checked and
+  again after dangling rows are dropped. Without it a chat filed into a folder deleted on
+  the other device made the whole merge fail its foreign-key check. The Study file is not
+  row-synced; a restored or imported copy is repaired on its first read.
+
+The pass clears a conversation's folder when the folder does not exist or belongs to
+another project (the chat stays in its project, unfiled); clears a project (or notebook)
+that does not exist (the chat returns to the general history); and drops the placement of
+a conversation that no longer exists, or one left placing nowhere. In the Study file it
+also drops a folder whose project is gone and returns a folder whose parent is missing, in
+another project or in a cycle to its project's root. It never deletes a conversation, a
+project or a folder, and a repaired table row is stamped so the repair itself converges
+across devices.
+
+### Differences between the surfaces
+
+- **Notebooks.** Research Chat's notebooks read collections of the research corpus and
+  are edited with the collection tree. Databases and Worldbuilding keep notebooks of their
+  own, edited in the same dialog with the surface's picker (databases, or world entries);
+  a chat inside one reads the notebook's current sources, its context panel says so, and a
+  new chat is free of it again. Study and Teaching do not duplicate their organization:
+  Courses → Subjects → Topics play the notebook's part. A chat lives in the course its
+  scope reads, a course's page starts a chat scoped to the course, and search matches a
+  course by its subjects and topics.
+- **Moving notebook chats.** As in Research Chat, a chat inside a Databases or
+  Worldbuilding notebook stays out of projects. A Study course is only a chat's current
+  scope, which can change from one turn to the next, so a course chat can still be moved
+  into a project.
+- **Courses are managed in Study.** The history lists them and starts chats in them, but
+  does not rename, restyle or delete them; that stays in the Study vault's own views.
+- **Server sync.** The Databases and Worldbuilding tables travel in `.nodussync`
+  packages with the rest of their sync group. Like Research Chat's projects and folders,
+  they are not part of the Nodus Server mutable-table contract; `world_chat_conversations`
+  already was, and its new `archived` column travels with its rows.
+- **Older builds.** An older build reading `study-chat-history.json` ignores the
+  `projects` and `folders` arrays and may write the file back without them; the next read
+  by this build clears the conversations' now dangling references rather than hiding them.
+
+### Validation
+
+- `node --test scripts/test-research-chat-projects.mjs scripts/test-chat-history-surfaces.mjs scripts/test-chat-history-sync.mjs`:
+  the shared contract (`scripts/lib/chatHistoryContract.mjs`) against Research Chat,
+  Databases, Worldbuilding, Study and Teaching (the three folder rules, projects, pins and
+  their refusal, archive, rename, the repair on load for a missing folder, a folder of
+  another project and a missing project); isolation between surfaces in one vault and
+  between vaults; the Study file's repair; the channels' refusal of unknown surfaces; and
+  the two-device conflict for each table-backed history.
+- `node --test scripts/test-research-chat-sidebar.mjs`: the history in a browser, including
+  "Move to folder…" by keyboard alone, the rename of a pinned chat inside a project, and
+  the course and surface-notebook variants.
+- `node scripts/verify-chat-history-surfaces.mjs` against the renderer-only harness on
+  localhost:5198: Databases, Study, Teaching and Worldbuilding in the real chat view
+  (projects, folders from the keyboard, pins, rename, archive and notebooks or courses).
