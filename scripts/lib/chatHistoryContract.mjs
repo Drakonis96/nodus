@@ -8,7 +8,7 @@
 //   listConversations(includeArchived) → summaries  setArchived(id, archived)
 //   listProjects() createProject(input) updateProject(id, patch) deleteProject(id)
 //   listFolders() createFolder(input) renameFolder(id, name) moveFolder(id, parentId, index?) deleteFolder(id)
-//   setProject(id, projectId) setFolder(id, folderId) setPinned(id, pinned)
+//   setProject(id, projectId) setFolder(id, folderId) setPinned(id, pinned) rename(id, title)?
 //   corruptFolder(conversationId, projectId, folderId): writes a placement no API call would write
 //   reload(): whatever the surface does on its initial load (reopen the database, read the file)
 import assert from 'node:assert/strict';
@@ -59,6 +59,14 @@ export function checkChatHistoryContract(api, label) {
   api.setPinned(chats[PIN_LIMIT], true);
   api.setArchived(chats[0], false);
   assert.equal(api.conversation(chats[0]).archived, false, at('unarchiving brings it back'));
+
+  // ── Renaming a chat keeps where it sits ───────────────────────────────────
+  if (api.rename) {
+    api.rename(inProject, '  Renombrado  ');
+    const renamed = api.listConversations(true).find(item => item.id === inProject);
+    assert.equal(renamed.title, 'Renombrado', at('a chat renames, trimmed'));
+    assert.equal(renamed.projectId, alpha.id, at('and keeps its project'));
+  }
 
   // ── Deleting a project never deletes its chats ────────────────────────────
   api.deleteProject(alpha.id);

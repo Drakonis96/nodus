@@ -21,6 +21,9 @@ export interface ChatHistoryTables {
   projects: string;
   folders: string;
   placements: string;
+  /** A surface that keeps notebooks of its own in this database (Research Chat's live in
+   * the research corpus instead). Its placements then carry notebook_id. */
+  notebooks?: string;
 }
 
 export const RESEARCH_CHAT_TABLES: ChatHistoryTables = {
@@ -31,13 +34,31 @@ export const RESEARCH_CHAT_TABLES: ChatHistoryTables = {
   placements: 'research_chat_placements',
 };
 
+export const DATABASE_CHAT_TABLES: ChatHistoryTables = {
+  surface: 'database',
+  conversations: 'database_chat_conversations',
+  projects: 'database_chat_projects',
+  folders: 'database_chat_project_folders',
+  placements: 'database_chat_placements',
+  notebooks: 'database_chat_notebooks',
+};
+
+export const WORLD_CHAT_TABLES: ChatHistoryTables = {
+  surface: 'world',
+  conversations: 'world_chat_conversations',
+  projects: 'world_chat_projects',
+  folders: 'world_chat_project_folders',
+  placements: 'world_chat_placements',
+  notebooks: 'world_chat_notebooks',
+};
+
 /** Every table-backed chat history. The study history lives in a JSON file and repairs itself on read. */
-export const CHAT_HISTORY_TABLES: readonly ChatHistoryTables[] = [RESEARCH_CHAT_TABLES];
+export const CHAT_HISTORY_TABLES: readonly ChatHistoryTables[] = [RESEARCH_CHAT_TABLES, DATABASE_CHAT_TABLES, WORLD_CHAT_TABLES];
 
 export interface ChatPlacementRepair {
   /** Placements whose folder did not exist or sat in another project: now unfiled. */
   folders: number;
-  /** Placements whose project did not exist: back in the general history. */
+  /** Placements whose project (or notebook) did not exist: back in the general history. */
   projects: number;
   /** Placements of conversations that no longer exist, or that were left empty. */
   removed: number;
@@ -54,8 +75,8 @@ function hasTable(db: Database.Database, name: string): boolean {
  * devices converge on it instead of arguing over the dangling value.
  */
 export function repairChatPlacements(db: Database.Database, tables: ChatHistoryTables, now = new Date().toISOString()): ChatPlacementRepair {
-  const { conversations, projects, folders, placements } = tables;
-  if (![conversations, projects, folders, placements].every((name) => hasTable(db, name))) return { folders: 0, projects: 0, removed: 0 };
+  const { conversations, projects, folders, placements, notebooks } = tables;
+  if (![conversations, projects, folders, placements, ...(notebooks ? [notebooks] : [])].every((name) => hasTable(db, name))) return { folders: 0, projects: 0, removed: 0 };
   const repair = db.transaction((): ChatPlacementRepair => {
     // A project that is gone takes nothing with it: the chat returns to the general history.
     const projectsFixed = db.prepare(`UPDATE ${placements} SET project_id = NULL, folder_id = NULL, updated_at = ?
@@ -65,10 +86,13 @@ export function repairChatPlacements(db: Database.Database, tables: ChatHistoryT
     const foldersFixed = db.prepare(`UPDATE ${placements} SET folder_id = NULL, updated_at = ?
       WHERE folder_id IS NOT NULL AND NOT EXISTS (
         SELECT 1 FROM ${folders} f WHERE f.folder_id = ${placements}.folder_id AND f.project_id IS ${placements}.project_id)`).run(now).changes;
+    // A notebook that is gone returns its chat to the general history, like a project.
+    const notebooksFixed = notebooks ? db.prepare(`UPDATE ${placements} SET notebook_id = NULL, updated_at = ?
+      WHERE notebook_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${notebooks} n WHERE n.id = ${placements}.notebook_id)`).run(now).changes : 0;
     // A deleted conversation keeps no placement, and a placement that places nowhere is not kept.
     const orphans = db.prepare(`DELETE FROM ${placements} WHERE NOT EXISTS (SELECT 1 FROM ${conversations} c WHERE c.id = ${placements}.conversation_id)`).run().changes;
-    const empty = db.prepare(`DELETE FROM ${placements} WHERE project_id IS NULL AND folder_id IS NULL AND pinned_at IS NULL`).run().changes;
-    return { folders: foldersFixed, projects: projectsFixed, removed: orphans + empty };
+    const empty = db.prepare(`DELETE FROM ${placements} WHERE project_id IS NULL AND folder_id IS NULL AND pinned_at IS NULL${notebooks ? ' AND notebook_id IS NULL' : ''}`).run().changes;
+    return { folders: foldersFixed, projects: projectsFixed + notebooksFixed, removed: orphans + empty };
   });
   return repair();
 }

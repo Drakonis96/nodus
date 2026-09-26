@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 187;
+export const SCHEMA_VERSION = 190;
 
 export const migrations: Migration[] = [
   {
@@ -9406,6 +9406,67 @@ export const migrations: Migration[] = [
       (SELECT c.updated_at FROM chat_conversations c WHERE c.id = research_chat_placements.conversation_id),
       pinned_at, '1970-01-01T00:00:00.000Z') WHERE updated_at IS NULL;
   ` },
+  // The Databases and Worldbuilding chat histories get what Research Chat has: projects,
+  // folders nested inside them, pins and notebooks, each surface in tables of its own so
+  // no history can read or write another's. The same shape and keys as migration 182
+  // plus 187's stamps; a notebook is the named set of sources its chats read, kept as the
+  // surface's own selection JSON. Placements carry no key to their conversation; the
+  // repository drops a chat's placement with it and the repair pass catches the rest.
+  { version: 188, up: `
+    CREATE TABLE IF NOT EXISTS database_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS database_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES database_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES database_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS database_chat_project_folders_project ON database_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS database_chat_project_folders_parent ON database_chat_project_folders(parent_id);
+    CREATE TABLE IF NOT EXISTS database_chat_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT, selection_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS database_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES database_chat_project_folders(folder_id) ON DELETE SET NULL,
+      notebook_id TEXT REFERENCES database_chat_notebooks(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS database_chat_placements_project ON database_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS database_chat_placements_folder ON database_chat_placements(folder_id);
+    CREATE INDEX IF NOT EXISTS database_chat_placements_notebook ON database_chat_placements(notebook_id);
+    CREATE TABLE IF NOT EXISTS world_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS world_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES world_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES world_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS world_chat_project_folders_project ON world_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS world_chat_project_folders_parent ON world_chat_project_folders(parent_id);
+    CREATE TABLE IF NOT EXISTS world_chat_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT, selection_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS world_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES world_chat_project_folders(folder_id) ON DELETE SET NULL,
+      notebook_id TEXT REFERENCES world_chat_notebooks(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS world_chat_placements_project ON world_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS world_chat_placements_folder ON world_chat_placements(folder_id);
+    CREATE INDEX IF NOT EXISTS world_chat_placements_notebook ON world_chat_placements(notebook_id);
+  ` },
+  // Archiving, as in Research Chat: an archived chat leaves the normal history.
+  { version: 189, up: `ALTER TABLE database_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
+  { version: 190, up: `ALTER TABLE world_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
 ];
 
 /**

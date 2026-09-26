@@ -37,7 +37,7 @@ try {
   const { ensureTombstoneTriggers } = require(path.join(repoRoot, 'electron/db/tombstones.ts'));
   const sync = require(path.join(repoRoot, 'electron/export/syncPackage.ts'));
   const { CHAT_HISTORY_TABLES, repairAllChatPlacements } = require(path.join(repoRoot, 'electron/db/chatHistoryTables.ts'));
-  const projects = require(path.join(repoRoot, 'electron/db/researchChatProjectsRepo.ts'));
+  const { createChatOrganizer } = require(path.join(repoRoot, 'electron/db/chatOrganizerRepo.ts'));
   const folderTree = require(path.join(repoRoot, 'shared/researchChatFolders.ts'));
 
   const PASS = 'frase-de-sincronizacion-de-prueba';
@@ -60,122 +60,139 @@ try {
     use(to);
     return sync.mergeSyncPackage(pack.buffer, PASS);
   };
-  const addConversation = (db, id, title) => {
-    const now = new Date().toISOString();
-    db.prepare('INSERT INTO chat_conversations (id, title, created_at, updated_at, archived) VALUES (?, ?, ?, ?, 0)').run(id, title, now, now);
-  };
-  const placementOf = (db, id) => {
-    const row = db.prepare('SELECT project_id, folder_id FROM research_chat_placements WHERE conversation_id = ?').get(id);
-    return { projectId: row?.project_id ?? null, folderId: row?.folder_id ?? null };
-  };
-  const folderIds = (db) => db.prepare('SELECT folder_id FROM research_chat_project_folders ORDER BY folder_id').all().map((row) => row.folder_id);
+  // Each table-backed history, with how its conversation rows are written.
+  const surfaces = CHAT_HISTORY_TABLES.map((tables) => ({
+    tables,
+    projects: createChatOrganizer(tables),
+    addConversation: (db, id, title) => {
+      const now = new Date().toISOString();
+      if (tables.surface === 'research') db.prepare('INSERT INTO chat_conversations (id, title, created_at, updated_at, archived) VALUES (?, ?, ?, ?, 0)').run(id, title, now, now);
+      else if (tables.surface === 'database') db.prepare("INSERT INTO database_chat_conversations (id, title, database_ids_json, messages_json, created_at, updated_at) VALUES (?, ?, '[]', '[]', ?, ?)").run(id, title, now, now);
+      else db.prepare("INSERT INTO world_chat_conversations (id, title, selection_json, focus_json, messages_json, created_at, updated_at) VALUES (?, ?, '{}', '[]', '[]', ?, ?)").run(id, title, now, now);
+    },
+  }));
+  assert.deepEqual(surfaces.map((surface) => surface.tables.surface), ['research', 'database', 'world'], 'every table-backed history is covered');
 
-  /**
-   * What must hold on a device after any merge, in any order: every conversation is still
-   * there, and no placement names a folder that is missing or belongs to another project.
-   * Then the history's own filter is asked where each chat shows, the way the sidebar asks.
-   */
-  const assertNothingHidden = (db, label, conversationIds) => {
-    use(db);
-    const present = new Set(db.prepare('SELECT id FROM chat_conversations').all().map((row) => row.id));
-    for (const id of conversationIds) assert.ok(present.has(id), `${label}: ${id} still exists`);
-    const dangling = db.prepare(`SELECT p.conversation_id FROM research_chat_placements p
-      WHERE p.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM research_chat_project_folders f WHERE f.folder_id = p.folder_id AND f.project_id = p.project_id)`).all();
-    assert.deepEqual(dangling, [], `${label}: no placement names a missing or foreign folder`);
-    assert.deepEqual(db.pragma('foreign_key_check'), [], `${label}: no broken reference`);
-    const folders = projects.listChatProjectFolders();
-    for (const project of projects.listChatProjects()) {
-      const inProject = conversationIds.map((id) => ({ id, ...placementOf(db, id) })).filter((item) => item.projectId === project.id);
-      const reachable = new Set([
-        ...folderTree.conversationsInSelection(inProject, folders, project.id, folderTree.UNFILED_FOLDER).map((item) => item.id),
-        ...folders.filter((folder) => folder.projectId === project.id).flatMap((folder) => folderTree.conversationsInSelection(inProject, folders, project.id, folder.id).map((item) => item.id)),
-      ]);
-      for (const item of inProject) assert.ok(reachable.has(item.id), `${label}: ${item.id} shows in a folder or under "No folder"`);
-    }
-  };
-
-  // ══ 1 · Ordinary moves and renames travel by newest-wins ════════════════════
-  {
-    const a = openDevice(); const b = openDevice();
-    use(a);
-    const project = projects.createChatProject({ name: 'Tesis' });
-    const folder = projects.createChatProjectFolder({ projectId: project.id, name: 'Fuentes' });
-    addConversation(a, 'c-move', 'Un chat');
-    projects.setConversationProject('c-move', project.id);
-    syncInto(a, b);
-    assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, 'B learns the project');
-    await pause();
-    use(b);
-    projects.setConversationFolder('c-move', folder.id);
-    projects.renameChatProjectFolder(folder.id, 'Fuentes primarias');
-    syncInto(b, a);
-    assert.deepEqual(placementOf(a, 'c-move'), { projectId: project.id, folderId: folder.id }, 'a chat filed on B is filed on A');
-    assert.equal(a.prepare('SELECT name FROM research_chat_project_folders WHERE folder_id = ?').get(folder.id).name, 'Fuentes primarias', 'a rename on B reaches A');
-    await pause();
-    use(a);
-    projects.setConversationFolder('c-move', null);
-    syncInto(a, b);
-    assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, 'taking it out of its folder travels back');
-    a.close(); b.close();
-  }
-
-  // ══ 2 · A deletes a folder; B, not knowing, files chats into it ═════════════
-  // Four runs: B's filing before or after A's deletion on the wall clock, and each device
-  // syncing first. Every run must end the same way on both devices.
-  const scenarios = [
-    { edits: 'delete-then-file', first: 'a' },
-    { edits: 'delete-then-file', first: 'b' },
-    { edits: 'file-then-delete', first: 'a' },
-    { edits: 'file-then-delete', first: 'b' },
-  ];
-  for (const scenario of scenarios) {
-    const label = `${scenario.edits}, ${scenario.first.toUpperCase()} syncs first`;
-    const a = openDevice(); const b = openDevice();
-    use(a);
-    const project = projects.createChatProject({ name: 'Tesis' });
-    const doomed = projects.createChatProjectFolder({ projectId: project.id, name: 'Capítulos' });
-    const inner = projects.createChatProjectFolder({ projectId: project.id, parentId: doomed.id, name: 'Capítulo 1' });
-    const kept = projects.createChatProjectFolder({ projectId: project.id, name: 'Notas' });
-    const ids = ['c-filed-before', 'c-filed-on-b', 'c-inner-on-b', 'c-kept'];
-    for (const id of ids) addConversation(a, id, id);
-    projects.setConversationFolder('c-filed-before', doomed.id);
-    projects.setConversationProject('c-filed-on-b', project.id);
-    projects.setConversationProject('c-inner-on-b', project.id);
-    projects.setConversationFolder('c-kept', kept.id);
-    syncInto(a, b);
-    assert.deepEqual(folderIds(b), [doomed.id, inner.id, kept.id].sort(), `${label}: B has the tree`);
-
-    const deleteOnA = () => { use(a); projects.deleteChatProjectFolder(doomed.id); };
-    const fileOnB = () => {
-      use(b);
-      projects.setConversationFolder('c-filed-on-b', doomed.id);
-      projects.setConversationFolder('c-inner-on-b', inner.id);
+  for (const { tables, projects, addConversation } of surfaces) {
+    const placementOf = (db, id) => {
+      const row = db.prepare(`SELECT project_id, folder_id FROM ${tables.placements} WHERE conversation_id = ?`).get(id);
+      return { projectId: row?.project_id ?? null, folderId: row?.folder_id ?? null };
     };
-    if (scenario.edits === 'delete-then-file') { deleteOnA(); await pause(); fileOnB(); } else { fileOnB(); await pause(); deleteOnA(); }
-    assert.deepEqual(placementOf(a, 'c-filed-before'), { projectId: project.id, folderId: null }, `${label}: on A, the deletion unfiles without deleting`);
+    const folderIds = (db) => db.prepare(`SELECT folder_id FROM ${tables.folders} ORDER BY folder_id`).all().map((row) => row.folder_id);
 
-    const [first, second] = scenario.first === 'a' ? [a, b] : [b, a];
-    syncInto(first, second);
-    assertNothingHidden(second, `${label}, after the first merge`, ids);
-    syncInto(second, first);
-    assertNothingHidden(first, `${label}, after the second merge`, ids);
-    // One more round in each direction: nothing may keep changing.
-    syncInto(first, second);
-    syncInto(second, first);
-
-    for (const [name, db] of [['A', a], ['B', b]]) {
-      assertNothingHidden(db, `${label}, ${name} settled`, ids);
-      assert.deepEqual(folderIds(db), [kept.id], `${label}: the deleted folder and its subfolder stay deleted on ${name}`);
-      for (const id of ['c-filed-before', 'c-filed-on-b', 'c-inner-on-b']) {
-        assert.deepEqual(placementOf(db, id), { projectId: project.id, folderId: null }, `${label}: ${id} is in the project with no folder on ${name}`);
+    /**
+     * What must hold on a device after any merge, in any order: every conversation is still
+     * there, and no placement names a folder that is missing or belongs to another project.
+     * Then the history's own filter is asked where each chat shows, the way the sidebar asks.
+     */
+    const assertNothingHidden = (db, label, conversationIds) => {
+      use(db);
+      const present = new Set(db.prepare(`SELECT id FROM ${tables.conversations}`).all().map((row) => row.id));
+      for (const id of conversationIds) assert.ok(present.has(id), `${label}: ${id} still exists`);
+      const dangling = db.prepare(`SELECT p.conversation_id FROM ${tables.placements} p
+        WHERE p.folder_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM ${tables.folders} f WHERE f.folder_id = p.folder_id AND f.project_id = p.project_id)`).all();
+      assert.deepEqual(dangling, [], `${label}: no placement names a missing or foreign folder`);
+      assert.deepEqual(db.pragma('foreign_key_check'), [], `${label}: no broken reference`);
+      const folders = projects.listChatProjectFolders();
+      for (const project of projects.listChatProjects()) {
+        const inProject = conversationIds.map((id) => ({ id, ...placementOf(db, id) })).filter((item) => item.projectId === project.id);
+        const reachable = new Set([
+          ...folderTree.conversationsInSelection(inProject, folders, project.id, folderTree.UNFILED_FOLDER).map((item) => item.id),
+          ...folders.filter((folder) => folder.projectId === project.id).flatMap((folder) => folderTree.conversationsInSelection(inProject, folders, project.id, folder.id).map((item) => item.id)),
+        ]);
+        for (const item of inProject) assert.ok(reachable.has(item.id), `${label}: ${item.id} shows in a folder or under "No folder"`);
       }
-      assert.deepEqual(placementOf(db, 'c-kept'), { projectId: project.id, folderId: kept.id }, `${label}: an unrelated folder keeps its chat on ${name}`);
+    };
+
+    // ══ 1 · Ordinary moves and renames travel by newest-wins ════════════════════
+    {
+      const a = openDevice(); const b = openDevice();
+      use(a);
+      const project = projects.createChatProject({ name: 'Tesis' });
+      const folder = projects.createChatProjectFolder({ projectId: project.id, name: 'Fuentes' });
+      addConversation(a, 'c-move', 'Un chat');
+      projects.setConversationProject('c-move', project.id);
+      syncInto(a, b);
+      assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, `${tables.surface}: B learns the project`);
+      await pause();
+      use(b);
+      projects.setConversationFolder('c-move', folder.id);
+      projects.renameChatProjectFolder(folder.id, 'Fuentes primarias');
+      syncInto(b, a);
+      assert.deepEqual(placementOf(a, 'c-move'), { projectId: project.id, folderId: folder.id }, 'a chat filed on B is filed on A');
+      assert.equal(a.prepare(`SELECT name FROM ${tables.folders} WHERE folder_id = ?`).get(folder.id).name, 'Fuentes primarias', `${tables.surface}: a rename on B reaches A`);
+      await pause();
+      use(a);
+      projects.setConversationFolder('c-move', null);
+      syncInto(a, b);
+      assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, 'taking it out of its folder travels back');
+      a.close(); b.close();
     }
-    a.close(); b.close();
+
+    // ══ 2 · A deletes a folder; B, not knowing, files chats into it ═════════════
+    // Four runs: B's filing before or after A's deletion on the wall clock, and each device
+    // syncing first. Every run must end the same way on both devices.
+    const scenarios = [
+      { edits: 'delete-then-file', first: 'a' },
+      { edits: 'delete-then-file', first: 'b' },
+      { edits: 'file-then-delete', first: 'a' },
+      { edits: 'file-then-delete', first: 'b' },
+    ];
+    for (const scenario of scenarios) {
+      const label = `${tables.surface}: ${scenario.edits}, ${scenario.first.toUpperCase()} syncs first`;
+      const a = openDevice(); const b = openDevice();
+      use(a);
+      const project = projects.createChatProject({ name: 'Tesis' });
+      const doomed = projects.createChatProjectFolder({ projectId: project.id, name: 'Capítulos' });
+      const inner = projects.createChatProjectFolder({ projectId: project.id, parentId: doomed.id, name: 'Capítulo 1' });
+      const kept = projects.createChatProjectFolder({ projectId: project.id, name: 'Notas' });
+      const ids = ['c-filed-before', 'c-filed-on-b', 'c-inner-on-b', 'c-kept'];
+      for (const id of ids) addConversation(a, id, id);
+      projects.setConversationFolder('c-filed-before', doomed.id);
+      projects.setConversationProject('c-filed-on-b', project.id);
+      projects.setConversationProject('c-inner-on-b', project.id);
+      projects.setConversationFolder('c-kept', kept.id);
+      syncInto(a, b);
+      assert.deepEqual(folderIds(b), [doomed.id, inner.id, kept.id].sort(), `${label}: B has the tree`);
+
+      const deleteOnA = () => { use(a); projects.deleteChatProjectFolder(doomed.id); };
+      const fileOnB = () => {
+        use(b);
+        projects.setConversationFolder('c-filed-on-b', doomed.id);
+        projects.setConversationFolder('c-inner-on-b', inner.id);
+      };
+      if (scenario.edits === 'delete-then-file') { deleteOnA(); await pause(); fileOnB(); } else { fileOnB(); await pause(); deleteOnA(); }
+      assert.deepEqual(placementOf(a, 'c-filed-before'), { projectId: project.id, folderId: null }, `${label}: on A, the deletion unfiles without deleting`);
+
+      const [first, second] = scenario.first === 'a' ? [a, b] : [b, a];
+      syncInto(first, second);
+      assertNothingHidden(second, `${label}, after the first merge`, ids);
+      syncInto(second, first);
+      assertNothingHidden(first, `${label}, after the second merge`, ids);
+      // One more round in each direction: nothing may keep changing.
+      syncInto(first, second);
+      syncInto(second, first);
+
+      for (const [name, db] of [['A', a], ['B', b]]) {
+        assertNothingHidden(db, `${label}, ${name} settled`, ids);
+        assert.deepEqual(folderIds(db), [kept.id], `${label}: the deleted folder and its subfolder stay deleted on ${name}`);
+        for (const id of ['c-filed-before', 'c-filed-on-b', 'c-inner-on-b']) {
+          assert.deepEqual(placementOf(db, id), { projectId: project.id, folderId: null }, `${label}: ${id} is in the project with no folder on ${name}`);
+        }
+        assert.deepEqual(placementOf(db, 'c-kept'), { projectId: project.id, folderId: kept.id }, `${label}: an unrelated folder keeps its chat on ${name}`);
+      }
+      a.close(); b.close();
+    }
+
   }
 
   // ══ 3 · The repair after a merge, and on every table-backed history ═════════
   {
+    const { projects, addConversation } = surfaces[0];
+    const placementOf = (db, id) => {
+      const row = db.prepare('SELECT project_id, folder_id FROM research_chat_placements WHERE conversation_id = ?').get(id);
+      return { projectId: row?.project_id ?? null, folderId: row?.folder_id ?? null };
+    };
     const a = openDevice();
     use(a);
     const one = projects.createChatProject({ name: 'Uno' });

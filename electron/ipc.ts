@@ -47,6 +47,7 @@ import { registerWorldbuildingIpc } from './ipc/worldbuilding';
 import { registerPlatformIpc } from './ipc/platform';
 import { registerRecordsIpc } from './ipc/records';
 import { registerAcademicIpc } from './ipc/academic';
+import { registerChatHistoryIpc } from './ipc/chatHistory';
 import { registerLibraryIpc } from './ipc/library';
 import { registerBrowserIpc } from './ipc/browser';
 import { registerRadarIpc } from './ipc/radar';
@@ -241,6 +242,7 @@ export function registerIpc(
   // imports. What remains below is everything not yet split out.
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
+  registerChatHistoryIpc(context);
   registerLibraryIpc(context);
   registerBrowserIpc(context);
   registerRadarIpc(context);

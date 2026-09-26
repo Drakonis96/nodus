@@ -198,6 +198,13 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       // v102: conversation history and its explicit focus are author working context,
       // not a regenerable model cache.
       'world_chat_conversations',
+      // Its history's projects, nested folders, notebooks and where each chat sits. Folders
+      // and placements carry updated_at, so a move travels by newest-wins; the merge's
+      // repair pass clears a chat's folder when another device deleted it.
+      'world_chat_projects',
+      'world_chat_project_folders',
+      'world_chat_notebooks',
+      'world_chat_placements',
       // v103: character roleplay chats and their generated binary attachments. Images
       // follow messages so an imported package never presents an attachment without its
       // answer, even though deletion remains explicit rather than FK-driven.
@@ -221,7 +228,8 @@ const SYNC_GROUPS: { key: SyncGroupKey; prefix?: string; tables?: string[] }[] =
       'dictionary_relations',
     ],
   },
-  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations', 'research_notebooks', 'research_notebook_conversations', 'research_chat_projects', 'research_chat_project_folders', 'research_chat_placements'] },
+  { key: 'chats', tables: ['chat_conversations', 'chat_messages', 'database_chat_conversations', 'research_notebooks', 'research_notebook_conversations', 'research_chat_projects', 'research_chat_project_folders', 'research_chat_placements',
+    'database_chat_projects', 'database_chat_project_folders', 'database_chat_notebooks', 'database_chat_placements'] },
   { key: 'content', tables: ['content_translations', 'decorative_images', 'audio_clips', 'page_block_blobs'] },
 ];
 

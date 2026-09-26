@@ -143,6 +143,7 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
   db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   db.exec('ALTER TABLE research_chat_project_folders DROP COLUMN updated_at; ALTER TABLE research_chat_placements DROP COLUMN updated_at;');
+  db.exec('ALTER TABLE database_chat_conversations DROP COLUMN archived; ALTER TABLE world_chat_conversations DROP COLUMN archived;');
   const rawRichTitle = '<span style="font-variant:small-caps;">CLE</span> peptides &amp; plant-biotic interactions';
   db.prepare(`INSERT INTO works(nodus_id,zotero_key,zotero_version,zotero_fingerprint,title,summary_status)
     VALUES('migration-173-rich','RICH',0,'stable-fingerprint',?,'failed')`).run(rawRichTitle);
@@ -209,6 +210,7 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
   db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   db.exec('ALTER TABLE research_chat_project_folders DROP COLUMN updated_at; ALTER TABLE research_chat_placements DROP COLUMN updated_at;');
+  db.exec('ALTER TABLE database_chat_conversations DROP COLUMN archived; ALTER TABLE world_chat_conversations DROP COLUMN archived;');
   db.pragma('user_version = 161');
   runMigrations(db);
   assert.ok(
@@ -263,6 +265,7 @@ try {
   db.exec('ALTER TABLE chat_messages DROP COLUMN skills_json;');
   db.exec('ALTER TABLE research_notebooks DROP COLUMN icon; ALTER TABLE research_notebooks DROP COLUMN color;');
   db.exec('ALTER TABLE research_chat_project_folders DROP COLUMN updated_at; ALTER TABLE research_chat_placements DROP COLUMN updated_at;');
+  db.exec('ALTER TABLE database_chat_conversations DROP COLUMN archived; ALTER TABLE world_chat_conversations DROP COLUMN archived;');
   db.pragma('user_version = 163');
   runMigrations(db);
   const recoveredJob = db.prepare("SELECT status, phase, progress, attempts, error FROM document_index_jobs WHERE job_id='migration-164-recover-job'").get();

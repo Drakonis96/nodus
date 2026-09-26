@@ -618,7 +618,7 @@ export interface DatabaseChatRequest {
   history?: DbChatTurn[];
 }
 
-export interface DatabaseChatConversationSummary {
+export interface DatabaseChatConversationSummary extends ChatHistoryPlacementFields {
   id: string;
   title: string;
   databaseIds: string[];
@@ -3804,7 +3804,7 @@ export interface WorldChatSelection {
   keepFocus: boolean;
 }
 
-export interface WorldChatConversationSummary {
+export interface WorldChatConversationSummary extends ChatHistoryPlacementFields {
   id: string;
   title: string;
   selection: WorldChatSelection;
@@ -6148,6 +6148,38 @@ export interface ResearchChatProjectFolder {
 
 /** How many conversations may be pinned at once. */
 export const RESEARCH_CHAT_PIN_LIMIT = 5;
+
+/**
+ * A notebook a chat history keeps of its own (Databases, Worldbuilding): a named, iconed
+ * set of sources its chats read. `selection` is what the surface's context picker stores —
+ * database ids, or a Worldbuilding selection. Research Chat's notebooks live in the
+ * research corpus instead, and Study reuses its courses.
+ */
+export interface ChatHistoryNotebook {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  selection: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The chat histories organized through the shared chat-history channels (Research Chat
+ * keeps its own). Study also serves the Teaching vault: same store, that vault's file. */
+export type ChatHistorySurface = 'database' | 'world' | 'study';
+/** The surfaces whose history keeps notebooks of its own. */
+export type ChatHistoryNotebookSurface = 'database' | 'world';
+
+/** Where a conversation of a chat history sits, beside its own fields. */
+export interface ChatHistoryPlacementFields {
+  archived?: boolean;
+  projectId?: string | null;
+  /** Always a folder of `projectId`, or null. */
+  folderId?: string | null;
+  pinnedAt?: string | null;
+  notebookId?: string | null;
+}
 
 /** A full conversation with its messages and the context selection it was using. */
 export interface ChatConversation extends ChatConversationSummary {

@@ -173,6 +173,7 @@ try {
     setProject: (id, projectId) => projects.setConversationProject(id, projectId),
     setFolder: (id, folderId) => projects.setConversationFolder(id, folderId),
     setPinned: (id, pinned) => projects.setConversationPinned(id, pinned),
+    rename: (id, title) => chat.renameConversation(id, title),
     // What no API call writes: only a sync merge or an older build could leave it behind.
     corruptFolder: (id, projectId, folderId) => {
       const live = database.getDb();

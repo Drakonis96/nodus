@@ -228,9 +228,11 @@ export interface DatabasesApi {
   onDatabaseDeepResearchProgress(cb: (progress: DatabaseResearchProgress) => void): () => void;
   dbChatStream(request: DatabaseChatRequest, handlers: { onDelta: (delta: string) => void }): Promise<{ text: string; aborted?: boolean }>;
   cancelDbChat(): Promise<void>;
-  listDatabaseChatConversations(): Promise<DatabaseChatConversationSummary[]>;
+  /** Archived chats only when asked for. */
+  listDatabaseChatConversations(includeArchived?: boolean): Promise<DatabaseChatConversationSummary[]>;
   getDatabaseChatConversation(id: string): Promise<DatabaseChatConversation | null>;
-  createDatabaseChatConversation(input: { title: string; databaseIds: string[] }): Promise<DatabaseChatConversation>;
+  /** A chat may start in a project (and a folder of it) or in a notebook. */
+  createDatabaseChatConversation(input: { title: string; databaseIds: string[]; projectId?: string | null; folderId?: string | null; notebookId?: string | null }): Promise<DatabaseChatConversation>;
   saveDatabaseChatConversation(id: string, messages: DbChatTurn[], databaseIds: string[]): Promise<DatabaseChatConversation | null>;
   deleteDatabaseChatConversation(id: string): Promise<void>;
   listDatabaseViews(databaseId: string): Promise<DatabaseSavedView[]>;
