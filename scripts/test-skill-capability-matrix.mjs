@@ -34,7 +34,7 @@ try {
   const ai = load('electron/ai/aiClient.ts');
   const plugins = load('electron/skillPlugins.ts');
 
-  settings.updateSettings({ chatModel: { provider: 'google', model: 'test-text-model' }, synthesisModel: { provider: 'google', model: 'test-text-model' }, nodiModel: { provider: 'google', model: 'test-text-model' }, imageProvider: 'google', imageModel: 'test-image-model', promptLanguage: 'en' });
+  settings.updateSettings({ chatModel: { provider: 'google', model: 'test-text-model' }, synthesisModel: { provider: 'google', model: 'test-text-model' }, nodiModel: { provider: 'google', model: 'test-text-model' }, imageProvider: 'google', imageModel: 'test-image-model', promptLanguage: 'en', researchWebSearch: 'off' });
 
   // ---- simulated boundaries -------------------------------------------------
   load('electron/ai/chatSvgQuality.ts').refineChatSvg = async answer => answer;

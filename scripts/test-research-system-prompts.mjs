@@ -34,7 +34,7 @@ try {
   assert.ok(composed.endsWith('BASE\nCITATIONS\nSKILLS'));
   assert.ok(composed.includes(JSON.stringify({ name: hostile.name, instructions: hostile.instructions })));
   const model = { provider: 'openai', model: 'gpt-4.1' };
-  load('electron/db/settingsRepo.ts').updateSettings({ synthesisModel: model });
+  load('electron/db/settingsRepo.ts').updateSettings({ synthesisModel: model, researchWebSearch: 'off' });
   const skills = load('electron/chatSkills.ts');
   const svgSkill = skills.restoreChatSkills().find(skill => skill.builtin === 'svg');
   assert.ok(svgSkill);
