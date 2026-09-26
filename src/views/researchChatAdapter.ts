@@ -50,8 +50,8 @@ export function nativeSummary(conversation: {
 /** What a chat history's projects, folders and pins can do: Research Chat's calls, for any store. */
 export interface ChatHistoryOrganizer {
   listProjects: () => Promise<ResearchChatProject[]>;
-  createProject: (input: { name: string; icon?: string | null; color?: string | null }) => Promise<ResearchChatProject>;
-  updateProject: (id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => Promise<unknown>;
+  createProject: (input: { name: string; icon?: string | null; color?: string | null; instructions?: string }) => Promise<ResearchChatProject>;
+  updateProject: (id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }) => Promise<unknown>;
   deleteProject: (id: string) => Promise<unknown>;
   listFolders: () => Promise<ResearchChatProjectFolder[]>;
   createFolder: (input: { projectId: string; parentId?: string | null; name: string }) => Promise<ResearchChatProjectFolder>;

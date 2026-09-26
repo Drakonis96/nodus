@@ -89,7 +89,8 @@ export interface ResearchChatSidebarProps {
   onArchiveConversation?: (conversation: ChatConversationSummary) => Promise<void>;
   onDeleteConversation: (conversation: ChatConversationSummary) => void;
   onMoveConversation: (conversation: ChatConversationSummary, projectId: string | null) => Promise<void>;
-  onUpdateProject: (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null }) => Promise<void>;
+  onEditProjectInstructions: (project: ResearchChatProject) => void;
+  onUpdateProject: (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }) => Promise<void>;
   onDeleteProject: (project: ResearchChatProject) => Promise<void>;
   /** The projects' folder trees: the same state and actions as the project's page. */
   folderTree: ChatFolderTreeState;
@@ -306,6 +307,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       {menu?.kind === 'chat' && <ChatMenu {...props} conversation={menu.conversation} anchor={menu.anchor} onClose={() => setMenu(null)}
         onRename={() => setRenaming(menu.row)} run={run} />}
       {menu?.kind === 'project' && <FloatingMenu anchor={menu.anchor} label={menu.project.name} onClose={() => setMenu(null)}>
+        <MenuItem icon="brain" label={t('Instrucciones del proyecto')} onSelect={() => { setMenu(null); props.onEditProjectInstructions(menu.project); }} />
         <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`project:${menu.project.id}`); }} />
         <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'project', id: menu.project.id }); }} />
         <MenuItem icon="folderPlus" label={t('Nueva carpeta')} onSelect={() => {

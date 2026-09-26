@@ -336,4 +336,63 @@ const contextLayerTranslations: Record<string, string[]> = {
     'ソースなし：アシスタントは一般的な知識で回答し、その旨を回答で伝えます。'],
 };
 for (const [language, values] of Object.entries(contextLayerTranslations)) translations[language].push(...values);
+keys.push(...["Instrucciones del proyecto", "Se aplican a todos los chats de este proyecto desde el siguiente mensaje. El prompt de cada chat puede concretarlas. Déjalo vacío para desactivarlas.", "Las instrucciones del proyecto admiten hasta 12.000 caracteres."]);
+const projectInstructionTranslations: Record<string, string[]> = {
+  "en": [
+    "Project instructions",
+    "Apply to all chats in this project from the next message. Each chat’s prompt can refine them. Leave blank to disable.",
+    "Project instructions support up to 12,000 characters."
+  ],
+  "fr": [
+    "Instructions du projet",
+    "Elles s’appliquent à toutes les discussions de ce projet dès le prochain message. Le prompt de chaque discussion peut les préciser. Laissez vide pour les désactiver.",
+    "Les instructions du projet acceptent jusqu’à 12 000 caractères."
+  ],
+  "de": [
+    "Projektanweisungen",
+    "Gelten ab der nächsten Nachricht für alle Chats dieses Projekts. Der Prompt jedes Chats kann sie konkretisieren. Zum Deaktivieren leer lassen.",
+    "Projektanweisungen dürfen bis zu 12.000 Zeichen enthalten."
+  ],
+  "pt": [
+    "Instruções do projeto",
+    "Aplicam-se a todas as conversas deste projeto a partir da próxima mensagem. O prompt de cada conversa pode especificá-las. Deixe em branco para desativar.",
+    "As instruções do projeto admitem até 12.000 caracteres."
+  ],
+  "pt-BR": [
+    "Instruções do projeto",
+    "Aplicam-se a todas as conversas deste projeto a partir da próxima mensagem. O prompt de cada conversa pode detalhá-las. Deixe em branco para desativar.",
+    "As instruções do projeto admitem até 12.000 caracteres."
+  ],
+  "it": [
+    "Istruzioni del progetto",
+    "Si applicano a tutte le chat di questo progetto dal prossimo messaggio. Il prompt di ogni chat può precisarle. Lascia vuoto per disattivarle.",
+    "Le istruzioni del progetto ammettono fino a 12.000 caratteri."
+  ],
+  "tr": [
+    "Proje talimatları",
+    "Bir sonraki mesajdan itibaren bu projenin tüm sohbetlerine uygulanır. Her sohbetin istemi bunları özelleştirebilir. Devre dışı bırakmak için boş bırakın.",
+    "Proje talimatları en fazla 12.000 karakter içerebilir."
+  ],
+  "zh-CN": [
+    "项目指令",
+    "从下一条消息起应用于此项目中的所有聊天。每个聊天的提示词可以进一步细化这些指令。留空可停用。",
+    "项目指令最多支持12,000个字符。"
+  ],
+  "zh-TW": [
+    "專案指令",
+    "從下一則訊息起套用於此專案中的所有聊天。每個聊天的提示詞可以進一步細化這些指令。留空即可停用。",
+    "專案指令最多支援12,000個字元。"
+  ],
+  "ja": [
+    "プロジェクトの指示",
+    "次のメッセージから、このプロジェクトのすべてのチャットに適用されます。各チャットのプロンプトで詳細を指定できます。無効にするには空欄にしてください。",
+    "プロジェクトの指示は12,000文字まで入力できます。"
+  ],
+  "ko": [
+    "프로젝트 지침",
+    "다음 메시지부터 이 프로젝트의 모든 채팅에 적용됩니다. 각 채팅의 프롬프트로 구체화할 수 있습니다. 비워 두면 비활성화됩니다.",
+    "프로젝트 지침은 최대 12,000자까지 입력할 수 있습니다."
+  ]
+};
+for (const [language, values] of Object.entries(projectInstructionTranslations)) translations[language].push(...values);
 export const RESEARCH_CHAT_HISTORY_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

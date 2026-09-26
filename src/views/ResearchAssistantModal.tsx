@@ -1,3 +1,4 @@
+import { ProjectInstructionsDialog } from '../components/ProjectInstructionsDialog';
 import { ResearchActivityPanel } from '../components/ResearchActivityPanel';
 import { ResearchWebSearchControl } from '../components/ResearchWebSearchControl';
 import { ResearchWebSources } from '../components/ResearchWebSources';
@@ -174,6 +175,7 @@ export function ResearchAssistantModal({
   organizerRef.current = organizer;
   const supportsProjects = !!organizer;
   const [projects, setProjects] = useState<ResearchChatProject[]>([]);
+  const [editingProjectInstructions, setEditingProjectInstructions] = useState<ResearchChatProject | null>(null);
   // Folders inside projects. The tree's selection is one state, shown in the history and
   // on the project's page alike.
   const [projectFolders, setProjectFolders] = useState<ResearchChatProjectFolder[]>([]);
@@ -442,7 +444,7 @@ export function ResearchAssistantModal({
     await refreshConversations();
     return created;
   };
-  const updateProject = async (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+  const updateProject = async (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }) => {
     await organizer!.updateProject(project.id, patch);
     await refreshConversations();
   };
@@ -949,6 +951,7 @@ export function ResearchAssistantModal({
               onDeleteConversation={setPendingDelete}
               onMoveConversation={moveConversation}
               onUpdateProject={updateProject}
+              onEditProjectInstructions={setEditingProjectInstructions}
               onDeleteProject={deleteProject}
               folderTree={folderTree}
               folderActions={folderActions}
@@ -965,6 +968,7 @@ export function ResearchAssistantModal({
             {projectHome && activeProject && <header className="research-project-title">
               <span style={{ color: activeProject.color ?? undefined }}><Icon name={activeProject.icon ?? 'folder'} size={30} /></span>
               <h2>{activeProject.name}</h2>
+              <button type="button" className="btn btn-ghost text-xs" onClick={() => setEditingProjectInstructions(activeProject)}><Icon name="brain" size={14} />{t('Instrucciones del proyecto')}</button>
             </header>}
             <div className="relative flex-1 min-h-0">
               {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} webDisabled={webSearch === 'off'} disabledLayers={[...(contextLayers.ideas ? [] : ['ideas', 'graph'] as const), ...(contextLayers.documents ? [] : ['profiles', 'nodus', 'zotero', 'context'] as const)]} />}
@@ -1293,6 +1297,9 @@ export function ResearchAssistantModal({
           if (id && created) openNotebook(id);
           else if (id && id === activeNotebookId) void refreshNotebookPreparation(id);
         }} />}
+      {editingProjectInstructions && <ProjectInstructionsDialog project={editingProjectInstructions}
+        onClose={() => setEditingProjectInstructions(null)}
+        onSave={instructions => updateProject(editingProjectInstructions, { instructions })} />}
       {pendingDelete && (
         <ConfirmModal
           title={t('Eliminar conversación')}
