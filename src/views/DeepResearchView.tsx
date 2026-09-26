@@ -2103,7 +2103,7 @@ function ReaderView({
         <button className="btn btn-ghost gap-1.5" onClick={onBack}>
           <Icon name="chevronLeft" /> {t('Volver a la galería')}
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-48 flex-1">
           <div className="truncate text-sm font-semibold text-neutral-100" title={appliedTranslation?.title ?? saved.title}>{appliedTranslation?.title ?? saved.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <span className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</span>

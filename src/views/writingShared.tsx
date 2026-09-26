@@ -160,7 +160,9 @@ export function DraftResultMain({
       <div className="space-y-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold break-words">{draft.title}</h2>
-          {draft.abstract && <p className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>{draft.abstract}</p>}
+          {draft.abstract && <div data-testid="draft-abstract" className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>
+            <Markdown content={draft.abstract} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
+          </div>}
         </div>
         {!hideActions && (
           <DraftActionBar
