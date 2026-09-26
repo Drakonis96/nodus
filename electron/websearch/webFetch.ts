@@ -71,15 +71,50 @@ export async function fetchScholarlyFallback(url: string, signal: AbortSignal): 
   } catch { return null; }
 }
 
+/** The languages Nodus answers in, keyed by both spellings the two URL forms use:
+ * ELI paths carry the three-letter code (`…/oj/spa`) and `legal-content` the
+ * two-letter one (`/legal-content/ES/TXT`). */
+const EU_LANGUAGES: Record<string, string> = {
+  es: 'spa', spa: 'spa', en: 'eng', eng: 'eng', fr: 'fra', fra: 'fra', de: 'deu', deu: 'deu', pt: 'por', por: 'por', it: 'ita', ita: 'ita',
+  tr: 'tur', tur: 'tur', ru: 'rus', rus: 'rus', uk: 'ukr', ukr: 'ukr', ja: 'jpn', jpn: 'jpn', ko: 'kor', kor: 'kor', vi: 'vie', vie: 'vie', zh: 'zho', zho: 'zho',
+};
+/** ELI document types, as their CELEX sector letters. */
+const EU_ACT_SECTORS: Record<string, string> = { reg: 'R', dir: 'L', dec: 'D' };
+
+/** The Publications Office copy of an EU legal act, or null for anything else.
+ *
+ * EUR-Lex renders its pages client-side: a reader gets an empty document and the
+ * web step ends up citing a reprint of the regulation somewhere else. The same act
+ * is one request away from the Publications Office, which serves it as a document
+ * once it is asked for the right content type and language. The ELI path carries
+ * everything the CELEX identifier needs (`/eli/reg/2024/1689/oj/eng` → `32024R1689`),
+ * and the `?uri=CELEX:…` form carries it directly. */
+export function publicationsOfficeTarget(raw: string): { url: string; language: string } | null {
+  let source: URL;
+  try { source = new URL(raw); } catch { return null; }
+  if (!/(^|\.)(eur-lex\.europa\.eu|publications\.europa\.eu)$/i.test(source.hostname)) return null;
+  const fromQuery = /[?&]uri=celex[:%3a]*([0-9]{5}[a-z]{1,2}[0-9]+)/i.exec(source.search)?.[1];
+  const fromEli = /^\/eli\/(reg|dir|dec)\/(\d{4})\/(\d+)\//i.exec(source.pathname);
+  const celex = fromQuery ? fromQuery.toUpperCase() : fromEli ? `3${fromEli[2]}${EU_ACT_SECTORS[fromEli[1].toLowerCase()]}${fromEli[3]}` : null;
+  if (!celex) return null;
+  // The language is the last three-letter segment of an ELI path (`…/oj/spa`), or
+  // the two-letter one right after `legal-content` (`/legal-content/ES/TXT`).
+  const segments = source.pathname.split('/').filter(Boolean);
+  const declared = (/^legal-content\/([a-z]{2})(\/|$)/i.exec(segments.join('/'))?.[1]
+    ?? [...segments].reverse().find(segment => /^[a-z]{3}$/i.test(segment)) ?? '').toLowerCase();
+  return { url: `http://publications.europa.eu/resource/celex/${celex}`, language: EU_LANGUAGES[declared] ?? EU_LANGUAGES[declared.slice(0, 2)] ?? 'eng' };
+}
+
 async function fetchPage(url: string, signal: AbortSignal, limits: typeof WEB_PAGE_LIMITS, language: string): Promise<FetchedWebPage> {
   const fixture = researchWebFixture();
   const timeout = AbortSignal.timeout(limits.timeoutMs);
   const combined = AbortSignal.any([signal, timeout]);
+  const official = publicationsOfficeTarget(url);
   let result;
   try {
-    result = await fetchPublicResource(url, {
-      accept: 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.1',
-      headers: { 'User-Agent': USER_AGENT, 'Accept-Language': language },
+    result = await fetchPublicResource(official?.url ?? url, {
+      accept: official ? 'application/xhtml+xml' : 'text/html,application/xhtml+xml,application/pdf;q=0.9,text/plain;q=0.8,*/*;q=0.1',
+      headers: { 'User-Agent': USER_AGENT, 'Accept-Language': official ? official.language : language },
       maxBytes: limits.pdfBytes, timeoutMs: limits.timeoutMs, signal: combined,
       ...(fixture ? { fetcher: fetch, assertPublic: async (raw: string) => {
         const target = new URL(raw);
@@ -95,14 +130,16 @@ async function fetchPage(url: string, signal: AbortSignal, limits: typeof WEB_PA
     const status = Number(/returned (\d{3})/.exec(message)?.[1] ?? 0);
     throw new WebFetchError(status === 401 || status === 403 || status === 429 || status === 451 ? 'blocked' : status === 404 || status === 410 ? 'not_found' : /larger than/.test(message) ? 'too_large' : 'failed', message.slice(0, 200));
   }
+  // An official copy is cited by the address the reader recognises, not by the API.
+  const finalUrl = official ? url : result.finalUrl;
   const contentType = (result.response.headers.get('content-type') ?? '').toLowerCase();
   try {
-    const isPdf = contentType.includes('application/pdf') || /\.pdf($|\?)/i.test(new URL(result.finalUrl).pathname);
+    const isPdf = contentType.includes('application/pdf') || /\.pdf($|\?)/i.test(new URL(finalUrl).pathname);
     const isHtml = /text\/html|application\/xhtml|application\/xml|text\/xml/.test(contentType) || (!contentType && !isPdf);
     if (!isPdf && !isHtml && !contentType.startsWith('text/plain')) { await result.response.body?.cancel().catch(() => {}); throw new WebFetchError('unsupported'); }
     const bytes = await readBounded(result.response, isPdf ? limits.pdfBytes : limits.htmlBytes, combined);
-    if (isPdf || Buffer.from(bytes.subarray(0, 5)).toString('latin1') === '%PDF-') return { url, finalUrl: result.finalUrl, kind: 'pdf', body: bytes, contentType };
-    return { url, finalUrl: result.finalUrl, kind: contentType.startsWith('text/plain') ? 'text' : 'html', body: decode(bytes, contentType), contentType };
+    if (isPdf || Buffer.from(bytes.subarray(0, 5)).toString('latin1') === '%PDF-') return { url, finalUrl, kind: 'pdf', body: bytes, contentType };
+    return { url, finalUrl, kind: contentType.startsWith('text/plain') ? 'text' : 'html', body: decode(bytes, contentType), contentType };
   } catch (error) {
     if (error instanceof WebFetchError) throw error;
     if (signal.aborted) throw new WebFetchError('cancelled');

@@ -56,21 +56,44 @@ as a limitation in the activity panel; a bot check is never worked around.
 
 ## Engines
 
-`settings.yml` keeps a curated list: the general engines (`duckduckgo`, `brave`,
-`bing`, `wikipedia`) and the scholarly ones (`arxiv`, `semantic scholar`,
-`openalex`, `pubmed`, `europepmc`, `google scholar`; `crossref` ships disabled).
-Startpage, Mojeek and `qwant` are out: upstream disables the first two for test
-CAPTCHAs, and Qwant returned nothing in every measured campaign.
+`settings.yml` keeps a curated list: the general engines (`duckduckgo web`,
+`brave`, `bing`, `yahoo`, `seznam`, `wikipedia`) and the scholarly ones (`arxiv`,
+`semantic scholar`, `openalex`, `pubmed`, `europepmc`, `google scholar`;
+`crossref` ships disabled). `qwant` is out (it returned nothing in every measured
+campaign), `marginalia` needs an API key, and `mojeek` and `startpage` answered
+with nothing at all.
 
 The general engines are the fragile half, and that is a property of scraping
-search engines rather than of this integration. In the campaigns of 2026-09-26,
-DuckDuckGo answered the first query of every session with a CAPTCHA and Brave
-served one burst after a long idle and then rate-limited itself, while the
-API-backed engines (arXiv, OpenAlex, EuropePMC, Google Scholar) never degraded —
-including while the machine fired thousands of queries. Two changes were tried
-and reverted because they made retrieval worse: putting the scholarly engines
-inside the general category (the academic consensus crowded the open web out of
-the answer) and rescuing an empty general query through them.
+search engines rather than of this integration. Two measurements of 2026-09-26
+shaped the list:
+
+- The plain `duckduckgo` engine answered the first query of every session with a
+  CAPTCHA and never returned a result, while `duckduckgo web` — the same index
+  reached with a browser fingerprint through `curl_cffi` — returned ten results
+  **in the same invocation**. The plain engine is therefore not in the list: it
+  only contributed the CAPTCHA, the wait and a `web_engine_blocked` limitation on
+  every run. Yahoo and Seznam answered throughout and stayed.
+- Brave is the opposite: it serves one burst after a long idle and then
+  rate-limits itself, and the API-backed engines never degrade at all. Two changes
+  were tried and reverted because they made retrieval worse: putting the scholarly
+  engines inside the general category (the academic consensus crowded the open web
+  out of the answer) and rescuing an empty general query through them.
+
+With the list as it stands, the question that had failed twice with no evidence at
+all — the entry-into-application dates of the EU AI Act — was answered from six
+real pages, including the European Commission's own service desk, in one round and
+ten seconds.
+
+## EU legal acts
+
+EUR-Lex renders its pages client-side: a reader gets an empty document, which is
+why the first campaigns cited a reprint of the AI Act instead of the regulation.
+The Publications Office serves the same act as a document once it is asked for the
+right content type and language, so `electron/websearch/webFetch.ts` maps an ELI
+path (`/eli/reg/2024/1689/oj/spa`) or a `?uri=CELEX:…` reference to
+`publications.europa.eu/resource/celex/32024R1689` with
+`Accept: application/xhtml+xml` and the act's own language. The citation keeps the
+EUR-Lex address, which the app's Browser renders normally.
 
 ## Verifying it
 
@@ -82,10 +105,12 @@ session directory, which is what the platform workflow runs.
 
 ## Known gaps
 
-- Official legal portals (EUR-Lex) often extract to nothing: their text is
-  rendered client-side, so the answer falls back to a reprint elsewhere.
-- Questions about current affairs rest on few sources while the scraped general
-  engines are blocked; an API-keyed search provider is the only real fix.
 - Run-to-run stability of the evidence set is still below the bar set for this
   work; the numbers and the experiment that would settle it are in
   `docs/research-evidence/web-search-acceptance.md`.
+- The general engines can still all be blocked at once by an address that has
+  searched a great deal; an optional API-keyed provider (Brave's own API serves
+  the same index) is the durable fix, and it is a product decision.
+- EU legal acts are covered; other official portals with client-side rendering
+  (national gazettes, some ministries) are not, and would need the same kind of
+  documented API route one at a time.

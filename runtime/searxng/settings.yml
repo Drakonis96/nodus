@@ -6,9 +6,11 @@
 use_default_settings:
   engines:
     keep_only:
-      - duckduckgo
+      - duckduckgo web
       - brave
       - bing
+      - yahoo
+      - seznam
       - qwant
       - wikipedia
       - arxiv
@@ -56,11 +58,21 @@ plugins:
     active: true
 
 engines:
-  - name: duckduckgo
+  # The plain DuckDuckGo engine answers with a CAPTCHA from addresses that have
+  # searched a lot, while its browser-impersonating variant (curl_cffi, a Firefox
+  # fingerprint) keeps returning results from the same address; measured on
+  # 2026-09-26, when it was the only general engine that never gave up. Yahoo and
+  # Seznam add two more general sources that answered throughout the campaigns.
+  - name: duckduckgo web
+    engine: duckduckgo_web
     disabled: false
   - name: brave
     disabled: false
   - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: seznam
     disabled: false
   - name: qwant
     disabled: true

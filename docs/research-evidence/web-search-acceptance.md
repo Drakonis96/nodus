@@ -131,22 +131,44 @@ rest. The AI Act question read only academic landing pages — the pages the
 official sources would have been found on never reached the pool — and the
 passage rater rejected everything it saw there, twice.
 
-## What is still open
+## Two fixes the rounds pointed at, and what they changed
 
-1. **Stability.** The same question asked twice still assembles a different set of
-   pages. The mechanism is understood (discovery depends on which engines answer,
-   and the reformulation round depends on what the first round found) but not
-   solved. The experiment that would settle it: alternate the two configurations
-   within one session, three repeats per question, and compare the evidence sets.
-2. **Current affairs.** With DuckDuckGo answering CAPTCHA and Brave rate-limiting
-   itself, the open-web layer is Bing alone, so a question about today's rules
-   rests on one source. An API-keyed search provider is the only real fix, and it
-   is a product decision.
-3. **Official portals.** EUR-Lex returns no text through the extractor, so the
-   answer leans on a reprint of the regulation elsewhere. This is an extraction
-   gap, not a ranking one.
-4. **The packaged runtime on every platform.** `scripts/verify-managed-searxng.mjs`
-   passes on macOS arm64 (ready, loopback only, 403 without the token, real JSON
-   results, clean stop, no orphan after `SIGKILL` of the parent). The workflow step
-   and the installer checks for Windows, Linux and Intel macOS are written but have
-   not run: that needs the branch pushed.
+**The general engines were reachable all along.** The plain `duckduckgo` engine
+answered with a CAPTCHA from this address while `duckduckgo web` — the same index
+reached with a browser fingerprint through `curl_cffi` — returned ten results *in
+the same invocation*. Yahoo and Seznam answered throughout and stayed. The list
+now reads `duckduckgo web`, `brave`, `bing`, `yahoo`, `seznam`, `wikipedia` plus
+the scholarly set, and the general layer went from "Bing alone with ten results"
+to four engines returning 28–70 results each, in every invocation of the final
+round, while Brave, Google Scholar and OpenAlex were still rate-limited or
+CAPTCHA'd. (`marginalia` needs an API key; `mojeek` and `startpage` answered with
+nothing.)
+
+**An EU legal act is one request away.** EUR-Lex renders client-side, so the
+official text was unreachable; the Publications Office returns the same act as a
+document with `Accept: application/xhtml+xml` and the act's own language
+(1.35 MB of Spanish XHTML, containing the entry-into-application dates). The fetch
+layer now maps an ELI path or a `?uri=CELEX:…` reference to the Publications
+Office resource and keeps the EUR-Lex address for the citation.
+
+The round that followed those two changes, same pace and same questions:
+
+| Question | Precision | Strong | Relevant sources | Domains | Dominant page | Latency |
+| --- | --- | --- | --- | --- | --- | --- |
+| Represión franquista | 1.00 | 0.86 | 6 | 5 | 0.29 | 21.5 s |
+| Halbwachs / memoria colectiva | 0.83 | 0.67 | 3 | 4 | 0.50 | 17.6 s |
+| Críticas a Putnam | 0.80 | 0.80 | 2 | 2 | 0.60 | 17.0 s |
+| AI Act: plazos | 0.88 | 0.75 | 4 | 4 | 0.38 | 7.1 s |
+
+The question that had failed twice with no evidence at all was answered from six
+real pages, including the European Commission's own AI Act service desk, and
+reached sufficiency in a single round. Across the four questions the bar now
+reads:
+
+| Bar | State |
+| --- | --- |
+| ≥80 % of passages relevant | **Met in 4 of 4** (0.80–1.00) |
+| ≥3 distinct relevant sources on non-trivial questions | Met in 3 of 4 (the Putnam question kept two) |
+| No page supplies >40 % of the evidence | Met in 2 of 4 (0.29 and 0.38; the other two 0.50 and 0.60) |
+| Run-to-run stability (URL Jaccard ≥0.6) | **Not met**: 0.17–0.50 measured across the earlier rounds |
+| p50 web step <15 s in balanced | Met in 1 of 4 (7.1 s); the rest 17–22 s |
