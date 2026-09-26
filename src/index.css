@@ -369,6 +369,61 @@ body {
   transition-duration: 0.001ms !important;
 }
 
+/* App-wide tooltip for every `title` attribute (src/tooltipLayer.ts). It is a manual
+   popover in the top layer, so these rules also reset the UA popover box (inset,
+   margin, border, Canvas colours). Size is in rem so it follows the interface scale. */
+.nodus-tooltip {
+  --tooltip-shift: translateY(3px);
+  position: fixed;
+  inset: auto;
+  z-index: 2147483647;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(22rem, calc(100vw - 16px));
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #404040;
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  background: #171717;
+  color: #f5f5f5;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.36);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: start;
+  pointer-events: none;
+  user-select: none;
+  animation: nodus-tooltip-in 110ms ease-out;
+}
+.nodus-tooltip[data-placement='bottom'] { --tooltip-shift: translateY(-3px); }
+.nodus-tooltip[data-placement='left'] { --tooltip-shift: translateX(3px); }
+.nodus-tooltip[data-placement='right'] { --tooltip-shift: translateX(-3px); }
+/* Keeps line breaks the title carries, wraps paths and URLs, and caps a long
+   description instead of letting it run off the window. */
+.nodus-tooltip-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 14;
+  overflow: hidden;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+@keyframes nodus-tooltip-in {
+  from { opacity: 0; transform: var(--tooltip-shift); }
+  to { opacity: 1; transform: none; }
+}
+.light .nodus-tooltip {
+  border-color: #d4d4d4;
+  background: #ffffff;
+  color: #262626;
+  box-shadow: 0 8px 24px rgb(15 23 42 / 0.16);
+}
+html.theme-active.dark .nodus-tooltip { border-color: var(--theme-border-dark); background: var(--n-950); color: var(--theme-text-dark); }
+html.theme-active.light .nodus-tooltip { border-color: var(--theme-border-light); background: var(--n-50); color: var(--theme-text-light); }
+.high-contrast .nodus-tooltip { border-color: #ffffff; background: #000000; color: #ffffff; }
+.high-contrast.light .nodus-tooltip { border-color: #000000; background: #ffffff; color: #000000; }
+
 @keyframes study-plan-progress {
   0% {
     transform: translateX(-120%);
