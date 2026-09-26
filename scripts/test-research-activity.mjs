@@ -71,7 +71,7 @@ try {
   assert.equal(state[0].status, 'active', 'state updates are immutable');
   // The panel is a fixed list of every layer a research turn can consult, in the order
   // the flow consults them, each reduced to one state for this request only.
-  assert.deepEqual(RESEARCH_ACTIVITY_LAYER_ORDER, ['scope', 'profiles', 'ideas', 'nodus', 'context', 'graph', 'zotero', 'attachments', 'tools', 'response']);
+  assert.deepEqual(RESEARCH_ACTIVITY_LAYER_ORDER, ['scope', 'profiles', 'ideas', 'nodus', 'context', 'graph', 'zotero', 'attachments', 'tools', 'web', 'response']);
   const at = (layer, operation, status, count) => ({ id: `${layer}-${operation}-${status}-${count}`, layer, operation, status, startedAt: 1, ...(count === undefined ? {} : { count }) });
   const summary = Object.fromEntries(summarizeResearchActivity([
     at('scope', 'resolve', 'completed'),
@@ -82,7 +82,7 @@ try {
     at('profiles', 'lexical', 'failed'), at('profiles', 'semantic', 'completed', 0),
     at('response', 'write', 'cancelled'),
   ]).map(entry => [entry.layer, entry]));
-  assert.equal(summarizeResearchActivity([]).length, 10, 'every layer is listed before anything runs');
+  assert.equal(summarizeResearchActivity([]).length, 11, 'every layer is listed before anything runs');
   assert.ok(summarizeResearchActivity([]).every(entry => entry.state === 'idle'));
   assert.equal(summary.scope.state, 'completed');
   assert.equal(summary.nodus.state, 'completed', 'one decisive operation makes the layer decisive');

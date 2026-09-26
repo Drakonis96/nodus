@@ -67,20 +67,13 @@ engines:
   - name: wikipedia
     disabled: false
     display_type: ["list"]
-  # The multidisciplinary scholarly engines also serve the general category: with
-  # every scraped engine blocked or parked, a general query still finds the
-  # literature instead of coming back empty. The biomedical engines (PubMed,
-  # EuropePMC) stay out of it, where their reading of "memory" or "cell" is noise.
   - name: arxiv
     disabled: false
-    categories: [general, science]
   - name: semantic scholar
     disabled: false
-    categories: [general, science]
   - name: openalex
     disabled: false
     timeout: 6.0
-    categories: [general, science]
   - name: crossref
     disabled: true
     timeout: 8.0
@@ -90,4 +83,3 @@ engines:
     disabled: false
   - name: google scholar
     disabled: false
-    categories: [general, science]

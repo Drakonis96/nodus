@@ -13,6 +13,13 @@ const load = file => require(path.join(repoRoot, file));
 try {
   const { validResearchAction } = load('shared/researchActions.ts');
   for (const value of [{ action: 'web', query: 'anything' }, { action: 'finish', command: 'anything' }, { action: 'original', documentId: 'x', from: 1, to: 100 }, { action: 'read', documentId: 'x', operation: { kind: 'search', query: 'a', path: '/etc/passwd' } }]) assert.equal(validResearchAction(value), false);
+  // The web step exists only for the runs that were granted it: same action, two answers.
+  const web = { action: 'web', queries: ['represión franquista posguerra víctimas'], intent: 'expand' };
+  assert.equal(validResearchAction(web), false, 'a library-only run never accepts a web step');
+  assert.equal(validResearchAction(web, true), true);
+  assert.equal(validResearchAction({ ...web, queries: [] }, true), false);
+  assert.equal(validResearchAction({ ...web, queries: ['a', 'b', 'c', 'd', 'e'] }, true), false);
+  assert.equal(validResearchAction({ ...web, intent: 'browse' }, true), false);
   const db = load('electron/db/database.ts').getDb();
   db.prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES('inside','inside','Inside','[]','book','text')").run();
   const passages = load('electron/db/passagesRepo.ts');

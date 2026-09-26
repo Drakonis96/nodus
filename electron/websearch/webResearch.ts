@@ -261,13 +261,16 @@ export async function runWebResearch(input: WebResearchInput, deps: WebResearchD
     if (!selected.length && !queries.length) break;
     // A page that refuses or fails leaves its slot empty; the next best candidate
     // from a site that has not refused yet takes it, so the step does not end short
-    // of evidence because the budget went to pages with nothing behind them.
+    // of evidence because the budget went to pages with nothing behind them. Every
+    // attempt spends a slot and only a failed one gives it back: the round never
+    // reads more pages than it was allowed, which would only dilute the evidence.
     let slots = selected.length;
     let attempt = selected;
     for (let pass = 0; attempt.length && pass < 3 && !signal.aborted; pass++) {
       const before = outcome.consulted.length;
       await readPages(attempt, round);
-      slots -= outcome.consulted.slice(before).filter(page => page.outcome !== 'read').length;
+      const outcomes = outcome.consulted.slice(before);
+      slots -= outcomes.length - outcomes.filter(page => page.outcome !== 'read').length;
       if (slots <= 0 || signal.aborted) break;
       attempt = selectPagesToRead(ranked, visited, readDomains, Math.max(slots, 6), 3, 0.12, 0.1, refusedDomains()).slice(0, slots);
     }
@@ -361,6 +364,13 @@ async function choosePassages(input: WebResearchInput, deps: WebResearchDeps, pa
     if (shortlist.some(item => ratings.has(item.key))) {
       pool = shortlist.filter(item => (ratings.get(item.key) ?? 0) >= 1);
       for (const item of pool) item.relevance = (ratings.get(item.key) === 2 ? 0.7 : 0.4) + 0.3 * item.relevance;
+      // The model's own reading decides: at most a third of the evidence may be
+      // background that does not answer the question, however many such passages
+      // the pages offered. An answer made of background reads as an answer about
+      // the subject rather than to the question.
+      const strong = pool.filter(item => ratings.get(item.key) === 2);
+      const background = pool.filter(item => ratings.get(item.key) !== 2);
+      pool = [...strong, ...background.slice(0, Math.max(1, Math.floor(limits.passages / 3)))];
     }
   }
   const chosen = selectWebPassages(pool, limits.passages, { perPage: 3, perDomain: 3, floor: 0 });

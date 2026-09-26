@@ -72,16 +72,22 @@ async function deepseekJson(system, user, maxTokens, guard, reasoning = false) {
   const reservation = ledger.reserve({ provider: 'deepseek', model: 'deepseek-flash', maximumUsd });
   let usage = { prompt_tokens: 0, completion_tokens: 0 };
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-      body: JSON.stringify({ model: 'deepseek-flash', temperature: 0, max_tokens: maxTokens, ...(reasoning ? { reasoning_effort: 'high' } : { thinking: { type: 'disabled' } }), response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }), signal: AbortSignal.timeout(60_000) });
-    const body = await response.json();
-    usage = body.usage ?? usage;
-    if (!response.ok) throw new Error(`deepseek ${response.status}: ${JSON.stringify(body).slice(0, 200)}`);
-    const value = JSON.parse(body.choices?.[0]?.message?.content ?? 'null');
-    if (!guard(value)) throw new Error('invalid json shape');
-    return value;
+    // The reasoner occasionally spends its whole allowance on thinking and returns an
+    // empty answer; that costs a question's measurement, so it is asked once more.
+    for (let attempt = 1; ; attempt++) {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+        body: JSON.stringify({ model: 'deepseek-flash', temperature: 0, max_tokens: maxTokens, ...(reasoning ? { reasoning_effort: 'high' } : { thinking: { type: 'disabled' } }), response_format: { type: 'json_object' },
+          messages: [{ role: 'system', content: system }, { role: 'user', content: user }] }), signal: AbortSignal.timeout(60_000) });
+      const body = await response.json();
+      usage = body.usage ?? usage;
+      if (!response.ok) throw new Error(`deepseek ${response.status}: ${JSON.stringify(body).slice(0, 200)}`);
+      const content = body.choices?.[0]?.message?.content;
+      if (!content && attempt < 2) { console.warn('[campaign] empty model answer, asking once more'); continue; }
+      const value = JSON.parse(content ?? 'null');
+      if (!guard(value)) throw new Error('invalid json shape');
+      return value;
+    }
   } finally {
     const actual = Math.min(maximumUsd, (usage.prompt_tokens * PRICES.deepseek.input + usage.completion_tokens * PRICES.deepseek.output) / 1e6);
     ledger.settle(reservation, { actualUsd: usage.prompt_tokens ? actual : maximumUsd, inputTokens: usage.prompt_tokens ?? 0, outputTokens: usage.completion_tokens ?? 0 });

@@ -67,17 +67,15 @@ export function webDomain(raw: string): string {
 const STRONG = ['doi.org', 'arxiv.org', 'nih.gov', 'europepmc.org', 'semanticscholar.org', 'openalex.org', 'nature.com', 'science.org', 'plos.org', 'frontiersin.org', 'hal.science',
   'archives-ouvertes.fr', 'persee.fr', 'redalyc.org', 'doaj.org', 'stanford.edu', 'britannica.com', 'europa.eu', 'un.org', 'who.int', 'oecd.org', 'worldbank.org', 'imf.org',
   'unesco.org', 'rah.es', 'cervantesvirtual.com', 'bne.es', 'csic.es', 'ine.es', 'boe.es', 'acm.org', 'ieee.org', 'biorxiv.org', 'medrxiv.org', 'pnas.org', 'bmj.com',
-  'thelancet.com', 'nejm.org', 'cell.com', 'iep.utm.edu', 'ucm.es', 'mdpi.com', 'core.ac.uk', 'unirioja.es'];
+  'thelancet.com', 'nejm.org', 'cell.com', 'iep.utm.edu', 'ucm.es', 'mdpi.com', 'core.ac.uk', 'unirioja.es',
+  'springer.com', 'wiley.com', 'oup.com', 'tandfonline.com', 'sagepub.com', 'cambridge.org', 'cairn.info'];
 /** Open-access networks that publish under a country domain each (scielo.org.mx,
  * scielo.cl, redalyc.org…): the Spanish and Portuguese American literature lives
  * here, so they count as scholarly whatever their TLD. */
 const OPEN_NETWORK = /(^|\.)(scielo|redalyc|dialnet|latindex)\.[a-z]{2,3}(\.[a-z]{2})?$/;
 /** Hosts that answer a reader with a login, a paywall or a bot check: they rank
- * below everything else, so the read budget lands on pages that have text. */
+ * below everything else and are never read, because the text is not there. */
 const WALLED = ['jstor.org', 'sciencedirect.com', 'ssrn.com', 'researchgate.net', 'academia.edu'];
-/** Commercial publishers: their landing pages carry an abstract, rarely the full
- * text, so an open repository copy of the same work is worth reading first. */
-const PUBLISHER = ['springer.com', 'wiley.com', 'oup.com', 'tandfonline.com', 'sagepub.com', 'cambridge.org', 'cairn.info'];
 const GOOD = ['wikipedia.org', 'reuters.com', 'apnews.com', 'bbc.com', 'bbc.co.uk', 'elpais.com', 'theguardian.com', 'nytimes.com', 'lemonde.fr', 'economist.com',
   'nationalgeographic.com', 'smithsonianmag.com', 'theconversation.com', 'historia.nationalgeographic.com.es', 'rtve.es', 'eldiario.es', 'nasa.gov', 'noaa.gov'];
 const WEAK = ['pinterest.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'x.com', 'twitter.com', 'youtube.com', 'youtu.be', 'quora.com', 'amazon.com', 'amazon.es',
@@ -93,7 +91,6 @@ export function webDomainPrior(raw: string): number {
   const matches = (list: string[]) => list.some(entry => domain === entry || host === entry || host.endsWith(`.${entry}`));
   if (matches(WEAK)) return -0.7;
   if (matches(WALLED)) return -0.2;
-  if (matches(PUBLISHER)) return 0.4;
   if (OPEN_NETWORK.test(host)) return 0.8;
   if (matches(STRONG) || /\.(edu|gov|mil|int)$/.test(host) || /\.(ac|edu|gov|gob|gouv)\.[a-z]{2}$/.test(host) || /(^|\.)(gob|gouv|gov)\.[a-z]{2,3}$/.test(host)) return 0.8;
   if (matches(GOOD) || /\.(org)$/.test(host)) return 0.35;
