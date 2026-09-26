@@ -72,13 +72,19 @@ const runtime = {
  *  how pip resolves — but the interpreter is a real one, which a shim pretending to be a
  *  `python.exe` could not be on Windows. */
 function installFakeRuntime() {
-  const dir = path.join(profile, 'plugins', 'runtimes', 'alphagenome', 'alphagenome');
+  // Shared environments are content-addressed by lock digest; a pointer under the plugin's
+  // own directory names the environment this capability's runtime resolves to.
+  const digest = 'b'.repeat(64);
+  const dir = path.join(profile, 'plugins', 'runtimes', 'shared', digest);
   const venv = path.join(dir, 'venv');
   fs.mkdirSync(dir, { recursive: true });
   // Built once and reused, and rebuilt if a test removed it: a virtual environment takes
   // a few seconds and this asks for one several times.
   if (!fs.existsSync(venv)) execFileSync(interpreter, ['-m', 'venv', venv], { stdio: 'pipe' });
-  fs.writeFileSync(path.join(dir, 'READY'), 'ready');
+  fs.writeFileSync(path.join(dir, 'READY'), digest);
+  const pointers = path.join(profile, 'plugins', 'runtimes', 'alphagenome');
+  fs.mkdirSync(pointers, { recursive: true });
+  fs.writeFileSync(path.join(pointers, 'alphagenome.json'), JSON.stringify({ schemaVersion: 1, lockDigest: digest, python: '3.12.0' }));
   return dir;
 }
 
@@ -144,6 +150,38 @@ test('a worker cannot ask for a credential the manifest did not declare for this
   await assert.rejects(
     services({ runtime: elsewhere, channel: 'python', method: 'run', payload: { runtimeId: 'alphagenome', args: ['-I', probe], secretId: 'api-key', timeoutMs: 30_000 }, signal: new AbortController().signal }),
     /not configured/,
+  );
+});
+
+test('an environment is shared by lock digest across capabilities', async (t) => {
+  if (!interpreter) { t.skip('no Python interpreter on this machine'); return; }
+  installFakeRuntime();
+  const probe = path.join(scratch, 'probe.py');
+  fs.writeFileSync(probe, PROBE);
+
+  // A different capability whose runtime points at the same lock digest reuses the one
+  // environment; nothing is rebuilt for it.
+  const chemistry = {
+    ...runtime,
+    capabilityId: 'nodus:chemistry',
+    plugin: { id: 'chemistry-studio', version: '2.5.7', digest: 'c'.repeat(64) },
+  };
+  const pointers = path.join(profile, 'plugins', 'runtimes', 'chemistry-studio');
+  fs.mkdirSync(pointers, { recursive: true });
+  fs.writeFileSync(path.join(pointers, 'chemistry.json'), JSON.stringify({ schemaVersion: 1, lockDigest: 'b'.repeat(64), python: '3.12.0' }));
+
+  const shared = await lib.runInPythonRuntime(chemistry, { runtimeId: 'chemistry', args: ['-I', probe], timeoutMs: 60_000 }, new AbortController().signal);
+  assert.equal(shared.code, 0, shared.stderr);
+
+  // Dropping one plugin's pointer leaves the shared environment for the other.
+  fs.rmSync(path.join(profile, 'plugins', 'runtimes', 'alphagenome'), { recursive: true, force: true });
+  const stillThere = await lib.runInPythonRuntime(chemistry, { runtimeId: 'chemistry', args: ['-I', probe], timeoutMs: 60_000 }, new AbortController().signal);
+  assert.equal(stillThere.code, 0, stillThere.stderr);
+
+  // The plugin whose pointer is gone no longer resolves.
+  await assert.rejects(
+    lib.runInPythonRuntime(runtime, { runtimeId: 'alphagenome', args: ['-c', 'print(1)'], timeoutMs: 10_000 }, new AbortController().signal),
+    /not installed/,
   );
 });
 
