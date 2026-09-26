@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 178;
+export const SCHEMA_VERSION = 179;
 
 export const migrations: Migration[] = [
   {
@@ -9313,6 +9313,36 @@ export const migrations: Migration[] = [
   // Rows written before this column read as 'model', which is what they were.
   { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
   { version: 178, up: `ALTER TABLE chat_messages ADD COLUMN concilium_json TEXT;` },
+  {
+    // Attendance (teaching vault). One row per student per LOCAL day; an empty cell
+    // has no row, so "not recorded" can never be mistaken for "present". The group is
+    // reached through the student, not stored twice. Holidays belong to a group — the
+    // interface offers to copy one to the teacher's other groups, but each group keeps
+    // its own calendar. A holiday hides the marks under it rather than deleting them.
+    version: 179,
+    up: /* sql */ `
+      CREATE TABLE teaching_attendance (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_attendance_key ON teaching_attendance(student_id, date);
+
+      CREATE TABLE teaching_attendance_holidays (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
+    `,
+  },
 ];
 
 /**

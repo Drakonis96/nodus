@@ -104,6 +104,13 @@ function csvCell(s: string): string {
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+/** A plain table (header + rows of text or numbers) as CSV, with the same escaping. */
+export function tableToCsv(header: string[], rows: Array<Array<string | number>>): string {
+  const line = (cells: Array<string | number>) =>
+    cells.map((cell) => (typeof cell === 'number' ? String(cell) : csvCell(cell))).join(',');
+  return [line(header), ...rows.map(line)].join('\r\n');
+}
+
 export function databaseToCsv(columns: DatabaseColumn[], rows: DatabaseRow[]): string {
   const header = columns.map((c) => csvCell(c.name)).join(',');
   const lines = rows.map((r) => columns.map((c) => csvCell(exportCellText(c, r))).join(','));

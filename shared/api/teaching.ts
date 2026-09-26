@@ -5,6 +5,7 @@ import type { RubricCellFillRequest, RubricCellFillResult, RubricExportFormat, R
 import type { AssessmentItem, AssessmentPlan, GradeEntry, PlanRulesPatch } from '../assessment/model';
 import type { ProposedPlan } from '../assessmentImport';
 import type { TeachingGroup, TeachingGroupInput, TeachingStudent } from '../teachingGroups';
+import type { AttendanceExportTables, AttendanceHoliday, AttendanceRecord, AttendanceSheet, AttendanceStatus } from '../teachingAttendance';
 
 export interface TeachingApi {
   // Gradebook (teaching vault). The plan is the programación / guía docente.
@@ -50,6 +51,22 @@ export interface TeachingApi {
   ): Promise<TeachingStudent>;
   deleteTeachingStudent(id: string): Promise<void>;
   importStudentsFromGroup(targetGroupId: string, sourceGroupId: string): Promise<TeachingGroup>;
+  // Attendance (teaching vault). Days are local `YYYY-MM-DD`; ranges include both ends.
+  getAttendanceSheet(groupId: string, from: string, to: string): Promise<AttendanceSheet>;
+  setAttendance(input: { studentId: string; date: string; status: AttendanceStatus; note?: string }): Promise<AttendanceRecord>;
+  clearAttendance(studentId: string, date: string): Promise<void>;
+  /** Marks every student with no mark that day; never overwrites. Returns the day's marks. */
+  fillAttendanceDay(groupId: string, date: string, status?: AttendanceStatus): Promise<AttendanceRecord[]>;
+  setAttendanceHoliday(groupIds: string[], date: string, label?: string): Promise<void>;
+  clearAttendanceHoliday(groupIds: string[], date: string): Promise<void>;
+  attendanceHolidayGroups(date: string): Promise<string[]>;
+  getAttendanceExportData(request: { groupIds: string[]; from: string; to: string }): Promise<Array<{
+    group: TeachingGroup;
+    students: TeachingStudent[];
+    records: AttendanceRecord[];
+    holidays: AttendanceHoliday[];
+  }>>;
+  exportAttendance(format: 'csv' | 'xlsx', tables: AttendanceExportTables, baseName: string): Promise<{ path: string } | null>;
   // Rubric builder (teaching vault).
   listTeachingRubrics(options?: { subjectId?: string | null; search?: string }): Promise<TeachingRubric[]>;
   getTeachingRubric(id: string): Promise<TeachingRubric>;
