@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 186;
+export const SCHEMA_VERSION = 187;
 
 export const migrations: Migration[] = [
   {
@@ -9393,6 +9393,18 @@ export const migrations: Migration[] = [
       text TEXT NOT NULL,
       retrieved_at TEXT NOT NULL
     );
+  ` },
+  // Research chat folders and placements carry their own updated_at, so a folder renamed or
+  // moved, or a chat filed, travels by newest-wins like every other synced row. Without a
+  // stamp the merge keeps whatever the receiving device already had, and a chat moved on
+  // one machine never moved on the other.
+  { version: 187, up: `
+    ALTER TABLE research_chat_project_folders ADD COLUMN updated_at TEXT;
+    UPDATE research_chat_project_folders SET updated_at = created_at WHERE updated_at IS NULL;
+    ALTER TABLE research_chat_placements ADD COLUMN updated_at TEXT;
+    UPDATE research_chat_placements SET updated_at = COALESCE(
+      (SELECT c.updated_at FROM chat_conversations c WHERE c.id = research_chat_placements.conversation_id),
+      pinned_at, '1970-01-01T00:00:00.000Z') WHERE updated_at IS NULL;
   ` },
 ];
 

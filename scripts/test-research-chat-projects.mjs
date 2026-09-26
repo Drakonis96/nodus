@@ -9,6 +9,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { installRuntimeHooks, requireElectronRuntime, repoRoot } from './lib/tsRuntimeHooks.mjs';
+import { checkChatHistoryContract } from './lib/chatHistoryContract.mjs';
 if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--research-chat-projects')) process.exit(0);
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-chat-projects-'));
 installRuntimeHooks(scratch);
@@ -150,7 +151,40 @@ try {
   assert.equal(projects.getChatProjectFolder(sources.id), null);
   assert.deepEqual([chat.getConversation(loose.id).projectId, chat.getConversation(loose.id).folderId], [null, null]);
   assert.equal(projects.listChatProjectFolders().length, 1, 'only the other project\'s folder is left');
-  console.log('Chat projects order, validation, placement, pin limit, archive release, non-destructive project deletion, chat cleanup and folders (nesting, cycles, filing, subtree, deletion) passed.');
+  // The contract every chat history shares, on an emptied history: the three folder rules,
+  // project and pin behaviour, and the repair pass that runs when the database opens.
+  db.exec('DELETE FROM research_chat_placements; DELETE FROM research_chat_project_folders; DELETE FROM research_chat_projects; DELETE FROM chat_messages; DELETE FROM chat_conversations;');
+  const database = load('electron/db/database.ts');
+  checkChatHistoryContract({
+    createConversation: (title, placement = {}) => chat.createConversation({ title, ...placement }).id,
+    deleteConversation: id => chat.deleteConversation(id),
+    conversation: id => chat.getConversation(id),
+    listConversations: includeArchived => chat.listConversations(includeArchived),
+    setArchived: (id, archived) => chat.setArchived(id, archived),
+    listProjects: () => projects.listChatProjects(),
+    createProject: input => projects.createChatProject(input),
+    updateProject: (id, patch) => projects.updateChatProject(id, patch),
+    deleteProject: id => projects.deleteChatProject(id),
+    listFolders: () => projects.listChatProjectFolders(),
+    createFolder: input => projects.createChatProjectFolder(input),
+    renameFolder: (id, name) => projects.renameChatProjectFolder(id, name),
+    moveFolder: (id, parentId, index) => projects.moveChatProjectFolder(id, parentId, index),
+    deleteFolder: id => projects.deleteChatProjectFolder(id),
+    setProject: (id, projectId) => projects.setConversationProject(id, projectId),
+    setFolder: (id, folderId) => projects.setConversationFolder(id, folderId),
+    setPinned: (id, pinned) => projects.setConversationPinned(id, pinned),
+    // What no API call writes: only a sync merge or an older build could leave it behind.
+    corruptFolder: (id, projectId, folderId) => {
+      const live = database.getDb();
+      live.pragma('foreign_keys = OFF');
+      live.prepare(`INSERT INTO research_chat_placements (conversation_id, project_id, folder_id, pinned_at, updated_at) VALUES (?, ?, ?, NULL, ?)
+        ON CONFLICT(conversation_id) DO UPDATE SET project_id = excluded.project_id, folder_id = excluded.folder_id`).run(id, projectId, folderId, new Date().toISOString());
+      live.pragma('foreign_keys = ON');
+    },
+    // The initial load: the repair pass runs when the vault's database opens.
+    reload: () => { database.closeDb(); database.getDb(); },
+  }, 'research');
+  console.log('Chat projects order, validation, placement, pin limit, archive release, non-destructive project deletion, chat cleanup, folders (nesting, cycles, filing, subtree, deletion) and the shared history contract with its repair on load passed.');
 } finally {
   load('electron/db/database.ts').closeDb();
   fs.rmSync(scratch, { recursive: true, force: true });

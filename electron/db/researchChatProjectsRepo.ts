@@ -50,13 +50,13 @@ export function updateChatProject(id: string, patch: { name?: string; icon?: str
 export function deleteChatProject(id: string): void {
   const db = getDb();
   db.transaction(() => {
-    db.prepare('UPDATE research_chat_placements SET project_id=NULL, folder_id=NULL WHERE project_id=?').run(id);
+    db.prepare('UPDATE research_chat_placements SET project_id=NULL, folder_id=NULL, updated_at=? WHERE project_id=?').run(new Date().toISOString(), id);
     db.prepare('DELETE FROM research_chat_placements WHERE project_id IS NULL AND pinned_at IS NULL').run();
     db.prepare('DELETE FROM research_chat_projects WHERE id=?').run(id);
   })();
 }
 
-type FolderRow = { folder_id: string; project_id: string; parent_id: string | null; name: string; position: number; created_at: string };
+type FolderRow = { folder_id: string; project_id: string; parent_id: string | null; name: string; position: number; created_at: string; updated_at: string | null };
 const decodeFolder = (row: FolderRow): ResearchChatProjectFolder => ({
   id: row.folder_id, projectId: row.project_id, parentId: row.parent_id, name: row.name, position: row.position, createdAt: row.created_at,
 });
@@ -97,8 +97,11 @@ function reorderSiblings(projectId: string, parentId: string | null, moving: str
   const siblings = (db.prepare(`SELECT folder_id FROM research_chat_project_folders WHERE project_id=? AND parent_id IS ? AND folder_id IS NOT ?
     ORDER BY position, created_at`).all(projectId, parentId, moving) as { folder_id: string }[]).map(row => row.folder_id);
   if (moving) siblings.splice(Math.max(0, Math.min(index ?? siblings.length, siblings.length)), 0, moving);
-  const write = db.prepare('UPDATE research_chat_project_folders SET parent_id=?, position=? WHERE folder_id=?');
-  siblings.forEach((id, position) => write.run(parentId, position, id));
+  // Only a folder whose place changed is stamped: renumbering must not make every sibling
+  // look freshly edited to the next sync.
+  const write = db.prepare('UPDATE research_chat_project_folders SET parent_id=?, position=?, updated_at=? WHERE folder_id=? AND (parent_id IS NOT ? OR position IS NOT ?)');
+  const now = new Date().toISOString();
+  siblings.forEach((id, position) => write.run(parentId, position, now, id, parentId, position));
 }
 
 export function createChatProjectFolder(input: { projectId: string; parentId?: string | null; name: string }): ResearchChatProjectFolder {
@@ -110,15 +113,16 @@ export function createChatProjectFolder(input: { projectId: string; parentId?: s
   db.transaction(() => {
     assertParent(input.projectId, parentId);
     const { n } = db.prepare('SELECT COUNT(*) n FROM research_chat_project_folders WHERE project_id=? AND parent_id IS ?').get(input.projectId, parentId) as { n: number };
-    db.prepare('INSERT INTO research_chat_project_folders (folder_id,project_id,parent_id,name,position,created_at) VALUES (?,?,?,?,?,?)')
-      .run(id, input.projectId, parentId, name, n, new Date().toISOString());
+    const now = new Date().toISOString();
+    db.prepare('INSERT INTO research_chat_project_folders (folder_id,project_id,parent_id,name,position,created_at,updated_at) VALUES (?,?,?,?,?,?,?)')
+      .run(id, input.projectId, parentId, name, n, now, now);
   })();
   return getChatProjectFolder(id)!;
 }
 
 export function renameChatProjectFolder(id: string, name: string): ResearchChatProjectFolder {
   if (!getChatProjectFolder(id)) throw new Error('research_chat_folder_not_found');
-  getDb().prepare('UPDATE research_chat_project_folders SET name=? WHERE folder_id=?').run(cleanFolderName(name), id);
+  getDb().prepare('UPDATE research_chat_project_folders SET name=?, updated_at=? WHERE folder_id=?').run(cleanFolderName(name), new Date().toISOString(), id);
   return getChatProjectFolder(id)!;
 }
 
@@ -150,8 +154,9 @@ export function deleteChatProjectFolder(id: string): void {
     const folder = getChatProjectFolder(id);
     if (!folder) return;
     const ids = subtreeIds(id);
-    const unfile = db.prepare('UPDATE research_chat_placements SET folder_id=NULL WHERE folder_id=?');
-    for (const folderId of ids) unfile.run(folderId);
+    const unfile = db.prepare('UPDATE research_chat_placements SET folder_id=NULL, updated_at=? WHERE folder_id=?');
+    const now = new Date().toISOString();
+    for (const folderId of ids) unfile.run(now, folderId);
     db.prepare('DELETE FROM research_chat_project_folders WHERE folder_id=?').run(id);
     reorderSiblings(folder.projectId, folder.parentId, null);
   })();
@@ -166,8 +171,9 @@ function writePlacement(conversationId: string, placement: Placement): void {
   const folderId = projectId ? placement.folderId : null;
   if (folderId && getChatProjectFolder(folderId)?.projectId !== projectId) throw new Error('research_chat_folder_wrong_project');
   if (!projectId && !pinnedAt) db.prepare('DELETE FROM research_chat_placements WHERE conversation_id=?').run(conversationId);
-  else db.prepare(`INSERT INTO research_chat_placements (conversation_id,project_id,folder_id,pinned_at) VALUES (?,?,?,?)
-    ON CONFLICT(conversation_id) DO UPDATE SET project_id=excluded.project_id, folder_id=excluded.folder_id, pinned_at=excluded.pinned_at`).run(conversationId, projectId, folderId, pinnedAt);
+  else db.prepare(`INSERT INTO research_chat_placements (conversation_id,project_id,folder_id,pinned_at,updated_at) VALUES (?,?,?,?,?)
+    ON CONFLICT(conversation_id) DO UPDATE SET project_id=excluded.project_id, folder_id=excluded.folder_id, pinned_at=excluded.pinned_at, updated_at=excluded.updated_at`)
+    .run(conversationId, projectId, folderId, pinnedAt, new Date().toISOString());
 }
 
 export function placementFor(conversationId: string): Placement {
