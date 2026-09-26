@@ -393,6 +393,66 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await page.getByRole('dialog').getByRole('button', { name: 'Eliminar', exact: true }).click();
       await action('deleteProject', 'p-a');
     });
+    await t.test('a pinned chat inside an open project renames from the row whose menu was opened', async () => {
+      await sidebar.getByTestId('research-project-p-z').getByRole('button', { name: 'Zeta', exact: true }).click();
+      const nested = sidebar.locator('[data-testid="research-conversation-c6"].is-nested');
+      await nested.hover();
+      await nested.getByRole('button', { name: 'Destacar chat' }).click();
+      await action('pin', 'c6', true);
+      assert.equal(await sidebar.getByTestId('research-conversation-c6').count(), 2, 'it shows pinned and inside its project');
+      await nested.hover();
+      await nested.getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Renombrar' }).click();
+      const field = sidebar.getByRole('textbox', { name: 'Nuevo nombre' });
+      assert.equal(await field.count(), 1, 'one rename field, not one per row');
+      await field.fill('Título largo, ya revisado'); await field.press('Enter');
+      await action('rename', 'c6', 'Título largo, ya revisado');
+      await sidebar.getByTestId('research-project-p-z').getByRole('button', { name: 'Zeta', exact: true }).click();
+    });
+
+    await t.test('another surface: Study\'s courses are its notebooks and their chats still move; a surface\'s own notebooks edit sources', async () => {
+      const course = page.getByTestId('course-history-sidebar');
+      const rowsOf = history => history.locator('.research-history-heading, .research-history-row, .research-history-empty').evaluateAll(nodes => nodes.map(node => (node.querySelector('.research-marquee') ?? node).textContent.trim()));
+      assert.deepEqual(await rowsOf(course), ['Proyectos', 'Examen', 'Cursos', 'Biología celular', 'Chats', 'Repaso general'], 'a course chat lives in its course');
+      const courseRow = course.getByTestId('research-notebook-course-n1');
+      assert.equal(await courseRow.getByRole('button', { name: 'Abrir Biología celular' }).getAttribute('title'), 'Nuevo chat en el curso');
+      assert.equal(await courseRow.getByRole('button', { name: 'Más acciones' }).count(), 0, 'courses are managed in Study, not from the chat history');
+      assert.equal(await course.getByTestId('research-chat-search').getAttribute('title'), 'Buscar chats, proyectos, cursos…');
+      await courseRow.getByRole('button', { name: 'Biología celular', exact: true }).click();
+      const chatRow = course.getByTestId('research-conversation-course-c1');
+      await chatRow.hover();
+      await chatRow.getByRole('button', { name: 'Más acciones' }).click();
+      const menu = page.getByRole('menu', { name: 'Membranas y transporte' });
+      assert.ok((await placedTexts(menu)).includes('Mover a proyecto'), 'a course is only a scope: the chat still moves into a project');
+      await menu.getByRole('menuitem', { name: 'Mover a proyecto' }).click();
+      await menu.getByRole('menuitemradio', { name: 'Examen' }).click();
+      await action('course', 'move', 'course-c1', 'course-p1');
+      await course.getByTestId('research-chat-search').fill('plasmática');
+      assert.deepEqual(await rowsOf(course), ['Cursos', 'Biología celular', 'Chats', 'Membranas y transporte'], 'a course is found by its subjects and topics, and so are its chats');
+      await course.getByTestId('research-chat-search').fill('');
+
+      const data = page.getByTestId('notebook-history-sidebar');
+      const notebookRow = data.getByTestId('research-notebook-notebook-n1');
+      await notebookRow.hover();
+      await notebookRow.getByRole('button', { name: 'Más acciones' }).click();
+      const notebookMenu = page.getByRole('menu', { name: 'Ventas' });
+      assert.deepEqual(await placedTexts(notebookMenu), ['Renombrar', 'Icono y color', 'Editar fuentes', 'Eliminar cuaderno'], 'its own notebooks read sources, not collections');
+      await notebookMenu.getByRole('menuitem', { name: 'Editar fuentes' }).click();
+      await action('notebook', 'editSources', 'notebook-n1');
+      await notebookRow.getByRole('button', { name: 'Más acciones' }).click();
+      await page.getByRole('menuitem', { name: 'Eliminar cuaderno' }).click();
+      await page.getByRole('dialog').getByText('Se eliminará «Ventas». Sus chats no se borran: vuelven al historial general.', { exact: true }).waitFor();
+      await page.getByRole('dialog').getByRole('button', { name: 'Cancelar' }).click();
+      await notebookRow.getByRole('button', { name: 'Ventas', exact: true }).click();
+      const inNotebook = data.getByTestId('research-conversation-notebook-c1');
+      assert.equal(await inNotebook.getAttribute('draggable'), null, 'a notebook\'s chat is not dragged into a project');
+      await inNotebook.hover();
+      await inNotebook.getByRole('button', { name: 'Más acciones' }).click();
+      const locked = page.getByRole('menu', { name: 'Membranas y transporte' });
+      assert.ok(!(await placedTexts(locked)).includes('Mover a proyecto'), 'nor moved from its menu');
+      await page.keyboard.press('Escape');
+      await locked.waitFor({ state: 'detached' });
+    });
     await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-research-chat-sidebar.png') });
     assert.deepEqual(errors, []);
   } finally {

@@ -219,4 +219,44 @@ const folderMenuTranslations: Record<string, string[]> = {
   ja: ['フォルダーへ移動…', 'フォルダーから外す'],
 };
 for (const [language, values] of Object.entries(folderMenuTranslations)) translations[language].push(...values);
+/** The other chat histories: Study's courses, and the notebooks of Databases and Worldbuilding. */
+keys.push('Nuevo chat en el curso', 'Buscar chats, proyectos, cursos…', 'Editar fuentes',
+  'Los chats que empieces aquí leerán los materiales de este curso.', 'Los chats que empieces aquí leerán las fuentes de este cuaderno.',
+  'Elige las fuentes que leerán sus chats.', 'Elige al menos una fuente.', 'Este chat lee las fuentes del cuaderno. Edita el cuaderno para cambiarlas.');
+const surfaceHistoryTranslations: Record<string, string[]> = {
+  en: ['New chat in the course', 'Search chats, projects, courses…', 'Edit sources',
+    'Chats you start here read this course’s materials.', 'Chats you start here read this notebook’s sources.',
+    'Choose the sources its chats will read.', 'Choose at least one source.', 'This chat reads the notebook’s sources. Edit the notebook to change them.'],
+  fr: ['Nouvelle discussion dans le cours', 'Rechercher des discussions, projets, cours…', 'Modifier les sources',
+    'Les discussions commencées ici lisent les supports de ce cours.', 'Les discussions commencées ici lisent les sources de ce carnet.',
+    'Choisissez les sources que liront ses discussions.', 'Choisissez au moins une source.', 'Cette discussion lit les sources du carnet. Modifiez le carnet pour les changer.'],
+  de: ['Neuer Chat im Kurs', 'Chats, Projekte, Kurse durchsuchen…', 'Quellen bearbeiten',
+    'Chats, die du hier beginnst, lesen die Materialien dieses Kurses.', 'Chats, die du hier beginnst, lesen die Quellen dieses Notizbuchs.',
+    'Wähle die Quellen, die seine Chats lesen.', 'Wähle mindestens eine Quelle.', 'Dieser Chat liest die Quellen des Notizbuchs. Bearbeite das Notizbuch, um sie zu ändern.'],
+  pt: ['Nova conversa no curso', 'Pesquisar conversas, projetos, cursos…', 'Editar fontes',
+    'As conversas que começar aqui leem os materiais deste curso.', 'As conversas que começar aqui leem as fontes deste caderno.',
+    'Escolha as fontes que as suas conversas vão ler.', 'Escolha pelo menos uma fonte.', 'Esta conversa lê as fontes do caderno. Edite o caderno para as alterar.'],
+  'pt-BR': ['Nova conversa no curso', 'Pesquisar conversas, projetos, cursos…', 'Editar fontes',
+    'As conversas que você começar aqui leem os materiais deste curso.', 'As conversas que você começar aqui leem as fontes deste caderno.',
+    'Escolha as fontes que as conversas dele vão ler.', 'Escolha pelo menos uma fonte.', 'Esta conversa lê as fontes do caderno. Edite o caderno para alterá-las.'],
+  it: ['Nuova chat nel corso', 'Cerca chat, progetti, corsi…', 'Modifica fonti',
+    'Le chat che inizi qui leggono i materiali di questo corso.', 'Le chat che inizi qui leggono le fonti di questo quaderno.',
+    'Scegli le fonti che leggeranno le sue chat.', 'Scegli almeno una fonte.', 'Questa chat legge le fonti del quaderno. Modifica il quaderno per cambiarle.'],
+  tr: ['Derste yeni sohbet', 'Sohbetlerde, projelerde, derslerde ara…', 'Kaynakları düzenle',
+    'Burada başlattığınız sohbetler bu dersin materyallerini okur.', 'Burada başlattığınız sohbetler bu defterin kaynaklarını okur.',
+    'Sohbetlerinin okuyacağı kaynakları seçin.', 'En az bir kaynak seçin.', 'Bu sohbet defterin kaynaklarını okur. Değiştirmek için defteri düzenleyin.'],
+  'zh-CN': ['在课程中新建对话', '搜索对话、项目、课程…', '编辑来源',
+    '在此开始的对话会阅读本课程的资料。', '在此开始的对话会阅读此笔记本的来源。',
+    '选择其对话要阅读的来源。', '请至少选择一个来源。', '此对话阅读笔记本的来源。要更改它们，请编辑笔记本。'],
+  'zh-TW': ['在課程中新增對話', '搜尋對話、專案、課程…', '編輯來源',
+    '在此開始的對話會閱讀本課程的資料。', '在此開始的對話會閱讀此筆記本的來源。',
+    '選擇其對話要閱讀的來源。', '請至少選擇一個來源。', '此對話閱讀筆記本的來源。要變更它們，請編輯筆記本。'],
+  ko: ['과정에서 새 대화', '대화, 프로젝트, 과정 검색…', '출처 편집',
+    '여기에서 시작한 대화는 이 과정의 자료를 읽습니다.', '여기에서 시작한 대화는 이 노트북의 출처를 읽습니다.',
+    '대화가 읽을 출처를 선택하세요.', '출처를 하나 이상 선택하세요.', '이 대화는 노트북의 출처를 읽습니다. 바꾸려면 노트북을 편집하세요.'],
+  ja: ['コースで新しいチャット', 'チャット、プロジェクト、コースを検索…', 'ソースを編集',
+    'ここで始めたチャットは、このコースの教材を読みます。', 'ここで始めたチャットは、このノートブックのソースを読みます。',
+    'チャットが読むソースを選びます。', 'ソースを 1 つ以上選んでください。', 'このチャットはノートブックのソースを読みます。変更するにはノートブックを編集してください。'],
+};
+for (const [language, values] of Object.entries(surfaceHistoryTranslations)) translations[language].push(...values);
 export const RESEARCH_CHAT_HISTORY_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

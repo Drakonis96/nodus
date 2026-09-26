@@ -63,7 +63,7 @@ function App() {
     },
     onMoveConversation: async (conversation, projectId) => { log('move', conversation.id, projectId); setConversations(current => current.map(item => item.id === conversation.id ? { ...item, projectId, folderId: null } : item)); },
   };
-  return <div style={{ display: 'flex', gap: 16 }}><aside style={{ width: 280, height: 640, display: 'flex', flexDirection: 'column' }} data-testid="research-history-sidebar" className="research-chat-history">
+  return <><div style={{ display: 'flex', gap: 16 }}><aside style={{ width: 280, height: 640, display: 'flex', flexDirection: 'column' }} data-testid="research-history-sidebar" className="research-chat-history">
     <ResearchChatSidebar
       conversations={conversations} projects={projects} notebooks={notebooks}
       supportsProjects notebooksOn activeId={null} activeProjectId={null} activeNotebookId={null} sending={false} archivedCount={0} showArchived={false}
@@ -101,7 +101,60 @@ function App() {
         </li>)}
       </ul>} />
   </main>
-  </div>;
+  </div>
+  {/* Other chat histories, below: Study's courses as its notebooks, and a Databases-style one. */}
+  <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
+    <SurfaceHistory kind="course" />
+    <SurfaceHistory kind="notebook" />
+  </div>
+  </>;
 }
+/**
+ * A chat history of another surface, as the Study and Databases views hand it to the
+ * sidebar: Study's courses (a chat's scope, still movable into projects, managed in Study
+ * and so without a menu here) or the surface's own notebooks (sources, not collections).
+ */
+function SurfaceHistory({ kind }: { kind: 'course' | 'notebook' }) {
+  const log = (...entry: unknown[]) => fixture.actions.push([kind, ...entry]);
+  const [conversations, setConversations] = useState<ChatConversationSummary[]>([
+    chat(`${kind}-c1`, 'Membranas y transporte', { notebookId: `${kind}-n1` }),
+    chat(`${kind}-c2`, 'Repaso general'),
+  ]);
+  const [folders] = useState<ResearchChatProjectFolder[]>([folder(`${kind}-f1`, `${kind}-p1`, null, 'Parciales', 0)]);
+  const folderTree = useChatFolderTreeState();
+  const entries = kind === 'course'
+    ? [{ id: `${kind}-n1`, name: 'Biología celular', color: '#22c55e', keywords: 'Célula Membrana plasmática' }]
+    : [{ id: `${kind}-n1`, name: 'Ventas', icon: 'chartBar', color: null }];
+  const folderActions: ChatFolderActions = {
+    folders,
+    onCreateFolder: async () => null,
+    onRenameFolder: async () => undefined,
+    onMoveFolder: async () => undefined,
+    onDeleteFolder: async () => undefined,
+    onFileConversation: async (conversation, folderId) => { log('file', conversation.id, folderId); },
+    onMoveConversation: async (conversation, projectId) => { log('move', conversation.id, projectId); setConversations(current => current.map(item => item.id === conversation.id ? { ...item, projectId } : item)); },
+  };
+  const editing = kind === 'notebook' ? {
+    onEditNotebook: (notebook: { id: string }) => log('editSources', notebook.id),
+    onUpdateNotebook: async (notebook: { id: string }, patch: object) => { log('updateNotebook', notebook.id, patch); },
+    onDeleteNotebook: async (notebook: { id: string }) => { log('deleteNotebook', notebook.id); },
+  } : {};
+  return <aside style={{ width: 280, height: 320, display: 'flex', flexDirection: 'column' }} data-testid={`${kind}-history-sidebar`} className="research-chat-history">
+    <ResearchChatSidebar
+      conversations={conversations} projects={[project(`${kind}-p1`, 'Examen')]} notebooks={entries}
+      supportsProjects notebooksOn notebookKind={kind} notebookCollections={false} notebookLocksMoves={kind !== 'course'}
+      activeId={null} activeProjectId={null} activeNotebookId={null} sending={false} archivedCount={0} showArchived={false}
+      onToggleArchived={() => undefined} onNewConversation={() => undefined} onNewProject={async () => null}
+      onOpenConversation={id => log('open', id)} onOpenProject={id => log('openProject', id)} onOpenNotebook={id => log('notebook', id)}
+      {...editing}
+      onRenameConversation={async (conversation, title) => log('rename', conversation.id, title)}
+      onPinConversation={async () => undefined} onArchiveConversation={async conversation => log('archive', conversation.id)}
+      onDeleteConversation={() => undefined} onMoveConversation={folderActions.onMoveConversation}
+      onUpdateProject={async () => undefined} onDeleteProject={async () => undefined}
+      folderTree={folderTree} folderActions={folderActions}
+    />
+  </aside>;
+}
+
 setActiveLang('es');
 createRoot(document.getElementById('root')!).render(<App />);

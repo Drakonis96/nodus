@@ -8,7 +8,7 @@ import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium
 import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
 import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
-import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
+import { researchChatOrganizer, type ResearchChatAdapter, type ResearchUiMessage } from './researchChatAdapter';
 import { SourceFilterPanel } from '../components/ResearchSourceFilterControl';
 import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNotebookControl';
 import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
@@ -288,8 +288,12 @@ export function ResearchAssistantModal({
   const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
   const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
-  // Projects and pinned chats exist where the transport stores them: the vault's research chat.
-  const supportsProjects = !adapter && typeof window.nodus.listChatProjects === 'function';
+  // Projects, their folders and pinned chats exist where the surface's store keeps them:
+  // the vault's research chat, or an adapter's own history (Databases, Worldbuilding, Study).
+  const organizer = useMemo(() => adapter ? adapter.organizer ?? null : researchChatOrganizer(), [adapter]);
+  const organizerRef = useRef(organizer);
+  organizerRef.current = organizer;
+  const supportsProjects = !!organizer;
   const [projects, setProjects] = useState<ResearchChatProject[]>([]);
   // Folders inside projects. The tree's selection is one state, shown in the history and
   // on the project's page alike.
@@ -314,7 +318,10 @@ export function ResearchAssistantModal({
   // A notebook's page, like a project's: shown while it is open and no chat has started in it.
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
   const activeNotebook = researchNotebooks.notebooks.find(notebook => notebook.id === activeNotebookId) ?? null;
-  const notebookHome = !!activeNotebook && !activeId;
+  // An adapter's notebook-equivalent: its own notebooks (Databases, Worldbuilding) or Study's courses.
+  const adapterNotebooks = adapter?.notebooks;
+  const adapterNotebook = adapterNotebooks?.entries.find(notebook => notebook.id === activeNotebookId) ?? null;
+  const notebookHome = (!!activeNotebook || !!adapterNotebook) && !activeId;
   const [notebookPreparation, setNotebookPreparation] = useState<ResearchNotebookPreparation | null>(null);
   // A notebook is read once its collections are indexed; until then it says so and waits.
   const notebookBlocked = !!activeNotebook && (!notebookPreparation || notebookPreparation.pending > 0);
@@ -368,10 +375,11 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
   const refreshConversations = useCallback(async () => {
+    const store = organizerRef.current;
     const [list, projectList, folderList] = await Promise.all([
       apiRef.current.listConversations(true),
-      supportsProjects ? window.nodus.listChatProjects!() : Promise.resolve([] as ResearchChatProject[]),
-      supportsProjects && window.nodus.listChatProjectFolders ? window.nodus.listChatProjectFolders() : Promise.resolve([] as ResearchChatProjectFolder[]),
+      store ? store.listProjects() : Promise.resolve([] as ResearchChatProject[]),
+      store ? store.listFolders() : Promise.resolve([] as ResearchChatProjectFolder[]),
     ]);
     setConversations(list);
     setProjects(projectList);
@@ -563,45 +571,47 @@ export function ResearchAssistantModal({
     const taken = new Set(projects.map(project => project.name));
     let name = base;
     for (let index = 2; taken.has(name); index++) name = `${base} ${index}`;
-    const created = await window.nodus.createChatProject!({ name });
+    const created = await organizer!.createProject({ name });
     await refreshConversations();
     return created;
   };
   const updateProject = async (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null }) => {
-    await window.nodus.updateChatProject!(project.id, patch);
+    await organizer!.updateProject(project.id, patch);
     await refreshConversations();
   };
   const deleteProject = async (project: ResearchChatProject) => {
-    await window.nodus.deleteChatProject!(project.id);
+    await organizer!.deleteProject(project.id);
     if (activeProjectId === project.id) setActiveProjectId(null);
     if (folderTree.selection?.projectId === project.id) folderTree.select(null);
     await refreshConversations();
   };
+  // Every store renames its chats: Research Chat's own call, or the adapter's.
+  const renameApi = adapter ? adapter.renameConversation : window.nodus.renameConversation;
   const renameConversation = async (conversation: ChatConversationSummary, title: string) => {
-    await window.nodus.renameConversation(conversation.id, title);
+    await renameApi!(conversation.id, title);
     if (conversation.id === activeId) setContextTitle(title);
     await refreshConversations();
   };
   const pinConversation = async (conversation: ChatConversationSummary, pinned: boolean) => {
-    await window.nodus.setConversationPinned!(conversation.id, pinned);
+    await organizer!.setPinned(conversation.id, pinned);
     await refreshConversations();
   };
   const moveConversation = async (conversation: ChatConversationSummary, projectId: string | null) => {
-    await window.nodus.setConversationProject!(conversation.id, projectId);
+    await organizer!.setProject(conversation.id, projectId);
     await refreshConversations();
   };
   const folderActions: ChatFolderActions = {
     folders: projectFolders,
     onCreateFolder: async (projectId, parentId) => {
-      if (!window.nodus.createChatProjectFolder) return null;
-      const created = await window.nodus.createChatProjectFolder({ projectId, parentId, name: nextFolderName(projectFolders, projectId, parentId, t('Nueva carpeta')) });
+      if (!organizer) return null;
+      const created = await organizer.createFolder({ projectId, parentId, name: nextFolderName(projectFolders, projectId, parentId, t('Nueva carpeta')) });
       await refreshConversations();
       return created;
     },
-    onRenameFolder: async (folder, name) => { await window.nodus.renameChatProjectFolder!(folder.id, name); await refreshConversations(); },
-    onMoveFolder: async (folder, parentId, index) => { await window.nodus.moveChatProjectFolder!(folder.id, parentId, index); await refreshConversations(); },
-    onDeleteFolder: async (folder) => { await window.nodus.deleteChatProjectFolder!(folder.id); await refreshConversations(); },
-    onFileConversation: async (conversation, folderId) => { await window.nodus.setConversationFolder!(conversation.id, folderId); await refreshConversations(); },
+    onRenameFolder: async (folder, name) => { await organizer!.renameFolder(folder.id, name); await refreshConversations(); },
+    onMoveFolder: async (folder, parentId, index) => { await organizer!.moveFolder(folder.id, parentId, index); await refreshConversations(); },
+    onDeleteFolder: async (folder) => { await organizer!.deleteFolder(folder.id); await refreshConversations(); },
+    onFileConversation: async (conversation, folderId) => { await organizer!.setFolder(conversation.id, folderId); await refreshConversations(); },
     onMoveConversation: moveConversation,
   };
   // A notebook opens on its own page; the first message there starts a chat inside it.
@@ -609,7 +619,9 @@ export function ResearchAssistantModal({
     if (sending) return;
     startNewConversation();
     setActiveNotebookId(notebookId);
-    setSelection(current => ({ ...current, notebookId }));
+    // An adapter points its own context at it; Research Chat reads it through the selection.
+    if (adapterNotebooks) adapterNotebooks.open(notebookId);
+    else setSelection(current => ({ ...current, notebookId }));
     window.setTimeout(() => inputRef.current?.focus(), 0);
   };
   const activeNotebookRef = useRef<string | null>(null);
@@ -622,7 +634,7 @@ export function ResearchAssistantModal({
   }, []);
   useEffect(() => {
     setNotebookPreparation(null);
-    if (!activeNotebookId) return;
+    if (!activeNotebookId || adapter) return;
     void refreshNotebookPreparation(activeNotebookId);
     let timer: number | null = null;
     const off = window.nodus.onResearchPreparationProgress(() => {
@@ -631,14 +643,17 @@ export function ResearchAssistantModal({
     });
     return () => { off(); if (timer != null) window.clearTimeout(timer); };
   }, [activeNotebookId, refreshNotebookPreparation]);
-  const updateNotebook = async (notebook: ResearchNotebook, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+  const updateNotebook = async (notebook: { id: string }, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+    if (adapterNotebooks) { await adapterNotebooks.update?.(notebook.id, patch); return; }
     await window.nodus.updateResearchNotebookAppearance(notebook.id, patch);
     await researchNotebooks.refresh();
   };
-  const deleteNotebook = async (notebook: ResearchNotebook) => {
-    await window.nodus.deleteResearchNotebook(notebook.id);
+  /** A notebook goes; its chats return to the general history. */
+  const deleteNotebook = async (notebook: { id: string }) => {
+    if (adapterNotebooks) await adapterNotebooks.remove?.(notebook.id);
+    else await window.nodus.deleteResearchNotebook(notebook.id);
     if (activeNotebookId === notebook.id) startNewConversation();
-    await researchNotebooks.refresh();
+    if (!adapterNotebooks) await researchNotebooks.refresh();
     await refreshConversations();
   };
 
@@ -825,7 +840,7 @@ export function ResearchAssistantModal({
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...projectPlacement });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...projectPlacement, ...(adapterNotebook ? { notebookId: adapterNotebook.id } : {}) });
       conversationId = created.id;
       await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
       activeIdRef.current = created.id;
@@ -1038,9 +1053,12 @@ export function ResearchAssistantModal({
             <ResearchChatSidebar
               conversations={visibleConversations}
               projects={projects}
-              notebooks={researchNotebooks.notebooks}
+              notebooks={adapterNotebooks ? adapterNotebooks.entries : researchNotebooks.notebooks}
               supportsProjects={supportsProjects}
-              notebooksOn={researchNotebooks.available}
+              notebooksOn={adapterNotebooks ? true : researchNotebooks.available}
+              notebookKind={adapterNotebooks?.kind}
+              notebookCollections={!adapterNotebooks}
+              notebookLocksMoves={adapterNotebooks ? adapterNotebooks.locksMoves : true}
               activeId={activeId}
               activeProjectId={activeProjectId}
               sending={sending}
@@ -1048,16 +1066,18 @@ export function ResearchAssistantModal({
               showArchived={showArchived}
               onToggleArchived={() => setShowArchived((value) => !value)}
               onNewConversation={startNewConversation}
-              onNewNotebook={() => setEditingNotebook('new')}
+              onNewNotebook={adapterNotebooks ? adapterNotebooks.create && (() => adapterNotebooks.create!(openNotebook)) : () => setEditingNotebook('new')}
               onNewProject={createProject}
               onOpenConversation={(id) => void loadConversation(id)}
               onOpenProject={openProject}
               activeNotebookId={activeNotebookId}
               onOpenNotebook={openNotebook}
-              onEditNotebook={notebook => setEditingNotebook(notebook)}
-              onUpdateNotebook={updateNotebook}
-              onDeleteNotebook={deleteNotebook}
-              onRenameConversation={!adapter ? renameConversation : undefined}
+              onEditNotebook={adapterNotebooks
+                ? adapterNotebooks.editSources && (notebook => adapterNotebooks.editSources!(notebook.id))
+                : notebook => setEditingNotebook(researchNotebooks.notebooks.find(item => item.id === notebook.id) ?? null)}
+              onUpdateNotebook={!adapterNotebooks || adapterNotebooks.update ? updateNotebook : undefined}
+              onDeleteNotebook={!adapterNotebooks || adapterNotebooks.remove ? deleteNotebook : undefined}
+              onRenameConversation={renameApi ? renameConversation : undefined}
               onPinConversation={pinConversation}
               onArchiveConversation={api.archiveConversation ? archiveConversation : undefined}
               onDeleteConversation={setPendingDelete}
@@ -1071,6 +1091,11 @@ export function ResearchAssistantModal({
 
           <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${projectHome || notebookHome ? 'research-project-home' : ''}`} data-testid={projectHome ? 'research-project-home' : notebookHome ? 'research-notebook-home' : undefined}>
             {notebookHome && activeNotebook && <NotebookHomeHeader notebook={activeNotebook} onEdit={() => setEditingNotebook(activeNotebook)} />}
+            {notebookHome && adapterNotebook && <header className="research-project-title" data-testid="research-adapter-notebook-title">
+              <span style={{ color: adapterNotebook.color ?? undefined }}><Icon name={adapterNotebook.icon ?? (adapterNotebooks?.kind === 'course' ? 'graduation' : 'notebook')} size={30} /></span>
+              <h2>{adapterNotebook.name}</h2>
+              {adapterNotebooks?.editSources && <button type="button" className="btn btn-ghost text-xs" onClick={() => adapterNotebooks.editSources!(adapterNotebook.id)}>{t('Editar fuentes')}</button>}
+            </header>}
             {projectHome && activeProject && <header className="research-project-title">
               <span style={{ color: activeProject.color ?? undefined }}><Icon name={activeProject.icon ?? 'folder'} size={30} /></span>
               <h2>{activeProject.name}</h2>
@@ -1094,7 +1119,8 @@ export function ResearchAssistantModal({
                 {notebookHome && messages.length === 0 && <ProjectChatList
                   conversations={visibleConversations.filter(conversation => conversation.notebookId === activeNotebookId)}
                   onOpen={(id) => { if (!sending) void loadConversation(id); }}
-                  empty={t('Los chats que empieces aquí leerán las colecciones de este cuaderno.')}
+                  empty={adapterNotebooks?.kind === 'course' ? t('Los chats que empieces aquí leerán los materiales de este curso.')
+                    : adapterNotebooks ? t('Los chats que empieces aquí leerán las fuentes de este cuaderno.') : t('Los chats que empieces aquí leerán las colecciones de este cuaderno.')}
                 />}
                 {!projectHome && !notebookHome && messages.length === 0 && (
                   <div className="research-empty-state h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
@@ -1268,7 +1294,7 @@ export function ResearchAssistantModal({
                   aria-label={t('Pregunta al asistente...')}
                   rows={1}
                   value={input}
-                  placeholder={notebookHome && activeNotebook ? tx('Nuevo chat en {name}', { name: activeNotebook.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
+                  placeholder={notebookHome && (activeNotebook ?? adapterNotebook) ? tx('Nuevo chat en {name}', { name: (activeNotebook ?? adapterNotebook)!.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : !adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
                   aria-autocomplete={skillsEnabled ? 'list' : undefined}
                   aria-controls={mention ? 'research-skill-mention' : undefined}
                   aria-activedescendant={mention && mentionOptions.length ? `research-skill-option-${mentionIndex}` : undefined}
@@ -1468,6 +1494,7 @@ export function ResearchAssistantModal({
         </div>}
       </HeaderBalloon>
 
+      {adapterNotebooks?.overlay}
       {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}
         onClose={() => setEditingNotebook(null)}
         onSaved={async (id) => {

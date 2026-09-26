@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatConversationSummary, ResearchChatProject } from '@shared/types';
-import type { ResearchNotebook } from '@shared/researchCorpus';
+import type { ChatHistoryNotebookEntry } from '../views/researchChatAdapter';
 import { VirtualList } from './VirtualList';
 import { ConfirmModal } from './ConfirmModal';
 import { Icon } from './ui';
@@ -24,6 +24,13 @@ export const PROJECT_ICONS = [
   'moon', 'bell', 'anchor', 'truck', 'languages', 'rss', 'bug', 'plug', 'inbox', 'ruler',
 ];
 
+/** How the history names its notebook-equivalent: Research Chat's notebooks, or Study's courses. */
+function notebookLabels(courses: boolean) {
+  return courses
+    ? { heading: t('Cursos'), newChat: t('Nuevo chat en el curso'), search: t('Buscar chats, proyectos, cursos…'), icon: 'graduation' }
+    : { heading: t('Cuadernos'), newChat: t('Nuevo chat en el cuaderno'), search: t('Buscar chats, proyectos, cuadernos…'), icon: 'notebook' };
+}
+
 export function formatRelative(iso: string): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return '';
@@ -43,17 +50,24 @@ type Row =
   | { kind: 'header'; id: string; label: string }
   | { kind: 'project'; project: ResearchChatProject; expanded: boolean; count: number }
   | { kind: 'chat'; conversation: ChatConversationSummary; nested: boolean }
-  | { kind: 'notebook'; notebook: ResearchNotebook; expanded: boolean; count: number }
+  | { kind: 'notebook'; notebook: ChatHistoryNotebookEntry; expanded: boolean; count: number }
   | { kind: 'folder'; row: FolderTreeRow }
   | { kind: 'empty'; id: string; label: string };
 
 export interface ResearchChatSidebarProps {
   conversations: ChatConversationSummary[];
   projects: ResearchChatProject[];
-  notebooks: ResearchNotebook[];
+  /** Research Chat's notebooks, or the surface's equivalent (Study's courses). */
+  notebooks: ChatHistoryNotebookEntry[];
   /** Projects and pins exist only where the transport stores them. */
   supportsProjects: boolean;
   notebooksOn: boolean;
+  /** What the notebook-equivalent is called; notebooks by default. */
+  notebookKind?: 'notebook' | 'course';
+  /** Research Chat's notebooks, whose sources are collections, rather than a surface's own. */
+  notebookCollections?: boolean;
+  /** A notebook's chat stays out of projects (Research Chat's rule); a course's may move. */
+  notebookLocksMoves?: boolean;
   activeId: string | null;
   activeProjectId: string | null;
   sending: boolean;
@@ -61,15 +75,15 @@ export interface ResearchChatSidebarProps {
   showArchived: boolean;
   onToggleArchived: () => void;
   onNewConversation: () => void;
-  onNewNotebook: () => void;
+  onNewNotebook?: () => void;
   onNewProject: () => Promise<ResearchChatProject | null>;
   onOpenConversation: (id: string) => void;
   onOpenProject: (id: string) => void;
   activeNotebookId: string | null;
   onOpenNotebook: (id: string) => void;
-  onEditNotebook: (notebook: ResearchNotebook) => void;
-  onUpdateNotebook: (notebook: ResearchNotebook, patch: { name?: string; icon?: string | null; color?: string | null }) => Promise<void>;
-  onDeleteNotebook: (notebook: ResearchNotebook) => Promise<void>;
+  onEditNotebook?: (notebook: ChatHistoryNotebookEntry) => void;
+  onUpdateNotebook?: (notebook: ChatHistoryNotebookEntry, patch: { name?: string; icon?: string | null; color?: string | null }) => Promise<void>;
+  onDeleteNotebook?: (notebook: ChatHistoryNotebookEntry) => Promise<void>;
   onRenameConversation?: (conversation: ChatConversationSummary, title: string) => Promise<void>;
   onPinConversation: (conversation: ChatConversationSummary, pinned: boolean) => Promise<void>;
   onArchiveConversation?: (conversation: ChatConversationSummary) => Promise<void>;
@@ -88,10 +102,16 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [menu, setMenu] = useState<{ kind: 'chat'; conversation: ChatConversationSummary; anchor: DOMRect } | { kind: 'project'; project: ResearchChatProject; anchor: DOMRect } | { kind: 'notebook'; notebook: ResearchNotebook; anchor: DOMRect } | null>(null);
+  // A chat's menu remembers which of its rows opened it: a pinned chat inside an open
+  // project shows twice, and only that row may turn into a rename field.
+  const [menu, setMenu] = useState<{ kind: 'chat'; conversation: ChatConversationSummary; row: string; anchor: DOMRect } | { kind: 'project'; project: ResearchChatProject; anchor: DOMRect } | { kind: 'notebook'; notebook: ChatHistoryNotebookEntry; anchor: DOMRect } | null>(null);
   const [styling, setStyling] = useState<{ kind: 'project' | 'notebook'; id: string } | null>(null);
   const [deletingProject, setDeletingProject] = useState<ResearchChatProject | null>(null);
-  const [deletingNotebook, setDeletingNotebook] = useState<ResearchNotebook | null>(null);
+  const [deletingNotebook, setDeletingNotebook] = useState<ChatHistoryNotebookEntry | null>(null);
+  const courses = props.notebookKind === 'course';
+  const labels = notebookLabels(courses);
+  const locksMoves = props.notebookLocksMoves ?? true;
+  const notebookMenu = !!(props.onUpdateNotebook || props.onEditNotebook || props.onDeleteNotebook);
   const [notice, setNotice] = useState<string | null>(null);
   const { folderTree, folderActions } = props;
   const folders = folderActions.folders;
@@ -105,12 +125,12 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
     if (needle) {
       const out: Row[] = [];
       const matchedProjects = supportsProjects ? projects.filter(project => fold(project.name).includes(needle)) : [];
-      const matchedNotebooks = notebooksOn ? notebooks.filter(notebook => fold(notebook.name).includes(needle)) : [];
+      const matchedNotebooks = notebooksOn ? notebooks.filter(notebook => fold(`${notebook.name} ${notebook.keywords ?? ''}`).includes(needle)) : [];
       const matchedChats = conversations.filter(conversation => fold(conversation.title).includes(needle)
         || (conversation.projectId && fold(projectById.get(conversation.projectId)?.name ?? '').includes(needle))
-        || (conversation.notebookId && fold(notebookById.get(conversation.notebookId)?.name ?? '').includes(needle)));
+        || (conversation.notebookId && fold(`${notebookById.get(conversation.notebookId)?.name ?? ''} ${notebookById.get(conversation.notebookId)?.keywords ?? ''}`).includes(needle)));
       if (matchedProjects.length) out.push({ kind: 'header', id: 'h-projects', label: t('Proyectos') }, ...matchedProjects.map(project => ({ kind: 'project' as const, project, expanded: false, count: 0 })));
-      if (matchedNotebooks.length) out.push({ kind: 'header', id: 'h-notebooks', label: t('Cuadernos') }, ...matchedNotebooks.map(notebook => ({ kind: 'notebook' as const, notebook, expanded: false, count: 0 })));
+      if (matchedNotebooks.length) out.push({ kind: 'header', id: 'h-notebooks', label: labels.heading }, ...matchedNotebooks.map(notebook => ({ kind: 'notebook' as const, notebook, expanded: false, count: 0 })));
       if (matchedChats.length) out.push({ kind: 'header', id: 'h-chats', label: t('Chats') }, ...matchedChats.map(conversation => ({ kind: 'chat' as const, conversation, nested: false })));
       if (!out.length) out.push({ kind: 'empty', id: 'no-results', label: t('Sin resultados') });
       return out;
@@ -136,7 +156,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
     if (notebooksOn && notebooks.length) {
       const inNotebooks = new Map<string, ChatConversationSummary[]>();
       for (const conversation of conversations) if (inNotebook(conversation)) inNotebooks.set(conversation.notebookId!, [...(inNotebooks.get(conversation.notebookId!) ?? []), conversation]);
-      out.push({ kind: 'header', id: 'h-notebooks', label: t('Cuadernos') });
+      out.push({ kind: 'header', id: 'h-notebooks', label: labels.heading });
       for (const notebook of [...notebooks].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))) {
         const chats = inNotebooks.get(notebook.id) ?? [];
         const open = expanded.has(`notebook:${notebook.id}`);
@@ -179,14 +199,14 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       <div className="research-chat-history-tools">
         <div className="flex items-center gap-1">
           <button type="button" className="research-chat-history-tool" data-testid="research-new-conversation" onClick={props.onNewConversation} disabled={sending} aria-label={t('Nueva conversación')} title={t('Nueva conversación')}><Icon name="plus" size={16} /></button>
-          {notebooksOn && <button type="button" className="research-chat-history-tool" data-testid="research-new-notebook" onClick={props.onNewNotebook} aria-label={t('Nuevo cuaderno')} title={t('Nuevo cuaderno')}><Icon name="notebook" size={16} /></button>}
+          {notebooksOn && props.onNewNotebook && <button type="button" className="research-chat-history-tool" data-testid="research-new-notebook" onClick={props.onNewNotebook} aria-label={t('Nuevo cuaderno')} title={t('Nuevo cuaderno')}><Icon name="notebook" size={16} /></button>}
           {supportsProjects && <button type="button" className="research-chat-history-tool" data-testid="research-new-project" onClick={newProject} aria-label={t('Nuevo proyecto')} title={t('Nuevo proyecto')}><Icon name="folderPlus" size={16} /></button>}
         </div>
         <label className="research-chat-search">
           <Icon name="search" size={14} aria-hidden="true" />
           <input data-testid="research-chat-search" type="search" value={query} onChange={event => setQuery(event.target.value)}
             placeholder={t('Buscar…')}
-            title={notebooksOn ? t('Buscar chats, proyectos, cuadernos…') : supportsProjects ? t('Buscar chats y proyectos…') : t('Buscar chats…')}
+            title={notebooksOn ? labels.search : supportsProjects ? t('Buscar chats y proyectos…') : t('Buscar chats…')}
             aria-label={t('Buscar en el historial')} />
         </label>
         {notice && <p role="alert" className="text-[11px] text-amber-500">{notice}</p>}
@@ -213,18 +233,18 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
               <div className={`research-history-row group ${activeNotebookId === notebook.id && !activeId ? 'is-active' : ''} ${menu?.kind === 'notebook' && menu.notebook.id === notebook.id ? 'is-menu-open' : ''}`}
                 data-testid={searching ? `research-search-notebook-${notebook.id}` : `research-notebook-${notebook.id}`} data-marquee-host>
                 {renaming === key
-                  ? <><span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
-                    <RenameField value={notebook.name} onDone={name => { setRenaming(null); if (name && name !== notebook.name) run(() => props.onUpdateNotebook(notebook, { name })); }} /></>
+                  ? <><span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? labels.icon} size={15} /></span>
+                    <RenameField value={notebook.name} onDone={name => { setRenaming(null); if (name && name !== notebook.name && props.onUpdateNotebook) run(() => props.onUpdateNotebook!(notebook, { name })); }} /></>
                   : <button type="button" className="research-history-main" aria-expanded={searching ? undefined : row.expanded} title={tx('{n} chat(s)', { n: row.count })}
                     onClick={() => { if (searching) open(); else toggleGroup(key); }}>
-                    <span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? 'notebook'} size={15} /></span>
+                    <span className="shrink-0" style={{ color: notebook.color ?? undefined }}><Icon name={notebook.icon ?? labels.icon} size={15} /></span>
                     <MarqueeText text={notebook.name} className="min-w-0 flex-1" />
                   </button>}
                 <span className="research-history-row-actions">
-                  <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: notebook.name })} title={t('Nuevo chat en el cuaderno')}
+                  <button type="button" className="research-history-action" aria-label={tx('Abrir {name}', { name: notebook.name })} title={labels.newChat}
                     onClick={event => { event.stopPropagation(); open(); }}><Icon name="edit" size={14} /></button>
-                  <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
-                    onClick={event => { event.stopPropagation(); setMenu({ kind: 'notebook', notebook, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
+                  {notebookMenu && <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
+                    onClick={event => { event.stopPropagation(); setMenu({ kind: 'notebook', notebook, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>}
                 </span>
               </div>
             );
@@ -252,12 +272,12 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
             );
           }
           const { conversation } = row;
-          const key = `chat:${conversation.id}`;
+          const key = `chat:${row.nested ? 'nested' : 'top'}:${conversation.id}`;
           const pinned = !!conversation.pinnedAt && !conversation.archived;
           return (
-            <div className={`research-history-row group ${row.nested ? 'is-nested' : ''} ${conversation.id === activeId ? 'is-active' : ''} ${pinned ? 'is-pinned' : ''} ${menu?.kind === 'chat' && menu.conversation.id === conversation.id ? 'is-menu-open' : ''}`}
+            <div className={`research-history-row group ${row.nested ? 'is-nested' : ''} ${conversation.id === activeId ? 'is-active' : ''} ${pinned ? 'is-pinned' : ''} ${menu?.kind === 'chat' && menu.row === key ? 'is-menu-open' : ''}`}
               data-testid={`research-conversation-${conversation.id}`} data-marquee-host
-              {...(supportsProjects && !inNotebook(conversation) && renaming !== key ? chatDragProps(conversation) : {})}>
+              {...(supportsProjects && !(locksMoves && inNotebook(conversation)) && renaming !== key ? chatDragProps(conversation) : {})}>
               {renaming === key
                 ? <RenameField value={conversation.title} onDone={title => { setRenaming(null); if (title && title !== conversation.title && props.onRenameConversation) run(() => props.onRenameConversation!(conversation, title)); }} />
                 : <button type="button" className="research-history-main" aria-current={conversation.id === activeId ? 'page' : undefined}
@@ -270,7 +290,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
                   aria-label={pinned ? t('Quitar de destacados') : t('Destacar chat')} title={pinned ? t('Quitar de destacados') : t('Destacar chat')}
                   onClick={event => { event.stopPropagation(); run(() => props.onPinConversation(conversation, !pinned)); }}><Icon name="pin" size={14} /></button>}
                 <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
-                  onClick={event => { event.stopPropagation(); setMenu({ kind: 'chat', conversation, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
+                  onClick={event => { event.stopPropagation(); setMenu({ kind: 'chat', conversation, row: key, anchor: event.currentTarget.getBoundingClientRect() }); }}><Icon name="moreVertical" size={14} /></button>
               </span>
             </div>
           );
@@ -284,7 +304,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         </button>
       )}
       {menu?.kind === 'chat' && <ChatMenu {...props} conversation={menu.conversation} anchor={menu.anchor} onClose={() => setMenu(null)}
-        onRename={() => setRenaming(`chat:${menu.conversation.id}`)} run={run} />}
+        onRename={() => setRenaming(menu.row)} run={run} />}
       {menu?.kind === 'project' && <FloatingMenu anchor={menu.anchor} label={menu.project.name} onClose={() => setMenu(null)}>
         <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`project:${menu.project.id}`); }} />
         <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'project', id: menu.project.id }); }} />
@@ -298,22 +318,26 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         <MenuItem icon="trash" danger label={t('Eliminar proyecto')} onSelect={() => { setMenu(null); setDeletingProject(menu.project); }} />
       </FloatingMenu>}
       {menu?.kind === 'notebook' && <FloatingMenu anchor={menu.anchor} label={menu.notebook.name} onClose={() => setMenu(null)}>
-        <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`notebook:${menu.notebook.id}`); }} />
-        <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'notebook', id: menu.notebook.id }); }} />
-        <MenuItem icon="folder" label={t('Editar colecciones')} onSelect={() => { setMenu(null); props.onEditNotebook(menu.notebook); }} />
-        <hr className="research-history-menu-separator" />
-        <MenuItem icon="trash" danger label={t('Eliminar cuaderno')} onSelect={() => { setMenu(null); setDeletingNotebook(menu.notebook); }} />
+        {props.onUpdateNotebook && <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { setMenu(null); setRenaming(`notebook:${menu.notebook.id}`); }} />}
+        {props.onUpdateNotebook && <MenuItem icon="palette" label={t('Icono y color')} onSelect={() => { setMenu(null); setStyling({ kind: 'notebook', id: menu.notebook.id }); }} />}
+        {props.onEditNotebook && <MenuItem icon="folder" label={props.notebookCollections === false ? t('Editar fuentes') : t('Editar colecciones')} onSelect={() => { setMenu(null); props.onEditNotebook!(menu.notebook); }} />}
+        {props.onDeleteNotebook && <>
+          <hr className="research-history-menu-separator" />
+          <MenuItem icon="trash" danger label={t('Eliminar cuaderno')} onSelect={() => { setMenu(null); setDeletingNotebook(menu.notebook); }} />
+        </>}
       </FloatingMenu>}
       {styling?.kind === 'project' && projectById.has(styling.id) && <AppearanceDialog value={projectById.get(styling.id)!} fallbackIcon="folder" onClose={() => setStyling(null)}
         onChange={patch => run(() => props.onUpdateProject(projectById.get(styling.id)!, patch))} />}
-      {styling?.kind === 'notebook' && notebookById.has(styling.id) && <AppearanceDialog value={notebookById.get(styling.id)!} fallbackIcon="notebook" onClose={() => setStyling(null)}
-        onChange={patch => run(() => props.onUpdateNotebook(notebookById.get(styling.id)!, patch))} />}
+      {styling?.kind === 'notebook' && notebookById.has(styling.id) && props.onUpdateNotebook && <AppearanceDialog value={notebookById.get(styling.id)!} fallbackIcon={labels.icon} onClose={() => setStyling(null)}
+        onChange={patch => run(() => props.onUpdateNotebook!(notebookById.get(styling.id)!, patch))} />}
       {deletingNotebook && <ConfirmModal
         title={t('Eliminar cuaderno')}
-        message={tx('Se eliminará «{name}». Sus chats no se borran: vuelven al historial general, y sus colecciones siguen en la Biblioteca.', { name: deletingNotebook.name })}
+        message={props.notebookCollections === false
+          ? tx('Se eliminará «{name}». Sus chats no se borran: vuelven al historial general.', { name: deletingNotebook.name })
+          : tx('Se eliminará «{name}». Sus chats no se borran: vuelven al historial general, y sus colecciones siguen en la Biblioteca.', { name: deletingNotebook.name })}
         confirmLabel={t('Eliminar')}
         danger
-        onConfirm={() => { const notebook = deletingNotebook; setDeletingNotebook(null); run(() => props.onDeleteNotebook(notebook)); }}
+        onConfirm={() => { const notebook = deletingNotebook; setDeletingNotebook(null); if (props.onDeleteNotebook) run(() => props.onDeleteNotebook!(notebook)); }}
         onCancel={() => setDeletingNotebook(null)}
       />}
       {folderUi.overlays}
@@ -335,8 +359,9 @@ function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supp
   // The menu swaps its list in place: the chat's actions, the projects, or the folders.
   const [list, setList] = useState<'actions' | 'projects' | 'folders'>('actions');
   const pinned = !!conversation.pinnedAt && !conversation.archived;
-  // A notebook's chat belongs to its notebook; it is not moved into a project.
-  const movable = supportsProjects && !(conversation.notebookId && props.notebooksOn && props.notebooks.some(notebook => notebook.id === conversation.notebookId));
+  // A notebook's chat belongs to its notebook; it is not moved into a project. A course is
+  // only a Study chat's scope, so its chats still move.
+  const movable = supportsProjects && !((props.notebookLocksMoves ?? true) && conversation.notebookId && props.notebooksOn && props.notebooks.some(notebook => notebook.id === conversation.notebookId));
   const project = conversation.projectId ? projects.find(item => item.id === conversation.projectId) ?? null : null;
   // The folders of the chat's own project; a folder id that no longer resolves is no folder.
   const outline = project ? folderOutline(props.folderActions.folders, project.id) : [];

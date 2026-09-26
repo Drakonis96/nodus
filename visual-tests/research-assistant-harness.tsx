@@ -41,10 +41,51 @@ const systemPrompts = new Map<string, any>();
 const promptSelections = new Map<string, string>();
 const nativeConversations = new Map<string, any>();
 const nativeCreate = async (input: any) => { const chat = { id: `native-${nativeConversations.size + 1}`, ...input, messages: [], focus: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), messageCount: 0 }; nativeConversations.set(chat.id, chat); return chat; };
-const nativeSave = async (id: string, patch: any) => { win.saved.push({ id, ...patch }); return Object.assign(nativeConversations.get(id), patch, { messageCount: patch.messages?.length ?? 0 }); };
+const nativeSave = async (id: string, patch: any) => { win.saved.push({ id, ...patch }); const chat = nativeConversations.get(id); return Object.assign(chat, patch, { messageCount: patch.messages?.length ?? chat.messageCount ?? 0 }, patch.archived ? { pinnedAt: null } : {}); };
 const nativeStream = async (request: any, handlers: any) => { win.requests.push(request); handlers.onDelta('Respuesta con evidencia.'); return { text: 'Respuesta con evidencia.', answer: 'Respuesta con evidencia [S1](nodus://study/evidence/S1).', citations: [{ id: 'S1', kind: 'material', title: 'Fuente original', location: { materialId: 'material-1' } }], focus: [{ kind: 'character', id: 'character-1', title: 'Personaje' }], noMaterial: false }; };
 
+// The chat history's organization for the native surfaces, in memory, with the store's
+// rules: a folder brings its project, another project clears the folder, a deleted folder
+// or project unfiles and never deletes, a deleted notebook returns its chats.
+const history = { projects: [] as any[], folders: [] as any[], notebooks: [] as any[] };
+win.chatHistoryStore = history;
+win.native = nativeConversations;
+const stamp = () => new Date().toISOString();
+const chatOf = (id: string) => { const chat = nativeConversations.get(id); if (!chat) throw new Error('research_chat_conversation_not_found'); return chat; };
+const nativeList = async (includeArchived?: boolean) => [...nativeConversations.values()].filter(chat => includeArchived || !chat.archived);
+const organizerFixtures = {
+  listChatHistoryProjects: async () => [...history.projects].sort((a, b) => a.name.localeCompare(b.name)),
+  createChatHistoryProject: async (_surface: string, input: any) => { const project = { id: `project-${history.projects.length + 1}`, icon: 'folder', color: null, createdAt: stamp(), updatedAt: stamp(), ...input }; history.projects.push(project); return project; },
+  updateChatHistoryProject: async (_surface: string, id: string, patch: any) => Object.assign(history.projects.find(project => project.id === id), patch),
+  deleteChatHistoryProject: async (_surface: string, id: string) => {
+    history.projects = history.projects.filter(project => project.id !== id);
+    history.folders = history.folders.filter(folder => folder.projectId !== id);
+    for (const chat of nativeConversations.values()) if (chat.projectId === id) Object.assign(chat, { projectId: null, folderId: null });
+  },
+  listChatHistoryFolders: async () => history.folders,
+  createChatHistoryFolder: async (_surface: string, input: any) => { const folder = { id: `folder-${history.folders.length + 1}`, parentId: null, position: history.folders.length, createdAt: stamp(), ...input }; history.folders.push(folder); return folder; },
+  renameChatHistoryFolder: async (_surface: string, id: string, name: string) => Object.assign(history.folders.find(folder => folder.id === id), { name }),
+  moveChatHistoryFolder: async (_surface: string, id: string, parentId: string | null) => Object.assign(history.folders.find(folder => folder.id === id), { parentId }),
+  deleteChatHistoryFolder: async (_surface: string, id: string) => {
+    history.folders = history.folders.filter(folder => folder.id !== id);
+    for (const chat of nativeConversations.values()) if (chat.folderId === id) chat.folderId = null;
+  },
+  setChatHistoryProject: async (_surface: string, id: string, projectId: string | null) => { const chat = chatOf(id); if (chat.projectId !== projectId) chat.folderId = null; chat.projectId = projectId; },
+  setChatHistoryFolder: async (_surface: string, id: string, folderId: string | null) => { const chat = chatOf(id); if (folderId) chat.projectId = history.folders.find(folder => folder.id === folderId).projectId; chat.folderId = folderId; },
+  setChatHistoryPinned: async (_surface: string, id: string, pinned: boolean) => { chatOf(id).pinnedAt = pinned ? stamp() : null; },
+  renameChatHistoryConversation: async (_surface: string, id: string, title: string) => { chatOf(id).title = title; },
+  archiveChatHistoryConversation: async (_surface: string, id: string, archived: boolean) => { Object.assign(chatOf(id), { archived, ...(archived ? { pinnedAt: null } : {}) }); },
+  listChatHistoryNotebooks: async () => history.notebooks,
+  createChatHistoryNotebook: async (_surface: string, input: any) => { const notebook = { id: `notebook-${history.notebooks.length + 1}`, icon: 'notebook', color: null, createdAt: stamp(), updatedAt: stamp(), ...input }; history.notebooks.push(notebook); return notebook; },
+  updateChatHistoryNotebook: async (_surface: string, id: string, patch: any) => Object.assign(history.notebooks.find(notebook => notebook.id === id), patch),
+  deleteChatHistoryNotebook: async (_surface: string, id: string) => {
+    history.notebooks = history.notebooks.filter(notebook => notebook.id !== id);
+    for (const chat of nativeConversations.values()) if (chat.notebookId === id) chat.notebookId = null;
+  },
+};
+
 window.nodus = new Proxy({
+  ...organizerFixtures,
   getSettings: async () => settings,
   listChatSkills: async () => params.get('concilium') ? DEFAULT_CHAT_SKILLS.map(skill => ({ ...skill, enabled: { assistant: skill.builtin === 'svg', nodi: false } })) : [],
   getResearchSystemPrompts: async (key: string) => ({ prompts: [...systemPrompts.values()].sort((a, b) => a.name.localeCompare(b.name)), selectedId: promptSelections.get(key) ?? null }),
@@ -54,9 +95,9 @@ window.nodus = new Proxy({
   listDatabases: async () => [{ id: 'database-1', name: 'Base seleccionada' }, { id: 'database-2', name: 'Otra base' }],
   ...studySourceFixtures(Number(params.get('sources') ?? 1)),
   listWorldEntries: async () => [{ key: 'character:character-1', id: 'character-1', kind: 'character', title: 'Personaje' }],
-  listDatabaseChatConversations: async () => [...nativeConversations.values()],
-  listStudyAssistantConversations: async () => [...nativeConversations.values()],
-  listWorldChatConversations: async () => [...nativeConversations.values()],
+  listDatabaseChatConversations: nativeList,
+  listStudyAssistantConversations: nativeList,
+  listWorldChatConversations: nativeList,
   getDatabaseChatConversation: async (id: string) => nativeConversations.get(id),
   getStudyAssistantConversation: async (id: string) => nativeConversations.get(id),
   getWorldChatConversation: async (id: string) => nativeConversations.get(id),
