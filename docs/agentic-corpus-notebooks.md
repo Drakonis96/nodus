@@ -164,7 +164,7 @@ abstract evidence from full text. `/private/tmp/nodus-research-6ts8sn` passed th
 real Electron citation lookup, fabricated-scope rejection and exclusion-after-
 publication checks, with seven audited private database opens and zero calls.
 
-Migration 180 adds backend-owned conversation provenance. Historical messages
+Migration 181 adds backend-owned conversation provenance. Historical messages
 stay visible, while only matching, server-recorded turns can re-enter a notebook
 prompt. Deleting a notebook also removes its conversation selection metadata.
 
@@ -218,7 +218,7 @@ and idempotent settlement. It is not yet wired to a live inference campaign.
 The passage embedding pipeline and Documentary Index now call the shared
 preparation service. Text is published lexically before embeddings. Persistent
 embedding-operation leases are acquired before provider dispatch, compatible
-vectors are reused, and migration 181 adds a vault publication token so a slower
+vectors are reused, and migration 182 adds a vault publication token so a slower
 legacy writer cannot replace newer passages. Explicit preparation can retry a
 failed stage; cancellation revokes leases without deleting published evidence.
 

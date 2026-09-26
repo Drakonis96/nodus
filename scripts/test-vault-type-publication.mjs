@@ -89,6 +89,7 @@ test('a study or teaching publication carries no rosters, recordings or performa
         'study_ai_usage',
         // Students, always.
         'teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations',
+        'teaching_attendance', 'teaching_attendance_holidays',
       ]) {
         assert.equal(payload.tables[forbidden], undefined, `${type} must not publish ${forbidden}`);
       }

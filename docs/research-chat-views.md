@@ -116,7 +116,7 @@ and the focus returns to the row it came from.
 ### Across devices
 
 Folders, placements and the conversation tables are synced. Folders and placements carry
-`updated_at` (migration 187 for Research Chat; the Databases and Worldbuilding tables were
+`updated_at` (migration 188 for Research Chat; the Databases and Worldbuilding tables were
 created with it), so a chat filed or moved, or a folder renamed or reordered, travels by
 the merge's newest-wins rule like any other row, and a deletion travels as a tombstone.
 

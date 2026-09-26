@@ -51,6 +51,7 @@ export type DialogTitleKey =
   // Teaching vault (electron/ipc/teaching.ts)
   | 'downloadActa'
   | 'downloadReportCard'
+  | 'downloadAttendance'
   | 'chooseTaskInstructions'
   | 'downloadRubric'
   | 'addLogoToLibrary'
@@ -244,6 +245,10 @@ export const DIALOG_TITLE_COPY: Record<DialogTitleKey, Record<AppLanguage, strin
   'zh-TW': '下載班級記錄',
   ko: "수업 기록 다운로드",
   ja: "授業記録をダウンロードする", },
+  downloadAttendance: { es: 'Descargar asistencia', en: 'Download attendance', fr: 'Télécharger les présences', de: 'Anwesenheit herunterladen', pt: 'Transferir assiduidade', 'pt-BR': 'Baixar frequência', it: 'Scarica presenze', tr: 'Devam durumunu indir', 'zh-CN': '下载考勤记录',
+  'zh-TW': '下載出缺席紀錄',
+  ko: "출결 기록 다운로드",
+  ja: "出欠記録をダウンロード", },
   downloadReportCard: { es: 'Descargar boletín', en: 'Download report card', fr: 'Télécharger le bulletin', de: 'Zeugnis herunterladen', pt: 'Transferir boletim', 'pt-BR': 'Baixar boletim', it: 'Scarica pagella', tr: 'Karne indir', 'zh-CN': '下载成绩单' ,
   'zh-TW': '下載成績單',
   ko: "성적표 다운로드",

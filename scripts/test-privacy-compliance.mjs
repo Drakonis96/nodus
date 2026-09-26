@@ -114,6 +114,7 @@ test('teaching AI modules cannot reach the student roster', async () => {
     const relative = path.relative(repoRoot, file);
     assert.doesNotMatch(code, /teachingGroupsRepo/, `${relative}: teaching AI must not import the roster repo`);
     assert.doesNotMatch(code, /teaching_students/, `${relative}: teaching AI must not read the roster table`);
+    assert.doesNotMatch(code, /teachingAttendanceRepo|teaching_attendance/, `${relative}: teaching AI must not read attendance`);
   }
 
   // The dormancy note is load-bearing documentation: without it the next reader sees
@@ -147,7 +148,7 @@ test('remote vault publication excludes credentials, files and student administr
   for (const sensitive of ['study_recordings', 'study_attempts', 'study_grading_runs', 'study_mastery']) {
     assert.doesNotMatch(snapshotCode, new RegExp(`'${sensitive}'`), `${sensitive} must not be publishable`);
   }
-  for (const sensitive of ['teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations']) {
+  for (const sensitive of ['teaching_students', 'teaching_groups', 'teaching_grade_entries', 'teaching_rubric_evaluations', 'teaching_attendance', 'teaching_attendance_holidays']) {
     assert.doesNotMatch(snapshotCode, new RegExp(`['"]${sensitive}['"]`));
   }
   assert.match(snapshot, /embedding[\s\S]*file_path[\s\S]*api_key[\s\S]*access_token/);

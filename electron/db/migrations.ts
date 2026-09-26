@@ -119,7 +119,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 190;
+export const SCHEMA_VERSION = 191;
 
 export const migrations: Migration[] = [
   {
@@ -9313,7 +9313,39 @@ export const migrations: Migration[] = [
   // Rows written before this column read as 'model', which is what they were.
   { version: 177, up: `ALTER TABLE document_profile_fields ADD COLUMN confidence_source TEXT;` },
   { version: 178, up: `ALTER TABLE chat_messages ADD COLUMN concilium_json TEXT;` },
-  { version: 179, up: `
+  {
+    // Attendance (teaching vault). One row per student per LOCAL day; an empty cell
+    // has no row, so "not recorded" can never be mistaken for "present". The group is
+    // reached through the student, not stored twice. Holidays belong to a group — the
+    // interface offers to copy one to the teacher's other groups, but each group keeps
+    // its own calendar. A holiday hides the marks under it rather than deleting them.
+    // IF NOT EXISTS: a vault that already has the tables (a differently numbered build,
+    // a replayed upgrade) must reach head instead of failing on "already exists".
+    version: 179,
+    up: /* sql */ `
+      CREATE TABLE IF NOT EXISTS teaching_attendance (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
+
+      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
+    `,
+  },
+  { version: 180, up: `
     CREATE TABLE IF NOT EXISTS research_notebooks (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
       revision INTEGER NOT NULL DEFAULT 1, mode TEXT NOT NULL CHECK(mode IN ('fixed','linked')),
@@ -9330,7 +9362,7 @@ export const migrations: Migration[] = [
       id TEXT PRIMARY KEY, notebook_id TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL
     );
   ` },
-  { version: 180, up: `
+  { version: 181, up: `
     CREATE TABLE IF NOT EXISTS research_conversation_provenance (
       conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
       scope_id TEXT NOT NULL REFERENCES research_run_scopes(id),
@@ -9338,7 +9370,7 @@ export const migrations: Migration[] = [
       PRIMARY KEY(conversation_id,scope_id,role,content_hash)
     );
   ` },
-  { version: 181, up: `
+  { version: 182, up: `
     CREATE TABLE IF NOT EXISTS passage_publications (
       nodus_id TEXT PRIMARY KEY REFERENCES works(nodus_id) ON DELETE CASCADE,
       token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
@@ -9350,7 +9382,7 @@ export const migrations: Migration[] = [
   // its subfolders, and a deleted folder leaves its chats in the project, unfiled. The
   // repo's transactions still release a project's chats and drop a conversation's
   // placement, since placements carry no key to chat_conversations.
-  { version: 182, up: `
+  { version: 183, up: `
     CREATE TABLE IF NOT EXISTS research_chat_projects (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -9370,13 +9402,13 @@ export const migrations: Migration[] = [
     CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
     CREATE INDEX IF NOT EXISTS research_chat_placements_folder ON research_chat_placements(folder_id);
   ` },
-  { version: 183, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
+  { version: 184, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
   // A notebook shows in the chat history like a project: its own icon and colour.
-  { version: 184, up: `ALTER TABLE research_notebooks ADD COLUMN icon TEXT;` },
-  { version: 185, up: `ALTER TABLE research_notebooks ADD COLUMN color TEXT;` },
+  { version: 185, up: `ALTER TABLE research_notebooks ADD COLUMN icon TEXT;` },
+  { version: 186, up: `ALTER TABLE research_notebooks ADD COLUMN color TEXT;` },
   // Research Chat web evidence: the exact passage Nodus read, where and when, so a
   // web citation stays verifiable after the page changes or disappears.
-  { version: 186, up: `
+  { version: 187, up: `
     CREATE TABLE IF NOT EXISTS research_web_passages (
       id TEXT PRIMARY KEY,
       url TEXT NOT NULL,
@@ -9398,7 +9430,7 @@ export const migrations: Migration[] = [
   // moved, or a chat filed, travels by newest-wins like every other synced row. Without a
   // stamp the merge keeps whatever the receiving device already had, and a chat moved on
   // one machine never moved on the other.
-  { version: 187, up: `
+  { version: 188, up: `
     ALTER TABLE research_chat_project_folders ADD COLUMN updated_at TEXT;
     UPDATE research_chat_project_folders SET updated_at = created_at WHERE updated_at IS NULL;
     ALTER TABLE research_chat_placements ADD COLUMN updated_at TEXT;
@@ -9408,11 +9440,11 @@ export const migrations: Migration[] = [
   ` },
   // The Databases and Worldbuilding chat histories get what Research Chat has: projects,
   // folders nested inside them, pins and notebooks, each surface in tables of its own so
-  // no history can read or write another's. The same shape and keys as migration 182
-  // plus 187's stamps; a notebook is the named set of sources its chats read, kept as the
+  // no history can read or write another's. The same shape and keys as migration 183
+  // plus 188's stamps; a notebook is the named set of sources its chats read, kept as the
   // surface's own selection JSON. Placements carry no key to their conversation; the
   // repository drops a chat's placement with it and the repair pass catches the rest.
-  { version: 188, up: `
+  { version: 189, up: `
     CREATE TABLE IF NOT EXISTS database_chat_projects (
       id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
       created_at TEXT NOT NULL, updated_at TEXT NOT NULL
@@ -9465,8 +9497,8 @@ export const migrations: Migration[] = [
     CREATE INDEX IF NOT EXISTS world_chat_placements_notebook ON world_chat_placements(notebook_id);
   ` },
   // Archiving, as in Research Chat: an archived chat leaves the normal history.
-  { version: 189, up: `ALTER TABLE database_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
-  { version: 190, up: `ALTER TABLE world_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
+  { version: 190, up: `ALTER TABLE database_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
+  { version: 191, up: `ALTER TABLE world_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
 ];
 
 /**

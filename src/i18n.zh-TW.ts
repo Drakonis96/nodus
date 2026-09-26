@@ -23,6 +23,7 @@ import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
 import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
+import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -138,6 +139,7 @@ export const ZH_TW: Record<string, string> = {
   ...WORLD_CHAT_TRANSLATIONS['zh-TW'],
   ...STUDY_SYNONYM_TRANSLATIONS['zh-TW'],
   ...STUDY_BANK_TRANSLATIONS['zh-TW'],
+  ...TEACHING_ATTENDANCE_TRANSLATIONS['zh-TW'],
   ...STUDY_SOURCE_TRANSLATIONS["zh-TW"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-TW'],
   ...WORKSPACE_TRANSLATIONS['zh-TW'],

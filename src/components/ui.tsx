@@ -164,6 +164,8 @@ const ICON_PATHS: Record<string, string> = {
   phone: '<rect x="6" y="2" width="12" height="20" rx="2.6"/><path d="M10.5 5.4h3"/><path d="M11 18.6h2"/>',
   star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   sparkles: '<path d="m12 3-1.35 3.65L7 8l3.65 1.35L12 13l1.35-3.65L17 8l-3.65-1.35L12 3Z"/><path d="m5 14-.9 2.1L2 17l2.1.9L5 20l.9-2.1L8 17l-2.1-.9L5 14Z"/><path d="m19 13-1.05 2.95L15 17l2.95 1.05L19 21l1.05-2.95L23 17l-2.95-1.05L19 13Z"/>',
+  // A party popper: marks a holiday in the attendance grid (its own drawing, not a copied set).
+  partyPopper: '<path d="M4 20 8.5 9l6.5 6.5z"/><path d="M7.3 13.3l3.4 3.4"/><path d="M11 7c-.4-1.8.6-3.2 2.4-3.4"/><path d="M17 13c1.8.4 3.2-.6 3.4-2.4"/><path d="M13.5 10.5 19 5"/><path d="M17 2.5v.01"/><path d="M21.5 7v.01"/><path d="M21 16.5v.01"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
