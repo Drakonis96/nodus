@@ -5,7 +5,6 @@
 // selection, filing and unfiling by drag, nesting with its cycle guard, renaming, deletion;
 // and long names that slide on hover without changing anything at rest.
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
