@@ -1,0 +1,73 @@
+name: SearXNG engine health
+
+# The web step depends on engines that are not under anyone's control: they change
+# their markup (which an upstream SearXNG bump fixes) and they block addresses that
+# search a lot (which nothing fixes). This job answers two questions on a schedule
+# instead of on the day a user reports it: is the pinned upstream still current, and
+# do the engines still answer?
+#
+# A GitHub runner is a datacenter address, and the scraped engines treat those
+# harshly, so the thresholds here are deliberately loose (at least one engine has to
+# answer) and the JSON artifact is the real signal. Run the same script on a real
+# machine with `--min-engines 3` before bumping the pin; that is the address real
+# users search from.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: searxng-health
+  cancel-in-progress: true
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Stage the pinned runtime
+        run: npm run research:runtime
+      - name: Upstream drift and engine canary
+        id: health
+        continue-on-error: true
+        run: node scripts/check-searxng-health.mjs --disposable-ci --json searxng-health.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: searxng-health
+          path: searxng-health.json
+          if-no-files-found: warn
+      - name: Report a hard signal once, without opening a new issue every week
+        if: steps.health.outcome == 'failure'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = 'SearXNG engine health check failed';
+            const report = require('fs').readFileSync('searxng-health.json', 'utf8');
+            const body = [
+              `The scheduled check found a hard signal on ${new Date().toISOString().slice(0, 10)}.`,
+              '',
+              'A runner is a datacenter address, so some engines being blocked here is expected;',
+              'what is not expected is the runtime failing to boot or every engine going quiet.',
+              'Run `node scripts/check-searxng-health.mjs --min-engines 3` on a real machine before',
+              'concluding anything about the engines themselves.',
+              '',
+              '```json',
+              report.slice(0, 60000),
+              '```',
+            ].join('\n');
+            const existing = await github.rest.issues.listForRepo({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', labels: 'searxng-health' });
+            if (existing.data.length) {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.data[0].number, body });
+            } else {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, labels: ['searxng-health'], body });
+            }
+      - name: Fail the job after reporting
+        if: steps.health.outcome == 'failure'
+        run: exit 1

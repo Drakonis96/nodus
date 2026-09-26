@@ -103,6 +103,33 @@ the token is refused, that a real search returns JSON results, and that killing
 the parent with `SIGKILL` leaves no orphan. `--disposable-ci` uses a throwaway
 session directory, which is what the platform workflow runs.
 
+## Keeping the pin current
+
+`node scripts/check-searxng-health.mjs` answers the two maintenance questions
+together: it compares the pinned commit with the tip of upstream's default branch,
+boots the staged runtime and fires three fixed queries (one humanities, one current
+affairs, one scholarly), then reports per engine how many results it contributed and
+why it was unresponsive. It exits non-zero only on a hard signal — the runtime does
+not boot, no engine answers at all, or fewer than `--min-engines` do.
+
+A runner in a datacenter is treated as a hostile address by the scraped engines, so
+`.github/workflows/searxng-health.yml` runs it weekly with the loose default and
+keeps the JSON as the signal, and comments on one standing issue rather than opening
+a new one every week. On a real machine — the address users actually search from —
+run it as:
+
+```
+node scripts/check-searxng-health.mjs --min-engines 3
+```
+
+**The bump itself is a reviewed change, never an automatic one.** The pinned commit
+and the hashed lock are what make the shipped runtime reproducible and keep an
+unvetted upstream release out of a signed application, so the procedure is: read the
+canary's parser-rot signal, bump `manifest.json` (commit, date, tarball URL and its
+SHA-256), run `npm run research:runtime`, re-run the canary on a real machine with
+`--min-engines 3`, and open a pull request with the before/after table. The platform
+workflow then re-verifies all four systems before anyone merges.
+
 ## Known gaps
 
 - Run-to-run stability of the evidence set is still below the bar set for this
