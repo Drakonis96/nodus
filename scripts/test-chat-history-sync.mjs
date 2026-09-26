@@ -108,24 +108,29 @@ try {
     {
       const a = openDevice(); const b = openDevice();
       use(a);
-      const project = projects.createChatProject({ name: 'Tesis' });
+      const project = projects.createChatProject({ name: 'Tesis', instructions: 'Initial project context' });
       const folder = projects.createChatProjectFolder({ projectId: project.id, name: 'Fuentes' });
       addConversation(a, 'c-move', 'Un chat');
       projects.setConversationProject('c-move', project.id);
       syncInto(a, b);
+      assert.equal(b.prepare(`SELECT instructions FROM ${tables.projects} WHERE id=?`).get(project.id).instructions, 'Initial project context');
       assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, `${tables.surface}: B learns the project`);
       await pause();
       use(b);
       projects.setConversationFolder('c-move', folder.id);
       projects.renameChatProjectFolder(folder.id, 'Fuentes primarias');
+      projects.updateChatProject(project.id, { instructions: 'Updated project context' });
       syncInto(b, a);
+      assert.equal(a.prepare(`SELECT instructions FROM ${tables.projects} WHERE id=?`).get(project.id).instructions, 'Updated project context');
       assert.deepEqual(placementOf(a, 'c-move'), { projectId: project.id, folderId: folder.id }, 'a chat filed on B is filed on A');
       assert.equal(a.prepare(`SELECT name FROM ${tables.folders} WHERE folder_id = ?`).get(folder.id).name, 'Fuentes primarias', `${tables.surface}: a rename on B reaches A`);
       await pause();
       use(a);
       projects.setConversationFolder('c-move', null);
+      projects.updateChatProject(project.id, { instructions: '' });
       syncInto(a, b);
       assert.deepEqual(placementOf(b, 'c-move'), { projectId: project.id, folderId: null }, 'taking it out of its folder travels back');
+      assert.equal(b.prepare(`SELECT instructions FROM ${tables.projects} WHERE id=?`).get(project.id).instructions, '', 'cleared instructions travel back');
       a.close(); b.close();
     }
 

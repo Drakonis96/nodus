@@ -1851,8 +1851,8 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
   h('chat:projects:list', async () => chatProjects.listChatProjects());
-  h('chat:projects:create', async (_e, input: { name: string; icon?: string | null; color?: string | null }) => chatProjects.createChatProject(input));
-  h('chat:projects:update', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => chatProjects.updateChatProject(id, patch));
+  h('chat:projects:create', async (_e, input: { name: string; icon?: string | null; color?: string | null; instructions?: string }) => chatProjects.createChatProject(input));
+  h('chat:projects:update', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }) => chatProjects.updateChatProject(id, patch));
   h('chat:projects:delete', async (_e, id: string) => chatProjects.deleteChatProject(id));
   h('chat:folders:list', async () => chatProjects.listChatProjectFolders());
   h('chat:folders:create', async (_e, input: { projectId: string; parentId?: string | null; name: string }) => chatProjects.createChatProjectFolder(input));

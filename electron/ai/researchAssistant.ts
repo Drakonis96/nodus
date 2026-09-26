@@ -570,7 +570,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     chemistryEnabled && !genealogy && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
     !genealogy && request.selection.sourceFilter?.enabled === true
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
-  ].filter(Boolean).join('\n\n'), request.systemPromptId);
+  ].filter(Boolean).join('\n\n'), request.systemPromptId, { surface: 'research', conversationId: request.conversationId });
 
   // Derive the budget from the window. Cloud (window === null) keeps the cloud-sized cap
   // and the default generation budget; local shrinks both to fit the loaded window.

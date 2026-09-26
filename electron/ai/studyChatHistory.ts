@@ -1,3 +1,4 @@
+import { cleanProjectInstructions } from '@shared/researchSystemPrompts';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,7 +25,7 @@ import { activeVaultDir } from '../vaults/vaultRegistry';
  * back at once, so the file on disk is sound after the first read.
  */
 
-export interface StudyChatStoredProject { id: string; name: string; icon: string | null; color: string | null; createdAt: string; updatedAt: string }
+export interface StudyChatStoredProject { instructions?: string; id: string; name: string; icon: string | null; color: string | null; createdAt: string; updatedAt: string }
 export interface StudyChatStoredFolder { id: string; projectId: string; parentId: string | null; name: string; position: number; createdAt: string; updatedAt: string }
 export interface StudyAssistantStore {
   version: 1;
@@ -120,7 +121,7 @@ const cleanName = (name: unknown, code: string): string => {
   return name.trim();
 };
 const byName = <T extends { name: string; id: string }>(a: T, b: T) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) || a.id.localeCompare(b.id);
-const toProject = (project: StudyChatStoredProject): ResearchChatProject => ({ ...project });
+const toProject = (project: StudyChatStoredProject): ResearchChatProject => ({ ...project, instructions: project.instructions ?? '' });
 const toFolder = ({ updatedAt: _updatedAt, ...folder }: StudyChatStoredFolder): ResearchChatProjectFolder => folder;
 
 // ── Projects ─────────────────────────────────────────────────────────────────
@@ -129,19 +130,20 @@ export function listStudyChatProjects(): ResearchChatProject[] {
   return readStudyChatStore().projects.map(toProject).sort(byName);
 }
 
-export function createStudyChatProject(input: { name: string; icon?: string | null; color?: string | null }): ResearchChatProject {
+export function createStudyChatProject(input: { name: string; icon?: string | null; color?: string | null; instructions?: string }): ResearchChatProject {
   const stamp = now();
   const project: StudyChatStoredProject = {
-    id: crypto.randomUUID(), name: cleanName(input.name, 'research_chat_project_invalid_name'),
+    id: crypto.randomUUID(), name: cleanName(input.name, 'research_chat_project_invalid_name'), instructions: cleanProjectInstructions(input.instructions ?? ''),
     icon: cleanAppearanceIcon(input.icon ?? 'folder'), color: cleanAppearanceColor(input.color ?? null), createdAt: stamp, updatedAt: stamp,
   };
   return mutate((store) => { store.projects.push(project); return toProject(project); });
 }
 
-export function updateStudyChatProject(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): ResearchChatProject {
+export function updateStudyChatProject(id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }): ResearchChatProject {
   return mutate((store) => {
     const project = store.projects.find((item) => item.id === id);
     if (!project) throw new Error('research_chat_project_not_found');
+    if ('instructions' in patch) project.instructions = cleanProjectInstructions(patch.instructions);
     if ('name' in patch) project.name = cleanName(patch.name, 'research_chat_project_invalid_name');
     if ('icon' in patch) project.icon = cleanAppearanceIcon(patch.icon);
     if ('color' in patch) project.color = cleanAppearanceColor(patch.color);

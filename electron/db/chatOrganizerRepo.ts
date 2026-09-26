@@ -1,3 +1,4 @@
+import { cleanProjectInstructions } from '@shared/researchSystemPrompts';
 import { randomUUID } from 'node:crypto';
 import { getDb } from './database';
 import { cleanAppearanceColor, cleanAppearanceIcon } from './chatAppearance';
@@ -20,13 +21,13 @@ import { RESEARCH_CHAT_PIN_LIMIT, type ChatHistoryNotebook, type ResearchChatPro
  * The table names come from the fixed descriptors in chatHistoryTables.ts, never from input.
  */
 
-type ProjectRow = { id: string; name: string; icon: string | null; color: string | null; created_at: string; updated_at: string };
+type ProjectRow = { instructions: string; id: string; name: string; icon: string | null; color: string | null; created_at: string; updated_at: string };
 type FolderRow = { folder_id: string; project_id: string; parent_id: string | null; name: string; position: number; created_at: string; updated_at: string | null };
 type NotebookRow = { id: string; name: string; icon: string | null; color: string | null; selection_json: string; created_at: string; updated_at: string };
 
 export type ChatPlacement = { projectId: string | null; folderId: string | null; pinnedAt: string | null; notebookId: string | null };
 
-const decodeProject = (row: ProjectRow): ResearchChatProject => ({ id: row.id, name: row.name, icon: row.icon, color: row.color, createdAt: row.created_at, updatedAt: row.updated_at });
+const decodeProject = (row: ProjectRow): ResearchChatProject => ({ id: row.id, name: row.name, instructions: row.instructions ?? '', icon: row.icon, color: row.color, createdAt: row.created_at, updatedAt: row.updated_at });
 const decodeFolder = (row: FolderRow): ResearchChatProjectFolder => ({
   id: row.folder_id, projectId: row.project_id, parentId: row.parent_id, name: row.name, position: row.position, createdAt: row.created_at,
 });
@@ -63,23 +64,24 @@ export function createChatOrganizer(tables: ChatHistoryTables) {
     return row ? decodeProject(row) : null;
   }
 
-  function createChatProject(input: { name: string; icon?: string | null; color?: string | null }): ResearchChatProject {
+  function createChatProject(input: { name: string; icon?: string | null; color?: string | null; instructions?: string }): ResearchChatProject {
     const stamp = now();
     const id = randomUUID();
-    getDb().prepare(`INSERT INTO ${projects} (id,name,icon,color,created_at,updated_at) VALUES (?,?,?,?,?,?)`)
-      .run(id, cleanName(input.name, 'research_chat_project_invalid_name'), cleanAppearanceIcon(input.icon ?? 'folder'), cleanAppearanceColor(input.color ?? null), stamp, stamp);
+    getDb().prepare(`INSERT INTO ${projects} (id,name,icon,color,instructions,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`)
+      .run(id, cleanName(input.name, 'research_chat_project_invalid_name'), cleanAppearanceIcon(input.icon ?? 'folder'), cleanAppearanceColor(input.color ?? null), cleanProjectInstructions(input.instructions ?? ''), stamp, stamp);
     return getChatProject(id)!;
   }
 
-  function updateChatProject(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): ResearchChatProject {
+  function updateChatProject(id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }): ResearchChatProject {
     const existing = getChatProject(id);
     if (!existing) throw new Error('research_chat_project_not_found');
     const next = {
+      instructions: 'instructions' in patch ? cleanProjectInstructions(patch.instructions) : existing.instructions ?? '',
       name: 'name' in patch ? cleanName(patch.name, 'research_chat_project_invalid_name') : existing.name,
       icon: 'icon' in patch ? cleanAppearanceIcon(patch.icon) : existing.icon,
       color: 'color' in patch ? cleanAppearanceColor(patch.color) : existing.color,
     };
-    getDb().prepare(`UPDATE ${projects} SET name=?, icon=?, color=?, updated_at=? WHERE id=?`).run(next.name, next.icon, next.color, now(), id);
+    getDb().prepare(`UPDATE ${projects} SET name=?, icon=?, color=?, instructions=?, updated_at=? WHERE id=?`).run(next.name, next.icon, next.color, next.instructions, now(), id);
     return getChatProject(id)!;
   }
 

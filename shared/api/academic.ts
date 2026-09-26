@@ -810,8 +810,8 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   deleteConversation(id: string): Promise<void>;
   /** Research chat projects, alphabetical. Optional: surfaces without projects omit them. */
   listChatProjects?(): Promise<ResearchChatProject[]>;
-  createChatProject?(input: { name: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
-  updateChatProject?(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  createChatProject?(input: { name: string; icon?: string | null; color?: string | null; instructions?: string }): Promise<ResearchChatProject>;
+  updateChatProject?(id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }): Promise<ResearchChatProject>;
   /** The project's chats return to the general history; none is deleted. */
   deleteChatProject?(id: string): Promise<void>;
   /** Every project's folders; a project's tree is built from parentId and position. */
@@ -834,8 +834,8 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   // its own, each call reaching only that surface's store in the active vault. Same rules
   // and the same refusals as the research chat calls above.
   listChatHistoryProjects?(surface: ChatHistorySurface): Promise<ResearchChatProject[]>;
-  createChatHistoryProject?(surface: ChatHistorySurface, input: { name: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
-  updateChatHistoryProject?(surface: ChatHistorySurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  createChatHistoryProject?(surface: ChatHistorySurface, input: { name: string; icon?: string | null; color?: string | null; instructions?: string }): Promise<ResearchChatProject>;
+  updateChatHistoryProject?(surface: ChatHistorySurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }): Promise<ResearchChatProject>;
   deleteChatHistoryProject?(surface: ChatHistorySurface, id: string): Promise<void>;
   listChatHistoryFolders?(surface: ChatHistorySurface): Promise<ResearchChatProjectFolder[]>;
   createChatHistoryFolder?(surface: ChatHistorySurface, input: { projectId: string; parentId?: string | null; name: string }): Promise<ResearchChatProjectFolder>;

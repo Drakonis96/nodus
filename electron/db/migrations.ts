@@ -158,7 +158,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 192;
+export const SCHEMA_VERSION = 193;
 
 export const migrations: Migration[] = [
   {
@@ -9528,6 +9528,11 @@ export const migrations: Migration[] = [
   // names ON DELETE CASCADE, so the create-only backfill will not replay it; this does,
   // and is a no-op wherever the tables exist.
   { version: 192, up: TEACHING_ATTENDANCE_SQL },
+  { version: 193, up: 'SELECT 1;', after: (db) => {
+    for (const table of ['research_chat_projects', 'database_chat_projects', 'world_chat_projects']) {
+      addColumnIfMissing(db, table, 'instructions', "TEXT NOT NULL DEFAULT ''");
+    }
+  } },
 ];
 
 /**

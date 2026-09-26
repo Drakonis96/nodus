@@ -6142,6 +6142,8 @@ export interface ChatConversationSummary {
 
 /** A research chat project: a named, iconed group of conversations. */
 export interface ResearchChatProject {
+  /** Shared preferences inherited by every conversation currently in this project. */
+  instructions?: string;
   id: string;
   name: string;
   icon: string | null;

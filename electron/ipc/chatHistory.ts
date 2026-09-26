@@ -65,8 +65,8 @@ function notebookOrganizer(surface: unknown): typeof databaseChatOrganizer {
 
 export function registerChatHistoryIpc({ h }: IpcContext): void {
   h('chatHistory:projects:list', async (_e, surface: ChatHistorySurface) => organizer(surface).listProjects());
-  h('chatHistory:projects:create', async (_e, surface: ChatHistorySurface, input: { name: string; icon?: string | null; color?: string | null }) => organizer(surface).createProject(input));
-  h('chatHistory:projects:update', async (_e, surface: ChatHistorySurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => organizer(surface).updateProject(id, patch));
+  h('chatHistory:projects:create', async (_e, surface: ChatHistorySurface, input: { name: string; icon?: string | null; color?: string | null; instructions?: string }) => organizer(surface).createProject(input));
+  h('chatHistory:projects:update', async (_e, surface: ChatHistorySurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null; instructions?: string }) => organizer(surface).updateProject(id, patch));
   h('chatHistory:projects:delete', async (_e, surface: ChatHistorySurface, id: string) => organizer(surface).deleteProject(id));
   h('chatHistory:folders:list', async (_e, surface: ChatHistorySurface) => organizer(surface).listFolders());
   h('chatHistory:folders:create', async (_e, surface: ChatHistorySurface, input: { projectId: string; parentId?: string | null; name: string }) => organizer(surface).createFolder(input));

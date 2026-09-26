@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 try {
   const Database = require('better-sqlite3');
   const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
-  assert.equal(SCHEMA_VERSION, 192);
+  assert.ok(SCHEMA_VERSION >= 192);
   const columns = (db, table) => new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(row => row.name));
   const hasTable = (db, table) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
 
