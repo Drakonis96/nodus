@@ -11,7 +11,7 @@ import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
-import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor } from '@shared/moleculeInspection';
+import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, formatRouteCheckUnavailable, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor, routeFixPromptForHistory, routeReportsForHistory } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
 import type {
   Author,
@@ -220,6 +220,9 @@ async function finalizeWithAudit(answer: string, execution: ReturnType<typeof sk
 /** The audits themselves, split out so `finalizeWithAudit` can fail open around them. */
 async function auditAnswer(answer: string, execution: ReturnType<typeof skillExecution>, signal?: AbortSignal, onDeterministic?: (text: string) => void): Promise<string> {
   const skilled = await executeChatSkills(answer, execution, signal);
+  // Show the answer with its target drawing now: the route checks below (name lookups, balance,
+  // step drawings) take seconds more and repaint the answer when they finish.
+  if (onDeterministic && skilled !== answer) onDeterministic(skilled);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
   const base = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
   // One capability runner for the whole phase: the resolve pass warms the worker's reference
@@ -233,16 +236,19 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
     // route is still checked and drawn; the clarification is appended after it. When the answer
     // carries no named route (or the installed package has no resolve-names tool), only the
     // structure check and a possible "list the species" chip run.
-    const resolved = await resolveNamedRoute(skilled, skilled, options);
+    const resolved = await resolveNamedRoute(skilled, skilled, { ...options, target: execution.target });
     if (resolved.legacy) {
       const withStructures = await appendStructureAudit(skilled, skilled, options);
       // A route that describes steps but lists no species cannot be checked; offer one click to
       // have the model re-emit it with the four labelled lines.
       const steps = options.enabled !== false ? countRouteSteps(skilled) : 0;
       const missingSpecies = steps > 0 && !findStepNamedSpecies(skilled, steps).some((step) => step.length);
-      return missingSpecies ? `${withStructures.trimEnd()}\n\n${formatMissingSpeciesPrompt()}\n` : withStructures;
+      const unchecked = resolved.error ? `${withStructures.trimEnd()}\n\n${formatRouteCheckUnavailable(resolved.error)}\n` : withStructures;
+      return missingSpecies ? `${unchecked.trimEnd()}\n\n${formatMissingSpeciesPrompt(execution.target)}\n` : unchecked;
     }
-    const withStructures = await appendStructureAudit(resolved.answer, resolved.answer, options);
+    // The structure check reads the model's own text: the resolved answer carries the app's
+    // derived SMILES beside every name, which the route check already covers.
+    const withStructures = await appendStructureAudit(resolved.answer, skilled, options);
     const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
     const correctionNote = formatNameCorrectionNote(resolved.corrections);
     const structureNote = formatAuthorStructureNote(resolved.authorStructures);
@@ -275,7 +281,7 @@ export async function answerResearchChat(request: ResearchChatRequest): Promise<
 
 export async function streamResearchChat(
   request: ResearchChatRequest,
-  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
+  onDelta: (delta: string, kind?: 'content' | 'reasoning' | 'replace') => void,
   signal?: AbortSignal,
   onConcilium?: (result: ConciliumResult) => void,
 ): Promise<ResearchChatResponse> {
@@ -292,7 +298,7 @@ export async function streamResearchChat(
 
 async function streamResearchChatTurn(
   request: ResearchChatRequest,
-  onDelta: (delta: string, kind?: 'content' | 'reasoning') => void,
+  onDelta: (delta: string, kind?: 'content' | 'reasoning' | 'replace') => void,
   signal?: AbortSignal,
   council?: { member?: boolean; assessments?: ConciliumResult },
 ): Promise<ResearchChatResponse> {
@@ -328,7 +334,8 @@ async function streamResearchChatTurn(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
-  return { answer: council?.member ? answer : await finalizeWithAudit(answer, execution, signal, onDelta), stats };
+  // Interim repaints carry the whole answer, so they replace the streamed text rather than append.
+  return { answer: council?.member ? answer : await finalizeWithAudit(answer, execution, signal, (text) => onDelta(text, 'replace')), stats };
 }
 
 /**
@@ -466,12 +473,19 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const local = window != null;
   const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
 
-  let messages = request.messages
-    .filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim())
+  const turns = request.messages.filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim());
+  const latestAnswer = turns.map((m) => m.role).lastIndexOf('assistant');
+  const latestQuestion = turns.map((m) => m.role).lastIndexOf('user');
+  let messages = turns
     // Replay only the model's prose: the rendered route-fix chips, drawings and package
     // results are the app's blocks, and sending them back as assistant text makes the
     // conversation read as a stack of injected instructions (a safety-classifier refusal).
-    .map((m) => (m.role === 'assistant' ? { ...m, content: chatProseForHistory(m.content) } : m))
+    // The app's route reports are kept for the latest answer only, so a long run of
+    // corrections does not re-send every superseded report on every turn.
+    .map((m, index) => (m.role === 'assistant'
+      ? { ...m, content: routeReportsForHistory(chatProseForHistory(m.content), index === latestAnswer) }
+      // An earlier correction keeps its failures and edit policy, not another copy of the rules.
+      : index === latestQuestion ? m : { ...m, content: routeFixPromptForHistory(m.content) }))
     .filter((m) => m.content.trim())
     .slice(-MAX_HISTORY_MESSAGES);
 
@@ -496,7 +510,9 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     genealogy ? buildGenealogyChatSystemPrompt(compact, promptLanguage) : buildChatSystemPrompt(compact, promptLanguage), council?.member ? '' : buildChatSkillsPrompt(skills),
     moleculeDossiers.length ? MOLECULE_DOSSIER_SYSTEM_RULE : '',
     chemistryEnabled ? ROUTE_CONTINUITY_SYSTEM_RULE : '',
-    chemistryEnabled && !genealogy && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
+    // A correction carries the same rules itself, with its own edit policy; the first-request
+    // contract is not added on top, so the rules are sent once.
+    chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
     !genealogy && request.selection.sourceFilter?.enabled === true
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
   ].filter(Boolean).join('\n\n'), request.systemPromptId);
