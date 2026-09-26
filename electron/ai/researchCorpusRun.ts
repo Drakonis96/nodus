@@ -1,4 +1,5 @@
 import { researchActivityStep, startResearchActivity } from './researchActivity';
+import type { ResearchContextLayers } from '@shared/types';
 import type { ResearchDocumentRead, ResearchEvidence, ResearchTraversal, ResolvedResearchScope, RetrievalSettings } from '@shared/researchCorpus';
 import { RETRIEVAL_PRESETS, describeResearchLimitation, validateRetrievalSettings, validateResearchDocumentRead } from '@shared/researchCorpus';
 import { ResearchRetrievalBudget } from '@shared/researchRetrievalBudget';
@@ -47,6 +48,9 @@ export class ResearchCorpusRun {
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
   /** Research Chat only: the web step, when the user left it on. Deep Research never sets it. */
   web?: ResearchWebGrant;
+  /** Research Chat only: the layers the user left on in the context balloon. Deep Research
+   * reads both. A layer that is off is never consulted, not merely left out of the prompt. */
+  layers: ResearchContextLayers = { ideas: true, documents: true };
   /** Whether the supervisor made at least one decision in this run. */
   supervised = false;
   private readonly workIds: string[];
@@ -96,7 +100,8 @@ export class ResearchCorpusRun {
     // successful first retrieval would consume the entire expansion allowance.
     await this.retrieve(query, 1, this.budget.settings.autoExpand && this.budget.settings.rounds > 1
       ? Math.max(256, Math.floor((this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens) / 3)) : undefined);
-    await deepenResearch(this, query, model);
+    // The supervisor's decisions read documents: nothing to decide with the documents off.
+    if (this.layers.documents) await deepenResearch(this, query, model);
   }
   async retrieve(query: string, expandRounds = 2, roundLimit?: number): Promise<void> {
     this.validate();
@@ -106,6 +111,8 @@ export class ResearchCorpusRun {
     }
     const settings = this.budget.settings;
     if (!this.scope.documents.length) return;
+    const { ideas: readIdeas, documents: readDocuments } = this.layers;
+    if (!readIdeas && !readDocuments) { this.traversal.push({ query, sources: [], candidates: 0, partial: false }); return; }
     const vector = await researchActivityStep('scope', 'embed', () => embed(query, this.signal)).catch(() => {
       this.limitations.add('embedding_provider_unavailable'); return null;
     });
@@ -114,19 +121,19 @@ export class ResearchCorpusRun {
     const stableWorks = this.pinRevisions ? this.scope.documents.filter(document => (!document.indexedSource || document.indexedSource.revision === document.revision) && current.find(item => item.id === document.id)?.revision === document.revision).flatMap(document => document.workId ? [document.workId] : []) : this.workIds;
     const stableIdeas = stableWorks.length === this.workIds.length ? this.ideaIds : [];
     const hierarchy = await retrieveHierarchical(query, { embedding: vector, nodusIds: stableWorks, ideaIds: stableIdeas,
-      documentLimit: settings.candidates, ideaLimit: settings.passagesPerRound, passageLimit: settings.candidates,
+      documentLimit: readDocuments ? settings.candidates : 0, ideaLimit: readIdeas ? settings.passagesPerRound : 0, passageLimit: readDocuments ? settings.candidates : 0,
       minIdeaSimilarity: -1, minPassageSimilarity: -1, minDocumentSimilarity: -1 });
     const usedBeforeRound = this.budget.usedEvidenceTokens;
     const remaining = Math.min(roundLimit ?? Infinity, this.budget.evidenceTokenLimit - usedBeforeRound);
     const acceptRound = (id: string, text: string) => this.budget.usedEvidenceTokens - usedBeforeRound + Buffer.byteLength(text) <= remaining && this.budget.accept(id, text);
     const expansion = settings.autoExpand ? Math.max(1, Math.min(expandRounds, settings.rounds - this.budget.rounds + 1)) : 1;
-    const shared = remaining >= 256 ? await retrieveSharedDocumentaryEvidence(this.scope, query,
+    const shared = readDocuments && remaining >= 256 ? await retrieveSharedDocumentaryEvidence(this.scope, query,
       { ...settings, rounds: expansion, evidenceTokens: remaining }, vector, this.signal) : { evidence: [], traversal: { rounds: 1, candidates: 0, partial: true } };
     for (let round = 1; round < shared.traversal.rounds; round++) this.budget.nextRound();
     this.validate();
     // Interleave independent native/shared lanes, retaining source diversity.
     const candidates = shared.evidence.map(item => this.passage(item));
-    const separable = scopedIdeaEvidencePassages(query, stableWorks, settings.candidates);
+    const separable = readDocuments ? scopedIdeaEvidencePassages(query, stableWorks, settings.candidates) : [];
     const legacy = selectPassageEvidence([...hierarchy.passages, ...separable], settings.passagesPerRound, { preferLexical: true, preferSourceDiversity: true }).flatMap(hit => {
       const receipt = recordScopedLegacyPassage(this.scope, hit.passage_id);
       return receipt ? [{ id: receipt.passage_id, label: hit.title, summary: receipt.text, nodus_id: hit.nodus_id, pageLabel: receipt.page_label,
@@ -141,10 +148,10 @@ export class ResearchCorpusRun {
       if (selected >= settings.passagesPerRound * shared.traversal.rounds) { this.budget.partial = true; break; }
       if (acceptRound(key, candidate.summary)) { this.evidence.set(candidate.id, candidate); selected++; }
     }
-    const finishIdeas = startResearchActivity('ideas', 'lexical');
-    const lexical = getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(stableIdeas)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
+    const finishIdeas = readIdeas ? startResearchActivity('ideas', 'lexical') : undefined;
+    const lexical = !readIdeas ? [] : getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(stableIdeas)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
-    const ordered = [...hierarchy.ideas, ...lexical.map(idea => ({ ...idea, similarity: words.reduce((score, word) => score + Number(`${idea.label} ${idea.statement}`.toLocaleLowerCase().includes(word)), 0) })).filter(idea => idea.similarity > 0).sort((a, b) => b.similarity - a.similarity)];
+    const ordered = !readIdeas ? [] : [...hierarchy.ideas, ...lexical.map(idea => ({ ...idea, similarity: words.reduce((score, word) => score + Number(`${idea.label} ${idea.statement}`.toLocaleLowerCase().includes(word)), 0) })).filter(idea => idea.similarity > 0).sort((a, b) => b.similarity - a.similarity)];
     for (const row of ordered.slice(0, settings.passagesPerRound)) {
       if (this.ideas.has(row.global_id) || !acceptRound(`idea:${row.global_id}`, row.statement)) continue;
       const ids = getDb().prepare('SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id=?').all(row.global_id) as { nodus_id: string }[];
@@ -154,7 +161,7 @@ export class ResearchCorpusRun {
         works: documents.map(document => ({ nodus_id: document.workId!, title: document.title, authors: document.authors, year: document.year,
           zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' })) });
     }
-    finishIdeas('completed', this.ideas.size);
+    finishIdeas?.('completed', this.ideas.size);
     for (const candidate of [...candidates, ...legacy]) {
       const document = this.scope.documents.find(doc => (doc.workId ?? doc.id) === candidate.nodus_id);
       if (document) this.matchedDocuments.add(document.id);
@@ -288,7 +295,7 @@ export class ResearchCorpusRun {
       zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '', deepStatus: 'pending' as const, ideaCount: 0, gapCount: 0 }));
     const ideas = [...this.ideas.values()];
     const passages = [...this.evidence.values()];
-    const { gaps, contradictions, themes } = this.graphSnapshot ??= this.graph();
+    const { gaps, contradictions, themes } = this.graphSnapshot ??= this.layers.ideas ? this.graph() : { gaps: [], contradictions: [], themes: [] };
     return { generatedAt: new Date().toISOString(), brief, works, ideas, passages, themes, gaps, contradictions, tutorRoutes: [],
       stats: { works: works.length, ideas: ideas.length, passages: passages.length, themes: themes.length, gaps: gaps.length, contradictions: contradictions.length, tutorRoutes: 0 },
       recommendedSelection: { workIds: works.map(work => work.id), ideaIds: ideas.map(idea => idea.id), passageIds: passages.map(passage => passage.id), themeIds: themes.map(theme => theme.id), gapIds: gaps.map(gap => gap.id), contradictionIds: contradictions.map(edge => edge.id), tutorRouteIds: [] } };

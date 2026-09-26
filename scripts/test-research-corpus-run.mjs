@@ -99,6 +99,42 @@ try {
   assert.equal(coverage.scopeId, scope.id);
   assert.equal(coverage.queries.length, 1);
   assert.equal(coverage.sourceCount, 1);
+  // The context balloon's layers: a layer that is off is never consulted, not merely hidden.
+  const realShared = preparation.retrieveSharedDocumentaryEvidence;
+  const layered = async layers => {
+    const events = []; let sharedReads = 0;
+    preparation.retrieveSharedDocumentaryEvidence = async (...args) => { sharedReads++; return realShared(...args); };
+    const layeredRun = new ResearchCorpusRun(scope, RETRIEVAL_PRESETS.balanced);
+    layeredRun.layers = layers;
+    const embedsBefore = embeddingCalls;
+    const result = await withResearchActivity(event => events.push(event), undefined, () => layeredRun.snapshot({ kind: 'research_question', objective: 'measure', language: 'en' }));
+    const layersRead = new Set(events.filter(event => event.status === 'completed').map(event => event.layer));
+    return { result, layersRead, sharedReads, embeds: embeddingCalls - embedsBefore };
+  };
+  const ideasOnly = await layered({ ideas: true, documents: false });
+  assert.deepEqual(ideasOnly.result.ideas.map(idea => idea.id), ['selected'], 'the ideas layer alone still reads the ideas');
+  assert.equal(ideasOnly.result.passages.length, 0, 'with documents off no passage is read');
+  assert.equal(ideasOnly.sharedReads, 0, 'with documents off the documentary store is never asked');
+  for (const layer of ['profiles', 'nodus']) assert.ok(!ideasOnly.layersRead.has(layer), `with documents off ${layer} is not consulted`);
+  const documentsOnly = await layered({ ideas: false, documents: true });
+  assert.ok(documentsOnly.result.passages.length > 0, 'the documents layer alone still reads passages');
+  assert.deepEqual(documentsOnly.result.ideas, [], 'with ideas off no idea is read');
+  assert.deepEqual([documentsOnly.result.themes, documentsOnly.result.gaps, documentsOnly.result.contradictions], [[], [], []], 'with ideas off the graph is not read');
+  assert.ok(!documentsOnly.layersRead.has('ideas'), 'with ideas off the ideas layer is not consulted');
+  assert.equal(documentsOnly.sharedReads, 1);
+  const nothing = await layered({ ideas: false, documents: false });
+  assert.deepEqual([nothing.result.ideas, nothing.result.passages], [[], []], 'with every layer off nothing is read');
+  assert.equal(nothing.layersRead.size, 0, 'with every layer off no activity layer runs');
+  assert.equal(nothing.embeds + nothing.sharedReads, 0, 'with every layer off no provider or store is called');
+  preparation.retrieveSharedDocumentaryEvidence = realShared;
+  const { researchContextLayers, withResearchContextLayers } = load('shared/researchContextLayers.ts');
+  const legacySelection = { ideas: false, themes: true, contradictions: false, gaps: false, readingPath: false, authors: false, graph: false, documents: false, passages: false };
+  assert.deepEqual(researchContextLayers(legacySelection), { ideas: true, documents: false }, 'a selection saved before layers is read from its sections');
+  assert.deepEqual(researchContextLayers(legacySelection, true), { ideas: true, documents: true }, 'an academic vault always read its documents');
+  const chosen = withResearchContextLayers(legacySelection, { ideas: false, documents: true });
+  assert.deepEqual(researchContextLayers(chosen, true), { ideas: false, documents: true });
+  assert.equal(chosen.themes || chosen.graph || chosen.graphParts.ideaEdges, false, 'the sections follow the chosen layers');
+
   const conversation = load('electron/db/chatRepo.ts').createConversation({ title: 'Scoped history' });
   const request = { conversationId: conversation.id, selection: { notebookId: notebook.id }, messages: [{ role: 'user', content: 'measure?' }] };
   // A notebook answers once its documents are indexed; this one has never been prepared.

@@ -62,8 +62,16 @@ try {
     assert.match(captured[1].system, /Evidencia y Límites/);
     assert.deepEqual(Object.keys(captured[1]).sort(), Object.keys(captured[0]).sort(), 'tools, budgets and transport options unchanged');
   }
+  // Every layer of the context balloon off: the answer comes from general knowledge and says so.
+  const { withResearchContextLayers } = load('shared/researchContextLayers.ts');
+  const layeredSelection = layers => withResearchContextLayers({ ideas: true, themes: true, contradictions: true, gaps: true, readingPath: true, authors: true, documents: true, passages: true, graph: true, graphParts: {} }, layers);
+  captured.length = 0;
+  await load('electron/ai/researchAssistant.ts').streamResearchChat({ ...request, selection: layeredSelection({ ideas: false, documents: false }) }, () => {});
+  await load('electron/ai/researchAssistant.ts').streamResearchChat({ ...request, selection: layeredSelection({ ideas: true, documents: false }) }, () => {});
+  assert.match(JSON.stringify(captured[0]), /switched off every source.*general knowledge/, 'with every layer off the model is told to answer from general knowledge and say so');
+  assert.doesNotMatch(JSON.stringify(captured[1]), /switched off every source/, 'a single layer left on is not a general-knowledge answer');
   load('electron/db/database.ts').closeDb();
-  const vaults = load('electron/vaults/vaultRegistry.ts');
+  const vaults =load('electron/vaults/vaultRegistry.ts');
   const previousVault = vaults.getActiveVault().id;
   const otherVault = vaults.createVault('Otro vault');
   vaults.setActiveVault(otherVault.id);
