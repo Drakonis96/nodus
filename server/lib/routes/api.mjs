@@ -58,7 +58,7 @@ const PERMANENT_PUBLICATION_DENYLIST = new Set([
   'audio_clips', 'testimony_media', 'testimony_interview_media', 'social_contacts',
   'testimony_agreements', 'testimony_agreement_versions', 'teaching_groups', 'teaching_students',
   'teaching_assessment_plans', 'teaching_assessment_items', 'teaching_grade_entries',
-  'teaching_rubric_evaluations', 'study_attempts', 'study_attempt_answers', 'study_grading_runs',
+  'teaching_rubric_evaluations', 'teaching_attendance', 'teaching_attendance_holidays', 'study_attempts', 'study_attempt_answers', 'study_grading_runs',
   'study_grading_annotations', 'study_mastery', 'study_reviews', 'study_srs_state',
 ]);
 const USER_CONTENT_TABLES = new Set([

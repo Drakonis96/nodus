@@ -127,7 +127,7 @@ try {
   assert.equal(exams.listTeachingExams().length, 0);
   assert.equal(grades.listAssessmentPlans().length, 0);
   const db = getDb();
-  for (const table of ['teaching_students', 'teaching_grade_entries', 'teaching_assessment_items', 'teaching_rubric_evaluations']) {
+  for (const table of ['teaching_students', 'teaching_grade_entries', 'teaching_assessment_items', 'teaching_rubric_evaluations', 'teaching_attendance', 'teaching_attendance_holidays']) {
     assert.equal(Number(db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get().n), 0, `${table} is empty after cleanup`);
   }
   assert.equal(settings.getSettings().demoMode, false);

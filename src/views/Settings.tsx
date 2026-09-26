@@ -2342,7 +2342,7 @@ export function Settings({
                       <div className="border-t border-neutral-200 pt-4 dark:border-neutral-800">
                         <h3 className="text-sm font-medium">{t('Qué se publica')}</h3>
                         <p className="mt-1 text-xs text-neutral-500">
-                          {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, audio, claves API, contraseñas, rutas locales, listas de alumnos, grupos, calificaciones, resultados de evaluación ni la base SQLite original.')}
+                          {t('Siempre: referencias, autores, temas, ideas, evidencias, conexiones y preguntas. Nunca: archivos PDF, audio, claves API, contraseñas, rutas locales, listas de alumnos, grupos, calificaciones, asistencia, resultados de evaluación ni la base SQLite original.')}
                         </p>
                       </div>
                       <div className="flex items-center justify-between gap-4">

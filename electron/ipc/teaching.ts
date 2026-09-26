@@ -6,6 +6,9 @@ import * as teachingExams from '../db/teachingExamsRepo';
 import * as teachingRubrics from '../db/teachingRubricsRepo';
 import * as teachingGroups from '../db/teachingGroupsRepo';
 import * as teachingGrades from '../db/teachingGradesRepo';
+import * as teachingAttendance from '../db/teachingAttendanceRepo';
+import { attendanceCsv, attendanceXlsx, type AttendanceExportFormat } from '../export/attendanceExport';
+import type { AttendanceExportTables, AttendanceStatus } from '@shared/teachingAttendance';
 import { importAssessmentPlan } from '../ai/assessmentImport';
 import { actaPdfBytes, actaDocxBytes, boletinPdfBytes, gradebookCsv, gradebookXlsx } from '../export/gradebookExport';
 import type { ActaExportInput, BoletinExportInput, GradebookExportFormat } from '../export/gradebookExport';
@@ -98,6 +101,37 @@ export function registerTeachingIpc({ h, getWindow }: IpcContext): void {
     return null;
   });
   h('teaching:groups:import', async (_e, targetGroupId: string, sourceGroupId: string) => teachingGroups.importStudentsFromGroup(targetGroupId, sourceGroupId));
+
+  // ---- Attendance (teaching vault) ----
+  h('teaching:attendance:sheet', async (_e, groupId: string, from: string, to: string) => teachingAttendance.getAttendanceSheet(groupId, from, to));
+  h('teaching:attendance:set', async (_e, input: Parameters<typeof teachingAttendance.setAttendance>[0]) => teachingAttendance.setAttendance(input));
+  h('teaching:attendance:clear', async (_e, studentId: string, date: string) => {
+    teachingAttendance.clearAttendance(studentId, date);
+    return null;
+  });
+  h('teaching:attendance:fillDay', async (_e, groupId: string, date: string, status?: AttendanceStatus) => teachingAttendance.fillAttendanceDay(groupId, date, status ?? 'present'));
+  h('teaching:attendance:holiday:set', async (_e, groupIds: string[], date: string, label?: string) => {
+    teachingAttendance.setAttendanceHoliday(groupIds, date, label ?? '');
+    return null;
+  });
+  h('teaching:attendance:holiday:clear', async (_e, groupIds: string[], date: string) => {
+    teachingAttendance.clearAttendanceHoliday(groupIds, date);
+    return null;
+  });
+  h('teaching:attendance:holiday:groups', async (_e, date: string) => teachingAttendance.holidayGroupsOn(date));
+  h('teaching:attendance:exportData', async (_e, request: { groupIds: string[]; from: string; to: string }) => teachingAttendance.getAttendanceExportData(request));
+  h('teaching:attendance:export', async (_e, format: AttendanceExportFormat, tables: AttendanceExportTables, baseName: string) => {
+    const base = (baseName || 'asistencia').replace(/[\\/:*?"<>|]+/g, '-') || 'asistencia';
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+      title: dialogTitle('downloadAttendance', getSettings().uiLanguage),
+      defaultPath: `${base}.${format}`,
+      filters: [{ name: format.toUpperCase(), extensions: [format] }],
+    });
+    if (picked.canceled || !picked.filePath) return null;
+    if (format === 'xlsx') fs.writeFileSync(picked.filePath, attendanceXlsx(tables));
+    else fs.writeFileSync(picked.filePath, attendanceCsv(tables), 'utf8');
+    return { path: picked.filePath };
+  });
 
   // ---- Rubric builder (teaching vault) ----
   h('teaching:rubrics:list', async (_e, options?: { subjectId?: string | null; search?: string }) => teachingRubrics.listTeachingRubrics(options ?? {}));

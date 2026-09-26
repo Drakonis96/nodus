@@ -68,6 +68,10 @@ try {
   await page.evaluate((v) => {
     localStorage.setItem('nodus.lastSeenVersion', v);
     sessionStorage.setItem('nodus.startupUpdateChecked', '1');
+    // Every one-time announcement is a full-screen modal with its own gate; this is the
+    // same list verify-chat-skills.mjs settles.
+    for (const key of ['nodus.mobileTeaserSeen.3.2.4', 'nodus.platformHighlightsSeen.2026-07', 'nodus.toolkitBetaGuideSeen.2.4.0',
+      'nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA']) localStorage.setItem(key, '1');
   }, appVersion);
 
   // ── Start with an EMPTY teaching vault. The gradebook CTA must help the user
@@ -219,13 +223,122 @@ try {
   // ── The privacy indicator states the no-AI-evaluation boundary truthfully ──
   const privacy = page.getByTestId('group-privacy-toggle');
   await privacy.waitFor();
-  assert.match(await privacy.innerText(), /La IA no accede a este listado, a las notas ni a las respuestas/i,
+  assert.match(await privacy.innerText(), /La IA no accede a este listado, a la asistencia, a las notas ni a las respuestas/i,
     'the roster states that student data is outside the AI surface');
   assert.match(await privacy.innerText(), /no expone ninguna función de IA para calificar, perfilar o evaluar/i,
     'the indicator describes the enforced no-AI-evaluation boundary');
   console.log('[ui] privacy indicator states the enforced no-AI-evaluation boundary');
 
   await page.screenshot({ path: path.join(shotDir, 'groups-detail-light-es.png') });
+
+  // ── Attendance ("pasar lista") ──────────────────────────────────────────────
+  // A second group of the same subject and year, so the holiday can be copied to it.
+  // Created through IPC and then re-entered from the list, which reloads the groups.
+  {
+    const detailGroupId = await page.evaluate(async () => {
+      const groups = await window.nodus.listTeachingGroups();
+      const current = groups[0];
+      await window.nodus.createTeachingGroup({ name: '1º ESO B', subjectId: current.subjectId, academicYearId: current.academicYearId, expectedSize: 1 });
+      return current.id;
+    });
+    await page.getByTestId('group-back').click();
+    await page.getByTestId(`group-attendance-${detailGroupId}`).click();
+    await page.getByTestId('attendance-grid').waitFor();
+    assert.equal(await page.getByTestId('group-tab-attendance').getAttribute('aria-selected'), 'true', '"Pasar lista" opens the attendance tab');
+
+    const dayHeaders = () => page.locator('[data-testid^="attendance-day-"]').count();
+    await page.getByTestId('attendance-mode-week').click();
+    assert.equal(await dayHeaders(), 5, 'the week is Monday to Friday by default');
+    await page.getByRole('checkbox', { name: 'Incluir fin de semana' }).check();
+    assert.equal(await dayHeaders(), 7, 'the checkbox adds Saturday and Sunday');
+    await page.getByRole('checkbox', { name: 'Incluir fin de semana' }).uncheck();
+    await page.getByTestId('attendance-mode-month').click();
+    const monthColumns = await dayHeaders();
+    assert.ok(monthColumns >= 28 && monthColumns <= 31, `the month shows every day, weekends included (${monthColumns})`);
+    await page.getByTestId('attendance-mode-week').click();
+    // The fixture year ends on 30 June 2025, so the grid opens on the week that year ends
+    // in — and its Tuesday already lies outside the year. One week back keeps every day
+    // inside it, which the holiday copy below needs (only groups whose year contains the
+    // day are offered).
+    await page.getByTestId('attendance-prev').click();
+    console.log('[ui] attendance switches between week (with optional weekend) and month');
+
+    const date = (await page.locator('[data-testid^="attendance-day-"]').first().getAttribute('data-testid')).replace('attendance-day-', '');
+    const nextDate = (await page.locator('[data-testid^="attendance-day-"]').nth(1).getAttribute('data-testid')).replace('attendance-day-', '');
+    const studentIds = await page.locator('[data-testid^="attendance-row-"]').evaluateAll((rows) => rows.map((r) => r.dataset.testid.replace('attendance-row-', '')));
+    const cell = (student, day) => page.getByTestId(`attendance-cell-${student}-${day}`);
+
+    await cell(studentIds[0], date).click();
+    await page.getByTestId('attendance-set-late').click();
+    await page.waitForFunction((id) => document.querySelector(`[data-testid="${id}"]`)?.dataset.status === 'late', `attendance-cell-${studentIds[0]}-${date}`);
+    await cell(studentIds[0], nextDate).focus();
+    await page.keyboard.press('2');
+    await page.waitForFunction((id) => document.querySelector(`[data-testid="${id}"]`)?.dataset.status === 'justified', `attendance-cell-${studentIds[0]}-${nextDate}`);
+    await cell(studentIds[0], nextDate).click();
+    await page.getByTestId('attendance-note').fill('Cita médica');
+    await page.keyboard.press('Enter');
+    await page.getByTestId(`attendance-note-dot-${studentIds[0]}-${nextDate}`).waitFor();
+    console.log('[ui] the four states, the keyboard and the comment all reach the grid');
+
+    await page.getByTestId(`attendance-day-${date}`).click();
+    await page.getByTestId('attendance-fill-day').click();
+    await page.waitForFunction(({ ids, day }) => ids.every((id) => document.querySelector(`[data-testid="attendance-cell-${id}-${day}"]`)?.dataset.status), { ids: studentIds, day: date });
+    assert.equal(await cell(studentIds[0], date).getAttribute('data-status'), 'late', '"Todos asisten" does not overwrite a mark');
+    console.log('[ui] "Todos asisten" fills the blanks only');
+
+    // Holiday, copied to the second group through the hierarchical picker.
+    await page.getByTestId(`attendance-day-${nextDate}`).click();
+    await page.getByTestId('attendance-holiday-set').click();
+    await page.getByTestId('attendance-holiday-label').fill('Fiesta local');
+    await page.getByTestId('attendance-holiday-confirm').click();
+    await page.getByTestId('attendance-holiday-modal').waitFor();
+    await page.getByTestId('attendance-holiday-pick').click();
+    await page.getByTestId('attendance-holiday-tree').waitFor();
+    await page.screenshot({ path: path.join(shotDir, 'attendance-holiday-tree-light-es.png') });
+    await page.locator('[data-testid^="holiday-group-"]:not([disabled])').first().check();
+    await page.getByTestId('attendance-holiday-apply').click();
+    await page.getByTestId('attendance-holiday-modal').waitFor({ state: 'detached' });
+    const holidayGroups = await page.evaluate((day) => window.nodus.attendanceHolidayGroups(day), nextDate);
+    assert.equal(holidayGroups.length, 2, `the holiday reached both groups (${holidayGroups.length})`);
+    assert.equal(await cell(studentIds[0], nextDate).count(), 0, 'a holiday column takes no marks');
+    console.log('[ui] a holiday is marked and copied to a chosen group');
+
+    // The real XLSX export: stub the save dialog, then open the bytes.
+    const target = path.join(shotDir, 'attendance-check.xlsx');
+    await app.evaluate(async ({ dialog }, filePath) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath });
+    }, target);
+    await page.getByTestId('attendance-export').click();
+    await page.getByTestId('attendance-export-modal').waitFor();
+    await page.getByTestId('attendance-export-run').click();
+    const xlsx = await waitForFile(target);
+    assert.equal(xlsx.subarray(0, 2).toString('latin1'), 'PK', 'the attendance export is a real XLSX package');
+    const AdmZip = require('adm-zip');
+    const sheet = new AdmZip(xlsx).readAsText('xl/worksheets/sheet1.xml');
+    assert.match(sheet, /Ana María Peña López/, 'the export carries the roster');
+    assert.match(sheet, /Festivo/, 'and marks the holiday');
+    console.log('[ui] attendance exports to a real XLSX');
+
+    await page.getByTestId('attendance-mode-month').click();
+    await page.screenshot({ path: path.join(shotDir, 'attendance-month-light-es.png') });
+    await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
+    await page.waitForFunction(() => document.documentElement.classList.contains('dark'));
+    await page.screenshot({ path: path.join(shotDir, 'attendance-month-dark-es.png') });
+    // The export confirmation is stored already translated (see the note below on the
+    // identifier toast); let it expire so it cannot pass for leftover Spanish.
+    await page.waitForFunction(() => !/Asistencia exportada/.test(document.body.innerText), null, { timeout: 10_000 });
+    await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en', theme: 'light' }));
+    await page.getByRole('button', { name: 'Month', exact: true }).waitFor();
+    const attendanceEnglish = await page.evaluate(() => document.body.innerText);
+    for (const spanish of ['Asiste', 'Falta justificada', 'Falta injustificada', 'Retraso', 'Festivo', 'Sin registrar', 'Asistencia', 'Exportar', 'Semana']) {
+      assert.ok(!new RegExp(`\\b${spanish}\\b`).test(attendanceEnglish), `"${spanish}" is still Spanish in the English attendance view`);
+    }
+    await page.screenshot({ path: path.join(shotDir, 'attendance-month-light-en.png') });
+    await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es' }));
+    await page.getByTestId('group-tab-roster').click();
+    await page.getByTestId('student-table').waitFor();
+    console.log('[ui] attendance captured in both themes and in English');
+  }
   await page.getByTestId('group-back').click();
   await page.getByTestId('groups-list').waitFor();
   await page.screenshot({ path: path.join(shotDir, 'groups-list-light-es.png') });
@@ -395,6 +508,9 @@ try {
   await page.getByTestId('plan-structure').waitFor();
   await page.getByTestId('item-from-exam').click();
   await page.getByTestId('source-picker').waitFor();
+  // The picker opens on a spinner while it lists the exams; read it once that settles.
+  await page.waitForFunction(() => /Todavía no has creado ningún examen/.test(document.querySelector('[data-testid="source-picker"]')?.textContent ?? '')
+    || !!document.querySelector('[data-testid="source-select"]'));
   const examCopy = await page.getByTestId('source-picker').innerText();
   // With no exams in this profile the picker must say so rather than offering an empty
   // dropdown that silently does nothing.

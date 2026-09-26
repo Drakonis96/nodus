@@ -38,6 +38,12 @@ const STEPS: TourStep[] = [
     body: 'La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.',
   },
   {
+    target: 'group-attendance',
+    view: 'teachingGroups',
+    title: 'Pasar lista',
+    body: 'Desde cada grupo pasas lista por semana o por mes: asiste, falta justificada, falta injustificada o retraso, con un comentario si hace falta. Marca un festivo una vez y cópialo al resto de tus grupos.',
+  },
+  {
     target: 'nav-studySchedule',
     view: 'studySchedule',
     title: 'Tu horario',
