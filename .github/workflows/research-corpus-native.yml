@@ -45,7 +45,7 @@ jobs:
         run: npm run research:runtime
       - name: Native stdio against synthetic local API
         run: node scripts/verify-managed-zotero-mcp.mjs --disposable-ci
-      - name: Managed SearXNG: loopback only, token enforced, no orphans
+      - name: Managed SearXNG answers on loopback only, with a token and no orphans
         run: node scripts/verify-managed-searxng.mjs --disposable-ci
       - name: Private runtime directory lifecycle and two-profile coexistence
         run: node scripts/verify-research-runtime-lifecycle.mjs --disposable-ci > research-runtime-lifecycle.json
