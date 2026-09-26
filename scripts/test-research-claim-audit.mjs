@@ -262,5 +262,11 @@ try {
   const failedCheck = await run(async () => { throw new Error('consistency judge unavailable'); });
   assert.equal(failedCheck.meta.factualAudit.consistency.checked, false);
   assert.ok(failedCheck.draft.limitations.some(item => /coherencia interna/.test(item)), 'an unchecked report says so');
+  table.set('Fields', verdict(0, [premise('An unsupported heading claim', '', { entailed: false })], { supported: false }));
+  const removedHeading = await run(async () => []);
+  assert.doesNotMatch(removedHeading.draft.draftMarkdown, /^## Fields$/m, 'an audited-away heading never returns');
+  assert.match(removedHeading.draft.draftMarkdown, /^## Línea argumental 1\n/m, 'the surviving body keeps a neutral section boundary');
+  assert.equal(removedHeading.draft.outline[0].title, 'Línea argumental 1', 'reader navigation and published Markdown agree');
+  assert.match(removedHeading.draft.draftMarkdown, /North field measured 23 units\./, 'verified facts survive the rejected heading');
   console.log('Claim ledger: atomic premises, verdict agreement, silence, qualified inference, retired-claim carry-over, whole-report contradictions and orchestration passed.');
 } finally { fs.rmSync(root, { recursive: true, force: true }); }

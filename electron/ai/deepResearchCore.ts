@@ -1453,7 +1453,7 @@ export async function orchestrateDeepResearch(
   const claimLedger: ResearchClaimRecord[] = [];
   let consistency: NonNullable<NonNullable<DeepResearchMeta['factualAudit']>['consistency']> | null = null;
   if (deps.auditFactualProse) {
-    for (const item of written) {
+    for (const [index, item] of written.entries()) {
       const audit = await deps.auditFactualProse(item.markdown);
       if (audit.passages?.length) mergeRetrievedMaterial(maps, { passages: audit.passages });
       item.markdown = audit.markdown;
@@ -1462,7 +1462,7 @@ export async function orchestrateDeepResearch(
       // audited prose may populate the published outline's factual claims.
       item.section.keyClaims = audit.claims.filter(claim => claim.status === 'supported' && claim.kind !== 'nonfactual').map(claim => claim.sentence);
       item.section.coverageClaims = [];
-      item.section.title = audit.markdown.match(/^#{1,6}\s+(.+)$/m)?.[1] ?? effectiveRequest.objective;
+      item.section.title = audit.markdown.trimStart().match(/^#{1,6}\s+([^\n]+)/)?.[1] ?? `${L.threadTitle} ${index + 1}`;
     }
     for (let index = written.length - 1; index >= 0; index--) {
       if (!stripInitialHeading(written[index].markdown).trim()) written.splice(index, 1);
@@ -1567,10 +1567,14 @@ export async function orchestrateDeepResearch(
     finalize.abstract = reconciled.parts.abstract || researchEvidenceLimitation(language);
     finalize.limitations = reconciled.parts.limitations;
     finalize.nextSteps = reconciled.parts.nextSteps;
-    for (const item of written) {
+    for (const [index, item] of written.entries()) {
       const present = researchProseSentenceKeys(item.markdown);
       item.section.keyClaims = item.section.keyClaims.filter(claim => present.has(researchSentenceKey(claim)));
-      item.section.title = item.markdown.match(/^#{1,6}\s+(.+)$/m)?.[1] ?? effectiveRequest.objective;
+      const heading = item.markdown.trimStart().match(/^#{1,6}\s+([^\n]+)/)?.[1];
+      item.section.title = heading ?? `${L.threadTitle} ${index + 1}`;
+      // Removing an unsupported heading must not merge its verified body into
+      // the preceding section. Restore only a neutral, localized navigation label.
+      if (!heading) item.markdown = `## ${item.section.title}\n\n${item.markdown.trim()}`;
     }
     // Citations are recounted from what finally remains, not from removed prose.
     coveredIdeaIds.clear(); Object.values(citedIds).forEach(set => set.clear());
