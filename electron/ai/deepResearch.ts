@@ -1,3 +1,4 @@
+import { withJobThinkingEffort } from './thinkingEffort';
 import { registerNotebookRun } from './researchNotebookService';
 import { bindAcademicCorpusRun } from './researchCorpusRun';
 import { withDocumentVisualPlanning } from './documentVisualContext';
@@ -120,7 +121,9 @@ export async function generateDeepResearchReport(request: DeepResearchRequest, o
   const release = request.notebookId ? registerNotebookRun(request.notebookId, controller) : () => undefined;
   const runSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   try {
-    return await withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints));
+    // The thinking level chosen in the form applies to every call the report makes to its model.
+    return await withJobThinkingEffort(request.thinkingEffort, request.model ?? settings.deepResearchModel ?? settings.synthesisModel,
+      () => withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints)), runSignal);
   } finally { release(); }
 }
 

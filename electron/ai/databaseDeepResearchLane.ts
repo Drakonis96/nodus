@@ -1,3 +1,4 @@
+import { withJobThinkingEffort } from './thinkingEffort';
 import { BrowserWindow } from 'electron';
 import type {
   DatabaseDeepResearchJob,
@@ -278,10 +279,11 @@ async function drainVault(vaultId: string): Promise<void> {
         try {
           const progress = repo.startDatabaseResearchRun(run.id);
           broadcastProgress(progress);
-          await processDatabaseResearchRun(run.id, {
+          // The thinking level chosen in the form applies to every call the run makes to its model.
+          await withJobThinkingEffort(current.options.thinkingEffort, current.model as ModelRef | null, () => processDatabaseResearchRun(run.id, {
             complete: agentCompletion(),
             onProgress: broadcastProgress,
-          });
+          }));
         } catch {
           // processDatabaseResearchRun persists the failure. A failed run never
           // prevents later queued work from draining.

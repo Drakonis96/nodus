@@ -2123,9 +2123,10 @@ export interface AppSettings {
   codexReasoningEfforts: Record<string, CodexReasoningEffort>;
   /**
    * The thinking level the Research composer last used, keyed by `provider:model`, so
-   * reopening a model starts where the user left it. Missing (or Standard, which is
-   * stored as an absence) means the composer opens on Standard. App-wide like the other
-   * model preferences: the level belongs to the model, not to the vault asking.
+   * reopening a model starts where the user left it. Missing means the model opens on the
+   * middle of its levels (`researchDefaultEffort`); Standard, once picked, is stored like any
+   * other level. Shared by the Research chat, Deep Research and Immersion. App-wide like the
+   * other model preferences: the level belongs to the model, not to the vault asking.
    */
   researchEffortByModel: Record<string, ResearchEffort>;
   /** Research Chat's web step: automatic (the agent decides) or off. App-wide. */
@@ -7479,6 +7480,9 @@ export interface DeepResearchRequest {
    */
   sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   model?: ModelRef | null;
+  /** The thinking level chosen in the form for `model`. Absent (older builds, MCP, the
+   *  Server) runs every call with the model's usual reasoning, as before. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   decorativeImage?: DecorativeImageOption;
   /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
   studyMode?: boolean;
@@ -8103,6 +8107,9 @@ export interface ImmersionRequest {
   /** Whether stations and the final exam carry retrieval questions (always skippable). */
   includeQuiz: boolean;
   model?: ModelRef | null;
+  /** The thinking level chosen in the form for `model`. Absent (older builds, MCP, the
+   *  Server) runs every call with the model's usual reasoning, as before. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   decorativeImage?: DecorativeImageOption;
 }
 

@@ -1,3 +1,6 @@
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import { useResearchEffort } from '../hooks/useResearchEffort';
+import type { ResearchEffort } from '@shared/researchReasoning';
 import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
 import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
@@ -121,7 +124,7 @@ export type ReadFilter = 'all' | 'read' | 'unread';
  */
 type DeepResearchVariant = 'academic' | 'genealogy' | 'study' | 'unit';
 
-interface DeepResearchCopy {
+export interface DeepResearchCopy {
   heading: string;
   subtitle: string;
   newAction: string;
@@ -162,7 +165,7 @@ const REPORT_TUTORIAL = [
   },
 ];
 
-const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
+export const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
   academic: {
     heading: 'Deep Research',
     subtitle: 'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.',
@@ -312,6 +315,9 @@ export function DeepResearchView({
   const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v1');
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
+  // The thinking level for that model, shared with the Research chat's memory: the level
+  // last chosen for it, or its middle level.
+  const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, selectedModel ?? null);
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [deepSectionLength, setDeepSectionLength] = useState<DeepResearchSectionLength>('auto');
   const [sectionLengthValid, setSectionLengthValid] = useState(true);
@@ -552,6 +558,7 @@ export function DeepResearchView({
       documentSkills: documentSkills.policy,
       ...(isStudy ? { audience } : {}),
       model: selectedModel,
+      thinkingEffort,
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
       ...(isStudy ? { studyMode: true } : {}),
@@ -1227,6 +1234,8 @@ export function DeepResearchView({
           audience={audience}
           language={language}
           model={selectedModel}
+          thinkingEffort={thinkingEffort}
+          onThinkingEffort={setThinkingEffort}
           sectionLimit={deepSectionLimit}
           sectionLength={deepSectionLength}
           onSectionLength={setDeepSectionLength}
@@ -2249,6 +2258,8 @@ export function ComposerModal({
   audience,
   language,
   model,
+  thinkingEffort,
+  onThinkingEffort,
   sectionLimit,
   sectionLength,
   onSectionLength,
@@ -2289,6 +2300,8 @@ export function ComposerModal({
   audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
+  thinkingEffort: ResearchEffort;
+  onThinkingEffort: (effort: ResearchEffort) => void;
   sectionLimit: DeepResearchSectionLimit;
   sectionLength: DeepResearchSectionLength;
   onSectionLength: (v: DeepResearchSectionLength) => void;
@@ -2493,6 +2506,10 @@ export function ComposerModal({
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Modelo')}</span>
               <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
+            <div className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Esfuerzo de thinking')}</span>
+              <ResearchEffortControl variant="field" className="w-full !py-2 text-sm" testId="deep-research-thinking" model={model ?? null} value={thinkingEffort} onChange={onThinkingEffort} disabled={!model} />
+            </div>
           </div>
           {!isAcademic && <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />}
           <div className="flex flex-wrap items-center gap-2">

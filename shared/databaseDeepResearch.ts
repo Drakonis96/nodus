@@ -1,6 +1,7 @@
 import type { PromptLanguage } from './types';
 import type { DatabaseColumnType } from './databases';
 import type { DeepResearchSectionLength } from './deepResearchSectionLength';
+import { isResearchEffort } from './researchReasoning';
 
 /** Stable, contextual report modes. Keep `general` first for legacy callers. */
 export const DATABASE_DEEP_RESEARCH_REPORT_TYPES = [
@@ -564,6 +565,8 @@ export interface DatabaseDeepResearchJobInput {
   filters: DatabaseResearchFilters;
   roles: DatabaseResearchSemanticRoles;
   model: { provider: string; model: string } | null;
+  /** The thinking level chosen in the form for `model`; absent runs as before. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   depth: DatabaseResearchDepth;
   budget?: Partial<DatabaseResearchBudget>;
   /** User-edited preview outline carried into the durable request. */
@@ -1046,6 +1049,7 @@ export function normalizeDatabaseDeepResearchJobInput(
     },
     roles: structuredClone(input.roles ?? {}),
     model,
+    ...(isResearchEffort(input.thinkingEffort) ? { thinkingEffort: input.thinkingEffort } : {}),
     depth,
     budget,
     planSections,
