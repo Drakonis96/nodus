@@ -884,7 +884,7 @@ export function DemoOfferCard({
           : variant === 'teaching'
             ? {
                 title: t('Explora un curso de ejemplo'),
-                desc: t('Carga una unidad completa con su horario, materiales, grupo de alumnado, una rúbrica ponderada, un examen imprimible y un cuaderno de calificaciones ya publicado. Incluye un tutorial guiado.'),
+                desc: t('Carga una unidad completa con su horario, materiales, grupo de alumnado con su asistencia, una rúbrica ponderada, un examen imprimible y un cuaderno de calificaciones ya publicado. Incluye un tutorial guiado.'),
                 icon: 'graduation',
                 label: t('Cargar demo de docencia'),
                 onClick: onLoadTeachingDemo ?? (async () => {}),

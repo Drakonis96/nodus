@@ -153,7 +153,7 @@ export function TeachingGroupsView() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((entry) => (
+                {filtered.map((entry, index) => (
                   <tr
                     key={entry.id}
                     data-testid={`group-row-${entry.id}`}
@@ -177,6 +177,7 @@ export function TeachingGroupsView() {
                       <button
                         type="button"
                         data-testid={`group-attendance-${entry.id}`}
+                        data-tour={index === 0 ? 'group-attendance' : undefined}
                         className="btn btn-ghost mr-1 h-7 px-2 text-xs"
                         title={t('Pasar lista')}
                         onClick={(event) => {

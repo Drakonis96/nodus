@@ -153,6 +153,21 @@ export function TeachingAttendancePanel({
 
   useEffect(() => { void load(); }, [load]);
 
+  // A month is wider than the pane: bring today's column into view instead of always
+  // opening on the 1st, which hides the days the teacher is actually marking.
+  useEffect(() => {
+    // Measured with rects: the header cell is sticky, so its offsetParent is <body>, not
+    // the scroller, and offsetLeft would not say where it sits in the grid.
+    const header = gridRef.current?.querySelector<HTMLElement>(`[data-testid="attendance-day-${today}"]`)?.closest('th');
+    const scroller = gridRef.current?.parentElement;
+    if (!header || !scroller) return;
+    const cell = header.getBoundingClientRect();
+    const box = scroller.getBoundingClientRect();
+    // Centre it in the strip between the pinned student column and the pinned totals.
+    const stripCentre = STUDENT_WIDTH + (scroller.clientWidth - STUDENT_WIDTH - SUMMARY_COLUMNS.length * SUMMARY_WIDTH) / 2;
+    scroller.scrollLeft = Math.max(0, scroller.scrollLeft + cell.left - box.left + cell.width / 2 - stripCentre);
+  }, [mode, from, today]);
+
   useEffect(() => {
     if (!message) return;
     const timer = setTimeout(() => setMessage(''), 4000);
@@ -534,6 +549,8 @@ const SUMMARY_COLUMNS = ['present', 'justified', 'unjustified', 'late', 'rate'] 
 type SummaryColumn = (typeof SUMMARY_COLUMNS)[number];
 /** Matches `w-14`: the totals stay pinned to the right edge while a month scrolls under them. */
 const SUMMARY_WIDTH = 56;
+/** Matches the `w-[220px]` pinned student column. */
+const STUDENT_WIDTH = 220;
 const summaryOffset = (index: number) => (SUMMARY_COLUMNS.length - 1 - index) * SUMMARY_WIDTH;
 
 function summaryHeader(column: SummaryColumn) {
