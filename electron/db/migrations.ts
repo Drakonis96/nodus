@@ -16,6 +16,45 @@ export interface Migration {
 
 const DATABASE_RESEARCH_REPORT_TYPES_SQL = "'general', 'data_quality', 'cohort_comparison', 'temporal_anomalies', 'relationships_integrity', 'causal_impact', 'survival_retention', 'privacy_attachments', 'formulas_reconciliation'";
 
+/**
+ * Add a column only where it is missing. The migrations from 180 on were numbered
+ * differently in earlier builds of the research notebooks branch (main's attendance took
+ * 179 first), so a database from one of those builds can already have a column while its
+ * user_version points before the migration that now adds it. Like v168, these are
+ * idempotent rather than failing the vault's opening on "duplicate column name".
+ */
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+  const present = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((row) => row.name === column);
+  if (!present) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/**
+ * Teaching attendance (migration 179), kept as one statement set so migration 192 can
+ * re-apply it verbatim; every object is IF NOT EXISTS.
+ */
+const TEACHING_ATTENDANCE_SQL = /* sql */ `
+      CREATE TABLE IF NOT EXISTS teaching_attendance (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
+
+      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
+    `;
+
 /** v168 is deliberately idempotent: recovery tests and older prerelease builds may
  * have the column while their user_version still points before this migration. */
 function ensureDatabaseResearchReportTypeColumns(db: Database.Database): void {
@@ -119,7 +158,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 191;
+export const SCHEMA_VERSION = 192;
 
 export const migrations: Migration[] = [
   {
@@ -9322,28 +9361,7 @@ export const migrations: Migration[] = [
     // IF NOT EXISTS: a vault that already has the tables (a differently numbered build,
     // a replayed upgrade) must reach head instead of failing on "already exists".
     version: 179,
-    up: /* sql */ `
-      CREATE TABLE IF NOT EXISTS teaching_attendance (
-        id TEXT PRIMARY KEY,
-        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
-        date TEXT NOT NULL,
-        status TEXT NOT NULL,
-        note TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
-
-      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
-        id TEXT PRIMARY KEY,
-        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
-        date TEXT NOT NULL,
-        label TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
-    `,
+    up: TEACHING_ATTENDANCE_SQL,
   },
   { version: 180, up: `
     CREATE TABLE IF NOT EXISTS research_notebooks (
@@ -9402,10 +9420,10 @@ export const migrations: Migration[] = [
     CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
     CREATE INDEX IF NOT EXISTS research_chat_placements_folder ON research_chat_placements(folder_id);
   ` },
-  { version: 184, up: `ALTER TABLE chat_messages ADD COLUMN skills_json TEXT;` },
+  { version: 184, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'chat_messages', 'skills_json', 'TEXT') },
   // A notebook shows in the chat history like a project: its own icon and colour.
-  { version: 185, up: `ALTER TABLE research_notebooks ADD COLUMN icon TEXT;` },
-  { version: 186, up: `ALTER TABLE research_notebooks ADD COLUMN color TEXT;` },
+  { version: 185, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'research_notebooks', 'icon', 'TEXT') },
+  { version: 186, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'research_notebooks', 'color', 'TEXT') },
   // Research Chat web evidence: the exact passage Nodus read, where and when, so a
   // web citation stays verifiable after the page changes or disappears.
   { version: 187, up: `
@@ -9430,14 +9448,20 @@ export const migrations: Migration[] = [
   // moved, or a chat filed, travels by newest-wins like every other synced row. Without a
   // stamp the merge keeps whatever the receiving device already had, and a chat moved on
   // one machine never moved on the other.
-  { version: 188, up: `
-    ALTER TABLE research_chat_project_folders ADD COLUMN updated_at TEXT;
-    UPDATE research_chat_project_folders SET updated_at = created_at WHERE updated_at IS NULL;
-    ALTER TABLE research_chat_placements ADD COLUMN updated_at TEXT;
-    UPDATE research_chat_placements SET updated_at = COALESCE(
-      (SELECT c.updated_at FROM chat_conversations c WHERE c.id = research_chat_placements.conversation_id),
-      pinned_at, '1970-01-01T00:00:00.000Z') WHERE updated_at IS NULL;
-  ` },
+  {
+    version: 188,
+    up: /* sql */ `SELECT 1;`,
+    after: (db) => {
+      addColumnIfMissing(db, 'research_chat_project_folders', 'updated_at', 'TEXT');
+      addColumnIfMissing(db, 'research_chat_placements', 'updated_at', 'TEXT');
+      db.exec(`
+        UPDATE research_chat_project_folders SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE research_chat_placements SET updated_at = COALESCE(
+          (SELECT c.updated_at FROM chat_conversations c WHERE c.id = research_chat_placements.conversation_id),
+          pinned_at, '1970-01-01T00:00:00.000Z') WHERE updated_at IS NULL;
+      `);
+    },
+  },
   // The Databases and Worldbuilding chat histories get what Research Chat has: projects,
   // folders nested inside them, pins and notebooks, each surface in tables of its own so
   // no history can read or write another's. The same shape and keys as migration 183
@@ -9497,8 +9521,13 @@ export const migrations: Migration[] = [
     CREATE INDEX IF NOT EXISTS world_chat_placements_notebook ON world_chat_placements(notebook_id);
   ` },
   // Archiving, as in Research Chat: an archived chat leaves the normal history.
-  { version: 190, up: `ALTER TABLE database_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
-  { version: 191, up: `ALTER TABLE world_chat_conversations ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
+  { version: 190, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'database_chat_conversations', 'archived', 'INTEGER NOT NULL DEFAULT 0') },
+  { version: 191, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'world_chat_conversations', 'archived', 'INTEGER NOT NULL DEFAULT 0') },
+  // A database from an earlier build of the research notebooks branch passed 179 under
+  // that branch's own numbering and never created main's attendance tables. The body
+  // names ON DELETE CASCADE, so the create-only backfill will not replay it; this does,
+  // and is a no-op wherever the tables exist.
+  { version: 192, up: TEACHING_ATTENDANCE_SQL },
 ];
 
 /**
