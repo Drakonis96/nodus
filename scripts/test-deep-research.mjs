@@ -837,6 +837,37 @@ try {
     assert.ok(planInput.passages[0].extract.includes('tiempo humano'), 'the planner sees readable passage evidence');
   }
 
+  // A small documentary corpus must reach every writer beyond its first page.
+  {
+    const snapshot = makeSnapshot(3);
+    const tail = '[p. 3] The 1786 judgment changed the interval from eleven to seven days.';
+    snapshot.passages = Array.from({ length: 3 }, (_, index) => ({
+      id: `late-evidence-${index}`, nodus_id: 'w-1', label: 'Synthetic source',
+      summary: '[p. 1] Background. '.repeat(60) + tail,
+      authors: ['Synthetic Author'], year: 2030, pageLabel: 'pp. 1–3', score: 1, reason: 'source', zotero_key: '',
+    }));
+    const section = { ideaIds: [], workIds: [], gapIds: [], contradictionIds: [], passageIds: snapshot.passages.map(p => p.id) };
+    const outputs = () => [
+      buildPlanInput({ objective: 'Explain the judgment' }, 'en', snapshot, resolveSectionPlan(snapshot, 'auto')).passages.map(p => p.extract),
+      buildCitationMenu(section, buildSnapshotMaps(snapshot)).map(p => p.note.slice(1, -1)),
+      buildCitationCatalog(snapshot).passages.map(p => p.note.slice(1, -1)),
+    ];
+    for (const excerpts of outputs()) {
+      assert.equal(excerpts.length, 3);
+      assert.ok(excerpts.every(text => text.endsWith(tail)), 'planning, drafting and external writers receive the late evidence');
+    }
+    snapshot.passages = Array.from({ length: 32 }, (_, index) => ({
+      ...snapshot.passages[index % 3], id: `bounded-${index}`, summary: index === 0 ? tail : 'Long source text. '.repeat(1000),
+    }));
+    section.passageIds = snapshot.passages.map(p => p.id);
+    for (const excerpts of outputs()) {
+      assert.equal(excerpts.length, 32);
+      assert.equal(excerpts[0], tail, 'short evidence stays complete alongside long passages');
+      assert.ok(excerpts.reduce((sum, text) => sum + text.length, 0) <= 32_000, 'the whole passage pool remains bounded');
+      assert.ok(excerpts.every(text => text.length <= 6_000));
+    }
+  }
+
   // ── 11b0. Graph-first planning sees the scope contract; documents stay last ─
   {
     const snapshot = makeSnapshot(12);

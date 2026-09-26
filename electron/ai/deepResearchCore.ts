@@ -67,8 +67,21 @@ export const MAX_SECTION_IDEAS = 18;
 export const MAX_COVERAGE_QUESTIONS = 16;
 /** How much of an idea's statement reaches the writer. */
 const IDEA_NOTE_CHARS = 240;
-/** How much of a literal passage reaches the writer. Never truncate below usefulness. */
-const PASSAGE_NOTE_CHARS = 480;
+/** Share a bounded prompt allowance across passages instead of discarding the end
+ * of every retrieved chunk, even when a small corpus fits in full. */
+function passageExcerpts(passages: Array<{ id: string; text: string }>): Map<string, string> {
+  let remaining = 32_000;
+  const ordered = [...new Map(passages.map(passage => [passage.id, passage])).values()]
+    .sort((a, b) => a.text.length - b.text.length);
+  const excerpts = new Map<string, string>();
+  ordered.forEach((passage, index) => {
+    const allowance = Math.min(6_000, Math.floor(remaining / (ordered.length - index)));
+    const excerpt = allowance > 0 ? clip(passage.text, allowance) : '';
+    excerpts.set(passage.id, excerpt);
+    remaining -= excerpt.length;
+  });
+  return excerpts;
+}
 /** Extra material a per-section retrieval may add on top of what the planner assigned. */
 export const SECTION_RETRIEVAL_LIMITS = { ideas: 6, passages: 6 } as const;
 /** One focused retry is allowed when the epistemic audit cannot answer an atomic
@@ -1963,6 +1976,8 @@ export function buildPlanInput(
   snapshot: WritingWorkshopSnapshot,
   sectionPlan: SectionPlan,
 ): PlanInput {
+  const passages = snapshot.passages.filter(passage => passage.summary.trim().length > 0).slice(0, POOL_LIMITS.passages);
+  const excerpts = passageExcerpts(passages.map(passage => ({ id: passage.id, text: passage.summary })));
   return {
     objective: request.objective,
     coverageQuestions: (request.coverageQuestions ?? [])
@@ -1986,15 +2001,12 @@ export function buildPlanInput(
       .slice(0, POOL_LIMITS.contradictions)
       .map((c) => ({ id: c.id, label: c.label, summary: clip(c.summary, 160) })),
     works: snapshot.works.slice(0, POOL_LIMITS.works).map((w) => ({ id: w.id, label: w.label, summary: clip(w.summary, 140) })),
-    passages: snapshot.passages
-      .filter((passage) => passage.summary.trim().length > 0)
-      .slice(0, POOL_LIMITS.passages)
-      .map((passage) => ({
+    passages: passages.map((passage) => ({
         id: passage.id,
         workId: passage.nodus_id,
         source: `${passage.authors[0] ?? 'Autor'}${passage.year ? ` (${passage.year})` : ''}`,
         page: passage.pageLabel,
-        extract: clip(passage.summary, 360),
+        extract: excerpts.get(passage.id)!,
       })),
   };
 }
@@ -3444,6 +3456,10 @@ function sectionSources(section: DeepResearchPlanSection, maps: SnapshotMaps): s
 
 export function buildCitationMenu(section: DeepResearchPlanSection, maps: SnapshotMaps): CitationMenuItem[] {
   const items: CitationMenuItem[] = [];
+  const excerpts = passageExcerpts(section.passageIds.flatMap(id => {
+    const text = maps.passageText.get(id);
+    return text?.trim() && maps.passageWorkId.has(id) ? [{ id, text }] : [];
+  }));
   // Passages are offered last, on purpose. Leading with them was measured and made
   // the report worse: verbatim quoting more than tripled, the argument leaned on a
   // third fewer distinct works because each passage belongs to a single one, and
@@ -3502,7 +3518,7 @@ export function buildCitationMenu(section: DeepResearchPlanSection, maps: Snapsh
     items.push({
       token: `[${label}](nodus://passage/${encodeURIComponent(id)})`,
       kind: 'passage',
-      note: `«${clip(text, PASSAGE_NOTE_CHARS)}»`,
+      note: `«${excerpts.get(id) ?? ''}»`,
       source: label,
     });
   }
@@ -3621,6 +3637,8 @@ export interface CitationCatalog {
 }
 
 export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): CitationCatalog {
+  const passages = snapshot.passages.filter(passage => passage.summary?.trim()).slice(0, POOL_LIMITS.passages);
+  const excerpts = passageExcerpts(passages.map(passage => ({ id: passage.id, text: passage.summary })));
   return {
     ideas: snapshot.ideas.slice(0, POOL_LIMITS.ideas).map((i) => ({
       token: ideaCitation(i),
@@ -3642,14 +3660,11 @@ export function buildCitationCatalog(snapshot: WritingWorkshopSnapshot): Citatio
     })),
     // Only passages whose text is actually present; a page number the writer cannot
     // read is an invitation to invent what the source says.
-    passages: snapshot.passages
-      .filter((p) => p.summary?.trim())
-      .slice(0, POOL_LIMITS.passages)
-      .map((p) => {
+    passages: passages.map((p) => {
         const label = `${authorYearLabel(p.authors[0], p.year)}${p.pageLabel ? `, ${p.pageLabel}` : ''}`;
         return {
           token: `[${label}](nodus://passage/${encodeURIComponent(p.id)})`,
-          note: `«${clip(p.summary, PASSAGE_NOTE_CHARS)}»`,
+          note: `«${excerpts.get(p.id)!}»`,
           source: label,
         };
       }),
