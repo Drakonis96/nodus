@@ -132,12 +132,35 @@ export function researchEffortMemoryKey(ref: ModelRef | null | undefined): strin
   return ref?.provider && ref.model ? `${ref.provider}:${ref.model}` : null;
 }
 
+/** How deep each level reasons, for finding the one nearest the middle. `on` is a switch,
+ *  not a depth, so it has no rank and is never a default. */
+const depth: Partial<Record<NativeResearchEffort, number>> = { none: 0, off: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, ultra: 7 };
+
 /**
- * The writer for the per provider+model memory the Research composer owns.
- *
- * «Standard» removes the entry instead of storing it: with no choice remembered the
- * picker already opens on Standard, so the map only ever holds levels the user went out
- * of their way to pick, and no model is pinned to a value that used to be the default.
+ * The level a model starts on when the user never chose one for it: the middle of what it
+ * publishes. Medium where the model offers it; otherwise the level nearest to medium, the
+ * lighter one on a tie (DeepSeek's low/high ladder starts on low). «Standard» stands for
+ * the model's own first level, so a ladder that starts at low (Gemini 3 Pro: low, high)
+ * starts there. A plain on/off switch has no middle and stays on Standard.
+ */
+export function researchDefaultEffort(p: ResearchReasoningProfile): ResearchEffort {
+  const choices = researchEffortChoices(p);
+  if (choices.includes('medium')) return 'medium';
+  const rank = (choice: ResearchEffort) => depth[choice === 'standard' ? p.levels[0] ?? 'none' : choice];
+  let best: ResearchEffort = 'standard';
+  let distance = Infinity;
+  for (const choice of choices) {
+    const value = rank(choice);
+    if (value === undefined) continue;
+    if (Math.abs(value - depth.medium!) < distance) { best = choice; distance = Math.abs(value - depth.medium!); }
+  }
+  return best;
+}
+
+/**
+ * The writer for the per provider+model memory the Research composer owns. Every level
+ * the user picks is stored, Standard included: a model with no entry opens on its middle
+ * level, so Standard is a choice like any other.
  */
 export function withResearchEffort(
   current: Record<string, ResearchEffort> | undefined,
@@ -146,28 +169,39 @@ export function withResearchEffort(
 ): Record<string, ResearchEffort> {
   const key = researchEffortMemoryKey(ref);
   const next = { ...(current ?? {}) };
-  if (!key) return next;
-  if (effort === 'standard') delete next[key];
-  else next[key] = effort;
+  if (key) next[key] = effort;
   return next;
 }
 
+/** The level remembered for one selection, if the user ever picked one. A value that is
+ *  not a level at all (a hand-edited preferences file) counts as no choice. */
+export function rememberedResearchEffort(
+  remembered: Record<string, ResearchEffort> | undefined,
+  ref: ModelRef | null | undefined
+): ResearchEffort | undefined {
+  const key = researchEffortMemoryKey(ref);
+  const stored = key ? remembered?.[key] : undefined;
+  return isResearchEffort(stored) ? stored : undefined;
+}
+
 /**
- * The level the composer opens on for one selection: the last level chosen for that same
- * provider+model, or Standard when nothing was remembered for it.
+ * The level a picker opens on for one selection: the level last chosen for that same
+ * provider+model, or the model's middle level when nothing was chosen for it.
  *
- * A value that is not a level at all (a hand-edited preferences file) is ignored here.
- * A level the model no longer publishes is left alone on purpose — only the picker holds
- * the live catalogue, so it is the place that normalises it, and the request path
- * (`resolveResearchEffort`) already floors anything the model rejects.
+ * A remembered level the model no longer publishes gives way to the middle level too, once
+ * the ladder is known. A provider whose ladder comes with its live catalogue has no ladder
+ * until `info` arrives, so its remembered level stands until then; the request path
+ * (`resolveResearchEffort`) floors anything the model rejects in any case.
  */
 export function researchEffortFor(
   remembered: Record<string, ResearchEffort> | undefined,
-  ref: ModelRef | null | undefined
+  ref: ModelRef | null | undefined,
+  info?: ModelInfo
 ): ResearchEffort {
-  const key = researchEffortMemoryKey(ref);
-  const stored = key ? remembered?.[key] : undefined;
-  return isResearchEffort(stored) ? stored : 'standard';
+  const p = researchReasoningProfile(ref, info);
+  const stored = rememberedResearchEffort(remembered, ref);
+  if (stored && (researchEffortChoices(p).includes(stored) || (researchReasoningNeedsCatalog(ref) && !info))) return stored;
+  return researchDefaultEffort(p);
 }
 
 /** Additional allowance for reasoning, preserving room for the visible answer.

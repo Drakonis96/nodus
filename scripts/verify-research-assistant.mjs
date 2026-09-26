@@ -11,10 +11,11 @@ try {
   await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?accent=%238951ef');
   const input = page.locator('.research-composer-input');
   await input.fill('Ejemplo');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  // A model never set opens on the middle of its ladder: GPT-5.4 publishes none … xhigh.
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
   const slider = page.getByRole('slider', { name: 'Esfuerzo de thinking' });
   await slider.focus();
-  await slider.press('ArrowRight'); await slider.press('ArrowRight'); await slider.press('ArrowRight');
+  await slider.press('ArrowRight');
   assert.equal(await slider.getAttribute('aria-valuetext'), 'Alto');
   assert.equal(await page.locator('.research-effort-panel').evaluate(el => getComputedStyle(el).getPropertyValue('--vault-accent').trim()), '#8951ef');
   await page.screenshot({ path: `${output}/light-high.png` });
@@ -26,12 +27,12 @@ try {
   assert.deepEqual(
     await page.evaluate(() => window.updates.filter(patch => 'researchEffortByModel' in patch).at(-1).researchEffortByModel),
     { 'openai:gpt-5.4': 'high' },
-    'the level is saved for this model as soon as it is picked, and Standard is never stored'
+    'the level is saved for this model as soon as it is picked'
   );
   const models = page.locator('select').first();
   // A level belongs to the model it was picked for.
   await models.selectOption('deepseek::deepseek-flash');
-  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'a model that was never used opens on Standard');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).count(), 1, 'a model that was never used opens on its middle level (DeepSeek: low, the lighter of low and high)');
   await models.selectOption('openai::gpt-5.4');
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Alto', exact: true }).count(), 1, 'reopening a model restores the level picked for it');
   await models.selectOption('gemini::gemini-3-pro-preview');
@@ -39,7 +40,8 @@ try {
   assert.equal(await slider.getAttribute('max'), '1');
   await slider.press('Escape');
   await models.selectOption('codex::gpt-6-astra');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  // A subscription's middle is known once its catalogue arrives.
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
   await slider.press('End');
   assert.equal(await slider.getAttribute('aria-valuetext'), 'Ultra');
   await slider.press('Escape');
@@ -56,7 +58,7 @@ try {
   assert.equal(await page.evaluate(() => window.requests[1].thinkingEffort), 'standard');
   await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981');
   await input.fill('Compara las fuentes y explica las diferencias.');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
   await slider.press('End');
   await page.screenshot({ path: `${output}/dark-high.png` });
   await slider.press('Escape');
@@ -84,20 +86,20 @@ try {
   await restoredModels.selectOption('deepseek::deepseek-flash');
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Máximo', exact: true }).count(), 1, 'every model keeps its own remembered level');
   await restoredModels.selectOption('gemini::gemini-3-pro-preview');
-  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'and a model with no memory still opens on Standard');
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'and a model with no memory opens on its middle level (Gemini 3 Pro: low, its Standard)');
   // A remembered level the model no longer publishes — a catalogue that changed under the
-  // memory — is dropped instead of sent, and dropped from the store, not just hidden here.
+  // memory — is never shown or sent: the model opens on its middle level instead, and the
+  // store is left alone until the user picks.
   await page.goto(`http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?memory=${encodeURIComponent(JSON.stringify({ 'codex:gpt-6-astra': 'minimal' }))}`);
   const staleModels = page.locator('select').first();
   await staleModels.selectOption('codex::gpt-6-astra');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Medio', exact: true }).click();
   assert.equal(await slider.getAttribute('max'), '5', 'the subscription catalogue loaded, so the level was judged against the live ladder');
   await slider.press('Escape');
-  assert.deepEqual(
-    await page.evaluate(() => window.updates.filter(patch => 'researchEffortByModel' in patch).at(-1).researchEffortByModel),
-    {},
-    'a level the model no longer offers is removed from the remembered map'
-  );
+  assert.equal(await page.evaluate(() => window.updates.some(patch => 'researchEffortByModel' in patch)), false, 'nothing is written that the user did not pick');
+  await input.fill('Pregunta con nivel obsoleto'); await input.press('Enter');
+  await page.waitForFunction(() => window.requests.length === 1);
+  assert.equal(await page.evaluate(() => window.requests[0].thinkingEffort), 'medium', 'the middle level is what the request carries');
   assert.deepEqual(errors, []);
-  console.log('Research Assistant UI: keyboard, slider, remembered effort per model, stale level dropped, exact request, theme/accent, context and compact layout passed.');
+  console.log('Research Assistant UI: keyboard, slider, remembered effort per model, middle-level default, stale level replaced, exact request, theme/accent, context and compact layout passed.');
 } finally { await browser.close(); }

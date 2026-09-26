@@ -1,26 +1,34 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import type { ModelInfo, ModelRef } from '@shared/types';
-import { researchEffortChoices, researchReasoningNeedsCatalog, researchReasoningProfile, type ResearchEffort } from '@shared/researchReasoning';
+import type { ModelRef } from '@shared/types';
+import { researchEffortChoices, researchReasoningProfile, type ResearchEffort } from '@shared/researchReasoning';
+import { useResearchModelInfo } from '../hooks/useResearchModelInfo';
 import { t } from '../i18n';
 import { Icon } from './ui';
+import './researchEffort.css';
 
 const labels: Record<ResearchEffort, string> = {
   standard: 'Estándar', minimal: 'Mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto',
   xhigh: 'Muy alto', max: 'Máximo', ultra: 'Ultra', on: 'Thinking activado',
 };
 
-export function ResearchEffortControl({ model, value, onChange, disabled }: {
+/**
+ * The thinking level for one model: a trigger showing the current level and a balloon with a
+ * slider over the levels the model publishes (loaded from the provider's live catalogue
+ * where the ladder comes with it). `field` renders the trigger as a form field, for the
+ * Deep Research and Immersion forms; the Research chat composer uses the compact one.
+ */
+export function ResearchEffortControl({ model, value, onChange, disabled, variant = 'composer', testId, className = '' }: {
   model: ModelRef | null; value: ResearchEffort; onChange: (effort: ResearchEffort) => void; disabled: boolean;
+  variant?: 'composer' | 'field'; testId?: string; className?: string;
 }) {
-  const [catalog, setCatalog] = useState<{ provider: string; models: ModelInfo[] } | null>(null);
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CSSProperties>({});
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const slider = useRef<HTMLInputElement>(null);
   const id = useId();
-  const info = catalog?.provider === model?.provider ? catalog?.models.find(x => x.id === model?.model) : undefined;
+  const info = useResearchModelInfo(model);
   const profile = useMemo(
     () => researchReasoningProfile(model, info),
     [model?.provider, model?.model, info]
@@ -33,25 +41,7 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
     : ['none', 'off'].includes(profile.levels[0]) ? t('Thinking desactivado por defecto.')
     : t('Este modelo requiere thinking; estándar usa el mínimo disponible.');
 
-  useEffect(() => {
-    setOpen(false);
-    if (!model || !researchReasoningNeedsCatalog(model)) return;
-    let active = true;
-    void window.nodus.listModels(model.provider).then(models => {
-      if (active) setCatalog({ provider: model.provider, models });
-    }).catch(() => { if (active) setCatalog(null); });
-    return () => { active = false; };
-  }, [model?.provider, model?.model]);
-
-  // A remembered level the model no longer offers — chosen under an older catalogue, or under
-  // a version of the profiles that has since dropped it — is dropped here, where the live
-  // ladder is known: the control must never claim a level it would not send. Catalogue-driven
-  // providers wait for their catalogue, since until then «no levels» means «not loaded».
-  useEffect(() => {
-    if (choices.includes(value)) return;
-    if (researchReasoningNeedsCatalog(model) && info === undefined) return;
-    onChange('standard');
-  }, [choices, info, model?.provider, model?.model, onChange, value]);
+  useEffect(() => { setOpen(false); }, [model?.provider, model?.model]);
 
   useLayoutEffect(() => {
     if (!open) return;
@@ -59,10 +49,14 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(300, window.innerWidth - 24);
+      // Above the trigger, as in the composer; below it when there is no room above (a
+      // field near the top of a form).
+      const height = panel.current?.offsetHeight ?? 170;
+      const below = rect.top - 12 < height + 12;
       setPosition({ '--vault-accent': getComputedStyle(trigger.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)', position: 'fixed', zIndex: 10060, width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
-        bottom: window.innerHeight - rect.top + 12,
-      } as CSSProperties);
+        ...(below ? { top: rect.bottom + 8 } : { bottom: window.innerHeight - rect.top + 12 }),
+      } as unknown as CSSProperties);
     };
     place();
     slider.current?.focus();
@@ -87,9 +81,10 @@ export function ResearchEffortControl({ model, value, onChange, disabled }: {
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
   return <>
-    <button ref={trigger} type="button" className="research-effort-trigger" disabled={disabled || !model}
+    <button ref={trigger} type="button" className={`${variant === 'field' ? 'research-effort-field input' : 'research-effort-trigger'} ${className}`} disabled={disabled || !model} data-testid={testId}
       aria-label={`${t('Esfuerzo de thinking')}: ${t(labels[current])}`} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
+      {variant === 'field' && <Icon name="bulb" size={14} className="research-effort-field-mark" />}
       <span>{t(labels[current])}</span><Icon name="chevronDown" size={16} />
     </button>
     {open && createPortal(<div id={id} ref={panel} role="dialog" aria-label={t('Esfuerzo de thinking')}

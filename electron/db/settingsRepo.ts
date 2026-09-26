@@ -54,14 +54,14 @@ function sanitizeCodexReasoningEfforts(value: unknown): AppSettings['codexReason
  * Only levels this build still knows survive: the map comes from a preferences file the user
  * can edit and outlives app versions that may have renamed or dropped a level. The model half
  * of the key stays free-form, because a custom endpoint's ids are whatever its gateway calls
- * them. Standard is dropped rather than stored, since a missing entry already opens the picker
- * on Standard (see `withResearchEffort`).
+ * them. Standard is kept like any other level: a model with no entry opens on its middle
+ * level, so Standard is a choice the user made (see `withResearchEffort`).
  */
 function sanitizeResearchEffortByModel(value: unknown): AppSettings['researchEffortByModel'] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return Object.fromEntries(
     Object.entries(value).filter(([key, effort]) =>
-      /^[a-z][a-z0-9-]{0,31}:.{1,200}$/.test(key) && effort !== 'standard' && isResearchEffort(effort))
+      /^[a-z][a-z0-9-]{0,31}:.{1,200}$/.test(key) && isResearchEffort(effort))
   ) as AppSettings['researchEffortByModel'];
 }
 
