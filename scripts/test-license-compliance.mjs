@@ -29,6 +29,7 @@ test('packaging generates and exposes the legal bundle', () => {
       // extracted or loaded unless a profile actually asked for one, and verified like a
       // download when it is.
       ['build/capability-bootstrap', 'capability-bootstrap'],
+      ['build/zotero-mcp', 'zotero-mcp'],
     ],
   );
   // Whatever else that folder gains, the shipped copy must never carry a live deployment's state:

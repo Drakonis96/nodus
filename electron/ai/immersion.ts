@@ -1,3 +1,4 @@
+import { withJobThinkingEffort } from './thinkingEffort';
 import { withDocumentVisualPlanning, withoutDocumentVisualPlanning } from './documentVisualContext';
 import { documentSkillCatalog, documentVisualProgressLabel } from '../../shared/documentSkills';
 import { listDocumentSkills } from '../capabilities/documentCatalog';
@@ -442,7 +443,9 @@ export async function generateImmersionSession(request: ImmersionRequest, onProg
   const settings = getSettings();
   const hints = await prepareDocumentVisualHints(request.documentSkills, request.topic, request.model ?? settings.immersionModel ?? settings.synthesisModel);
   const catalog = request.documentSkills ? documentSkillCatalog(listDocumentSkills(), request.documentSkills) : '[]';
-  return withDocumentVisualPlanning(catalog, hints, () => generateImmersionWithVisualPlan(request, onProgress, hints));
+  // The thinking level chosen in the form applies to every call the session makes to its model.
+  return withJobThinkingEffort(request.thinkingEffort, request.model ?? settings.immersionModel ?? settings.synthesisModel,
+    () => withDocumentVisualPlanning(catalog, hints, () => generateImmersionWithVisualPlan(request, onProgress, hints)));
 }
 
 async function generateImmersionWithVisualPlan(

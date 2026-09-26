@@ -28,6 +28,9 @@ try {
     synthesisModel: { provider: 'google', model: 'test-text-model' },
     nodiModel: { provider: 'google', model: 'test-text-model' },
     promptLanguage: 'en',
+    // This suite isolates cancellation of the answer transport. A staged SearXNG
+    // runtime must not turn its empty synthetic corpus into a live web search.
+    researchWebSearch: 'off',
   });
 
   const ai = load('electron/ai/aiClient.ts');

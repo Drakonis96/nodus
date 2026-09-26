@@ -1,0 +1,190 @@
+{
+ "description": "Focused isolated regressions on application code fa19beff: the 39 scripts of 2026-09-24-final-regressions.json plus the four suites added in this campaign; the standalone OS-isolation suite ran first (6/6).",
+ "commit": "fa19beff",
+ "root": "/private/tmp/nodus-research-QPY4dq",
+ "proof": {
+  "writeInsideAllowed": true,
+  "writeOutsideDenied": true,
+  "descendantWriteDenied": true,
+  "externalNetworkDenied": true,
+  "forbiddenLoopbackPortDenied": true
+ },
+ "workers": 2,
+ "standaloneIsolationSuite": {
+  "tests": 6,
+  "pass": 6,
+  "fail": 0
+ },
+ "results": [
+  {
+   "file": "test-deep-research-approaches.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-deep-research.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-campaigns.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-ocr-deferred.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-requests.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-store.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-automatic-lifecycle.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-vault-ownership.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-documentary-writers.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-library-tutorial.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-ipc-contract.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-actions.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-activity.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-assistant-i18n.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-attachment-transport.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-mcp.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-background-process.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-canonical-inventory.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-claim-audit.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-attachments.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-context-popover.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-concilium.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-cost-ledger.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-listener.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-corpus-run.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-native-effort.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-notebooks.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-original-read.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-preflight.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-prompt-packs.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-provider-proxy.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-reasoning-transport.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-reasoning.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-request-budget.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-save-to-notes.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-preparation-ui.mjs",
+   "passed": false,
+   "note": "Chrome cannot start inside the Seatbelt boundary (ProcessSingleton); passes outside it on the same code"
+  },
+  {
+   "file": "test-research-source-filters.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-zotero-sessions.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-research-system-prompts.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-citation-verification.mjs",
+   "passed": true
+  },
+  {
+   "file": "test-library-source-pages.mjs",
+   "passed": true
+  }
+ ],
+ "passed": 40,
+ "total": 41,
+ "outsideBoundary": {
+  "test-research-preparation-ui.mjs": "pass"
+ }
+}

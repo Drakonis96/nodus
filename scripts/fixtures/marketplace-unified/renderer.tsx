@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import type { NodusApi } from '../../../shared/types';
 import type { ChatSkill } from '../../../shared/chatSkills';
 import { SkillMarketplaceModal } from '../../../src/components/SkillMarketplaceModal';
+import { ChatSkillsControl } from '../../../src/components/ChatSkillsControl';
 import { ChatMarkdown } from '../../../src/components/ChatMarkdown';
 import { setActiveLang } from '../../../src/i18n';
 
@@ -47,7 +48,12 @@ const capabilityCatalog = {
   },
 };
 
-const qa = { marketplaceApprovals: 0, capabilityStages: 0, capabilityApprovals: 0 };
+const community: Array<{ id: string; url: string; entries: []; plugins: []; errors: string[] }> = [];
+const marketplace = () => ({ version: 1 as const, sources: [{ id: capabilityCatalog.sourceId, url: capabilityCatalog.url, commit: capabilityCatalog.commit, updatedAt: capabilityCatalog.fetchedAt, entries: [
+  { path: 'alpha-method', package: skillPackage('alpha-method', 'Alpha Method', 'Start a research question with explicit assumptions and falsifiable criteria.', 'Research') },
+  { path: 'zeta-review', package: skillPackage('zeta-review', 'Zeta Review', 'Close a project with a concise audit of remaining uncertainty.', 'Writing') },
+], plugins: [anatomyPlugin], errors: [] as string[] }, ...community] });
+const qa = { marketplaceApprovals: 0, capabilityStages: 0, capabilityApprovals: 0, saved: [] as ChatSkill[], sources: [] as string[] };
 (window as typeof window & { __marketplaceQa?: typeof qa }).__marketplaceQa = qa;
 
 window.nodus = {
@@ -56,9 +62,16 @@ window.nodus = {
   onVaultChanged: () => () => {},
   listChatSkills: async () => skills,
   onChatSkillsChanged: () => () => {},
-  saveChatSkill: async () => skills,
+  saveChatSkill: async (skill: ChatSkill) => { qa.saved.push(skill); return skills; },
   deleteChatSkill: async () => skills,
-  getSkillMarketplace: async () => ({ version: 1 as const, sources: [{ id: capabilityCatalog.sourceId, url: capabilityCatalog.url, commit: capabilityCatalog.commit, updatedAt: capabilityCatalog.fetchedAt, entries: [
+  addSkillSource: async (url: string) => { qa.sources.push(url); community.push({ id: url.replace('https://github.com/', '').toLowerCase(), url, entries: [], plugins: [], errors: [] }); return marketplace(); },
+  removeSkillSource: async (id: string) => { community.splice(community.findIndex(source => source.id === id), 1); return marketplace(); },
+  updateSkillSource: async () => marketplace(),
+  refreshCapabilityCatalog: async () => null,
+  checkCapabilityUpdates: async () => [],
+  exportSkillPackage: async () => '/tmp/skill',
+  getSkillMarketplace: async () => marketplace(),
+  getSkillMarketplaceUnused: async () => ({ version: 1 as const, sources: [{ id: capabilityCatalog.sourceId, url: capabilityCatalog.url, commit: capabilityCatalog.commit, updatedAt: capabilityCatalog.fetchedAt, entries: [
     { path: 'alpha-method', package: skillPackage('alpha-method', 'Alpha Method', 'Start a research question with explicit assumptions and falsifiable criteria.', 'Research') },
     { path: 'zeta-review', package: skillPackage('zeta-review', 'Zeta Review', 'Close a project with a concise audit of remaining uncertainty.', 'Writing') },
   ], plugins: [anatomyPlugin], errors: [] }] }),
@@ -85,6 +98,7 @@ const anatomy = '```nodus-capability\n{"skillId":"anatomy-atlas","capabilityId":
 function Harness() {
   const [open, setOpen] = useState(true);
   return <main style={{ minHeight: '100vh', padding: 32, background: '#0b0b0f' }}>
+    <header data-testid="chat-header" style={{ display: 'flex', gap: 10, marginBottom: 20 }}><ChatSkillsControl surface="assistant" /></header>
     {open && <SkillMarketplaceModal onClose={() => setOpen(false)} />}
     <section data-testid="capability-demo" style={{ width: 680, margin: '80px auto', display: 'grid', gap: 18 }}>
       <h2 style={{ fontSize: 20 }}>Named capability activity</h2>

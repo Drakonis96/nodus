@@ -1,0 +1,152 @@
+{
+  "description": "Follow-up closure work on 24 September after the owner authorized integrating main.",
+  "mergeOfMain": {
+    "commit": "535f9a3d",
+    "newCommitsFromMain": 17,
+    "conflict": "electron/ai/researchAssistant.ts",
+    "resolution": "kept main route-fix handling (isRouteFixPrompt, original request for route review, onDelta) and this branch notebook scope validation, cancellation signals, activity steps and academic vaults without chat skills",
+    "localChecks": "typecheck, lint, 57/61 targeted suites in the sandbox; the 4 others open unlisted loopback servers or launch the app and are covered by CI"
+  },
+  "realProviderFaults": {
+    "root": "/private/tmp/nodus-research-R5f9iZ",
+    "proof": {
+      "writeInsideAllowed": true,
+      "writeOutsideDenied": true,
+      "descendantWriteDenied": true,
+      "externalNetworkDenied": true,
+      "forbiddenLoopbackPortDenied": true,
+      "allowedLoopbackPorts": [
+        51756
+      ]
+    },
+    "providers": [
+      "api.deepseek.com",
+      "openrouter.ai"
+    ],
+    "note": "Real DeepSeek and OpenRouter responses through the shared cost-reserving proxy. Only authentication failures can be provoked on demand without billing inference; rate limits and server errors remain covered by the simulated upstream only.",
+    "phases": {
+      "revokedEmbeddings": {
+        "preparation": {
+          "lexical": "ready",
+          "embeddings": "failed",
+          "status": "ready",
+          "reason": "provider_failed",
+          "error": "Clave de IA inválida. Revísala en Ajustes."
+        },
+        "providerResponses": [
+          "openrouter:401",
+          "openrouter:401",
+          "openrouter:401"
+        ],
+        "lexicalSearchStillWorks": true
+      },
+      "revokedChat": {
+        "result": {
+          "ok": false,
+          "error": "page.evaluate: Error: Error invoking remote method 'research:chat': Error: Clave de IA inválida. Revísala en Ajustes."
+        },
+        "providerResponses": [
+          "openrouter:401",
+          "deepseek:401",
+          "deepseek:401"
+        ]
+      },
+      "revokedDeepResearch": {
+        "result": {
+          "completed": true,
+          "markdown": "The available evidence cannot support a sufficient answer. Review the selected sources, accessible text and pending documents. Claims that could not be verified have been omitted.",
+          "factualAudit": null,
+          "truncated": true
+        },
+        "providerResponses": [
+          "openrouter:401",
+          "deepseek:401"
+        ]
+      },
+      "recoveredEmbeddings": {
+        "ready": true,
+        "providerResponses": [
+          "openrouter:200"
+        ]
+      },
+      "recoveredChat": {
+        "result": {
+          "answer": "# Marcador que cierra una línea en la página 2 de «realfault-1»\n\n**Respuesta:** el marcador es **REALFAULT1P1**.\n\nEl pasaje recuperado del primer documento —y único en el contexto— contiene la frase literal «Marker REALFAULT1P1 closes this line» ([realfault-1, pp. 1–2](nodus://passage/documentary%3Ae00fc1f75ced559134712aa6c9d8871c657a09e19cffe4a9d321d9187624c182%3Af484581fc7d88fa5a76314388d6638976",
+          "cited": true
+        },
+        "providerResponses": [
+          "openrouter:200",
+          "deepseek:200",
+          "deepseek:200"
+        ]
+      }
+    },
+    "ledgerBefore": {
+      "calls": 1764,
+      "accountedUsd": 3.8511878699999986
+    },
+    "ledgerAfter": {
+      "calls": 1777,
+      "accountedUsd": 3.8886977374999985,
+      "unresolved": 21
+    },
+    "observation": "The recovered answer cites a passage spanning pp. 1-2 but names REALFAULT1P1 for a question about page 2: a real model answer error, unrelated to the induced fault; Research Chat has no claim audit."
+  },
+  "pinReadWindow": {
+    "root": "/private/tmp/nodus-research-PQ2Sot",
+    "realZotero": "10.0.3",
+    "simulatedModel": true,
+    "documentId": "nodus:29779717-75f9-4562-bf70-1d94b2f3b8fc",
+    "decisions": [
+      "original",
+      "finish"
+    ],
+    "replacedAt": "between pin and read",
+    "result": {
+      "completed": true,
+      "truncated": true,
+      "limitations": [
+        "text_pending",
+        "embeddings_pending",
+        "local_original_unavailable",
+        "original_revision_changed",
+        "research_read_unavailable"
+      ],
+      "partial": true,
+      "markdown": "The available evidence cannot support a sufficient answer. Review the selected sources, accessible text and pending documents. Claims that could not be verified have been omitted."
+    },
+    "replacedTextReturned": false
+  },
+  "rerunsOnMergedCode": {
+    "appBuild": "535f9a3d (scripts-only commits after it)",
+    "roots": {
+      "vaultSwitch": "nodus-research-jHgANl",
+      "providerFaults": "nodus-research-EFkZ2C",
+      "attachmentReplacement": "nodus-research-vUiXiE",
+      "sharedIndex": "nodus-research-vTqffv",
+      "embeddingKill": "nodus-research-mesjsP",
+      "queueRecovery": "nodus-research-ve1CJw",
+      "accessibility": "nodus-research-TJhJqd",
+      "zoteroReplacement": "nodus-research-Ls3Vgc"
+    },
+    "allCompleted": true,
+    "focusedRegressions": {
+      "root": "/private/tmp/nodus-research-pn8riM",
+      "passed": 41,
+      "total": 41
+    },
+    "osIsolationSuite": "6/6"
+  },
+  "chemistryStudioPin": {
+    "status": "blocked on a release that does not exist",
+    "catalogAdvertises": "chemistry-studio 2.5.6, tag chemistry-studio-v2.5.6 (asset bytes identical to 2.5.1, apparently not regenerated)",
+    "latestRelease": "chemistry-studio-v2.5.1",
+    "why": "The bootstrap downloads and verifies the signed release asset; pinning 2.5.6 before the release exists breaks installer builds. Cutting it means dispatching release-plugin.yml in NodusResearch/nodus-research-skill-marketplace, which signs in the protected capability-signing environment: a release publication reserved for the owner."
+  },
+  "ledger": {
+    "calls": 1777,
+    "accountedUsd": 3.888697737,
+    "unresolvedReservations": 21,
+    "limitUsd": 5
+  }
+}

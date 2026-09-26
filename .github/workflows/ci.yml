@@ -22,7 +22,9 @@ concurrency:
 jobs:
   test:
     runs-on: macos-latest
-    timeout-minutes: 30
+    # Build + two-worker regression suite can exceed 30 minutes before GUI checks.
+    # Keep the existing per-E2E timeouts; allow the complete job to finish.
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -63,6 +65,9 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build:server-web
+
+      - name: Prepare hash-verified local OCR test resource
+        run: node scripts/prepare-research-ocr-fixture.mjs
 
       - name: Unit and integration tests
         # Two files at a time: the heavy tail (Zotero, world databases, Chromium

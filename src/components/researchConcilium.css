@@ -54,3 +54,9 @@
 .light .concilium-intro, .light .concilium-footnote, .light .concilium-response-meta, .light .concilium-progress, .light .concilium-toggle div > span, .light .concilium-seat-number, .light .concilium-link { color: var(--theme-text-light-muted); }
 @keyframes concilium-pulse { 50% { opacity: .3; } }
 @media (prefers-reduced-motion: reduce) { .is-thinking .concilium-status-dot { animation: none; } }
+
+/* Concilium in the header opens the shared header balloon. */
+.concilium-balloon { --c-accent: var(--vault-accent, #6366f1); }
+.concilium-balloon .header-balloon-body > * + * { margin-top: 12px; }
+.concilium-balloon button:disabled { opacity: .45; cursor: default; }
+.concilium-balloon button:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 3px; }

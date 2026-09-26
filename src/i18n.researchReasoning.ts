@@ -1,5 +1,6 @@
 export const RESEARCH_REASONING_TRANSLATIONS = {
   "en": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "Planning and writing use this level; verification uses Standard.",
     "Estándar": "Standard",
     "Mínimo": "Minimal",
     "Bajo": "Low",
@@ -18,6 +19,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Transcribing..."
   },
   "fr": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "La planification et la rédaction utilisent ce niveau ; les vérifications utilisent Standard.",
     "Estándar": "Standard",
     "Mínimo": "Minimal",
     "Bajo": "Faible",
@@ -36,6 +38,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Transcription..."
   },
   "de": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "Planung und Schreiben verwenden diese Stufe; Prüfungen verwenden Standard.",
     "Estándar": "Standard",
     "Mínimo": "Minimal",
     "Bajo": "Niedrig",
@@ -54,6 +57,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Transkription..."
   },
   "it": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "La pianificazione e la scrittura usano questo livello; le verifiche usano Standard.",
     "Estándar": "Standard",
     "Mínimo": "Minimo",
     "Bajo": "Basso",
@@ -72,6 +76,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Trascrizione..."
   },
   "pt": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "O planeamento e a escrita usam este nível; as verificações usam Padrão.",
     "Estándar": "Padrão",
     "Mínimo": "Mínimo",
     "Bajo": "Baixo",
@@ -90,6 +95,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "A transcrever..."
   },
   "pt-BR": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "O planejamento e a escrita usam este nível; as verificações usam Padrão.",
     "Estándar": "Padrão",
     "Mínimo": "Mínimo",
     "Bajo": "Baixo",
@@ -108,6 +114,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Transcrevendo..."
   },
   "tr": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "Planlama ve yazım bu düzeyi, doğrulamalar Standart düzeyi kullanır.",
     "Estándar": "Standart",
     "Mínimo": "En az",
     "Bajo": "Düşük",
@@ -126,6 +133,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "Yazıya dökülüyor..."
   },
   "zh-CN": {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "规划和写作使用此级别；核验使用标准级别。",
     "Estándar": "标准",
     "Mínimo": "最低",
     "Bajo": "低",
@@ -144,6 +152,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "正在转录…"
   },
   'zh-TW': {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "規劃與寫作使用此級別；核驗使用標準級別。",
     "Estándar": "標準",
     "Mínimo": "最低",
     "Bajo": "低",
@@ -162,6 +171,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "正在轉錄…"
   },
   ko: {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "계획과 작성에는 이 수준을, 검증에는 표준을 사용합니다.",
     "Estándar": "기준",
     "Mínimo": "최저한의",
     "Bajo": "낮은",
@@ -180,6 +190,7 @@ export const RESEARCH_REASONING_TRANSLATIONS = {
     "Transcribiendo...": "스크립트 작성 중...",
   },
   ja: {
+    "La planificación y la redacción usan este nivel; las verificaciones usan Estándar.": "計画と執筆にはこのレベルを使用し、検証には標準を使用します。",
     "Estándar": "標準",
     "Mínimo": "最小",
     "Bajo": "低い",

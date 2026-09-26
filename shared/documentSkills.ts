@@ -1,4 +1,4 @@
-import type { ChatSkill } from './chatSkills';
+import { skillActive, type ChatSkill } from './chatSkills';
 import { PIPELINE_LOG_REASONS, type PipelineLogReasonId } from './pipelineLogMessages';
 import type { ViewDocumentV1 } from '../packages/capability-api/src/views';
 
@@ -87,7 +87,7 @@ export const EMPTY_DOCUMENT_SKILLS: DocumentSkillPolicy = { enabled: true, skill
 
 export function defaultDocumentSkillPolicy(options: readonly DocumentSkillOption[]): DocumentSkillPolicy {
   return { enabled: true, skills: options.map(({ skill, billing, available }) => ({
-    skillId: skill.id, enabled: available && billing === 'none' && skill.enabled.assistant,
+    skillId: skill.id, enabled: available && billing === 'none' && skillActive(skill),
     maxCalls: billing === 'none' ? 'auto' : null,
   })) };
 }

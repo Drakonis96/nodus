@@ -114,12 +114,14 @@ test('every chat surface replays only model prose in history', () => {
 
 
 
-test('skills support independent activation, CRUD and explicit built-in restoration', () => {
+test('a skill is on or off for every chat at once; CRUD and explicit built-in restoration', () => {
   assert.equal(lib.listChatSkills().length, lib.DEFAULT_CHAT_SKILLS.length);
   const built = lib.listChatSkills()[0];
+  const before = lib.enabledChatSkills('assistant').length;
   lib.saveChatSkill({ ...built, enabled: { assistant: false, nodi: true } });
-  assert.equal(lib.enabledChatSkills('assistant').length, 1);
-  assert.equal(lib.enabledChatSkills('nodi').length, 2);
+  assert.deepEqual(lib.listChatSkills()[0].enabled, { assistant: true, nodi: true }, 'switching it on anywhere switches it on everywhere');
+  assert.equal(lib.enabledChatSkills('assistant').length, lib.enabledChatSkills('nodi').length);
+  assert.ok(lib.enabledChatSkills('assistant').length >= before);
   lib.saveChatSkill({ id: 'untrusted-id', builtin: 'image', name: 'A custom skill', description: 'For reviews', instructions: 'Give two recommendations.', enabled: { assistant: true, nodi: false } });
   const custom = lib.listChatSkills().find(item => !item.builtin);
   assert.ok(custom); assert.notEqual(custom.id, 'untrusted-id');
@@ -131,14 +133,13 @@ test('skills support independent activation, CRUD and explicit built-in restorat
   assert.throws(() => lib.saveChatSkill({ name: '' }), /name, description/);
 });
 
-test('Socratic Tutor is opt-in, can be activated independently, edited and deleted', () => {
+test('Socratic Tutor is opt-in, activates in every chat at once, can be edited and deleted', () => {
   const tutor = lib.listChatSkills().find(skill => skill.builtin === 'socratic');
   assert.ok(tutor);
   assert.deepEqual(tutor.enabled, { assistant: false, nodi: false });
   for (const surface of ['assistant', 'nodi']) assert.doesNotMatch(lib.buildChatSkillsPrompt(lib.enabledChatSkills(surface)), /Socratic Tutor/);
   lib.saveChatSkill({ ...tutor, instructions: 'Ask one focused question at a time.', enabled: { assistant: true, nodi: false } });
-  assert.match(lib.buildChatSkillsPrompt(lib.enabledChatSkills('assistant')), /Socratic Tutor/);
-  assert.doesNotMatch(lib.buildChatSkillsPrompt(lib.enabledChatSkills('nodi')), /Socratic Tutor/);
+  for (const surface of ['assistant', 'nodi']) assert.match(lib.buildChatSkillsPrompt(lib.enabledChatSkills(surface)), /Socratic Tutor/);
   assert.equal(lib.listChatSkills().find(skill => skill.id === tutor.id).instructions, 'Ask one focused question at a time.');
   lib.deleteChatSkill(tutor.id);
   assert.equal(lib.listChatSkills().some(skill => skill.id === tutor.id), false);
@@ -165,20 +166,31 @@ test('existing libraries receive the disabled tutor once without overwriting use
   } finally { fs.writeFileSync(location, original); }
 });
 
-test('all eight general skills are opt-in, independently configurable and restorable', () => {
+test('all eight general skills are opt-in, configurable and restorable', () => {
   const general = lib.listChatSkills().filter(skill => skill.builtin === 'general');
   assert.deepEqual(general.map(skill => skill.name), ['Thought Partner', 'Brainstorm Studio', 'Make It Simple', 'Action Planner', 'Compare & Choose', 'Constructive Critic', 'Writing Partner', 'Perspective Switcher']);
   for (const skill of general) {
     assert.deepEqual(skill.enabled, { assistant: false, nodi: false });
     for (const surface of ['assistant', 'nodi']) assert.equal(lib.buildChatSkillsPrompt(lib.enabledChatSkills(surface)).includes(`<skill id=${JSON.stringify(skill.id)}`), false);
     lib.saveChatSkill({ ...skill, instructions: 'My edited instructions.', enabled: { assistant: false, nodi: true } });
-    assert.equal(lib.enabledChatSkills('assistant').some(item => item.id === skill.id), false);
-    assert.equal(lib.enabledChatSkills('nodi').find(item => item.id === skill.id).instructions, 'My edited instructions.');
+    for (const surface of ['assistant', 'nodi']) assert.equal(lib.enabledChatSkills(surface).find(item => item.id === skill.id).instructions, 'My edited instructions.');
     lib.deleteChatSkill(skill.id);
     assert.equal(lib.listChatSkills().some(item => item.id === skill.id), false);
   }
   const restored = lib.restoreChatSkills().filter(skill => skill.builtin === 'general');
   assert.deepEqual(restored, general);
+});
+
+test('an older profile switched on for one surface only counts as on for every chat', () => {
+  const location = path.join(temporary, 'chat-skills.json');
+  const original = fs.readFileSync(location);
+  try {
+    const stored = JSON.parse(original.toString('utf8'));
+    const [first] = stored.skills;
+    first.enabled = { assistant: false, nodi: true };
+    fs.writeFileSync(location, JSON.stringify(stored));
+    for (const surface of ['assistant', 'nodi']) assert.ok(lib.enabledChatSkills(surface).some(item => item.id === first.id), surface);
+  } finally { fs.writeFileSync(location, original); }
 });
 
 test('version 2 migration adds general skills once and preserves edited or deleted earlier defaults', () => {

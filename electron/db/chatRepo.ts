@@ -1,3 +1,5 @@
+import { associateNotebookConversation, notebookForConversation } from './researchNotebooksRepo';
+import { deleteConversationPlacement, placementFor, setConversationFolder, setConversationPinned, setConversationProject } from './researchChatProjectsRepo';
 import { deleteResearchAttachments } from '../researchAttachments';
 import { chatAssetOwner, deleteChatAssets, reconcileChatAssets } from '../chatAssets';
 import { getActiveVault } from '../vaults/vaultRegistry';
@@ -21,6 +23,9 @@ interface ConversationRow {
   archived: number;
   model_json: string | null;
   selection_json: string | null;
+  project_id?: string | null;
+  folder_id?: string | null;
+  pinned_at?: string | null;
 }
 
 interface MessageRow {
@@ -33,6 +38,7 @@ interface MessageRow {
   stats_json: string | null;
   attachments_json: string | null;
   concilium_json: string | null;
+  skills_json?: string | null;
   error: number;
   created_at: string;
 }
@@ -47,8 +53,13 @@ function parseJson<T>(value: string | null): T | null {
 }
 
 function toSummary(row: ConversationRow, messageCount: number): ChatConversationSummary {
+  const placement = row.project_id !== undefined ? { projectId: row.project_id ?? null, folderId: row.folder_id ?? null, pinnedAt: row.pinned_at ?? null } : placementFor(row.id);
   return {
     id: row.id,
+    notebookId: notebookForConversation(row.id),
+    projectId: placement.projectId,
+    folderId: placement.folderId,
+    pinnedAt: placement.pinnedAt,
     title: row.title || DEFAULT_TITLE,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -65,6 +76,7 @@ function toMessage(row: MessageRow): ChatMessageRecord {
     content: row.content,
     attachments: parseJson(row.attachments_json) ?? undefined,
     concilium: parseJson(row.concilium_json) ?? undefined,
+    skills: parseJson<{ id: string; name: string }[]>(row.skills_json ?? null) ?? undefined,
     selectionKey: row.selection_key,
     stats: parseJson(row.stats_json),
     error: row.error === 1,
@@ -76,8 +88,9 @@ export function listConversations(includeArchived = false): ChatConversationSumm
   const where = includeArchived ? '' : 'WHERE c.archived = 0';
   const rows = db
     .prepare(
-      `SELECT c.*, (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id) AS message_count
+      `SELECT c.*, p.project_id, p.folder_id, p.pinned_at, (SELECT COUNT(*) FROM chat_messages m WHERE m.conversation_id = c.id) AS message_count
        FROM chat_conversations c
+       LEFT JOIN research_chat_placements p ON p.conversation_id = c.id
        ${where}
        ORDER BY c.archived ASC, c.updated_at DESC`
     )
@@ -103,6 +116,9 @@ export function createConversation(input: {
   model?: ModelRef | null;
   selection?: ResearchContextSelection | null;
   title?: string;
+  projectId?: string | null;
+  /** A folder of that project, when the chat starts inside one. */
+  folderId?: string | null;
 }): ChatConversation {
   const db = getDb();
   const now = new Date().toISOString();
@@ -118,6 +134,9 @@ export function createConversation(input: {
     input.model ? JSON.stringify(input.model) : null,
     input.selection ? JSON.stringify(input.selection) : null
   );
+  if (input.selection?.notebookId) associateNotebookConversation(input.selection.notebookId, id);
+  if (input.projectId) setConversationProject(id, input.projectId);
+  if (input.projectId && input.folderId) setConversationFolder(id, input.folderId);
   return getConversation(id)!;
 }
 
@@ -134,8 +153,8 @@ export function saveMessages(
     if (!exists) return;
     db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(id);
     const insert = db.prepare(
-      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at, attachments_json, concilium_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO chat_messages (id, conversation_id, seq, role, content, selection_key, stats_json, error, created_at, attachments_json, concilium_json, skills_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     );
     messages.forEach((message, index) => {
       insert.run(
@@ -149,7 +168,8 @@ export function saveMessages(
         message.error ? 1 : 0,
         now,
         message.attachments?.length ? JSON.stringify(message.attachments) : null,
-        message.concilium ? JSON.stringify(message.concilium) : null
+        message.concilium ? JSON.stringify(message.concilium) : null,
+        message.skills?.length ? JSON.stringify(message.skills.slice(0, 8).map(skill => ({ id: String(skill.id), name: String(skill.name).slice(0, 120) }))) : null
       );
     });
     const sets: string[] = ['updated_at = @now'];
@@ -159,6 +179,7 @@ export function saveMessages(
       params.model = meta.model ? JSON.stringify(meta.model) : null;
     }
     if (meta && 'selection' in meta) {
+      associateNotebookConversation(meta.selection?.notebookId ?? null, id);
       sets.push('selection_json = @selection');
       params.selection = meta.selection ? JSON.stringify(meta.selection) : null;
     }
@@ -177,6 +198,8 @@ export function setArchived(id: string, archived: boolean): void {
   getDb()
     .prepare('UPDATE chat_conversations SET archived = ?, updated_at = ? WHERE id = ?')
     .run(archived ? 1 : 0, new Date().toISOString(), id);
+  // An archived chat leaves the pinned section and frees its place.
+  if (archived && placementFor(id).pinnedAt) setConversationPinned(id, false);
 }
 
 export function deleteConversation(id: string): void {
@@ -185,6 +208,7 @@ export function deleteConversation(id: string): void {
   const db = getDb();
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(id);
+    deleteConversationPlacement(id);
     db.prepare('DELETE FROM chat_conversations WHERE id = ?').run(id);
   });
   tx();

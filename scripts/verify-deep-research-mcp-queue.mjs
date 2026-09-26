@@ -83,7 +83,7 @@ try {
   await page.waitForFunction(() => {
     const root = document.getElementById('root');
     return !!root && root.children.length > 0;
-  }, { timeout: 30_000 });
+  }, null, { timeout: 30_000 });
   // Past the what's-new and update-tour overlays: they are modal, and this walk is
   // about the queue, not about onboarding (which scripts/e2e-smoke.mjs covers screen
   // by screen). Each guide records its own "seen" flag in localStorage.
@@ -104,7 +104,7 @@ try {
   await page.waitForFunction(() => {
     const root = document.getElementById('root');
     return !!root && root.children.length > 0;
-  }, { timeout: 30_000 });
+  }, null, { timeout: 30_000 });
   console.log('[verify] renderer mounted');
 
   // Every lane snapshot the window receives, from before anything is queued. This is a

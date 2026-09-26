@@ -5,6 +5,7 @@ import { getDb, SCHEMA_VERSION } from '../db/database';
 import { decryptWithKey, deriveKeyFromDescriptor, encryptWithKey, newKdfDescriptor, type KdfDescriptor } from './backupCrypto';
 import { identityColumns, identityWhere, quoteIdentifier, tableColumns, type TableColumn } from '../db/rowIdentity';
 import { measureClockSkewAhead, packageIsOlderThanHorizon, type TombstoneRow } from '../db/tombstones';
+import { repairAllChatPlacements } from '../db/chatHistoryTables';
 import { describeSyncCoverage, groupOfTable, localTableNames, syncedTablesByGroup } from '../db/syncTables';
 import { getPrimarySourcePolicySettings } from '../db/primarySourceGovernanceRepo';
 import { decidePrimarySourcePolicy } from '@shared/primarySourcesTypes';
@@ -1004,7 +1005,13 @@ export function mergeTables(
       }
       mergeTable(table, rows, resolveBlob, groups[group], conflicts, insertedRowIds, tables, packageDate, supersededKept, localTombstones);
     }
+    // A chat filed on the other device in a folder that was deleted here (or that the merge
+    // is about to drop) arrives pointing at nothing. Deletion wins: the chat stays in its
+    // project with no folder, before the foreign keys are checked, and again after the
+    // dangling rows go, since removing a folder can orphan a reference.
+    repairAllChatPlacements(db);
     dropDanglingRows(insertedRowIds, conflicts);
+    repairAllChatPlacements(db);
   });
   tx();
 

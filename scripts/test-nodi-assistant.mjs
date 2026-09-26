@@ -529,7 +529,7 @@ test('the chat retrieval never holds the main process for a whole similarity sca
   assert.match(hierarchy, /findSimilarIdeasPaged\(/, 'idea similarity is delegated to the paged hierarchy lane');
   assert.match(hierarchy, /findSimilarPassagesPaged\(/, 'passage similarity is delegated to the paged hierarchy lanes');
   assert.match(hierarchy, /await Promise\.all\(/, 'the first paged lanes are awaited as one bounded batch');
-  assert.match(hierarchy, /await findSimilarPassagesPaged\(/, 'the routed passage lane is awaited');
+  assert.match(hierarchy, /await researchActivityStep\('context', 'expand', \(\) => findSimilarPassagesPaged\(/, 'the routed passage lane is awaited through its activity observer');
   // The passage section is the largest scan of all and runs twice per question.
   assert.match(assistant, /async function listRelevantPassages/);
   assert.match(assistant, /await listRelevantPassages\(/);

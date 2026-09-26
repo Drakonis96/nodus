@@ -41,6 +41,11 @@ export interface ChatSkill {
   builtin?: 'svg' | 'image' | 'socratic' | 'general';
 }
 
+/** A skill is on or off for every chat at once: the assistant, Nodi and the other chats.
+ *  The stored flag keeps one entry per surface for older profiles; either one means on. */
+export const skillActive = (skill: Pick<ChatSkill, 'enabled'>): boolean => skill.enabled.assistant || skill.enabled.nodi;
+export const onEverySurface = (on: boolean): Record<ChatSkillSurface, boolean> => ({ assistant: on, nodi: on });
+
 export function skillHasCapability(skill: ChatSkill, capability: SkillCapability): boolean {
   const expected = normalizeCapabilityId(capability);
   return normalizeCapabilityId(skill.builtin ?? '') === expected || skill.capabilities?.some(item => normalizeCapabilityId(item) === expected) === true;

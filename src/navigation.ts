@@ -445,6 +445,7 @@ export interface LibraryNavigationTarget {
   readerItemId?: string;
   /** Physical 1-based page the reader must jump to once the item is open. */
   readerPage?: number | null;
+  readerAttachmentId?: string | null;
   /** Open the installed/downloadable CSL style manager. */
   citationStyles?: boolean;
 }

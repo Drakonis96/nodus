@@ -61,6 +61,11 @@ import type {
   ChapterSuggestionStatus,
   ChatConversation,
   ChatConversationSummary,
+  ResearchChatProject,
+  ResearchChatProjectFolder,
+  ChatHistoryNotebook,
+  ChatHistoryNotebookSurface,
+  ChatHistorySurface,
   ChatMessageRecord,
   CitationPreview,
   CitationRef,
@@ -223,7 +228,11 @@ import type {
   ZoteroTag,
 } from '../types';
 
-export interface AcademicApi {
+export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCorpusApi,
+  'getResearchCorpusSources' | 'listResearchNotebooks' | 'saveResearchNotebook' | 'deleteResearchNotebook' | 'resolveResearchNotebook' | 'updateResearchNotebookAppearance' | 'getResearchNotebookPreparation' | 'searchResearchNotebook' | 'readResearchDocument'
+  | 'getResearchPreparationPolicy' | 'setResearchPreparationPolicy' | 'previewResearchPreparation' | 'startResearchPreparationCampaign' | 'getResearchPreparationProgress' | 'onResearchPreparationProgress' | 'controlResearchPreparationCampaign' | 'controlAllResearchPreparation'
+  | 'getResearchPreparationInventory' | 'prepareResearchDocuments' | 'indexResearchWorks' | 'cancelResearchDocuments' | 'setResearchPreparationEnabled' | 'setResearchPreparationPaused'
+  | 'setResearchZoteroAutomatic' | 'getZoteroMcpStatus' | 'connectResearchZotero' | 'disconnectResearchZotero' | 'readResearchZotero'> {
   // Dictionary: persistent evidence-backed concept syntheses
   listDictionaryEntries(request: DictionaryListRequest): Promise<DictionaryEntryPage>;
   listDictionaryFacets(): Promise<DictionaryFacets>;
@@ -783,6 +792,11 @@ export interface AcademicApi {
   createConversation(input: {
     model?: ModelRef | null;
     selection?: ResearchContextSelection | null;
+    title?: string;
+    /** Research chat project the new conversation starts in. */
+    projectId?: string | null;
+    /** A folder of that project it starts in. */
+    folderId?: string | null;
   }): Promise<ChatConversation>;
   saveConversationMessages(
     id: string,
@@ -794,6 +808,50 @@ export interface AcademicApi {
   renameConversation(id: string, title: string): Promise<void>;
   archiveConversation(id: string, archived: boolean): Promise<void>;
   deleteConversation(id: string): Promise<void>;
+  /** Research chat projects, alphabetical. Optional: surfaces without projects omit them. */
+  listChatProjects?(): Promise<ResearchChatProject[]>;
+  createChatProject?(input: { name: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  updateChatProject?(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  /** The project's chats return to the general history; none is deleted. */
+  deleteChatProject?(id: string): Promise<void>;
+  /** Every project's folders; a project's tree is built from parentId and position. */
+  listChatProjectFolders?(): Promise<ResearchChatProjectFolder[]>;
+  createChatProjectFolder?(input: { projectId: string; parentId?: string | null; name: string }): Promise<ResearchChatProjectFolder>;
+  renameChatProjectFolder?(id: string, name: string): Promise<ResearchChatProjectFolder>;
+  /** Nest under `parentId` (null: the project's root) at `index`; refused with research_chat_folder_cycle into its own subtree. */
+  moveChatProjectFolder?(id: string, parentId: string | null, index?: number): Promise<ResearchChatProjectFolder>;
+  /** Subfolders go too; the chats of all of them stay in the project, unfiled. */
+  deleteChatProjectFolder?(id: string): Promise<void>;
+  /** Changing project clears the chat's folder. */
+  setConversationProject?(id: string, projectId: string | null): Promise<void>;
+  /** A folder also places the chat in its project; null leaves it in the project, unfiled. */
+  setConversationFolder?(id: string, folderId: string | null): Promise<void>;
+  /** Refused with research_chat_pin_limit beyond RESEARCH_CHAT_PIN_LIMIT pinned chats. */
+  setConversationPinned?(id: string, pinned: boolean): Promise<void>;
+
+  // The other chat histories (Databases, Worldbuilding, Study and Teaching): the same
+  // projects, folders, pins, archive and rename, and notebooks where the surface keeps
+  // its own, each call reaching only that surface's store in the active vault. Same rules
+  // and the same refusals as the research chat calls above.
+  listChatHistoryProjects?(surface: ChatHistorySurface): Promise<ResearchChatProject[]>;
+  createChatHistoryProject?(surface: ChatHistorySurface, input: { name: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  updateChatHistoryProject?(surface: ChatHistorySurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null }): Promise<ResearchChatProject>;
+  deleteChatHistoryProject?(surface: ChatHistorySurface, id: string): Promise<void>;
+  listChatHistoryFolders?(surface: ChatHistorySurface): Promise<ResearchChatProjectFolder[]>;
+  createChatHistoryFolder?(surface: ChatHistorySurface, input: { projectId: string; parentId?: string | null; name: string }): Promise<ResearchChatProjectFolder>;
+  renameChatHistoryFolder?(surface: ChatHistorySurface, id: string, name: string): Promise<ResearchChatProjectFolder>;
+  moveChatHistoryFolder?(surface: ChatHistorySurface, id: string, parentId: string | null, index?: number): Promise<ResearchChatProjectFolder>;
+  deleteChatHistoryFolder?(surface: ChatHistorySurface, id: string): Promise<void>;
+  setChatHistoryProject?(surface: ChatHistorySurface, conversationId: string, projectId: string | null): Promise<void>;
+  setChatHistoryFolder?(surface: ChatHistorySurface, conversationId: string, folderId: string | null): Promise<void>;
+  setChatHistoryPinned?(surface: ChatHistorySurface, conversationId: string, pinned: boolean): Promise<void>;
+  renameChatHistoryConversation?(surface: ChatHistorySurface, conversationId: string, title: string): Promise<void>;
+  archiveChatHistoryConversation?(surface: ChatHistorySurface, conversationId: string, archived: boolean): Promise<void>;
+  listChatHistoryNotebooks?(surface: ChatHistoryNotebookSurface): Promise<ChatHistoryNotebook[]>;
+  createChatHistoryNotebook?(surface: ChatHistoryNotebookSurface, input: { name: string; icon?: string | null; color?: string | null; selection: unknown }): Promise<ChatHistoryNotebook>;
+  updateChatHistoryNotebook?(surface: ChatHistoryNotebookSurface, id: string, patch: { name?: string; icon?: string | null; color?: string | null; selection?: unknown }): Promise<ChatHistoryNotebook>;
+  /** The notebook's chats return to the general history; none is deleted. */
+  deleteChatHistoryNotebook?(surface: ChatHistoryNotebookSurface, id: string): Promise<void>;
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   /** Load every folder and note in one payload; the renderer builds the tree. */

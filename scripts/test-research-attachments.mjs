@@ -13,7 +13,7 @@ globalThis.fetch = () => { throw new Error('External network forbidden in attach
 const fixtures = path.join(scratch, 'fixtures'); fs.mkdirSync(fixtures);
 const write = (name, data) => { const file = path.join(fixtures, name); fs.writeFileSync(file, data); return file; };
 try {
-  const settings = load('electron/db/settingsRepo.ts'); settings.updateSettings({ synthesisModel: { provider: 'openai', model: 'gpt-4.1' }, chatReasoning: 'off' });
+  const settings = load('electron/db/settingsRepo.ts'); settings.updateSettings({ synthesisModel: { provider: 'openai', model: 'gpt-4.1' }, chatReasoning: 'off', researchWebSearch: 'off' });
   const store = load('electron/researchAttachments.ts');
   const chats = load('electron/db/chatRepo.ts');
   const owner = () => ({ surface: 'research', conversationId: chats.createConversation({}).id });

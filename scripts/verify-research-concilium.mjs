@@ -7,9 +7,10 @@ try {
   await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?lang=en&view=embedded');
   const trigger = page.getByRole('button', { name: 'Concilium', exact: true });
   await trigger.click();
-  const panel = page.locator('.concilium-panel');
-  assert.equal(await panel.evaluate(el => el.matches(':popover-open')), true);
-  assert.equal(await panel.getAttribute('role'), 'region');
+  const panel = page.getByTestId('concilium-panel');
+  // The shared header balloon, like Context, Sources, System prompt and Skills.
+  assert.equal(await panel.getAttribute('role'), 'dialog');
+  assert.equal(await panel.locator('.header-balloon-title').innerText(), 'Concilium');
   assert.equal(await page.locator('.concilium-seat').count(), 2);
   assert.equal(await page.getByRole('button', { name: /Remove member/ }).count(), 0);
   const add = page.getByRole('button', { name: /Add member/ });
@@ -52,10 +53,10 @@ try {
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'toolbar fits the compact viewport');
   const box = await panel.boundingBox();
   assert.ok(box.x >= 0 && box.x + box.width <= 560 && box.y >= 0 && box.y + box.height <= 800);
-  await page.locator('.concilium-heading button').click();
+  await panel.getByRole('button', { name: 'Close', exact: true }).click();
   assert.equal(await panel.count(), 0);
   await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?lang=en&view=embedded&theme=dark');
   await trigger.click(); assert.equal(await panel.isVisible(), true);
   assert.deepEqual(errors, []);
-  console.log('Concilium UI: native popover, 2–5 bounds, search, duplicate prevention, nested Escape, chairman/removal, exact request, disable mode, compact and dark layouts passed.');
+  console.log('Concilium UI: header balloon, 2–5 bounds, search, duplicate prevention, nested Escape, chairman/removal, exact request, disable mode, compact and dark layouts passed.');
 } finally { await browser.close(); }

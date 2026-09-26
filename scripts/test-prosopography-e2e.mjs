@@ -14,7 +14,8 @@ import { _electron as electron } from 'playwright-core';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const appVersion = require(path.join(repoRoot, 'package.json')).version;
-const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-prosop-e2e-'));
+const inheritedIsolation = process.env.NODUS_ISOLATED_ROOT;
+const userData = inheritedIsolation ? path.join(inheritedIsolation, 'profile') : await mkdtemp(path.join(os.tmpdir(), 'nodus-prosop-e2e-'));
 const screenshotDir = process.env.NODUS_PROSOPOGRAPHY_SCREENSHOT_DIR || os.tmpdir();
 const childEnv = {
   ...process.env,
@@ -42,7 +43,7 @@ let app;
 try {
   app = await electron.launch({
     executablePath: require('electron'),
-    args: [repoRoot],
+    args: [...(inheritedIsolation ? ['--no-sandbox', '--disable-gpu'] : []), repoRoot],
     env: childEnv,
   });
   const page = await app.firstWindow();
@@ -147,5 +148,5 @@ try {
   console.log(`prosopography Electron smoke passed\nlight=${lightPath}\ndark=${darkPath}`);
 } finally {
   await closeElectronApp(app);
-  await rm(userData, { recursive: true, force: true });
+  if (!inheritedIsolation) await rm(userData, { recursive: true, force: true });
 }

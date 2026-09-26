@@ -1,0 +1,97 @@
+# Nodus managed SearXNG. serve.py copies this file into a private session
+# directory and replaces __SECRET__ before SearXNG reads it. Only the JSON API
+# is served, only on the loopback interface, and only to requests carrying the
+# per-launch token (serve.py). Engines that answer with a CAPTCHA are suspended
+# by SearXNG itself; Nodus never retries around a block.
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo web
+      - brave
+      - bing
+      - yahoo
+      - seznam
+      - qwant
+      - wikipedia
+      - arxiv
+      - semantic scholar
+      - openalex
+      - crossref
+      - pubmed
+      - europepmc
+      - google scholar
+
+general:
+  debug: false
+  instance_name: "Nodus"
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  favicon_resolver: ""
+  default_lang: "auto"
+  formats:
+    - json
+
+server:
+  bind_address: "127.0.0.1"
+  port: 0
+  base_url: false
+  limiter: false
+  public_instance: false
+  secret_key: "__SECRET__"
+  image_proxy: false
+  method: "GET"
+
+valkey:
+  url: false
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 10.0
+  pool_connections: 20
+  enable_http2: true
+
+plugins:
+  searx.plugins.tracker_url_remover.SXNGPlugin:
+    active: true
+
+engines:
+  # The plain DuckDuckGo engine answers with a CAPTCHA from addresses that have
+  # searched a lot, while its browser-impersonating variant (curl_cffi, a Firefox
+  # fingerprint) keeps returning results from the same address; measured on
+  # 2026-09-26, when it was the only general engine that never gave up. Yahoo and
+  # Seznam add two more general sources that answered throughout the campaigns.
+  - name: duckduckgo web
+    engine: duckduckgo_web
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: yahoo
+    disabled: false
+  - name: seznam
+    disabled: false
+  - name: qwant
+    disabled: true
+  - name: wikipedia
+    disabled: false
+    display_type: ["list"]
+  - name: arxiv
+    disabled: false
+  - name: semantic scholar
+    disabled: false
+  - name: openalex
+    disabled: false
+    timeout: 6.0
+  - name: crossref
+    disabled: true
+    timeout: 8.0
+  - name: pubmed
+    disabled: false
+  - name: europepmc
+    disabled: false
+  - name: google scholar
+    disabled: false

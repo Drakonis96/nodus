@@ -1,7 +1,11 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
+import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -78,11 +82,15 @@ export const KO: Record<string, string> = {
   "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus 안에서 출처를 탐색하고, 새 소식을 확인하고, 파일을 작업하세요.",
   "Buscar herramientas": "도구 검색",
 
+  ...RESEARCH_ACTIVITY_TRANSLATIONS.ko,
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS.ko,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ko,
+  ...VAULT_FILE_DROP_TRANSLATIONS['ko'],
   ...DOCUMENT_SKILLS_TRANSLATIONS.ko,
   ...RESEARCH_PROMPT_TRANSLATIONS.ko,
   ...RESEARCH_SOURCE_TRANSLATIONS.ko,
   ...RESEARCH_REASONING_TRANSLATIONS.ko,
+  ...RESEARCH_NOTEBOOK_TRANSLATIONS["ko"],
   ...CHAT_SKILLS_TRANSLATIONS.ko,
   ...CAPABILITIES_TRANSLATIONS.ko,
   ...STELLAR_GRAPH_TRANSLATIONS.ko,

@@ -1,3 +1,4 @@
+import { withJobThinkingEffort } from './thinkingEffort';
 import { BrowserWindow } from 'electron';
 import type {
   DatabaseDeepResearchJob,
@@ -59,6 +60,7 @@ const AGGREGATE_STRUCTURAL_KEYS = new Set([
   'chi2', 'dof', 'cramersV', 'expected', 'counts', 'rowLevels', 'columnLevels',
   'p', 'pValue', 'qValue', 'confidenceInterval', 'interval', 'low', 'high',
   'mean', 'median', 'mad', 'variance', 'standardError', 'coefficient', 'coefficients',
+  'min', 'max', 'sum', 'q1', 'q3', 'iqr', 'stdev', 'cv', 'skewness', 'kurtosis', 'mode', 'value', 'count', 'ci',
   'hazardRatio', 'hazardRatios', 'survival', 'time', 'atRisk', 'events', 'censored',
   'points', 'sourceIndexes', 'timestamps', 'droppedMissing', 'warnings', 'columns',
   'columnIds', 'inputs', 'output', 'seed', 'iterations', 'components', 'eigenvalues',
@@ -93,7 +95,13 @@ function redactAggregateValue(value: unknown, _sensitive: boolean, depth = 0): u
   ]));
 }
 
-function compactEvidence(evidence: DatabaseResearchEvidence[], _columnTypes: Record<string, string> = {}): string {
+export function researchColumnAliases(evidence: DatabaseResearchEvidence[], columnTypes: Record<string, string> = {}): Map<string, string> {
+  const ids = new Set([...Object.keys(columnTypes), ...evidence.flatMap(item => item.columnIds)]);
+  return new Map([...ids].map((id, index) => [id, `column_${index + 1}`]));
+}
+
+export function compactEvidence(evidence: DatabaseResearchEvidence[], columnTypes: Record<string, string> = {}): string {
+  const aliases = researchColumnAliases(evidence, columnTypes);
   const items = evidence.map((item, index) => ({
     // Expose only the cryptographic reference needed to cite an artifact. Step
     // and column ids can be user-controlled/cell-derived, so replace them with
@@ -101,7 +109,7 @@ function compactEvidence(evidence: DatabaseResearchEvidence[], _columnTypes: Rec
     artifactId: `artifact_${index + 1}`,
     artifactRef: item.hash,
     method: item.operation,
-    columns: item.columnIds.map((_id, columnIndex) => `column_${columnIndex + 1}`),
+    columns: item.columnIds.map(id => aliases.get(id)),
     n: item.n,
     hash: item.hash,
     output: redactAggregateValue(item.value, false),
@@ -138,8 +146,11 @@ function agentCompletion(): NonNullable<DatabaseResearchAgentDeps['complete']> {
   return async ({ role, objective, evidence, model, reportType, language, columnTypes, modelContext, narrativeDraft, sectionLength }) => {
     if (!model) throw new Error('Selecciona un modelo para Deep Research antes de iniciar la investigación.');
     if (model.provider === 'codex') await assertChatGptSubscriptionConnected();
+    const columnAliases = researchColumnAliases(evidence, columnTypes);
     const schemaContext = modelContext ? JSON.stringify({
-      schema: modelContext.schema,
+      schema: modelContext.schema.map(source => ({ ...source,
+        columns: source.columns.map(column => ({ ...column, artifactAlias: columnAliases.get(column.id) })),
+      })),
       semanticRoles: modelContext.semanticRoles,
       rowCounts: modelContext.rowCounts,
       allowedOperations: modelContext.allowedOperations,
@@ -278,10 +289,11 @@ async function drainVault(vaultId: string): Promise<void> {
         try {
           const progress = repo.startDatabaseResearchRun(run.id);
           broadcastProgress(progress);
-          await processDatabaseResearchRun(run.id, {
+          // The thinking level chosen in the form applies to every call the run makes to its model.
+          await withJobThinkingEffort(current.options.thinkingEffort, current.model as ModelRef | null, () => processDatabaseResearchRun(run.id, {
             complete: agentCompletion(),
             onProgress: broadcastProgress,
-          });
+          }));
         } catch {
           // processDatabaseResearchRun persists the failure. A failed run never
           // prevents later queued work from draining.

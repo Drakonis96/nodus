@@ -87,6 +87,8 @@ export type LibraryExtractionProgressHandler = (value: {
   phase: 'analyze' | 'extract' | 'ocr' | 'assets' | 'write';
   progress: number;
   message: string;
+  page?: number;
+  totalPages?: number;
 }) => void;
 
 export interface LibraryRemoteOcrPage {
@@ -1211,16 +1213,22 @@ async function pdfBlocks(
       const page = await pdf.getPage(pageNumber);
       const layout = await pageLayout(page, pageNumber);
       layouts.push(layout);
-      if (layout.lines.reduce((sum, line) => sum + line.text.length, 0) < 50) blank.push(pageNumber);
+      if (layout.lines.reduce((sum, line) => sum + line.text.length, 0) < 50) {
+        const pdfjs = options.localOcrOnly ? await loadPdfjs() : null;
+        const operators = pdfjs ? await page.getOperatorList() : null;
+        // Blank leaves and short digital title pages do not require OCR.
+        if (!operators || operators.fnArray.some((op: number) => [pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintJpegXObject].includes(op))) blank.push(pageNumber);
+      }
       page.cleanup?.();
-      onProgress?.({ phase: 'extract', progress: 0.08 + (pageNumber / pdf.numPages) * 0.47, message: `Extrayendo página ${pageNumber} de ${pdf.numPages}…` });
+      onProgress?.({ phase: 'extract', progress: 0.08 + (pageNumber / pdf.numPages) * 0.47, message: `Extrayendo página ${pageNumber} de ${pdf.numPages}…`, page: pageNumber, totalPages: pdf.numPages });
     }
+    if (blank.length && options.localOcrOnly && options.ocrMode === 'off') throw new Error('documentary_ocr_deferred');
     if (blank.length && options.ocrMode !== 'off') {
       const pages = blank.slice(0, options.maxOcrPages);
       if (options.ocrMode === 'local') {
         const recognized = await ocrPdfPages(pdf, pages, options.ocrLanguages, ({ page, totalPages }) => onProgress?.({
-          phase: 'ocr', progress: 0.55 + (page / totalPages) * 0.2, message: `OCR local ${page} de ${totalPages}…`,
-        }));
+          phase: 'ocr', progress: 0.55 + (page / totalPages) * 0.2, message: `OCR local ${page} de ${totalPages}…`, page, totalPages,
+        }), { localOnly: options.localOcrOnly, signal });
         for (const [pageNumber, result] of recognized) {
           if (!result.text.trim()) continue;
           const layout = layouts[pageNumber - 1];
@@ -1237,6 +1245,7 @@ async function pdfBlocks(
           ocrPages += 1;
         }
       } else {
+        if (options.localOcrOnly) throw new Error('documentary_remote_ocr_forbidden');
         if (!remoteOcr) throw new Error('El OCR remoto solo puede usarse tras elegir explícitamente un modelo de visión.');
         for (let index = 0; index < pages.length; index += 1) {
           abortIfNeeded(signal);
@@ -1255,6 +1264,7 @@ async function pdfBlocks(
         }
       }
     }
+    if (options.localOcrOnly && blank.length > ocrPages) throw new Error('documentary_ocr_incomplete');
     const chrome = repeatedChrome(layouts);
     const pageContent: OutputBlock[] = [];
     let continuingTable = false;

@@ -11,7 +11,7 @@ import {
 } from './deepResearchSectionLength';
 
 /** Bump whenever a prompt contract changes; it is stored in provenance. */
-export const DATABASE_DEEP_RESEARCH_PROMPT_VERSION = '1.0.0';
+export const DATABASE_DEEP_RESEARCH_PROMPT_VERSION = '1.0.2';
 
 export type DatabaseDeepResearchPromptRole =
   | 'planner'
@@ -639,6 +639,27 @@ export function buildDatabaseDeepResearchPrompt(input: DatabaseDeepResearchPromp
     context: input.context ?? '',
     ...(lengthGuidance ? { guidelineWordsPerSection: lengthWords } : {}),
     outputContract: outputContracts[input.role],
+    ...(input.role === 'verifier' ? {
+      verificationContract: {
+        coverage: 'Return a review for EVERY approved artifact hash, including separate hashes with identical results. The host checks coverage by artifactRef; a summary that omits a hash cannot pass.',
+        references: 'Use the exact approved artifactRef hash as claimId and include it in artifactRefs. Never invent a reference. Review each artifact once.',
+        scope: 'Judge the numeric or boolean results the artifact actually establishes. Redacted identifiers cannot support identity claims but do not invalidate visible counts or descriptive statistics.',
+        status: 'Use unverifiable for failed, unusable or unsupported results, sensitive for assumption-dependent results and exploratory for exploratory results. Do not upgrade uncertainty to verified to complete coverage.',
+        reason: 'Give a concise reason per artifact; avoid repeating its complete output.',
+      },
+    } : {}),
+    ...((input.role === 'writer' || input.role === 'editor') ? {
+      narrativeContract: {
+        placeholderSyntax: '{{artifact:<artifactRef>:<numericOrBooleanOutputPath>}}',
+        artifactRef: 'Copy the exact hash from APPROVED_ARTIFACTS.artifactRef; never use artifact_1, a column alias, or a made-up label.',
+        outputPath: 'Use a real path inside the artifact output, for example mean, min, ci.0 or ci.1. The host resolves the value; do not add an output. prefix.',
+        paragraph: 'Every paragraph requires at least one valid placeholder. artifactRefs must equal exactly the set of hashes used in its placeholders. Omit unsupported paragraphs.',
+        summary: 'Use an empty string or include valid artifact placeholders; a nonempty summary without placeholders is rejected.',
+        numbers: 'No literal digits outside placeholders in title, summary, headings or textTemplate. Do not include aliases such as column_1 in prose.',
+        claimClass: 'Use verified only for directly established descriptive results; use sensitive or exploratory for assumptions or uncertain interpretations.',
+        example: { textTemplate: '{{artifact:<copy actual hash>:mean}}', artifactRefs: ['<copy actual hash>'], claimClass: 'verified' },
+      },
+    } : {}),
     constraints: constraints[input.language],
   });
   return { version: DATABASE_DEEP_RESEARCH_PROMPT_VERSION, language: input.language, reportType: input.reportType, role: input.role, system, user };

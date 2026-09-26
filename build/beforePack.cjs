@@ -8,6 +8,10 @@ const CLANG_ARCHITECTURES = { arm64: 'arm64', x64: 'x86_64' };
 
 exports.default = async function beforePack(context) {
   const root = path.join(__dirname, '..');
+  if (context.electronPlatformName !== process.platform || Arch[context.arch] !== process.arch) {
+    throw new Error('Managed Zotero runtime must be packaged on its native platform and architecture');
+  }
+  execFileSync(process.execPath, [path.join(root, 'scripts', 'prepare-zotero-mcp.mjs')], { cwd: root, stdio: 'inherit' });
   execFileSync(process.execPath, [path.join(root, 'scripts', 'generate-third-party-licenses.mjs')], {
     cwd: root,
     stdio: 'inherit',

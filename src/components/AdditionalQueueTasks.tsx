@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { QueueActivity } from '../queueActivity';
 import { DICTIONARY_FINISHED, DOCUMENT_LIVE, backgroundFailure, ocrVersion, researchVersion } from '../queueActivity';
 import { deepResearchProgressPercent } from '@shared/deepResearchProgress';
+import { PreparationQueueBar } from './PreparationQueueBar';
 import { progressDetail } from './DeepResearchQueueStrip';
 import { errorText, t, tr, tx } from '../i18n';
 
@@ -55,6 +56,8 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
     return () => { cancelled = true; };
   }, [dictionaryIds]);
   return <>
+    {/* Indexing is one entry, like Idea extraction: one bar, one set of controls. */}
+    <PreparationQueueBar activity={activity} />
     {activity.extraction.slice(0, limit).map((job) => {
       const live = job.status === 'queued' || job.status === 'processing';
       return <Task key={job.id} testId={`library-extraction-${job.id}`} title={`${t('Extracción de texto')} · ${titles[job.itemId] ?? t('Documento')}`}
@@ -66,7 +69,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
       </Task>;
     })}
     {activity.documents?.campaigns.filter((job) => !DOCUMENT_LIVE.has(job.status)).slice(0, limit).map((job) => <Task key={job.campaignId} testId={`document-result-${job.campaignId}`}
-      title={t('Índice documental')} detail={`${t(job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')} · ${tx('{done} de {total} obras', { done: job.completedJobs, total: job.totalJobs })}`}
+      title={t('Ficha documental')} detail={`${t(job.status === 'cancelled' ? 'Cancelado' : job.status === 'failed' ? 'Fallido' : 'Completado')} · ${tx('{done} de {total} obras', { done: job.completedJobs, total: job.totalJobs })}`}
       error={job.status === 'cancelled' ? null : job.error ?? activity.documents?.jobs.find((item) => item.campaignId === job.campaignId && item.error)?.error ?? (job.failedJobs > 0 ? `${job.failedJobs} ${t('fallidos')}` : null)}>
       <Action label={t('Ocultar')} run={() => activity.dismiss(`documents:${job.campaignId}`, `${job.status}:${job.updatedAt}`)} />
     </Task>)}
@@ -108,7 +111,7 @@ export function AdditionalQueueTasks({ activity }: { activity: QueueActivity }) 
       detail={tr(job.message)} error={job.error}>
       {DICTIONARY_FINISHED.has(job.phase) && <Action label={t('Ocultar')} run={() => activity.dismiss(`dictionary:${job.entryId}`, job.phase)} />}
     </Task>)}
-    {[activity.extraction.length, activity.documents?.campaigns.length ?? 0, activity.research.length, activity.ocr.length, activity.background.length, activity.dictionary.length].some((size) => size > limit) && (
+    {[activity.preparation.campaigns.length, ...activity.preparation.campaigns.map(campaign => campaign.jobs.length), activity.extraction.length, activity.documents?.campaigns.length ?? 0, activity.research.length, activity.ocr.length, activity.background.length, activity.dictionary.length].some((size) => size > limit) && (
       <button className="btn btn-ghost m-3" onClick={() => setLimit((current) => current + 50)}>{t('Mostrar más')}</button>
     )}
   </>;

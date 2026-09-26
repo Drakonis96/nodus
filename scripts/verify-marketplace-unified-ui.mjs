@@ -30,6 +30,7 @@ try {
   const css = [
     await readFile(tailwind, 'utf8'),
     await readFile(path.join(root, 'src/components/chatSkills.css'), 'utf8'),
+    await readFile(path.join(root, 'src/components/headerBalloon.css'), 'utf8'),
     await readFile(path.join(root, 'src/components/capabilityPackages.css'), 'utf8'),
     await readFile(path.join(root, 'src/components/chatVisuals.css'), 'utf8'),
   ].join('\n');
@@ -49,13 +50,54 @@ try {
   await modal.waitFor();
   const libraryBox = await modal.boundingBox();
   assert.ok(libraryBox);
-  for (const name of ['Create skill', 'Import .md']) {
-    const box = await modal.getByRole('button', { name, exact: true }).boundingBox();
-    assert.ok(box && box.width <= 180 && box.height <= 40, `${name} expanded into an oversized button`);
-  }
+  // Four tabs that show their title only once chosen.
+  const tabs = modal.getByRole('tab');
+  assert.deepEqual(await tabs.evaluateAll(items => items.map(item => item.getAttribute('aria-label'))), ['My skills', 'Marketplace', 'Repositories', 'Create']);
+  assert.deepEqual(await tabs.evaluateAll(items => items.map(item => item.innerText.trim())), ['My skills', '', '', ''], 'only the selected tab shows its title');
+  const importBox = await modal.getByRole('button', { name: 'Import .md', exact: true }).boundingBox();
+  assert.ok(importBox && importBox.height <= 40, 'Import .md expanded into an oversized button');
+  // One switch per skill: on or off for every chat at once.
+  const alpha = modal.locator('.chat-skill-item').filter({ hasText: 'Alpha Method' });
+  assert.equal(await alpha.getByRole('switch').count(), 1, 'a single switch, not one per surface');
+  assert.equal(await modal.getByText(/^(Assistant|Nodi)$/).count(), 0, 'no surface labels in the library');
+  await alpha.getByRole('switch').click();
+  await page.waitForFunction(() => window.__marketplaceQa.saved.length === 1);
+  assert.deepEqual(await page.evaluate(() => window.__marketplaceQa.saved[0].enabled), { assistant: false, nodi: false }, 'the switch sets every surface together');
   await page.screenshot({ path: path.join(artifacts, '01-my-skills-fixed-size.png') });
 
-  await page.getByRole('button', { name: 'Marketplace', exact: true }).click();
+  // Repositories: managed here, not in the Marketplace.
+  await modal.getByRole('tab', { name: 'Repositories', exact: true }).click();
+  assert.equal((await modal.getByRole('tab', { name: 'Repositories', exact: true }).innerText()).trim(), 'Repositories');
+  await modal.getByTestId('skills-repo-nodusresearch/nodus-research-skill-marketplace').waitFor();
+  assert.equal(await modal.getByTestId('skills-repo-nodusresearch/nodus-research-skill-marketplace').getByRole('button', { name: /^Remove source/ }).count(), 0, 'the official repository cannot be removed');
+  await modal.getByRole('textbox', { name: 'Repository URL', exact: true }).fill('https://github.com/labtools/skills');
+  await modal.getByRole('button', { name: 'Add', exact: true }).click();
+  const communityRow = modal.getByTestId('skills-repo-labtools/skills');
+  await communityRow.waitFor();
+  await communityRow.getByRole('button', { name: 'Edit: labtools/skills', exact: true }).click();
+  await communityRow.getByRole('textbox', { name: 'Repository URL', exact: true }).fill('https://github.com/labtools/skills-v2');
+  await communityRow.getByRole('button', { name: 'Save', exact: true }).click();
+  await modal.getByTestId('skills-repo-labtools/skills-v2').waitFor();
+  assert.equal(await modal.getByTestId('skills-repo-labtools/skills').count(), 0, 'editing replaces the address');
+  await modal.getByTestId('skills-repo-labtools/skills-v2').getByRole('button', { name: 'Remove source: labtools/skills-v2', exact: true }).click();
+  await modal.getByRole('button', { name: 'Remove', exact: true }).click();
+  await modal.getByTestId('skills-repo-labtools/skills-v2').waitFor({ state: 'detached' });
+  await page.screenshot({ path: path.join(artifacts, '01b-repositories-tab.png') });
+
+  // Create: no choice between assistant and Nodi; a new skill is on everywhere.
+  await modal.getByRole('tab', { name: 'Create', exact: true }).click();
+  const editor = modal.getByTestId('skills-hub-editor');
+  await editor.waitFor();
+  assert.equal(await editor.getByRole('checkbox', { name: /^(Assistant|Nodi)$/ }).count(), 0, 'no surface choice when creating');
+  await editor.getByLabel('Skill name', { exact: true }).fill('Field Notes');
+  await editor.getByLabel('When to use it', { exact: true }).fill('Use when the user shares field observations.');
+  await editor.getByLabel('Instructions', { exact: true }).fill('Turn observations into dated notes.');
+  await editor.getByRole('button', { name: 'Create skill', exact: true }).click();
+  await page.waitForFunction(() => window.__marketplaceQa.saved.length === 2);
+  assert.deepEqual(await page.evaluate(() => window.__marketplaceQa.saved[1].enabled), { assistant: true, nodi: true });
+  assert.equal(await modal.getByRole('tab', { name: 'My skills', exact: true }).getAttribute('aria-selected'), 'true', 'saving returns to the library');
+
+  await modal.getByRole('tab', { name: 'Marketplace', exact: true }).click();
   await page.getByRole('button', { name: 'Show details of Anatomy Atlas', exact: true }).waitFor();
   const marketplaceBox = await modal.boundingBox();
   assert.ok(marketplaceBox);
@@ -106,8 +148,19 @@ try {
   await packagePermission.waitFor({ state: 'detached' });
   assert.equal(await page.evaluate(() => window.__marketplaceQa.capabilityApprovals), 1, 'the permission modal did not approve the signed package');
 
+  assert.equal(await modal.locator('.skill-marketplace-sources').count(), 0, 'repository management left the Marketplace');
   await modal.getByRole('button', { name: 'Close', exact: true }).click();
   await modal.waitFor({ state: 'detached' });
+
+  // The chat's Skills button opens the same four tabs in the shared header balloon.
+  await page.getByTestId('chat-skills-assistant').click();
+  const balloon = page.getByTestId('chat-skills-panel-assistant');
+  await balloon.waitFor();
+  assert.equal(await balloon.locator('.header-balloon-title').innerText(), 'Skills');
+  assert.equal(await balloon.getByRole('tab').count(), 4);
+  await page.screenshot({ path: path.join(artifacts, '05-skills-header-balloon.png') });
+  await page.keyboard.press('Escape');
+  await balloon.waitFor({ state: 'detached' });
   const demo = page.getByTestId('capability-demo');
   await demo.waitFor();
   assert.deepEqual(await demo.locator('.chat-visual-pending b').allTextContents(), ['Chemistry', 'Anatomy']);

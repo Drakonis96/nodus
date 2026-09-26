@@ -833,6 +833,12 @@ export class LibraryCatalog {
     return rows.map((row) => row.citation_key);
   }
 
+  /** Live items holding an attachment with exactly these bytes. */
+  itemIdsForAttachmentHash(sha256: string): string[] {
+    return (this.handle.prepare(`SELECT DISTINCT i.id FROM library_attachments a JOIN library_items i ON i.id=a.item_id
+      WHERE a.sha256=? AND i.deleted_at IS NULL ORDER BY i.id`).all(sha256) as Array<{ id: string }>).map((row) => row.id);
+  }
+
   attachmentHashes(): string[] {
     return (this.handle.prepare('SELECT DISTINCT sha256 FROM library_attachments').all() as Array<{ sha256: string }>).map((row) => row.sha256);
   }
@@ -1098,6 +1104,16 @@ export class LibraryCatalog {
     if (query.extractionStatus) { where.push('i.extraction_status=@extractionStatus'); params.extractionStatus = query.extractionStatus; }
     if (Number.isInteger(query.yearFrom)) { where.push('i.year>=@yearFrom'); params.yearFrom = query.yearFrom; }
     if (Number.isInteger(query.yearTo)) { where.push('i.year<=@yearTo'); params.yearTo = query.yearTo; }
+    // Multi-value facets: any listed value matches. Only strings reach SQL, as one JSON array.
+    const listed = (values: unknown): string | null => Array.isArray(values) && values.length
+      ? JSON.stringify(values.filter((value): value is string => typeof value === 'string').slice(0, 500)) : null;
+    const sources = listed(query.sources), itemTypes = listed(query.itemTypes), extractionStatuses = listed(query.extractionStatuses);
+    const tags = listed(query.tags), vaultIds = listed(query.vaultIds);
+    if (sources) { where.push('i.source IN (SELECT value FROM json_each(@sources))'); params.sources = sources; }
+    if (itemTypes) { where.push('i.item_type IN (SELECT value FROM json_each(@itemTypes))'); params.itemTypes = itemTypes; }
+    if (extractionStatuses) { where.push('i.extraction_status IN (SELECT value FROM json_each(@extractionStatuses))'); params.extractionStatuses = extractionStatuses; }
+    if (tags) { where.push('EXISTS (SELECT 1 FROM json_each(i.tags_json) query_tags WHERE LOWER(CAST(query_tags.value AS TEXT)) IN (SELECT LOWER(value) FROM json_each(@tags)))'); params.tags = tags; }
+    if (vaultIds) { where.push('EXISTS (SELECT 1 FROM library_vault_links query_vaults WHERE query_vaults.item_id=i.id AND query_vaults.vault_id IN (SELECT value FROM json_each(@vaultIds)))'); params.vaultIds = vaultIds; }
     if (query.hasAttachments === true) where.push('i.attachment_count>0');
     if (query.hasAttachments === false) where.push('i.attachment_count=0');
     if (query.collectionId) {

@@ -70,6 +70,7 @@ import {
   listGlobalLibraryVaults,
   listGlobalLibraryVaultLinks,
   linkGlobalLibraryItemsToVault,
+  importGlobalLibraryFilesIntoVault,
   startGlobalLibraryMetadataBatch,
   applyGlobalLibraryMetadataBatch,
   cancelGlobalLibraryMetadataBatch,
@@ -178,6 +179,12 @@ export function registerLibraryIpc({ h }: IpcContext): void {
       throw new Error('La lista de archivos arrastrados no es válida.');
     }
     return importGlobalLibraryFiles(filePaths, collectionId);
+  });
+  h('library:importDroppedFilesToVault', async (_event, filePaths, vaultId) => {
+    if (!Array.isArray(filePaths) || filePaths.length > 500 || filePaths.some((entry) => typeof entry !== 'string') || typeof vaultId !== 'string') {
+      throw new Error('La lista de archivos arrastrados no es válida.');
+    }
+    return importGlobalLibraryFilesIntoVault(filePaths, vaultId);
   });
   h('library:importBibliography', async (event, collectionId) => {
     const owner = BrowserWindow.fromWebContents(event.sender) ?? undefined;

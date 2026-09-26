@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { RESEARCH_PROMPT_NAME_LIMIT, RESEARCH_PROMPT_TEXT_LIMIT, type ResearchSystemPrompt } from '@shared/researchSystemPrompts';
+import { HeaderBalloon } from './HeaderBalloon';
 import { Icon } from './ui';
 import { t } from '../i18n';
 
@@ -9,92 +10,122 @@ export function ResearchSystemPromptControl({ prompts, selectedId, disabled, onS
   onSelect: (id: string | null) => Promise<void>; refresh: () => Promise<unknown>;
 }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<ResearchSystemPrompt | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<ResearchSystemPrompt | null>(null);
+  const [query, setQuery] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const trigger = useRef<HTMLButtonElement>(null);
   const selected = prompts.find(prompt => prompt.id === selectedId);
+  useEffect(() => { if (open) void refresh().catch(e => setError(String(e))); }, [open]);
+  const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().trim();
+  const listed = [...prompts].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
+    .filter(prompt => fold(`${prompt.name} ${prompt.instructions}`).includes(fold(query)));
+  // One prompt is active per conversation: activating one is the whole choice.
+  const activate = async (id: string | null) => {
+    setBusy(true); setError('');
+    try { await onSelect(id); } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  };
+  const accent = () => trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent').trim() || 'var(--a-500)' : 'var(--a-500)';
+  const row = (prompt: ResearchSystemPrompt | null) => {
+    const id = prompt?.id ?? null;
+    const active = selectedId === id;
+    return <div key={id ?? 'default'} role="listitem" className={`header-balloon-row research-prompt-row ${active ? 'is-active' : ''}`} data-testid={`research-prompt-${id ?? 'default'}`}>
+      <span className="header-balloon-row-icon"><Icon name={prompt ? 'brain' : 'layers'} size={15} /></span>
+      <span className="header-balloon-row-text"><strong>{prompt?.name ?? 'Default'}</strong><small>{prompt?.instructions ?? t('Prompt original de Nodus')}</small></span>
+      <button type="button" className={`header-balloon-chip ${active ? 'is-on' : ''}`} aria-pressed={active} disabled={busy || active}
+        aria-label={`${active ? t('Activo') : t('Activar')}: ${prompt?.name ?? 'Default'}`} onClick={() => void activate(id)}>
+        {active && <Icon name="check" size={13} />}{active ? t('Activo') : t('Activar')}
+      </button>
+      {prompt && <button type="button" className="header-balloon-icon-button" disabled={busy} aria-label={`${t('Editar')}: ${prompt.name}`} title={t('Editar')} onClick={() => setEditing(prompt)}><Icon name="edit" size={15} /></button>}
+      {/* Deleting stays one click away even for the active prompt; its conversations return to Default. */}
+      {prompt && <button type="button" className="header-balloon-icon-button is-danger" disabled={busy} aria-label={`${t('Eliminar prompt')}: ${prompt.name}`} title={t('Eliminar prompt')} onClick={() => setDeleting(prompt)}><Icon name="trash" size={15} /></button>}
+    </div>;
+  };
   return <>
     <button ref={trigger} type="button" className={`btn btn-ghost border border-neutral-700 gap-1.5 text-xs research-system-prompt-trigger ${selected ? 'research-accent-soft' : ''}`}
       data-testid="research-system-prompt-trigger" disabled={disabled} aria-haspopup="dialog" aria-expanded={open}
       aria-label={`${t('System prompt')}: ${selected?.name ?? 'Default'}`}
-      title={`${t('System prompt')}: ${selected?.name ?? 'Default'}`} onClick={() => setOpen(true)}>
-      <Icon name="edit" size={14} /><span className="research-system-prompt-name">{selected?.name ?? 'Default'}</span><Icon name="chevronDown" size={13} />
+      title={`${t('System prompt')}: ${selected?.name ?? 'Default'}`} onClick={() => setOpen(current => !current)}>
+      <Icon name="brain" size={14} /><span className="research-system-prompt-name">{t('System prompt')}</span><Icon name="chevronDown" size={13} />
     </button>
-    {open && <PromptDialog prompts={prompts} selectedId={selectedId} refresh={refresh} onSelect={onSelect}
-      accent={trigger.current ? getComputedStyle(trigger.current).getPropertyValue('--vault-accent').trim() || 'var(--a-500)' : 'var(--a-500)'}
-      onClose={() => { setOpen(false); requestAnimationFrame(() => trigger.current?.focus()); }} />}
+    <HeaderBalloon open={open} anchor={trigger} onClose={() => { if (!editing && !deleting) setOpen(false); }} width={440}
+      icon={<Icon name="brain" size={18} />} title={t('System prompts')} meta={selected?.name ?? 'Default'} testId="research-system-prompt-panel"
+      footer={<button type="button" className="btn btn-ghost research-prompt-new-button" disabled={busy} onClick={() => setEditing('new')}><Icon name="plus" size={14} />{t('Nuevo prompt')}</button>}>
+      <p className="header-balloon-intro">{t('Elige cómo quieres que te acompañe el asistente.')}</p>
+      {prompts.length > 5 && <label className="header-balloon-search"><Icon name="search" size={14} /><input aria-label={t('Buscar prompts')} placeholder={t('Buscar prompts')} value={query} onChange={e => setQuery(e.target.value)} /></label>}
+      <div role="list" aria-label={t('Prompts guardados')}>
+        {!query && row(null)}
+        {listed.map(prompt => row(prompt))}
+        {!listed.length && query && <p className="research-prompt-empty">{t('No hay prompts que coincidan.')}</p>}
+      </div>
+      {!prompts.length && <p className="research-prompt-empty">{t('Crea un prompt para personalizar tus conversaciones.')}</p>}
+      {error && <p className="research-prompt-error" role="alert">{error}</p>}
+    </HeaderBalloon>
+    {deleting && <DeletePromptConfirmation name={deleting.name} busy={busy} error={error} accent={accent()}
+      onCancel={() => setDeleting(null)}
+      onConfirm={async () => {
+        setBusy(true); setError('');
+        try {
+          await window.nodus.deleteResearchSystemPrompt(deleting.id);
+          if (selectedId === deleting.id) await onSelect(null);
+          await refresh();
+          setDeleting(null);
+        } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+      }} />}
+    {editing && <PromptEditor prompt={editing === 'new' ? null : editing} accent={accent()} refresh={refresh}
+      onClose={() => setEditing(null)}
+      onDeleted={async id => { if (selectedId === id) await onSelect(null); }} />}
   </>;
 }
 
-function PromptDialog({ prompts, selectedId, accent, onClose, onSelect, refresh }: {
-  prompts: ResearchSystemPrompt[]; selectedId: string | null; accent: string; onClose: () => void;
-  onSelect: (id: string | null) => Promise<void>; refresh: () => Promise<unknown>;
+/** One prompt's name and instructions, in a modal whose Cancel and Save stay in view. */
+function PromptEditor({ prompt, accent, refresh, onClose, onDeleted }: {
+  prompt: ResearchSystemPrompt | null; accent: string; refresh: () => Promise<unknown>; onClose: () => void; onDeleted: (id: string) => Promise<void>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleInput = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState('');
-  const [viewId, setViewId] = useState<string | null>(selectedId);
-  const [name, setName] = useState(prompts.find(p => p.id === selectedId)?.name ?? '');
-  const [instructions, setInstructions] = useState(prompts.find(p => p.id === selectedId)?.instructions ?? '');
+  const [name, setName] = useState(prompt?.name ?? '');
+  const [instructions, setInstructions] = useState(prompt?.instructions ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const original = prompts.find(p => p.id === viewId);
-  const creating = viewId === 'new';
-  const isDefault = viewId === null;
-  const dirty = creating || name !== original?.name || instructions !== original?.instructions;
-  const matching = [...prompts].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }))
-    .filter(p => `${p.name} ${p.instructions}`.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().includes(query.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase().trim()));
-  useEffect(() => { dialog.current?.showModal(); void refresh().catch(e => setError(String(e))); }, []);
-  useLayoutEffect(() => { if (viewId === 'new') titleInput.current?.focus(); }, [viewId]);
-  const show = (prompt?: ResearchSystemPrompt) => { setViewId(prompt?.id ?? null); setName(prompt?.name ?? ''); setInstructions(prompt?.instructions ?? ''); setError(''); setConfirmDelete(false); };
-  const create = () => { setViewId('new'); setName(''); setInstructions(''); setError(''); setConfirmDelete(false); };
-  const usePrompt = async () => {
+  useLayoutEffect(() => {
+    const element = dialog.current;
+    element?.showModal();
+    titleInput.current?.focus();
+    return () => element?.close();
+  }, []);
+  const save = async () => {
     setBusy(true); setError('');
-    try {
-      let id = viewId;
-      if (!isDefault && dirty) {
-        const saved = await window.nodus.saveResearchSystemPrompt({ id: creating ? undefined : viewId!, name, instructions });
-        id = saved.id;
-        await refresh();
-      }
-      await onSelect(id); onClose();
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+    try { await window.nodus.saveResearchSystemPrompt({ id: prompt?.id, name, instructions }); await refresh(); onClose(); }
+    catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
   };
-  const remove = async () => { if (!original) return; setBusy(true); setError(''); try { await window.nodus.deleteResearchSystemPrompt(original.id); await refresh(); show(); } catch (e) { setError(String(e)); } finally { setBusy(false); } };
-  return createPortal(<dialog ref={dialog} className="research-system-prompt-dialog" aria-labelledby="research-system-prompt-title"
-    style={{ '--vault-accent': accent } as CSSProperties} onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <header className="research-prompt-header">
-      <div><div className="research-prompt-eyebrow">Research chat</div><h2 id="research-system-prompt-title">{t('System prompts')}</h2><p>{t('Elige cómo quieres que te acompañe el asistente.')}</p></div>
-      <button className="btn btn-ghost" title={t('Cerrar')} disabled={busy} onClick={onClose}><Icon name="x" size={18} /></button>
-    </header>
-    <div className="research-prompt-layout">
-      <aside className="research-prompt-library">
-        <label className="research-prompt-search"><Icon name="search" size={15} /><input aria-label={t('Buscar prompts')} placeholder={t('Buscar prompts')} value={query} onChange={e => setQuery(e.target.value)} /></label>
-        <button type="button" className="research-prompt-new" disabled={busy} onClick={create}><Icon name="plus" size={14} />{t('Nuevo prompt')}</button>
-        <div className="research-prompt-list" role="list" aria-label={t('Prompts guardados')}>
-          <div role="listitem"><button type="button" aria-pressed={isDefault} className={`research-prompt-item ${isDefault ? 'is-viewed' : ''}`} disabled={busy} onClick={() => show()}>
-            <Icon name="layers" size={16} /><span><strong>Default</strong><small>{t('Prompt original de Nodus')}</small></span>{selectedId === null && <Icon name="check" size={15} />}
-          </button></div>
-          <div className="research-prompt-list-label">{t('Tus prompts')} <span>{prompts.length}</span></div>
-          {matching.map(prompt => <div key={prompt.id} role="listitem"><button type="button" aria-pressed={viewId === prompt.id} className={`research-prompt-item ${viewId === prompt.id ? 'is-viewed' : ''}`} disabled={busy} onClick={() => show(prompt)}>
-            <Icon name="edit" size={15} /><span><strong>{prompt.name}</strong><small>{prompt.instructions}</small></span>{selectedId === prompt.id && <Icon name="check" size={15} />}
-          </button></div>)}
-          {!matching.length && <p className="research-prompt-empty">{t(query ? 'No hay prompts que coincidan.' : 'Crea un prompt para personalizar tus conversaciones.')}</p>}
-        </div>
-      </aside>
-      <section className="research-prompt-editor">
-        <div className="research-prompt-contract"><Icon name="check" size={16} /><div><strong>{t('Las capacidades de Nodus siguen activas')}</strong><p>{t('Contexto, ideas, citas y skills conservan sus reglas. Tus instrucciones personalizan el enfoque, no sustituyen estas capacidades.')}</p></div></div>
-        {isDefault ? <div className="research-prompt-default"><span><Icon name="layers" size={28} /></span><h3>Default</h3><p>{t('Usa el system prompt original de Nodus, sin instrucciones adicionales.')}</p><small>{t('El prompt base no se modifica y siempre puedes volver a él.')}</small></div> : <>
-          <label className="research-prompt-field">{t('Nombre del prompt')}<input ref={titleInput} className="input" maxLength={RESEARCH_PROMPT_NAME_LIMIT} disabled={busy} value={name} onChange={e => setName(e.target.value)} placeholder={t('Por ejemplo: Revisor crítico')} /></label>
-          <label className="research-prompt-field research-prompt-instructions">{t('Instrucciones personalizadas')}<textarea aria-label={t('Instrucciones personalizadas')} maxLength={RESEARCH_PROMPT_TEXT_LIMIT} disabled={busy} value={instructions} onChange={e => setInstructions(e.target.value)} placeholder={t('Define el rol, el tono y la estructura que prefieres para las respuestas.')} /><small>{instructions.length.toLocaleString()} / {RESEARCH_PROMPT_TEXT_LIMIT.toLocaleString()}</small></label>
-        </>}
-        {error && <p className="research-prompt-error" role="alert">{error}</p>}
-        <footer className="research-prompt-footer">{original && <button className="btn btn-ghost" title={t('Eliminar prompt')} disabled={busy} onClick={() => setConfirmDelete(true)}><Icon name="trash" size={14} /></button>}<span />
-          <button className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
-          <button className="btn btn-primary" disabled={busy || (!isDefault && (!name.trim() || !instructions.trim()))} onClick={() => void usePrompt()}>{busy ? t('Guardando…') : isDefault ? t('Usar Default') : dirty ? t('Guardar y usar') : t('Usar prompt')}</button>
-        </footer>
-      </section>
+  const remove = async () => {
+    if (!prompt) return;
+    setBusy(true); setError('');
+    try { await window.nodus.deleteResearchSystemPrompt(prompt.id); await onDeleted(prompt.id); await refresh(); onClose(); }
+    catch (e) { setError(String(e)); setBusy(false); }
+  };
+  const title = prompt ? t('Editar prompt') : t('Nuevo prompt');
+  return createPortal(<dialog ref={dialog} data-balloon-layer className="research-system-prompt-dialog research-prompt-edit-modal" aria-label={title}
+    style={{ '--vault-accent': accent } as CSSProperties}
+    onKeyDown={event => { if (event.key === 'Escape') event.stopPropagation(); }}
+    onCancel={event => { event.preventDefault(); if (!busy && !confirmDelete) onClose(); }}>
+    <header className="research-prompt-edit-head"><Icon name="brain" size={18} /><h2>{title}</h2></header>
+    <div className="research-prompt-edit-body">
+      <div className="research-prompt-contract"><Icon name="check" size={16} /><div><strong>{t('Las capacidades de Nodus siguen activas')}</strong><p>{t('Contexto, ideas, citas y skills conservan sus reglas. Tus instrucciones personalizan el enfoque, no sustituyen estas capacidades.')}</p></div></div>
+      <label className="research-prompt-field">{t('Nombre del prompt')}<input ref={titleInput} className="input" maxLength={RESEARCH_PROMPT_NAME_LIMIT} disabled={busy} value={name} onChange={e => setName(e.target.value)} placeholder={t('Por ejemplo: Revisor crítico')} /></label>
+      <label className="research-prompt-field research-prompt-instructions">{t('Instrucciones personalizadas')}<textarea aria-label={t('Instrucciones personalizadas')} maxLength={RESEARCH_PROMPT_TEXT_LIMIT} disabled={busy} value={instructions} onChange={e => setInstructions(e.target.value)} placeholder={t('Define el rol, el tono y la estructura que prefieres para las respuestas.')} /><small>{instructions.length.toLocaleString()} / {RESEARCH_PROMPT_TEXT_LIMIT.toLocaleString()}</small></label>
+      {error && <p className="research-prompt-error" role="alert">{error}</p>}
     </div>
-    {confirmDelete && original && <DeletePromptConfirmation name={original.name} busy={busy} error={error} accent={accent}
+    <footer className="research-prompt-footer research-prompt-edit-foot">
+      {prompt && <button type="button" className="btn btn-ghost" title={t('Eliminar prompt')} aria-label={t('Eliminar prompt')} disabled={busy} onClick={() => setConfirmDelete(true)}><Icon name="trash" size={14} /></button>}
+      <span />
+      <button type="button" className="btn btn-ghost" disabled={busy} onClick={onClose}>{t('Cancelar')}</button>
+      <button type="button" className="btn btn-primary" disabled={busy || !name.trim() || !instructions.trim()} onClick={() => void save()}>{busy ? t('Guardando…') : t('Guardar')}</button>
+    </footer>
+    {confirmDelete && prompt && <DeletePromptConfirmation name={prompt.name} busy={busy} error={error} accent={accent}
       onCancel={() => setConfirmDelete(false)} onConfirm={remove} />}
   </dialog>, document.body);
 }
@@ -112,7 +143,7 @@ function DeletePromptConfirmation({ name, busy, error, accent, onCancel, onConfi
     cancelButton.current?.focus();
     return () => element?.close();
   }, []);
-  return createPortal(<dialog ref={dialog} role="alertdialog" aria-modal="true"
+  return createPortal(<dialog ref={dialog} data-balloon-layer role="alertdialog" aria-modal="true"
     aria-labelledby="research-prompt-delete-title" aria-describedby="research-prompt-delete-description"
     className="research-system-prompt-dialog research-prompt-delete-modal" style={{ '--vault-accent': accent } as CSSProperties}
     onKeyDown={event => { if (event.key === 'Escape') event.stopPropagation(); }}

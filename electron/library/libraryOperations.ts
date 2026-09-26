@@ -545,7 +545,12 @@ export class LibraryOperations {
         report.skipped += 1; report.warnings.push(`Formato no compatible: ${path.basename(source)}`); continue;
       }
       const hash = sha256File(source);
-      if (knownHashes.has(hash)) { report.skipped += 1; report.warnings.push(`Ya estaba importado: ${path.basename(source)}`); continue; }
+      if (knownHashes.has(hash)) {
+        report.skipped += 1; report.warnings.push(`Ya estaba importado: ${path.basename(source)}`);
+        const existing = this.catalog.itemIdsForAttachmentHash(hash)[0];
+        if (existing) report.existingItemIds = [...new Set([...(report.existingItemIds ?? []), existing])];
+        continue;
+      }
       const uuid = randomUUID();
       const id = `nodus:${uuid}`;
       const storageId = id;

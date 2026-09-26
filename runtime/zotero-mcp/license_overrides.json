@@ -1,0 +1,16 @@
+{
+  "py-key-value-aio": {
+    "version": "0.3.0",
+    "file": "py-key-value-0.3.0-LICENSE",
+    "sha256": "d09dfd49388d9bff8ecf258700abebbd77d25da2903cd21f362e074f242a1601",
+    "source": "https://github.com/strawgate/py-key-value/blob/6736113ce6c80ef736368680e2c3dafc96a09f9b/LICENSE",
+    "reason": "The published wheel omits the Apache-2.0 text; copy the matching upstream release license."
+  },
+  "py-key-value-shared": {
+    "version": "0.3.0",
+    "file": "py-key-value-0.3.0-LICENSE",
+    "sha256": "d09dfd49388d9bff8ecf258700abebbd77d25da2903cd21f362e074f242a1601",
+    "source": "https://github.com/strawgate/py-key-value/blob/6736113ce6c80ef736368680e2c3dafc96a09f9b/LICENSE",
+    "reason": "The published wheel omits the Apache-2.0 text; copy the matching upstream release license."
+  }
+}

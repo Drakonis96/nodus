@@ -13,7 +13,8 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 if (!requireElectronRuntime(path.join(repoRoot, 'scripts/test-notion-zip-import.mjs'), '--electron-notion-import-test')) process.exit(0);
 
-const qaRoot = process.env.NODUS_QA_ROOT ? path.resolve(process.env.NODUS_QA_ROOT) : null;
+const allowedRoot = process.env.NODUS_QA_ROOT ?? process.env.NODUS_ISOLATED_ROOT;
+const qaRoot = allowedRoot ? path.resolve(allowedRoot) : null;
 const requested = process.env.NODUS_USERDATA ? path.resolve(process.env.NODUS_USERDATA) : null;
 if (requested && (!qaRoot || (requested !== qaRoot && !requested.startsWith(`${qaRoot}${path.sep}`)))) {
   throw new Error('NODUS_USERDATA for the Notion import suite must remain under NODUS_QA_ROOT.');

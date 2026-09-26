@@ -10,7 +10,7 @@ import 'katex/dist/katex.min.css';
 import type { CitationPreview } from '@shared/types';
 import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { t } from '../i18n';
-import { VERIFY_DEBOUNCE_MS, planCitationVerification } from '../citationVerification';
+import { VERIFY_DEBOUNCE_MS, decodeCitationId, planCitationVerification } from '../citationVerification';
 import { parsePrimarySourceExcerptDeepLink } from '@shared/primarySourceDeepLink';
 import { rehypeGroupParenthesizedCitations } from '../markdownCitationGroups';
 
@@ -184,7 +184,7 @@ function MarkdownComponent({
           p: ({ node, children, ...props }) => {
             const first = (node as any)?.children?.[0];
             const href = first?.tagName === 'a' ? String(first.properties?.href ?? '') : '';
-            const id = href.startsWith('#nodus-reference-') ? decodeURIComponent(href.slice(1)) : undefined;
+            const id = href.startsWith('#nodus-reference-') ? decodeCitationId(href.slice(1)) ?? undefined : undefined;
             if (chatVisuals && (node as any)?.children?.some((child: any) => child.tagName === 'img')) return <div {...props} id={id}>{children}</div>;
             return <p {...props} id={id}>{children}</p>;
           },
@@ -197,9 +197,11 @@ function MarkdownComponent({
             }
             const readerCitation = href?.match(/^nodus:\/\/reader\/([^/?]+)(?:\/(section|page)\/([^?]+))?$/);
             if (readerCitation && onReaderCitation) {
-              const documentId = decodeURIComponent(readerCitation[1]);
+              const documentId = decodeCitationId(readerCitation[1]);
               const target = readerCitation[2];
-              const value = readerCitation[3] ? decodeURIComponent(readerCitation[3]) : undefined;
+              const value = readerCitation[3] ? decodeCitationId(readerCitation[3]) : undefined;
+              // Still streaming inside a percent escape: plain text until the link is whole.
+              if (documentId === null || value === null) return <span>{children}</span>;
               return <button
                 className="citation-link"
                 data-citation-kind="reader"
@@ -237,7 +239,8 @@ function MarkdownComponent({
             const worldEntry = href?.match(/^nodus:\/\/world\/([a-z]+)\/(.+)$/);
             if (worldEntry && onWorldEntry) {
               const kind = worldEntry[1];
-              const id = decodeURIComponent(worldEntry[2]);
+              const id = decodeCitationId(worldEntry[2]);
+              if (id === null) return <span>{children}</span>;
               return kind === 'new' ? (
                 <button
                   className="border-b border-dashed border-amber-700/80 text-amber-400 hover:text-amber-300"
@@ -400,10 +403,12 @@ function CitationLink({
         type="button"
         className="citation-link"
         data-citation-kind={citation.kind}
+        data-web-source={citation.kind === 'passage' && citation.id.startsWith('web:') ? 'true' : undefined}
         data-verified={unverified ? 'false' : undefined}
         title={
           unverified
             ? t('Fuente no encontrada: esta cita no se pudo verificar en el corpus.')
+            : citation.kind === 'passage' && citation.id.startsWith('web:') ? t('Abrir la fuente web en una pestaña nueva del navegador de Nodus')
             : `${t('Abrir fuente:')} ${citationLabel(citation.kind)}`
         }
         onClick={(e) => {
@@ -428,9 +433,10 @@ function CitationLink({
             <span className="citation-card-loading">{t('Cargando…')}</span>
           ) : (
             <>
-              <span className="citation-card-kind">{citationLabel(preview.kind)}</span>
+              <span className="citation-card-kind">{preview.url ? t('Fuente web') : citationLabel(preview.kind)}</span>
               <span className="citation-card-title">{preview.title}</span>
               {preview.subtitle && <span className="citation-card-sub">{preview.subtitle}</span>}
+              {preview.url && <span className="citation-card-url" data-testid="citation-card-url">{preview.url}</span>}
               {preview.snippet && <span className="citation-card-snippet">{preview.snippet}</span>}
             </>
           )}
@@ -442,16 +448,21 @@ function CitationLink({
 
 function parseCitation(href: string | undefined): MarkdownCitation | null {
   if (!href) return null;
+  // Mid-stream a link can end inside a percent escape; it becomes a citation once complete.
+  const citation = (kind: MarkdownCitation['kind'], encoded: string): MarkdownCitation | null => {
+    const id = decodeCitationId(encoded);
+    return id === null ? null : { kind, id };
+  };
   const idea = href.match(/^nodus:\/\/idea\/(.+)$/);
-  if (idea) return { kind: 'idea', id: decodeURIComponent(idea[1]) };
+  if (idea) return citation('idea', idea[1]);
   const work = href.match(/^nodus:\/\/work\/(.+)$/);
-  if (work) return { kind: 'work', id: decodeURIComponent(work[1]) };
+  if (work) return citation('work', work[1]);
   const gap = href.match(/^nodus:\/\/gap\/(.+)$/);
-  if (gap) return { kind: 'gap', id: decodeURIComponent(gap[1]) };
+  if (gap) return citation('gap', gap[1]);
   const contradiction = href.match(/^nodus:\/\/contradiction\/(.+)$/);
-  if (contradiction) return { kind: 'contradiction', id: decodeURIComponent(contradiction[1]) };
+  if (contradiction) return citation('contradiction', contradiction[1]);
   const passage = href.match(/^nodus:\/\/passage\/(.+)$/);
-  if (passage) return { kind: 'passage', id: decodeURIComponent(passage[1]) };
+  if (passage) return citation('passage', passage[1]);
   return null;
 }
 

@@ -9,12 +9,46 @@ import type { AcademicApi } from '@shared/api/academic';
 // button can abort it without the renderer having to juggle request ids. One
 // stream at a time per surface (the composer is disabled while sending).
 let activeChatRequestId: string | null = null;
+/** How long a finished research turn still accepts its late activity events. */
+const ACTIVITY_GRACE_MS = 2000;
 let activeLibraryReaderChatRequestId: string | null = null;
 let activeStudyImproveRequestId: string | null = null;
 let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
 
 export const academicApi: AcademicApi = {
+  getResearchCorpusSources: () => ipcRenderer.invoke('research:corpus:sources'),
+  setResearchZoteroAutomatic: enabled => ipcRenderer.invoke('research:zotero:automatic', enabled),
+  getZoteroMcpStatus: notebookId => ipcRenderer.invoke('research:zotero:status', notebookId),
+  connectResearchZotero: input => ipcRenderer.invoke('research:zotero:connect', input),
+  disconnectResearchZotero: notebookId => ipcRenderer.invoke('research:zotero:disconnect', notebookId),
+  readResearchZotero: input => ipcRenderer.invoke('research:zotero:read', input),
+  listResearchNotebooks: () => ipcRenderer.invoke('research:notebooks:list'),
+  saveResearchNotebook: input => ipcRenderer.invoke('research:notebooks:save', input),
+  deleteResearchNotebook: id => ipcRenderer.invoke('research:notebooks:delete', id),
+  resolveResearchNotebook: id => ipcRenderer.invoke('research:notebooks:resolve', id),
+  updateResearchNotebookAppearance: (id, patch) => ipcRenderer.invoke('research:notebooks:appearance', id, patch),
+  getResearchNotebookPreparation: id => ipcRenderer.invoke('research:notebooks:preparation', id),
+  readResearchDocument: input => ipcRenderer.invoke('research:corpus:read', input),
+  searchResearchNotebook: (id, query) => ipcRenderer.invoke('research:notebooks:search', id, query),
+  getResearchPreparationPolicy: () => ipcRenderer.invoke('research:preparation:policy'),
+  setResearchPreparationPolicy: input => ipcRenderer.invoke('research:preparation:policy:set', input),
+  previewResearchPreparation: input => ipcRenderer.invoke('research:preparation:preview', input),
+  startResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:start', input),
+  getResearchPreparationProgress: () => ipcRenderer.invoke('research:preparation:progress'),
+  controlResearchPreparationCampaign: input => ipcRenderer.invoke('research:preparation:campaign:control', input),
+  controlAllResearchPreparation: action => ipcRenderer.invoke('research:preparation:control', action),
+  onResearchPreparationProgress: callback => {
+    const listener = (_event: unknown, value: import('@shared/researchCorpus').ResearchPreparationProgress) => callback(value);
+    ipcRenderer.on('research:preparation:progress', listener);
+    return () => ipcRenderer.removeListener('research:preparation:progress', listener);
+  },
+  getResearchPreparationInventory: () => ipcRenderer.invoke('research:preparation:inventory'),
+  prepareResearchDocuments: ids => ipcRenderer.invoke('research:preparation:start', ids),
+  indexResearchWorks: input => ipcRenderer.invoke('research:preparation:index', input),
+  cancelResearchDocuments: ids => ipcRenderer.invoke('research:preparation:cancel', ids),
+  setResearchPreparationEnabled: enabled => ipcRenderer.invoke('research:preparation:enabled', enabled),
+  setResearchPreparationPaused: paused => ipcRenderer.invoke('research:preparation:paused', paused),
   listDictionaryEntries: (request) => ipcRenderer.invoke('dictionary:list', request),
   listDictionaryFacets: () => ipcRenderer.invoke('dictionary:facets'),
   getDictionaryEntry: (id) => ipcRenderer.invoke('dictionary:get', id),
@@ -561,6 +595,10 @@ export const academicApi: AcademicApi = {
   researchChat: (request) => ipcRenderer.invoke('research:chat', request),
   researchChatStream: async (request, handlers) => {
     const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onActivity = (_e: unknown, id: string, activity: import('@shared/researchActivity').ResearchActivity) => {
+      if (id === requestId) handlers.onActivity?.(activity);
+    };
+    ipcRenderer.on('research:chatStream:activity', onActivity);
     const onDelta = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onDelta(delta);
     };
@@ -580,6 +618,9 @@ export const academicApi: AcademicApi = {
       return response;
     } finally {
       if (activeChatRequestId === requestId) activeChatRequestId = null;
+      // Activity events and the invoke reply travel on different IPC pipes, so the reply can
+      // overtake the last events of the turn. Keep listening briefly for those stragglers.
+      setTimeout(() => ipcRenderer.removeListener('research:chatStream:activity', onActivity), ACTIVITY_GRACE_MS);
       ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
@@ -682,6 +723,36 @@ export const academicApi: AcademicApi = {
   renameConversation: (id, title) => ipcRenderer.invoke('chat:rename', id, title).then(() => undefined),
   archiveConversation: (id, archived) => ipcRenderer.invoke('chat:archive', id, archived).then(() => undefined),
   deleteConversation: (id) => ipcRenderer.invoke('chat:delete', id).then(() => undefined),
+  listChatProjects: () => ipcRenderer.invoke('chat:projects:list'),
+  createChatProject: (input) => ipcRenderer.invoke('chat:projects:create', input),
+  updateChatProject: (id, patch) => ipcRenderer.invoke('chat:projects:update', id, patch),
+  deleteChatProject: (id) => ipcRenderer.invoke('chat:projects:delete', id).then(() => undefined),
+  listChatProjectFolders: () => ipcRenderer.invoke('chat:folders:list'),
+  createChatProjectFolder: (input) => ipcRenderer.invoke('chat:folders:create', input),
+  renameChatProjectFolder: (id, name) => ipcRenderer.invoke('chat:folders:rename', id, name),
+  moveChatProjectFolder: (id, parentId, index) => ipcRenderer.invoke('chat:folders:move', id, parentId, index),
+  deleteChatProjectFolder: (id) => ipcRenderer.invoke('chat:folders:delete', id).then(() => undefined),
+  setConversationProject: (id, projectId) => ipcRenderer.invoke('chat:setProject', id, projectId).then(() => undefined),
+  setConversationFolder: (id, folderId) => ipcRenderer.invoke('chat:setFolder', id, folderId).then(() => undefined),
+  listChatHistoryProjects: (surface) => ipcRenderer.invoke('chatHistory:projects:list', surface),
+  createChatHistoryProject: (surface, input) => ipcRenderer.invoke('chatHistory:projects:create', surface, input),
+  updateChatHistoryProject: (surface, id, patch) => ipcRenderer.invoke('chatHistory:projects:update', surface, id, patch),
+  deleteChatHistoryProject: (surface, id) => ipcRenderer.invoke('chatHistory:projects:delete', surface, id).then(() => undefined),
+  listChatHistoryFolders: (surface) => ipcRenderer.invoke('chatHistory:folders:list', surface),
+  createChatHistoryFolder: (surface, input) => ipcRenderer.invoke('chatHistory:folders:create', surface, input),
+  renameChatHistoryFolder: (surface, id, name) => ipcRenderer.invoke('chatHistory:folders:rename', surface, id, name),
+  moveChatHistoryFolder: (surface, id, parentId, index) => ipcRenderer.invoke('chatHistory:folders:move', surface, id, parentId, index),
+  deleteChatHistoryFolder: (surface, id) => ipcRenderer.invoke('chatHistory:folders:delete', surface, id).then(() => undefined),
+  setChatHistoryProject: (surface, id, projectId) => ipcRenderer.invoke('chatHistory:setProject', surface, id, projectId).then(() => undefined),
+  setChatHistoryFolder: (surface, id, folderId) => ipcRenderer.invoke('chatHistory:setFolder', surface, id, folderId).then(() => undefined),
+  setChatHistoryPinned: (surface, id, pinned) => ipcRenderer.invoke('chatHistory:setPinned', surface, id, pinned).then(() => undefined),
+  renameChatHistoryConversation: (surface, id, title) => ipcRenderer.invoke('chatHistory:rename', surface, id, title).then(() => undefined),
+  archiveChatHistoryConversation: (surface, id, archived) => ipcRenderer.invoke('chatHistory:archive', surface, id, archived).then(() => undefined),
+  listChatHistoryNotebooks: (surface) => ipcRenderer.invoke('chatHistory:notebooks:list', surface),
+  createChatHistoryNotebook: (surface, input) => ipcRenderer.invoke('chatHistory:notebooks:create', surface, input),
+  updateChatHistoryNotebook: (surface, id, patch) => ipcRenderer.invoke('chatHistory:notebooks:update', surface, id, patch),
+  deleteChatHistoryNotebook: (surface, id) => ipcRenderer.invoke('chatHistory:notebooks:delete', surface, id).then(() => undefined),
+  setConversationPinned: (id, pinned) => ipcRenderer.invoke('chat:setPinned', id, pinned).then(() => undefined),
 
   getNotesTree: (includeTrashed) => ipcRenderer.invoke('notes:tree', includeTrashed),
   createNoteFolder: (input) => ipcRenderer.invoke('notes:folders:create', input),

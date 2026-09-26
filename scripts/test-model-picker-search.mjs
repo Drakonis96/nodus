@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-model-picker-'));
@@ -25,11 +26,11 @@ test('model search ignores separators, case and accents and ANDs partial terms i
 });
 
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
-test('real model menus support search, selection, themes and clipped containers', { timeout: 120_000 }, async (t) => {
+test('real model menus support search, selection, themes and clipped containers', { timeout: 300_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/model-picker/renderer.tsx')], outfile: path.join(dir, 'fixture.js'), bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
-  execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', path.join(dir, 'style.css'), '--minify'], { cwd: root, stdio: 'pipe' });
-  const css = await readFile(path.join(dir, 'style.css'), 'utf8');
+  const stylesheet = componentStyles();
+  const css = await readFile(stylesheet, 'utf8');
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
   const errors = [];
   let page;

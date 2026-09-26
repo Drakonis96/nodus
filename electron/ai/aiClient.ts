@@ -1,3 +1,5 @@
+import { currentResearchRequestBudget, researchPromptUpperBound } from './researchRequestBudget';
+import { withJobThinking } from './thinkingEffort';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { documentVisualPlanningPrompt } from './documentVisualContext';
@@ -13,6 +15,7 @@ import {
   OPENROUTER_HEADERS,
   isLocalProvider,
   localContextWindow,
+  cachedModelContextWindow,
   localContextCapabilities,
   localBaseUrl,
   customBaseUrl,
@@ -452,6 +455,8 @@ function nodusLocalMaxTokens(model: ModelRef, opts: CallOpts, requestedMax: numb
 }
 
 export interface CallOpts {
+  /** Backend academic corpus requests only; include all final prompt/output bytes. */
+  corpusContext?: boolean;
   /** Set exclusively by Research Assistant; absent preserves every other surface. */
   researchEffort?: ResearchEffort;
   researchModelInfo?: import('@shared/types').ModelInfo;
@@ -808,6 +813,31 @@ export async function localModelContextWindow(model: ModelRef): Promise<number |
   if (model.provider === 'nodus') return getNodusLocalModel(model.model)?.contextLength ?? null;
   if (!isLocalProvider(model.provider)) return null;
   return localContextWindow(model.provider as LocalProvider, model.model, getApiKey(model.provider));
+}
+
+/** No catalogue/network discovery is started by retrieval. Unknown windows use
+ * a conservative operating cap, not a claim about the provider's model capacity. */
+export async function researchModelContextWindow(model: ModelRef): Promise<{ tokens: number; known: boolean }> {
+  const local = await localModelContextWindow(model);
+  if (local) return { tokens: local, known: true };
+  const advertised = cachedModelContextWindow(model.provider, model.model);
+  if (advertised) return { tokens: advertised, known: true };
+  // Official direct endpoint model contract, verified 2026-09-23:
+  // https://api-docs.deepseek.com/quick_start/pricing/
+  if (model.provider === 'deepseek' && model.model === 'deepseek-flash') return { tokens: 1000000, known: true };
+  return { tokens: 32768, known: false };
+}
+async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise<void> {
+  const active = currentResearchRequestBudget();
+  if (!active && !opts.corpusContext) return;
+  const effective = await researchModelContextWindow(model);
+  const window = Math.min(effective.tokens, active?.window ?? Infinity);
+  const needed = researchPromptUpperBound(opts.system, opts.user, opts.maxTokens ?? 8000);
+  if (needed > window) {
+    active?.onOverflow();
+    throw new AiError(isLocalProvider(model.provider) || model.provider === 'nodus'
+      ? contextOverflowMessage(model.provider, model.model, window, needed) : genericContextOverflowMessage(), false, true, 'context_overflow');
+  }
 }
 
 /**
@@ -1170,7 +1200,8 @@ async function rawComplete(
   reasoning: ReasoningEffort = 'off',
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  return rawCompleteTransport(model, opts, jsonMode, reasoning, codexReasoning);
+  // A Deep Research or Immersion job carries the thinking level chosen in its form.
+  return rawCompleteTransport(model, withJobThinking(model, opts), jsonMode, reasoning, codexReasoning);
 }
 
 async function rawCompleteTransport(
@@ -1184,6 +1215,7 @@ async function rawCompleteTransport(
   // providers do not use API keys, so this deliberately precedes key resolution.
   // The public entry points map the opaque codes back after parsing/repair.
   opts = anonymizeCallOpts({ ...opts, system: excludeInvisibleArtifacts(opts.system), user: excludeInvisibleArtifacts(opts.user) }).sent;
+  await assertCorpusRequestFits(model, opts);
 
   if (model.provider === 'codex') {
     try {
@@ -1883,7 +1915,7 @@ async function rawCompleteStream(
   signal?: AbortSignal,
   codexReasoning?: CodexReasoningEffort | null
 ): Promise<string> {
-  return rawCompleteStreamTransport(model, opts, onDelta, reasoning, signal, codexReasoning);
+  return rawCompleteStreamTransport(model, withJobThinking(model, opts), onDelta, reasoning, signal, codexReasoning);
 }
 
 async function rawCompleteStreamTransport(
@@ -1896,6 +1928,7 @@ async function rawCompleteStreamTransport(
 ): Promise<string> {
   const { sent, privacy } = anonymizeCallOpts({ ...opts, system: excludeInvisibleArtifacts(opts.system), user: excludeInvisibleArtifacts(opts.user) });
   opts = sent;
+  await assertCorpusRequestFits(model, opts);
   const scheduleOpts = { ...opts, signal: signal ?? opts.signal };
 
   let full = '';
@@ -2253,7 +2286,23 @@ function embeddingConfig(): { provider: EmbeddingProvider; modelId: string } {
   };
 }
 
-interface EmbeddingRequestOptions {
+export interface EmbeddingExecutionConfig {
+  provider: EmbeddingProvider;
+  modelId: string;
+  endpoint: string;
+}
+
+/** Capture before dispatch; never persist credentials in a job. */
+export function effectiveEmbeddingConfig(): EmbeddingExecutionConfig {
+  const config = embeddingConfig();
+  const endpoint = config.provider === 'nodus' ? 'nodus-local-runtime'
+    : config.provider === 'gemini' ? geminiBatchEmbeddingEndpoint(config.modelId) : openAiCompatBase(config.provider);
+  if (!endpoint) throw new AiError('Falta el endpoint del proveedor de embeddings.', false, true);
+  return { ...config, endpoint };
+}
+
+export interface EmbeddingRequestOptions {
+  config?: EmbeddingExecutionConfig;
   perf?: PerfContext;
   jobId?: string;
 }
@@ -2272,11 +2321,12 @@ async function requestEmbeddings(
     catch (error) { throw new AiError(error instanceof Error ? error.message : String(error), false); }
   };
   signal?.throwIfAborted();
-  const endpoint = provider === 'nodus'
+  const endpoint = options.config?.endpoint ?? (provider === 'nodus'
     ? 'nodus-local-runtime'
     : provider === 'gemini'
       ? geminiBatchEmbeddingEndpoint(modelId)
-      : openAiCompatBase(provider) ?? undefined;
+      : openAiCompatBase(provider) ?? undefined);
+  if (!endpoint) throw new AiError('Falta el endpoint del proveedor de embeddings.', false, true);
   const descriptor: AiRequestDescriptor = {
     provider,
     model: modelId,
@@ -2386,7 +2436,9 @@ async function requestEmbeddings(
  */
 export async function embed(text: string, signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<number[] | null> {
   signal?.throwIfAborted();
-  const { provider, modelId } = embeddingConfig();
+  const config = options.config ?? effectiveEmbeddingConfig();
+  options = { ...options, config };
+  const { provider, modelId } = config;
   const key = resolveProviderKey(provider);
   if (!key) return null;
   const vectors = await requestEmbeddings(provider, key, modelId, text.slice(0, 8000), signal, options);
@@ -2421,7 +2473,9 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
   signal?.throwIfAborted();
   if (texts.length === 0) return [];
   const clipped = texts.map((t) => t.slice(0, 8000));
-  const { provider, modelId } = embeddingConfig();
+  const config = options.config ?? effectiveEmbeddingConfig();
+  options = { ...options, config };
+  const { provider, modelId } = config;
   const key = resolveProviderKey(provider);
   if (!key) throw new AiError(`Falta la clave de IA para embeddings (${provider}). Configúrala en Ajustes o usa el modo léxico.`, false, true);
 
@@ -2452,7 +2506,7 @@ export async function embedManyStrict(texts: string[], signal?: AbortSignal, opt
 export async function embedMany(texts: string[], signal?: AbortSignal, options: EmbeddingRequestOptions = {}): Promise<(number[] | null)[]> {
   signal?.throwIfAborted();
   if (texts.length === 0) return [];
-  const { provider } = embeddingConfig();
+  const { provider } = options.config ?? effectiveEmbeddingConfig();
   if (!resolveProviderKey(provider)) return texts.map(() => null);
   return embedManyStrict(texts, signal, options);
 }

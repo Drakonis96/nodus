@@ -1,5 +1,6 @@
 import type { PassageDetail, WorkPassageStatus } from '@shared/types';
 import { getDb } from './database';
+import { assertPassagePublication, type PassagePublication } from './passagePublications';
 import { currentEmbeddingConfig, embeddingTextHash, encodeEmbedding } from './ideasRepo';
 import { scanSimilar } from './vectorScan';
 
@@ -43,7 +44,7 @@ export function lexicalPassageSearch(
   limit: number,
   opts: { nodusIds?: string[] } = {},
 ): SimilarPassage[] {
-  if (limit <= 0) return [];
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const fold = (value: string) => value.normalize('NFKD').replace(/\p{M}+/gu, '').toLocaleLowerCase();
   const tokens = fold(query).match(/[\p{L}\p{N}]+/gu) ?? [];
   // FTS5 has no language stemmer in this index. Prefix roots recover predictable
@@ -95,7 +96,7 @@ export function lexicalPassageSearch(
 }
 
 /** Replace one work atomically so interrupted/reprocessed runs never mix chunks. */
-export function replaceWorkPassages(nodusId: string, contentHash: string, rows: PassageInsert[]): void {
+export function replaceWorkPassages(nodusId: string, contentHash: string, rows: PassageInsert[], prepared?: { publication: PassagePublication; embeddingProvider: string; embeddingModel: string }): void {
   const db = getDb();
   const config = currentEmbeddingConfig();
   const now = new Date().toISOString();
@@ -106,6 +107,10 @@ export function replaceWorkPassages(nodusId: string, contentHash: string, rows: 
      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   db.transaction(() => {
+    if (prepared) {
+      assertPassagePublication(nodusId, prepared.publication);
+      if (config.provider !== prepared.embeddingProvider || config.model !== prepared.embeddingModel) throw new Error('documentary_embedding_configuration_changed');
+    }
     db.prepare('DELETE FROM passages WHERE nodus_id = ?').run(nodusId);
     rows.forEach((row, chunkIndex) => {
       const embedding = row.embedding;
@@ -136,7 +141,7 @@ export function findSimilarPassages(
   limit: number,
   opts: { nodusIds?: string[] } = {}
 ): SimilarPassage[] {
-  if (limit <= 0) return [];
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length
@@ -178,6 +183,7 @@ export async function findSimilarPassagesPaged(
   limit: number,
   opts: { nodusIds?: string[] } = {}
 ): Promise<SimilarPassage[]> {
+  if (limit <= 0 || opts.nodusIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';

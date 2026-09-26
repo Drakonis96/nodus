@@ -67,6 +67,11 @@ export interface StudyAssistantConversationSummary {
   createdAt: string;
   updatedAt: string;
   archived: boolean;
+  /** The chat history's project, a folder of it (always of that project), and the pin.
+   * They travel inside the conversation's own record in study-chat-history.json. */
+  projectId?: string | null;
+  folderId?: string | null;
+  pinnedAt?: string | null;
   selection: StudyAssistantSelection;
   model: ModelRef | null;
   messageCount: number;
@@ -85,6 +90,9 @@ export interface StudyAssistantConversationInput {
   title?: string;
   selection?: Partial<StudyAssistantSelection>;
   model?: ModelRef | null;
+  /** Start in a project of the history, and in one of its folders. */
+  projectId?: string | null;
+  folderId?: string | null;
 }
 
 export interface StudyAssistantConversationPatch {

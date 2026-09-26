@@ -1,12 +1,12 @@
-import crypto from 'node:crypto';
 import type { PassageEmbeddingProgress, Work } from '@shared/types';
+import { getActiveVault } from '../vaults/vaultRegistry';
 import { getDb } from '../db/database';
 import { clearAllPassages, replaceWorkPassages, workPassageStatuses } from '../db/passagesRepo';
 import { getSettings } from '../db/settingsRepo';
-import { planRetrievalChunks, resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
+import { resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
 import { setResolvedTextState } from '../db/worksRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
-import { embedMany } from './aiClient';
+import { prepareLegacyDocumentaryPassages } from './documentaryLegacyPreparation';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
@@ -209,6 +209,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         {
           unpaywallEmail: settings.unpaywallEmail,
           preferZoteroFulltext: settings.preferZoteroFulltext,
+          allowExternalRetrieval: getActiveVault().type === 'academic' ? false : undefined,
           ocr: {
             enabled: settings.ocrEnabled,
             languages: settings.ocrLanguages,
@@ -220,43 +221,18 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       setResolvedTextState(entry.work.nodus_id, resolvedTextStateFromDoc(document));
       if (state.stopRequested || (await waitIfPaused())) break;
 
-      const chunks = planRetrievalChunks(document.text, {
-        sourceMap: Object.fromEntries((document.segments ?? []).map((segment) => [segment.marker, segment.sourceRef])),
-      });
-      entry.chunks = chunks.length;
-      state.currentWorkPassages = chunks.length;
-      state.totalPassages += chunks.length;
+      const prepared = await prepareLegacyDocumentaryPassages(entry.work.nodus_id, document.text,
+        Object.fromEntries((document.segments ?? []).map(segment => [segment.marker, segment.sourceRef])),
+        document.sourceType === 'abstract_only' ? 'abstract' : 'fulltext');
+      entry.chunks = prepared.rows.length;
+      state.currentWorkPassages = prepared.rows.length;
+      state.totalPassages += prepared.rows.length;
+      if (state.stopRequested || await waitIfPaused()) break;
+      replaceWorkPassages(entry.work.nodus_id, prepared.contentHash, prepared.rows, prepared);
+      state.passagesEmbedded += prepared.rows.length;
+      state.currentPassageIndex = prepared.rows.length;
+      const contentHash = prepared.contentHash;
       emit();
-      if (chunks.length === 0) {
-        state.currentWorkFinishedAt = new Date().toISOString();
-        emit();
-        continue;
-      }
-
-      const embeddings = await embedMany(chunks.map((chunk) => chunk.text), undefined, {
-        perf: { nodusId: entry.work.nodus_id, title: entry.title },
-        jobId: `${entry.work.nodus_id}:passage-embeddings`,
-      });
-      const missing = embeddings.findIndex((embedding) => !embedding?.length);
-      if (missing >= 0) {
-        throw new Error(
-          `El proveedor no devolvió un embedding utilizable para el fragmento ${missing + 1} de ${chunks.length}.`
-        );
-      }
-      if (state.stopRequested) break;
-      for (let index = 0; index < chunks.length; index++) {
-        if (await waitIfPaused()) break;
-        state.currentPassageIndex = index;
-        state.passagesEmbedded++;
-        emit();
-      }
-      if (state.stopRequested) break;
-      const contentHash = crypto.createHash('sha1').update(document.text).digest('hex');
-      replaceWorkPassages(
-        entry.work.nodus_id,
-        contentHash,
-        chunks.map((chunk, index) => ({ ...chunk, embedding: embeddings[index] ?? null }))
-      );
       recordLinkedLibraryAnalysis({
         workId: entry.work.nodus_id,
         components: ['passages', 'embeddings'],

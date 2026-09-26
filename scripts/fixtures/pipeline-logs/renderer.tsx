@@ -18,6 +18,7 @@ fixture.listeners = {};
 fixture.sources = {
   getQueue: { total: 0, items: [], done: 0, failed: 0, maintenanceRunning: false },
   getDocumentIndexProgress: { campaigns: [], jobs: [] },
+  getResearchPreparationProgress: { paused: false, campaigns: [] },
   getEmbeddingStatus: null,
   getPassageStatus: null,
   listZoteroSyncSessions: [],

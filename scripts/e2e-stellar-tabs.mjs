@@ -18,6 +18,8 @@ try {
   for(const key of ['nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07', 'nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0'])localStorage.setItem(key,'1');
   await window.nodus.updateSettings({onboardingComplete:true,basicsTutorialVersion:999,recoverySetupVersion:999,tourComplete:true,advancedTourComplete:true,mascotEnabled:false,mascotStyle:'orb',mascotStyleChosen:true,uiLanguage:'es',theme:'dark'});
   await window.nodus.seedDemoData();
+  /* Same as the welcome's Later: the demonstration profile has seen it. */
+  await window.nodus.setResearchPreparationPolicy({welcomeVersion:1});
   const state=await window.nodus.getStellarSession('academic:corpus');
   await window.nodus.saveStellarSession(state.vaultId,'academic:corpus',{version:1,seeds:['demo-i1'],history:[],cursor:0,activeSeed:'demo-i1',positions:{},camera:{x:0,y:0,zoom:1},limit:3,speed:1});
  },appVersion);

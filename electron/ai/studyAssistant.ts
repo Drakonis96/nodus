@@ -9,8 +9,6 @@ import { getActiveVault } from '../vaults/vaultRegistry';
 import { vaultChatSkillSession } from './chatSkillSession';
 import { executeChatSkills, assertChatSkillSession } from './chatSkillExecution';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import type {
   StudyAssistantCitation,
   StudyAssistantConversation,
@@ -23,7 +21,6 @@ import type {
   StudyAssistantSourceOption,
 } from '@shared/studyAssistant';
 import {
-  DEFAULT_STUDY_ASSISTANT_SELECTION,
   compressStudyAssistantEvidence,
   studyAssistantSourceKey,
   titleFromStudyQuestion,
@@ -33,13 +30,10 @@ import type { StudySearchIndexEntry, StudySearchOptions } from '@shared/studySea
 import type { PromptLanguage } from '@shared/types';
 import { studyAssistantDemoSourceTitle, studyAssistantPromptPack } from '../../shared/studyAssistantPromptPacks';
 import { getSettings } from '../db/settingsRepo';
-import { activeVaultDir } from '../vaults/vaultRegistry';
+import { normalizeStudySelection, readStudyChatStore, writeStudyChatStore } from './studyChatHistory';
 import { completeTextStream, resolveModelRef } from './aiClient';
 import { listStudyAssistantSourceOptions, retrieveStudyAssistantEntries } from './studySearch';
 
-interface StudyAssistantStore { version: 1; conversations: StudyAssistantConversation[] }
-
-const EMPTY_STORE: StudyAssistantStore = { version: 1, conversations: [] };
 const MAX_HISTORY_MESSAGES = 12;
 const MAX_CONTEXT_CHARS = 52_000;
 const MAX_SOURCE_CHARS = 3_600;
@@ -56,29 +50,10 @@ function effectivePromptLanguage(requestLanguage: unknown): PromptLanguage {
 }
 
 function now(): string { return new Date().toISOString(); }
-function storePath(): string { return path.join(activeVaultDir(), 'study-chat-history.json'); }
 
-function normalizeSelection(selection?: Partial<StudyAssistantSelection> | null): StudyAssistantSelection {
-  return {
-    ...DEFAULT_STUDY_ASSISTANT_SELECTION,
-    ...selection,
-    sourceKeys: Array.isArray(selection?.sourceKeys) ? [...new Set(selection.sourceKeys.filter(Boolean))] : [],
-  };
-}
-
-function readStore(): StudyAssistantStore {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(storePath(), 'utf8')) as Partial<StudyAssistantStore>;
-    return { version: 1, conversations: Array.isArray(parsed.conversations) ? parsed.conversations.map((conversation) => ({ ...conversation, selection: normalizeSelection(conversation.selection), messages: Array.isArray(conversation.messages) ? conversation.messages : [] })) : [] };
-  } catch { return { ...EMPTY_STORE, conversations: [] }; }
-}
-
-function writeStore(store: StudyAssistantStore): void {
-  const target = storePath(); const temporary = `${target}.tmp`;
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(temporary, JSON.stringify(store), 'utf8');
-  fs.renameSync(temporary, target);
-}
+const normalizeSelection = normalizeStudySelection;
+const readStore = readStudyChatStore;
+const writeStore = writeStudyChatStore;
 
 function summary(conversation: StudyAssistantConversation): StudyAssistantConversationSummary {
   const { messages, task: _task, level: _level, tone: _tone, language: _language, allowExternalKnowledge: _external, ...rest } = conversation;
@@ -97,19 +72,28 @@ export function getStudyAssistantConversation(id: string): StudyAssistantConvers
 export function createStudyAssistantConversation(input: StudyAssistantConversationInput = {}): StudyAssistantConversation {
   const timestamp = now();
   const defaultTitle = studyAssistantPromptPack(promptLanguage(getSettings().promptLanguage)).conversationTitle;
+  const store = readStore();
+  // A chat started on a project's page starts in it, and in the folder selected there.
+  const projectId = input.projectId && store.projects.some((project) => project.id === input.projectId) ? input.projectId : null;
+  const folderId = projectId && input.folderId && store.folders.some((folder) => folder.id === input.folderId && folder.projectId === projectId) ? input.folderId : null;
   const conversation: StudyAssistantConversation = {
     id: crypto.randomUUID(), title: input.title?.trim() || defaultTitle, createdAt: timestamp, updatedAt: timestamp,
     archived: false, selection: normalizeSelection(input.selection), model: input.model ?? null, messageCount: 0,
     task: 'answer', level: 'standard', tone: 'clear', language: 'auto', allowExternalKnowledge: false, messages: [],
+    projectId, folderId, pinnedAt: null,
   };
-  const store = readStore(); store.conversations.unshift(conversation); writeStore(store); return conversation;
+  store.conversations.unshift(conversation); writeStore(store); return conversation;
 }
 
 export function updateStudyAssistantConversation(id: string, patch: StudyAssistantConversationPatch): StudyAssistantConversation | null {
   const store = readStore(); const index = store.conversations.findIndex((conversation) => conversation.id === id); if (index < 0) return null;
   const current = store.conversations[index];
+  // Where a chat sits is only ever changed through the organizer, which validates it.
+  const { projectId: _projectId, folderId: _folderId, pinnedAt: _pinnedAt, ...fields } = patch as StudyAssistantConversationPatch & { projectId?: unknown; folderId?: unknown; pinnedAt?: unknown };
   const next: StudyAssistantConversation = {
-    ...current, ...patch,
+    ...current, ...fields,
+    // An archived chat leaves the pinned chats and frees its place.
+    pinnedAt: fields.archived ? null : current.pinnedAt ?? null,
     title: patch.title !== undefined ? (patch.title.trim().slice(0, 120) || studyAssistantPromptPack(promptLanguage(getSettings().promptLanguage)).conversationTitle) : current.title,
     selection: patch.selection ? normalizeSelection(patch.selection) : current.selection,
     messages: patch.messages ? patch.messages.slice(-100) : current.messages,

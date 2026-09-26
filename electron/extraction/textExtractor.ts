@@ -20,6 +20,7 @@ import { csvFileToText, xlsxFileToText } from './tabular';
 import { getExtractionCache, upsertExtractionCache } from '../db/extractionCacheRepo';
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
+import { libraryMarkdownWithPageMarkers, readDocumentarySourceMap } from '../library/librarySourcePages';
 import { cleanExtractedText } from './textCleanup';
 import type { PipelineLogReasonId } from '@shared/pipelineLogMessages';
 import { logPipelineWarning } from '../logging/pipelineLogCore';
@@ -76,8 +77,8 @@ const ATTACHMENT_RETRY_DELAYS_MS = [0, 900, 2200];
 const STANDARD_CHUNK_WORDS = 1800;
 const STANDARD_OVERLAP_WORDS = 100;
 const LONG_CHUNK_WORDS = 30000;
-export const RETRIEVAL_CHUNK_WORDS = 280;
-export const RETRIEVAL_OVERLAP_WORDS = 60;
+export { planRetrievalChunks, RETRIEVAL_CHUNK_WORDS, RETRIEVAL_OVERLAP_WORDS } from '@shared/retrievalChunks';
+export type { RetrievalChunk } from '@shared/retrievalChunks';
 
 export interface ChunkOptions {
   mode?: DeepContextMode;
@@ -305,66 +306,6 @@ export function planTextChunks(text: string, opts: ChunkOptions = {}): ChunkPlan
     else start = Math.max(start + 1, end - config.overlapWords);
   }
   return { ...config, chunks, wordCount: words.length };
-}
-
-export interface RetrievalChunk {
-  text: string;
-  /** The most recent PDF page marker that precedes this chunk, if present. */
-  pageLabel: string | null;
-  sourceRef: string | null;
-  pageNumber: number | null;
-}
-
-/**
- * Fine-grained chunks for semantic retrieval. PDF page markers are retained in
- * extraction text, but stripped from the embedded passage and converted to a
- * compact citation location.
- */
-export function planRetrievalChunks(
-  text: string,
-  opts: { chunkWords?: number; overlapWords?: number; sourceMap?: Record<string, string> } = {}
-): RetrievalChunk[] {
-  const chunkWords = clampInt(opts.chunkWords, RETRIEVAL_CHUNK_WORDS, 80, 1000);
-  const overlapWords = clampInt(opts.overlapWords, RETRIEVAL_OVERLAP_WORDS, 0, Math.max(0, chunkWords - 1));
-  const tokens: { value: string; pageLabel: string | null; sourceRef: string | null; pageNumber: number | null }[] = [];
-  let pageLabel: string | null = null;
-  let pageNumber: number | null = null;
-  let sourceRef: string | null = null;
-  const rawTokens = text.match(/\[\[src:[^\]\s]+(?:\s+p\.\s*\d+)?\]\]|\[\[p\.\s*\d+\]\]|\S+/gi) ?? [];
-  for (const raw of rawTokens) {
-    const sourceMarker = raw.match(/^\[\[src:([^\]\s]+)(?:\s+p\.\s*(\d+))?\]\]$/i);
-    if (sourceMarker) {
-      sourceRef = opts.sourceMap?.[sourceMarker[1]] ?? sourceMarker[1];
-      pageNumber = sourceMarker[2] ? Number(sourceMarker[2]) : null;
-      pageLabel = pageNumber == null ? null : `p. ${pageNumber}`;
-      continue;
-    }
-    const marker = raw.match(/^\[\[p\.\s*(\d+)\]\]$/i);
-    if (marker) {
-      pageNumber = Number(marker[1]);
-      pageLabel = `p. ${pageNumber}`;
-      continue;
-    }
-    tokens.push({ value: raw, pageLabel, sourceRef, pageNumber });
-  }
-  if (tokens.length === 0) return [];
-
-  const chunks: RetrievalChunk[] = [];
-  for (let start = 0; start < tokens.length; ) {
-    let sourceEnd = start + 1;
-    while (sourceEnd < tokens.length && tokens[sourceEnd].sourceRef === tokens[start].sourceRef) sourceEnd++;
-    const end = Math.min(start + chunkWords, sourceEnd);
-    const slice = tokens.slice(start, end);
-    chunks.push({
-      text: slice.map((token) => token.value).join(' '),
-      pageLabel: slice[0]?.pageLabel ?? null,
-      sourceRef: slice[0]?.sourceRef ?? null,
-      pageNumber: slice[0]?.pageNumber ?? null,
-    });
-    if (end >= sourceEnd) start = sourceEnd;
-    else start = Math.max(start + 1, end - overlapWords);
-  }
-  return chunks;
 }
 
 // ── PDF: streaming extraction with page markers + optional OCR ────────────────
@@ -736,6 +677,7 @@ export function isTextAttachment(att: ZoteroAttachment): boolean {
 }
 
 export interface ResolveOptions {
+  allowExternalRetrieval?: boolean;
   unpaywallEmail: string;
   preferZoteroFulltext: boolean;
   ocr: OcrOptions;
@@ -973,6 +915,8 @@ export async function resolveWorkText(
   try {
     const clean = getLibraryReaderRawContent(zoteroKey);
     if (clean?.markdown.trim()) {
+      // The clean copy has no page markers of its own; its source map has the pages.
+      const text = libraryMarkdownWithPageMarkers(clean.markdown, readDocumentarySourceMap(clean.folder, clean.sourceMapFile));
       return combineSegments([{
         sourceRef: `library:${zoteroKey}`,
         marker: '',
@@ -981,10 +925,10 @@ export async function resolveWorkText(
         zoteroLibraryId: null,
         attachmentKey: null,
         displayName: clean.document.title,
-        text: clean.markdown,
-        contentHash: textHash(clean.markdown),
+        text,
+        contentHash: textHash(text),
         pageCount: clean.document.pageCount,
-        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(clean.markdown),
+        hasPageMarkers: /\[\[p\.\s*\d+\]\]/i.test(text),
       }], 'Versión limpia de la Biblioteca global.', clean.document.originalAvailable);
     }
   } catch {
@@ -992,7 +936,7 @@ export async function resolveWorkText(
   }
 
   // (3) Unpaywall fallback by DOI.
-  if (doi && opts.unpaywallEmail) {
+  if (opts.allowExternalRetrieval !== false && doi && opts.unpaywallEmail) {
     opts.onProgress?.({ phase: 'download', detail: 'Buscando texto abierto (Unpaywall)…', pct: null });
     const unpaywallDone = startPerf('Unpaywall', opts.perf, { doi });
     const oa = await tryUnpaywall(doi, opts.unpaywallEmail, opts.ocr, opts.onProgress, opts.perf, opts.signal).catch((e) => {

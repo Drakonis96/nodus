@@ -8,6 +8,7 @@ const fixture = window as any;
 fixture.actions = [];
 fixture.listeners = {};
 fixture.sources = {
+  getResearchPreparationProgress: { paused: false, campaigns: [] },
   getQueue: { total: 0, items: [], done: 0, failed: 0, maintenanceRunning: false },
   getDocumentIndexProgress: { campaigns: [], jobs: [] }, getEmbeddingStatus: null, getPassageStatus: null,
   listZoteroSyncSessions: [], listLibraryExtractionJobs: [], listDeepResearchJobs: [], listDictionaryGenerationJobs: [], listOcrDocs: [],

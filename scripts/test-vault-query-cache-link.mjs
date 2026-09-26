@@ -44,7 +44,7 @@ test('invalidating one vault clears only that vault, and returns stale pages to 
 test('the vault-link flow invalidates the target vault before it closes the dialog', () => {
   const source = fs.readFileSync(path.join(repoRoot, 'src/views/GlobalLibraryView.tsx'), 'utf8');
   assert.match(source, /import \{ invalidateVaultQueryCache \} from '\.\.\/vaultQueryCache';/);
-  assert.match(source, /import \{ notifyDataChanged \} from '\.\.\/hooks';/);
+  assert.match(source, /import \{[^}]*\bnotifyDataChanged\b[^}]*\} from '\.\.\/hooks';/);
   assert.match(
     source,
     /invalidateVaultQueryCache\(vaultId\);\s*notifyDataChanged\(\);\s*onLinked\(report\.links\);\s*onClose\(\);/,

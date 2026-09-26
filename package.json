@@ -160,7 +160,8 @@
     "verify:capability-migration": "node scripts/verify-capability-migration-e2e.mjs",
     "verify:capability-packages": "node scripts/verify-capability-package-install.mjs chemistry-studio && node scripts/verify-capability-package-install.mjs legalize && node scripts/verify-capability-package-install.mjs alphagenome && node scripts/verify-capability-package-install.mjs research-visuals",
     "verify:maps": "node scripts/verify-maps.mjs",
-    "verify:historical-maps": "node scripts/verify-historical-maps.mjs"
+    "verify:historical-maps": "node scripts/verify-historical-maps.mjs",
+    "research:runtime": "node scripts/prepare-zotero-mcp.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -183,6 +184,7 @@
     "@milkdown/react": "^7.21.3",
     "@milkdown/utils": "^7.21.3",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "@mozilla/readability": "^0.6.0",
     "@napi-rs/canvas": "^0.1.65",
     "@openai/codex": "0.144.6",
     "@pdf-lib/fontkit": "^1.1.1",
@@ -202,6 +204,7 @@
     "katex": "^0.17.0",
     "kokoro-js": "^1.2.1",
     "leaflet": "^1.9.4",
+    "linkedom": "^0.18.13",
     "mammoth": "^1.8.0",
     "mkcert": "^3.2.0",
     "openai": "^4.73.0",
@@ -326,6 +329,10 @@
       {
         "from": "build/capability-bootstrap",
         "to": "capability-bootstrap"
+      },
+      {
+        "from": "build/zotero-mcp",
+        "to": "zotero-mcp"
       }
     ],
     "files": [

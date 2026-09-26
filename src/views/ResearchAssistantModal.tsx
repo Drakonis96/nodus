@@ -1,25 +1,43 @@
+import { ResearchActivityPanel } from '../components/ResearchActivityPanel';
+import { ResearchWebSearchControl } from '../components/ResearchWebSearchControl';
+import { ResearchWebSources } from '../components/ResearchWebSources';
+import { openWebSource } from '../researchWebSources';
+import { settleResearchActivities, updateResearchActivities, type ResearchActivity, type ResearchActivityStatus } from '@shared/researchActivity';
 import { ResearchConciliumControl, ConciliumResponses } from '../components/ResearchConcilium';
 import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium';
 import type { ResearchAttachment, ResearchAttachmentSurface } from '@shared/researchAttachments';
 import { ResearchSystemPromptControl } from '../components/ResearchSystemPromptControl';
 import { useResearchSystemPrompts } from '../hooks/useResearchSystemPrompts';
-import type { ResearchChatAdapter, ResearchUiMessage } from './researchChatAdapter';
-import { ResearchSourceFilterControl } from '../components/ResearchSourceFilterControl';
-import { normalizeResearchSourceFilter } from '@shared/researchContextFilters';
+import { researchChatOrganizer, type ResearchChatAdapter, type ResearchUiMessage } from './researchChatAdapter';
+import { SourceFilterPanel } from '../components/ResearchSourceFilterControl';
+import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNotebookControl';
+import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
+import { HeaderBalloon } from '../components/HeaderBalloon';
+import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
+import { ProjectFolderBrowser, chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../components/ResearchChatFolderTree';
+import { MarqueeText } from '../components/MarqueeText';
+import { UNFILED_FOLDER, nextFolderName } from '@shared/researchChatFolders';
+import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
+import { useSkillLibrary } from '../components/skillLibrary';
+import type { ResearchNotebook, ResearchNotebookPreparation } from '@shared/researchCorpus';
+import { matchingResearchWorkIds, normalizeResearchSourceFilter, type ResearchContextSources } from '@shared/researchContextFilters';
+import { researchContextLayers, withResearchContextLayers } from '@shared/researchContextLayers';
+import { ResearchCoverage } from '../components/ResearchCoverage';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { ChatMarkdown } from '../components/ChatMarkdown';
 import { ChatAbortedNotice } from '../components/ChatAbortedNotice';
 import { ChatSkillsControl } from '../components/ChatSkillsControl';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import type {
   AppSettings,
   ChatConversationSummary,
+  ResearchChatProject,
+  ResearchChatProjectFolder,
   ModelRef,
   ResearchChatMessage,
   ResearchContextSelection,
-  ResearchGraphPartsSelection,
   NoteSource,
+  ResearchWebSearchMode,
 } from '@shared/types';
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
@@ -27,8 +45,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { ChatTypingIndicator } from '../components/ChatTypingIndicator';
 import { SaveToNotesModal, type StudyNoteDestination } from '../components/SaveToNotesModal';
 import { SourceCitationModal, type CitationTarget } from '../components/SourceCitationModal';
-import { VirtualList } from '../components/VirtualList';
-import { ASSISTANT_CONTEXTS, type AssistantNavigationTarget } from '../navigation';
+import type { AssistantNavigationTarget } from '../navigation';
 import { t, tx } from '../i18n';
 import { useFeatureModel } from '../hooks/useFeatureModel';
 import { useResearchEffort } from '../hooks/useResearchEffort';
@@ -53,141 +70,17 @@ const DEFAULT_SELECTION: ResearchContextSelection = {
   },
 };
 
-const ALL_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: true,
-  contradictions: true,
-  gaps: true,
-  readingPath: true,
-  authors: true,
-  documents: true,
-  passages: true,
-  graph: true,
-  graphParts: {
-    ideaNodes: true,
-    themeNodes: true,
-    ideaEdges: true,
-    authorGraph: true,
-  },
-};
+/** A new chat reads both layers of the corpus, ideas and documents, and the web while it is on. */
+const LAYERED_SELECTION = withResearchContextLayers(DEFAULT_SELECTION, { ideas: true, documents: true });
 
-type AssistantModeId = 'synthesis' | 'gaps' | 'contradictions' | 'reading' | 'authors' | 'documents';
-type ActiveAssistantModeId = AssistantModeId | 'custom';
-
-const AUTHOR_SELECTION: ResearchContextSelection = {
-  ideas: false,
-  themes: true,
-  contradictions: false,
-  gaps: false,
-  readingPath: false,
-  authors: true,
-  documents: true,
-  passages: true,
-  graph: true,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: true,
-  },
-};
-
-const DOCUMENT_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: true,
-  contradictions: false,
-  gaps: false,
-  readingPath: false,
-  authors: false,
-  documents: true,
-  passages: true,
-  graph: false,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: false,
-  },
-};
-
-const SYNTHESIS_SELECTION: ResearchContextSelection = {
-  ideas: true,
-  themes: false,
-  contradictions: true,
-  gaps: true,
-  readingPath: false,
-  authors: false,
-  documents: false,
-  passages: false,
-  graph: false,
-  graphParts: {
-    ideaNodes: false,
-    themeNodes: false,
-    ideaEdges: false,
-    authorGraph: false,
-  },
-};
-
-const ASSISTANT_MODES: {
-  id: AssistantModeId;
-  label: string;
-  icon: string;
-  description: string;
-  selection: ResearchContextSelection;
-  starter: string;
-}[] = [
-  {
-    id: 'synthesis',
-    label: 'Síntesis',
-    icon: 'layers',
-    description: 'Ideas, huecos y contradicciones básicas.',
-    selection: SYNTHESIS_SELECTION,
-    starter: 'Dame una síntesis crítica del corpus: ideas principales, contradicciones, huecos y próximos pasos.',
-  },
-  {
-    id: 'gaps',
-    label: 'Huecos',
-    icon: 'gap',
-    description: 'Preguntas abiertas, limitaciones y trabajo futuro.',
-    selection: ASSISTANT_CONTEXTS.gap,
-    starter: 'Prioriza los huecos de investigación del corpus y propón cómo atacarlos con lecturas o análisis.',
-  },
-  {
-    id: 'contradictions',
-    label: 'Contradicciones',
-    icon: 'alert',
-    description: 'Refutaciones, tensiones y evidencia asociada.',
-    selection: ASSISTANT_CONTEXTS.contradiction,
-    starter: 'Resume las contradicciones más relevantes y distingue tensiones reales de diferencias de marco o método.',
-  },
-  {
-    id: 'reading',
-    label: 'Lecturas',
-    icon: 'route',
-    description: 'Ruta de lectura, documentos, autores y grafo completo.',
-    selection: ASSISTANT_CONTEXTS.reading,
-    starter: 'Construye una ruta de lectura razonada para avanzar en la investigación y explica la prioridad de cada bloque.',
-  },
-  {
-    id: 'authors',
-    label: 'Autores',
-    icon: 'graduation',
-    description: 'Autores, documentos y red autoral.',
-    selection: AUTHOR_SELECTION,
-    starter: 'Analiza los autores centrales, sus relaciones y qué zonas del corpus dependen de cada grupo autoral.',
-  },
-  {
-    id: 'documents',
-    label: 'Documentos',
-    icon: 'book',
-    description: 'Obras relacionadas, ideas y temas sin grafo completo.',
-    selection: DOCUMENT_SELECTION,
-    starter: 'Compara los documentos más relevantes y señala qué aporta cada uno al argumento general.',
-  },
-];
+/** The context balloon's layers, in the order the activity balloon lists what they read. */
+const CONTEXT_LAYERS = [
+  { id: 'ideas', icon: 'bulb', label: 'Ideas', description: 'Ideas, temas, contradicciones, huecos, rutas de lectura, autores y el grafo que los relaciona.' },
+  { id: 'documents', icon: 'book', label: 'Documentos', description: 'El texto de las obras en la biblioteca de Nodus y en Zotero, y sus perfiles documentales.' },
+] as const;
 
 // Starter prompts offered as clickable chips on an empty chat. They run against
-// whatever context is currently selected (Síntesis by default), so they read as
+// whatever context is currently selected (every layer by default), so they read as
 // general research openers rather than mode switches.
 const CHAT_SUGGESTIONS = [
   '¿Cuáles son las ideas más centrales del corpus y por qué?',
@@ -213,6 +106,7 @@ export function ResearchAssistantModal({
   settings,
   initialTarget,
   isGenealogy = false,
+  isAcademic = false,
   onClose,
   embedded = false,
   adapter,
@@ -226,6 +120,9 @@ export function ResearchAssistantModal({
   /** Genealogy vault: the assistant answers over the family (people, kinship, events,
    *  documents, evidence), so the academic context selector is not shown. */
   isGenealogy?: boolean;
+  /** Academic vault: its chats always read the documents of its corpus, so a selection saved
+   *  before the context balloon had layers shows its documents layer on. */
+  isAcademic?: boolean;
   onClose?: () => void;
   embedded?: boolean;
   adapter?: ResearchChatAdapter;
@@ -243,7 +140,7 @@ export function ResearchAssistantModal({
   const [contextOpen, setContextOpen] = useState(() => embedded && !!adapter && localStorage.getItem(`nodus.${panelKey}ChatContextOpen`) === '1');
   const toggleHistory = () => setHistoryOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatHistoryOpen`, open ? '0' : '1'); return !open; });
   const toggleContext = () => setContextOpen(open => { localStorage.setItem(`nodus.${panelKey}ChatContextOpen`, open ? '0' : '1'); return !open; });
-  const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(SYNTHESIS_SELECTION));
+  const [selection, setSelection] = useState<ResearchContextSelection>(() => cloneSelection(LAYERED_SELECTION));
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
   const [attachments, setAttachments] = useState<ResearchAttachment[]>([]);
@@ -256,18 +153,57 @@ export function ResearchAssistantModal({
   const canUseAttachments = attachments.length > 0 || messages.some(message => message.attachments?.length);
 
   const [contextTitle, setContextTitle] = useState<string | null>(null);
-  const [activeModeId, setActiveModeId] = useState<ActiveAssistantModeId>('synthesis');
   const [concilium, setConcilium] = useState<ConciliumConfig | null>(null);
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, adapter?.modelFeature ?? 'chatModel', adapter?.modelFeature === 'studyModel' ? 'chatModel' : undefined);
   const [sending, setSending] = useState(false);
+  const [activityRun, setActivityRun] = useState<{ conversationId: string; turnId: string; activities: ResearchActivity[]; outcome: ResearchActivityStatus } | null>(null);
   // Remembered per provider+model: a conversation keeps whatever level the model was last
   // used at, so a level the user picked is not reset by switching chats or models.
   const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, selectedModel);
+  const [webSearch, setWebSearchState] = useState<ResearchWebSearchMode>(settings.researchWebSearch === 'off' ? 'off' : 'auto');
+  const setWebSearch = (mode: ResearchWebSearchMode) => { setWebSearchState(mode); void window.nodus.updateSettings({ researchWebSearch: mode }).catch(() => undefined); };
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
   const systemPrompts = useResearchSystemPrompts(promptConversationKey);
   const [showArchived, setShowArchived] = useState(false);
+  // Projects, their folders and pinned chats exist where the surface's store keeps them:
+  // the vault's research chat, or an adapter's own history (Databases, Worldbuilding, Study).
+  const organizer = useMemo(() => adapter ? adapter.organizer ?? null : researchChatOrganizer(), [adapter]);
+  const organizerRef = useRef(organizer);
+  organizerRef.current = organizer;
+  const supportsProjects = !!organizer;
+  const [projects, setProjects] = useState<ResearchChatProject[]>([]);
+  // Folders inside projects. The tree's selection is one state, shown in the history and
+  // on the project's page alike.
+  const [projectFolders, setProjectFolders] = useState<ResearchChatProjectFolder[]>([]);
+  const folderTree = useChatFolderTreeState();
+  // A project's page: shown while it is open and no conversation has started in it.
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [editingNotebook, setEditingNotebook] = useState<ResearchNotebook | 'new' | null>(null);
+  // Skills invoked with @ for the next message: typed in the composer, sent with the turn.
+  const skillsEnabled = !adapter;
+  const skillLibrary = useSkillLibrary();
+  const [invokedSkills, setInvokedSkills] = useState<InvokedSkill[]>([]);
+  const [mention, setMention] = useState<{ start: number; query: string } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const mentionOptions = skillsEnabled && mention ? rankSkillMentions(skillLibrary.skills, mention.query) : [];
+  const projectHome = supportsProjects && !!activeProjectId && !activeId;
+  const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
+  // A chat started on a project's page while one of its folders is selected starts in it.
+  const homeFolderId = projectHome && folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId !== UNFILED_FOLDER ? folderTree.selection.folderId : null;
+  const projectPlacement = projectHome ? { projectId: activeProjectId, ...(homeFolderId ? { folderId: homeFolderId } : {}) } : {};
+  const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
+  // A notebook's page, like a project's: shown while it is open and no chat has started in it.
+  const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
+  const activeNotebook = researchNotebooks.notebooks.find(notebook => notebook.id === activeNotebookId) ?? null;
+  // An adapter's notebook-equivalent: its own notebooks (Databases, Worldbuilding) or Study's courses.
+  const adapterNotebooks = adapter?.notebooks;
+  const adapterNotebook = adapterNotebooks?.entries.find(notebook => notebook.id === activeNotebookId) ?? null;
+  const notebookHome = (!!activeNotebook || !!adapterNotebook) && !activeId;
+  const [notebookPreparation, setNotebookPreparation] = useState<ResearchNotebookPreparation | null>(null);
+  // A notebook is read once its collections are indexed; until then it says so and waits.
+  const notebookBlocked = !!activeNotebook && (!notebookPreparation || notebookPreparation.pending > 0);
   const [pendingDelete, setPendingDelete] = useState<ChatConversationSummary | null>(null);
   const [citation, setCitation] = useState<CitationTarget>(null);
   const [noteTarget, setNoteTarget] = useState<{ content: string; title: string; source: NoteSource } | null>(null);
@@ -276,9 +212,9 @@ export function ResearchAssistantModal({
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [showContext, setShowContext] = useState(false);
-  // The context picker opens as a balloon anchored to its header trigger (like
-  // Skills) instead of a centered modal, so the corpus selection stays in reach.
-  const [contextPanelStyle, setContextPanelStyle] = useState<CSSProperties>({});
+  // The context balloon's two tabs: how the assistant approaches the corpus, and which of it.
+  const [contextTab, setContextTab] = useState<'focus' | 'library'>('focus');
+  // The context picker opens as a header balloon, like its neighbours.
   // Id of the assistant message currently streaming — drives the live caret and
   // the "stop" affordance. Null when nothing is in flight.
   const [streamingId, setStreamingId] = useState<string | null>(null);
@@ -291,7 +227,6 @@ export function ResearchAssistantModal({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const contextTriggerRef = useRef<HTMLButtonElement>(null);
-  const contextPanelRef = useRef<HTMLDivElement>(null);
   const lastInitialTargetRef = useRef<number | null>(null);
   const lastConversationTargetRef = useRef<number | null>(null);
   // Mirrors `messages` so async stream callbacks can persist the final array without
@@ -319,8 +254,16 @@ export function ResearchAssistantModal({
   }, [settings.chatModel, settings.favorites, settings.synthesisModel, selectedModel, concilium]);
 
   const refreshConversations = useCallback(async () => {
-    setConversations(await apiRef.current.listConversations(true));
-  }, []);
+    const store = organizerRef.current;
+    const [list, projectList, folderList] = await Promise.all([
+      apiRef.current.listConversations(true),
+      store ? store.listProjects() : Promise.resolve([] as ResearchChatProject[]),
+      store ? store.listFolders() : Promise.resolve([] as ResearchChatProjectFolder[]),
+    ]);
+    setConversations(list);
+    setProjects(projectList);
+    setProjectFolders(folderList);
+  }, [supportsProjects]);
 
   useEffect(() => {
     void refreshConversations();
@@ -334,61 +277,7 @@ export function ResearchAssistantModal({
     el.style.height = `${Math.min(el.scrollHeight, 224)}px`;
   }, [input]);
 
-  // Anchor the context balloon to its trigger, flipping above when there is no
-  // room below. Mirrors the Skills popover so both header menus feel the same.
-  useLayoutEffect(() => {
-    if (!showContext) return;
-    const place = () => {
-      const rect = contextTriggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const width = Math.min(420, window.innerWidth - 24);
-      const below = window.innerHeight - rect.bottom - 20;
-      const above = rect.top - 20;
-      const upwards = below < 360 && above > below;
-      setContextPanelStyle({
-        '--vault-accent': getComputedStyle(contextTriggerRef.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)',
-        position: 'fixed',
-        width,
-        left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
-        top: upwards ? 'auto' : rect.bottom + 8,
-        bottom: upwards ? window.innerHeight - rect.top + 8 : 'auto',
-        maxHeight: Math.min(720, Math.max(200, upwards ? above : below)),
-        zIndex: 10050,
-      } as CSSProperties);
-    };
-    place();
-    window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
-    return () => {
-      window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
-    };
-  }, [showContext]);
 
-  useEffect(() => {
-    if (!showContext) return;
-    const close = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (
-        !contextTriggerRef.current?.contains(target) &&
-        !contextPanelRef.current?.contains(target)
-      ) {
-        setShowContext(false);
-      }
-    };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.stopImmediatePropagation();
-        setShowContext(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', escape, true);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', escape, true);
-    };
-  }, [showContext]);
 
   const isNearBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -429,49 +318,43 @@ export function ResearchAssistantModal({
     }, 1400);
   }, []);
 
-  const selectedCount = useMemo(
-    () =>
-      [
-        selection.ideas,
-        selection.themes,
-        selection.contradictions,
-        selection.gaps,
-        selection.readingPath,
-        selection.authors,
-        selection.documents,
-        selection.passages,
-        selection.graph,
-      ].filter(Boolean).length,
-    [selection]
-  );
+  // What the balloon offers: the corpus layers and the web. A selection saved before layers
+  // existed is read from its sections, as the backend reads it.
+  const contextLayers = useMemo(() => researchContextLayers(selection, isAcademic), [selection, isAcademic]);
+  const selectedCount = Number(contextLayers.ideas) + Number(contextLayers.documents) + Number(webSearch !== 'off');
+  const sourceFilterOn = !!selection.sourceFilter?.enabled && !selection.notebookId;
+  // The works the Library tab authorizes, counted for the Focus tab's summary while it is open.
+  const [contextSources, setContextSources] = useState<ResearchContextSources | null>(null);
+  useEffect(() => {
+    if (!showContext || !sourceFilterOn) return;
+    let active = true;
+    void window.nodus.listResearchContextSources().then(sources => { if (active) setContextSources(sources); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [showContext, sourceFilterOn]);
+  const authorizedWorks = sourceFilterOn && contextSources ? matchingResearchWorkIds(contextSources, normalizeResearchSourceFilter(selection.sourceFilter)).length : null;
+  const authorizedSourcesSummary = !sourceFilterOn ? t('Toda la biblioteca')
+    : authorizedWorks === null ? t('Biblioteca filtrada')
+      : authorizedWorks === 1 ? t('1 obra autorizada') : tx('{n} obras autorizadas', { n: authorizedWorks });
+  // A notebook's chats read its collections: the Library tab is only for general chats.
+  const shownContextTab = contextTab === 'library' && !selection.notebookId ? 'library' : 'focus';
 
-  const updateSelection = (key: keyof Omit<ResearchContextSelection, 'graphParts' | 'sourceFilter'>, value: boolean) => {
-    setSelection((current) => ({ ...current, [key]: value }));
-  };
-
-  const updateGraphPart = (key: keyof ResearchGraphPartsSelection, value: boolean) => {
-    setSelection((current) => ({ ...current, graphParts: { ...current.graphParts, [key]: value } }));
-  };
-
-  const applyMode = (mode: (typeof ASSISTANT_MODES)[number]) => {
-    setActiveModeId(mode.id);
-    setSelection(current => ({ ...cloneSelection(mode.selection), sourceFilter: current.sourceFilter }));
-    setContextTitle(t(mode.label));
-    if (!input.trim()) setInput(t(mode.starter));
-  };
+  const setContextLayer = (layer: (typeof CONTEXT_LAYERS)[number]['id'], on: boolean) =>
+    setSelection(current => withResearchContextLayers(current, { ...researchContextLayers(current, isAcademic), [layer]: on }));
 
   const startNewConversation = () => {
     if (attachmentBusyRef.current) return;
     setAttachments([]);
     setAttachmentError('');
-    setSelection(current => { const { sourceFilter: _sourceFilter, ...rest } = current; return rest; });
+    setSelection(current => { const { sourceFilter: _sourceFilter, notebookId: _notebookId, ...rest } = current; return rest; });
+    setActiveNotebookId(null);
     adapter?.reset?.();
     if (!activeId) void systemPrompts.select(null);
+    setActiveProjectId(null);
     setActiveId(null);
     setMessages([]);
     setInput('');
     setStoppedMessageId(null);
-    setContextTitle(t(ASSISTANT_MODES.find((mode) => mode.id === activeModeId)?.label ?? '') || null);
+    setContextTitle(null);
     setShowJumpToBottom(false);
     setCopiedMessageId(null);
   };
@@ -485,7 +368,6 @@ export function ResearchAssistantModal({
     setMessages([]);
     setStoppedMessageId(null);
     setContextTitle(initialTarget.title ?? null);
-    setActiveModeId('custom');
     setSelection(current => cloneSelection(initialTarget.selection ?? { ...current, sourceFilter: undefined }));
     if (initialTarget.prompt) setInput(initialTarget.prompt);
     setShowJumpToBottom(false);
@@ -510,7 +392,8 @@ export function ResearchAssistantModal({
     const council = loadedMessages.filter(message => message.role === 'assistant').at(-1)?.concilium;
     setConcilium(council ? { chairman: council.chairman, models: council.members.map(member => member.model) } : null);
     setStoppedMessageId(null);
-    setSelection(cloneSelection(conversation.selection ?? SYNTHESIS_SELECTION));
+    setSelection(cloneSelection(conversation.selection ?? LAYERED_SELECTION));
+    setActiveNotebookId(conversation.selection?.notebookId ?? conversation.notebookId ?? null);
     if (conversation.model) setSelectedModel(conversation.model);
     setContextTitle(conversation.title || null);
     setInput('');
@@ -542,6 +425,104 @@ export function ResearchAssistantModal({
     lastConversationTargetRef.current = target.nonce;
     void loadConversation(target.conversationId, target.messageId, target.messageIndex);
   }, [initialConversationTarget?.nonce]);
+
+  const openProject = (projectId: string) => {
+    if (sending) return;
+    startNewConversation();
+    setActiveProjectId(projectId);
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const createProject = async (): Promise<ResearchChatProject | null> => {
+    if (!supportsProjects) return null;
+    const base = t('Nuevo proyecto');
+    const taken = new Set(projects.map(project => project.name));
+    let name = base;
+    for (let index = 2; taken.has(name); index++) name = `${base} ${index}`;
+    const created = await organizer!.createProject({ name });
+    await refreshConversations();
+    return created;
+  };
+  const updateProject = async (project: ResearchChatProject, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+    await organizer!.updateProject(project.id, patch);
+    await refreshConversations();
+  };
+  const deleteProject = async (project: ResearchChatProject) => {
+    await organizer!.deleteProject(project.id);
+    if (activeProjectId === project.id) setActiveProjectId(null);
+    if (folderTree.selection?.projectId === project.id) folderTree.select(null);
+    await refreshConversations();
+  };
+  // Every store renames its chats: Research Chat's own call, or the adapter's.
+  const renameApi = adapter ? adapter.renameConversation : window.nodus.renameConversation;
+  const renameConversation = async (conversation: ChatConversationSummary, title: string) => {
+    await renameApi!(conversation.id, title);
+    if (conversation.id === activeId) setContextTitle(title);
+    await refreshConversations();
+  };
+  const pinConversation = async (conversation: ChatConversationSummary, pinned: boolean) => {
+    await organizer!.setPinned(conversation.id, pinned);
+    await refreshConversations();
+  };
+  const moveConversation = async (conversation: ChatConversationSummary, projectId: string | null) => {
+    await organizer!.setProject(conversation.id, projectId);
+    await refreshConversations();
+  };
+  const folderActions: ChatFolderActions = {
+    folders: projectFolders,
+    onCreateFolder: async (projectId, parentId) => {
+      if (!organizer) return null;
+      const created = await organizer.createFolder({ projectId, parentId, name: nextFolderName(projectFolders, projectId, parentId, t('Nueva carpeta')) });
+      await refreshConversations();
+      return created;
+    },
+    onRenameFolder: async (folder, name) => { await organizer!.renameFolder(folder.id, name); await refreshConversations(); },
+    onMoveFolder: async (folder, parentId, index) => { await organizer!.moveFolder(folder.id, parentId, index); await refreshConversations(); },
+    onDeleteFolder: async (folder) => { await organizer!.deleteFolder(folder.id); await refreshConversations(); },
+    onFileConversation: async (conversation, folderId) => { await organizer!.setFolder(conversation.id, folderId); await refreshConversations(); },
+    onMoveConversation: moveConversation,
+  };
+  // A notebook opens on its own page; the first message there starts a chat inside it.
+  const openNotebook = (notebookId: string) => {
+    if (sending) return;
+    startNewConversation();
+    setActiveNotebookId(notebookId);
+    // An adapter points its own context at it; Research Chat reads it through the selection.
+    if (adapterNotebooks) adapterNotebooks.open(notebookId);
+    else setSelection(current => ({ ...current, notebookId }));
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  };
+  const activeNotebookRef = useRef<string | null>(null);
+  activeNotebookRef.current = activeNotebookId;
+  const refreshNotebookPreparation = useCallback(async (notebookId: string) => {
+    try {
+      const status = await window.nodus.getResearchNotebookPreparation(notebookId);
+      setNotebookPreparation(current => activeNotebookRef.current === notebookId ? status : current);
+    } catch { /* The page shows its last known state; the next progress event retries. */ }
+  }, []);
+  useEffect(() => {
+    setNotebookPreparation(null);
+    if (!activeNotebookId || adapter) return;
+    void refreshNotebookPreparation(activeNotebookId);
+    let timer: number | null = null;
+    const off = window.nodus.onResearchPreparationProgress(() => {
+      if (timer != null) return;
+      timer = window.setTimeout(() => { timer = null; void refreshNotebookPreparation(activeNotebookId); }, 1200);
+    });
+    return () => { off(); if (timer != null) window.clearTimeout(timer); };
+  }, [activeNotebookId, refreshNotebookPreparation]);
+  const updateNotebook = async (notebook: { id: string }, patch: { name?: string; icon?: string | null; color?: string | null }) => {
+    if (adapterNotebooks) { await adapterNotebooks.update?.(notebook.id, patch); return; }
+    await window.nodus.updateResearchNotebookAppearance(notebook.id, patch);
+    await researchNotebooks.refresh();
+  };
+  /** A notebook goes; its chats return to the general history. */
+  const deleteNotebook = async (notebook: { id: string }) => {
+    if (adapterNotebooks) await adapterNotebooks.remove?.(notebook.id);
+    else await window.nodus.deleteResearchNotebook(notebook.id);
+    if (activeNotebookId === notebook.id) startNewConversation();
+    if (!adapterNotebooks) await researchNotebooks.refresh();
+    await refreshConversations();
+  };
 
   const archiveConversation = async (conversation: ChatConversationSummary) => {
     await api.archiveConversation?.(conversation.id, !conversation.archived);
@@ -583,11 +564,11 @@ export function ResearchAssistantModal({
   // Runs one assistant turn against `priorMessages` + a fresh user turn. Shared by
   // the composer (send) and the regenerate action, which only differ in how they
   // pick the prior history and the user prompt.
-  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = []) => {
+  const generate = async (conversationId: string, priorMessages: UiMessage[], content: string, files: ResearchAttachment[] = [], skills: InvokedSkill[] = []) => {
     if (!selectedModel) return;
     const selectionKey = adapter?.contextKey ?? serializeSelection(selection);
     const isFirstExchange = priorMessages.length === 0;
-    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files };
+    const userMessage: UiMessage = { id: crypto.randomUUID(), role: 'user', content, selectionKey, attachments: files, ...(skills.length ? { skills } : {}) };
     const assistantId = crypto.randomUUID();
     const requestMessages: ResearchChatMessage[] = [
       ...priorMessages.filter((m) => (m.selectionKey === selectionKey || (adapter && !m.selectionKey)) && !m.error && m.content.trim()),
@@ -598,6 +579,7 @@ export function ResearchAssistantModal({
     setStoppedMessageId(null);
     setMessages([...priorMessages, userMessage, { id: assistantId, role: 'assistant', content: '', selectionKey }]);
     setSending(true);
+    setActivityRun({ conversationId, turnId: assistantId, activities: [], outcome: 'active' });
     setStreamingId(assistantId);
     // Reveal the question and the beginning of the answer once. Streaming
     // deltas must not chase the bottom: keeping this position stable lets the
@@ -610,8 +592,11 @@ export function ResearchAssistantModal({
     try {
       if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
       const response = await api.researchChatStream(
-        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined },
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, ...(!adapter ? { webSearch } : {}), systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined, ...(skillsEnabled && skills.length ? { skillIds: skills.map(skill => skill.id) } : {}) },
         {
+          // A terminal event may arrive after the turn settled (it travels on another IPC pipe
+          // than the reply); it then replaces the placeholder the settlement wrote.
+          onActivity: event => setActivityRun(current => current?.turnId === assistantId && (current.outcome === 'active' || event.status !== 'active') ? { ...current, activities: updateResearchActivities(current.activities, event) } : current),
           onConcilium: (result) => {
             councilResult = result;
             if (activeIdRef.current !== conversationId) return;
@@ -640,6 +625,7 @@ export function ResearchAssistantModal({
       // A user-triggered stop resolves with the partial answer; treat an empty
       // partial as "nothing generated" and drop the placeholder bubble.
       const aborted = stopRequestedRef.current || Boolean(response.aborted);
+      setActivityRun(current => current?.turnId === assistantId ? { ...current, activities: settleResearchActivities(current.activities, aborted ? 'cancelled' : 'completed'), outcome: aborted ? 'cancelled' : 'completed' } : current);
       if ('concilium' in response && response.concilium) councilResult = response.concilium;
       const answer = response.answer.trim();
       const finalMessages: UiMessage[] = answer || councilResult
@@ -656,6 +642,7 @@ export function ResearchAssistantModal({
       }
       await persist(conversationId, finalMessages, isFirstExchange);
     } catch (e) {
+      setActivityRun(current => current?.turnId === assistantId ? { ...current, activities: settleResearchActivities(current.activities, stopRequestedRef.current ? 'cancelled' : 'failed'), outcome: stopRequestedRef.current ? 'cancelled' : 'failed' } : current);
       if (stopRequestedRef.current) {
         // The user stopped the stream: keep the text that already arrived and mark
         // the message as aborted instead of replacing everything with the error.
@@ -673,7 +660,9 @@ export function ResearchAssistantModal({
         const errorMessage: UiMessage = {
           id: assistantId,
           role: 'assistant',
-          content: e instanceof Error ? e.message : String(e),
+          content: (e instanceof Error ? e.message : String(e)).includes('research_notebook_indexing')
+            ? t('El cuaderno aún está indexando sus colecciones. Podrás usarlo cuando termine.')
+            : e instanceof Error ? e.message : String(e),
           selectionKey,
           error: true,
           concilium: councilResult,
@@ -691,14 +680,34 @@ export function ResearchAssistantModal({
     }
   };
 
+  const pendingCaretRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current;
+    const field = inputRef.current;
+    if (caret == null || !field) return;
+    pendingCaretRef.current = null;
+    field.focus();
+    field.setSelectionRange(caret, caret);
+  }, [input]);
+  const pickSkill = (skill: { id: string; name: string }) => {
+    if (!mention) return;
+    const next = removeMention(input, mention);
+    setInput(next.text);
+    setInvokedSkills(current => current.some(item => item.id === skill.id) ? current : [...current, { id: skill.id, name: skill.name }].slice(0, 8));
+    setMention(null);
+    // Placed in the same commit as the new text: a frame later, a key typed straight after
+    // the pick landed before the caret moved.
+    pendingCaretRef.current = next.caret;
+  };
+
   const send = async (explicit?: string) => {
     const content = (explicit ?? input).trim() || (attachments.length ? t('Analiza los archivos adjuntos.') : '');
-    if (!content || sending || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
+    if (!content || sending || notebookBlocked || attachmentBusyRef.current || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)) return;
 
     // Lazily create the conversation on the first message so empty chats never clutter history.
     let conversationId = activeId;
     if (!conversationId) {
-      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80) });
+      const created = await api.createConversation({ model: selectedModel, selection, title: content.slice(0, 80), ...projectPlacement, ...(adapterNotebook ? { notebookId: adapterNotebook.id } : {}) });
       conversationId = created.id;
       await window.nodus.selectResearchSystemPrompt(`${adapter?.id ?? 'research'}:${created.id}`, systemPrompts.selectedId);
       activeIdRef.current = created.id;
@@ -709,7 +718,9 @@ export function ResearchAssistantModal({
     if (!explicit) setInput('');
     const files = explicit ? [] : attachments;
     if (!explicit) setAttachments([]);
-    await generate(conversationId, messagesRef.current, content, files);
+    const turnSkills = explicit ? [] : invokedSkills;
+    if (!explicit) { setInvokedSkills([]); setMention(null); }
+    await generate(conversationId, messagesRef.current, content, files, turnSkills);
   };
 
   // One click on a route-fix prompt sends the checker's correction request as the user's
@@ -736,7 +747,7 @@ export function ResearchAssistantModal({
     }
     const conversationId = activeIdRef.current;
     if (lastUserIdx < 0 || !conversationId) return;
-    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments);
+    await generate(conversationId, current.slice(0, lastUserIdx), current[lastUserIdx].content, current[lastUserIdx].attachments, current[lastUserIdx].skills);
   };
 
   const addAttachments = async (filePaths?: string[]) => {
@@ -745,7 +756,7 @@ export function ResearchAssistantModal({
     try {
       let id = activeIdRef.current;
       if (!id) {
-        const created = await api.createConversation({ model: selectedModel, selection });
+        const created = await api.createConversation({ model: selectedModel, selection, ...projectPlacement });
         id = created.id; activeIdRef.current = id; setActiveId(id);
         await window.nodus.selectResearchSystemPrompt(`${attachmentSurface}:${id}`, systemPrompts.selectedId);
       }
@@ -810,10 +821,18 @@ export function ResearchAssistantModal({
   const serializedModel = selectedModel ? serializeModel(selectedModel) : '';
   const visibleConversations = conversations.filter((c) => showArchived || !c.archived);
   const archivedCount = conversations.filter((c) => c.archived).length;
-  const activeMode = ASSISTANT_MODES.find((mode) => mode.id === activeModeId);
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   // Citations open their evidence workspace without replacing the conversation.
   const handleCitation = useCallback((c: MarkdownCitation) => {
+    // A web source opens where it lives: a new tab of Nodus' Browser, landing on the
+    // quoted passage. Library sources keep their citation workspace.
+    if (c.kind === 'passage' && c.id.startsWith('web:')) {
+      void window.nodus.getCitationPreview({ kind: 'passage', id: c.id }).then(preview => {
+        if (preview?.openUrl || preview?.url) openWebSource(preview.openUrl ?? preview.url!);
+        else setCitation({ kind: c.kind, id: c.id });
+      }).catch(() => setCitation({ kind: c.kind, id: c.id }));
+      return;
+    }
     setCitation({ kind: c.kind, id: c.id });
   }, []);
 
@@ -868,23 +887,18 @@ export function ResearchAssistantModal({
               type="button"
               ref={contextTriggerRef}
               data-testid="research-context-trigger"
-              className="btn btn-ghost border border-neutral-700 gap-1.5 text-xs py-1 research-accent-soft research-accent-text"
-              title={t('Elegir qué partes del corpus ve el asistente')}
+              className={`chat-skills-trigger research-context-trigger ${sourceFilterOn ? 'is-filtered' : ''}`}
+              title={sourceFilterOn ? `${t('Elegir qué partes del corpus ve el asistente')} · ${t('Biblioteca filtrada')}` : t('Elegir qué partes del corpus ve el asistente')}
               aria-haspopup="dialog"
               aria-expanded={showContext}
               onClick={() => setShowContext((value) => !value)}
             >
-              <Icon name="layers" size={15} className="research-accent-text" />
-              <span className="hidden min-w-0 truncate sm:inline">{activeMode ? t(activeMode.label) : t('Contexto')}</span>
-              <span className="research-accent-badge rounded bg-neutral-800 px-1.5 py-0.5 text-[10px] text-neutral-300">{selectedCount}</span>
+              <Icon name="layers" size={15} />
+              <span className="hidden min-w-0 truncate sm:inline">{t('Contexto')}</span>
+              {sourceFilterOn && <Icon name="library" size={12} aria-label={t('Biblioteca filtrada')} />}
+              <span className="chat-skills-count">{selectedCount}</span>
             </button>
           )}
-          {!adapter && !isGenealogy && <ResearchSourceFilterControl key={activeId ?? 'new'} value={selection.sourceFilter} disabled={sending} onChange={async sourceFilter => {
-            const next = { ...selection, sourceFilter };
-            if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
-            setSelection(next);
-            setShowContext(false);
-          }} />}
           <ResearchSystemPromptControl prompts={systemPrompts.prompts} selectedId={systemPrompts.selectedId} disabled={sending || !systemPrompts.ready} onSelect={systemPrompts.select} refresh={systemPrompts.refresh} />
           <ChatSkillsControl surface="assistant" disabled={sending} />
           {!adapter && <ResearchConciliumControl value={concilium} models={availableModels} selectedModel={selectedModel} disabled={sending} onChange={next => {
@@ -902,53 +916,79 @@ export function ResearchAssistantModal({
         <div className="flex-1 min-h-0 flex flex-col md:flex-row">
           {/* Conversation history */}
           <aside hidden={!historyOpen} data-testid="research-history-sidebar" className="research-chat-history w-full md:w-60 shrink-0 border-b md:border-b-0 md:border-r border-neutral-800 flex flex-col max-h-48 md:max-h-none">
-            <div className="p-3 border-b border-neutral-800">
-              <button className="btn btn-primary w-full gap-1.5" onClick={startNewConversation} disabled={sending}>
-                <Icon name="plus" /> {t('Nueva conversación')}
-              </button>
-            </div>
-            <VirtualList
-              items={visibleConversations}
-              itemHeight={58}
-              getKey={(conversation) => conversation.id}
-              className="flex-1 min-h-0 p-2"
-              empty={
-                <div className="text-xs text-neutral-600 text-center py-6 px-2">
-                  {t('Aún no hay conversaciones. Escribe abajo para empezar.')}
-                </div>
-              }
-              renderItem={(conversation) => (
-                <div className="h-[52px]">
-                  <ConversationRow
-                    conversation={conversation}
-                    active={conversation.id === activeId}
-                    onOpen={() => { if (!sending) void loadConversation(conversation.id); }}
-                    onArchive={api.archiveConversation ? () => void archiveConversation(conversation) : undefined}
-                    onDelete={() => setPendingDelete(conversation)}
-                  />
-                </div>
-              )}
+            <ResearchChatSidebar
+              conversations={visibleConversations}
+              projects={projects}
+              notebooks={adapterNotebooks ? adapterNotebooks.entries : researchNotebooks.notebooks}
+              supportsProjects={supportsProjects}
+              notebooksOn={adapterNotebooks ? true : researchNotebooks.available}
+              notebookKind={adapterNotebooks?.kind}
+              notebookCollections={!adapterNotebooks}
+              notebookLocksMoves={adapterNotebooks ? adapterNotebooks.locksMoves : true}
+              activeId={activeId}
+              activeProjectId={activeProjectId}
+              sending={sending}
+              archivedCount={archivedCount}
+              showArchived={showArchived}
+              onToggleArchived={() => setShowArchived((value) => !value)}
+              onNewConversation={startNewConversation}
+              onNewNotebook={adapterNotebooks ? adapterNotebooks.create && (() => adapterNotebooks.create!(openNotebook)) : () => setEditingNotebook('new')}
+              onNewProject={createProject}
+              onOpenConversation={(id) => void loadConversation(id)}
+              onOpenProject={openProject}
+              activeNotebookId={activeNotebookId}
+              onOpenNotebook={openNotebook}
+              onEditNotebook={adapterNotebooks
+                ? adapterNotebooks.editSources && (notebook => adapterNotebooks.editSources!(notebook.id))
+                : notebook => setEditingNotebook(researchNotebooks.notebooks.find(item => item.id === notebook.id) ?? null)}
+              onUpdateNotebook={!adapterNotebooks || adapterNotebooks.update ? updateNotebook : undefined}
+              onDeleteNotebook={!adapterNotebooks || adapterNotebooks.remove ? deleteNotebook : undefined}
+              onRenameConversation={renameApi ? renameConversation : undefined}
+              onPinConversation={pinConversation}
+              onArchiveConversation={api.archiveConversation ? archiveConversation : undefined}
+              onDeleteConversation={setPendingDelete}
+              onMoveConversation={moveConversation}
+              onUpdateProject={updateProject}
+              onDeleteProject={deleteProject}
+              folderTree={folderTree}
+              folderActions={folderActions}
             />
-            {archivedCount > 0 && (
-              <button
-                className="text-xs text-neutral-500 hover:text-neutral-300 px-3 py-2 border-t border-neutral-800 text-left flex items-center gap-1.5"
-                onClick={() => setShowArchived((v) => !v)}
-              >
-                <Icon name="archive" size={13} />
-                {showArchived ? t('Ocultar archivadas') : tx('Ver archivadas ({n})', { n: archivedCount })}
-              </button>
-            )}
           </aside>
 
-          <section className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <section className={`flex-1 min-w-0 min-h-0 flex flex-col ${projectHome || notebookHome ? 'research-project-home' : ''}`} data-testid={projectHome ? 'research-project-home' : notebookHome ? 'research-notebook-home' : undefined}>
+            {notebookHome && activeNotebook && <NotebookHomeHeader notebook={activeNotebook} onEdit={() => setEditingNotebook(activeNotebook)} />}
+            {notebookHome && adapterNotebook && <header className="research-project-title" data-testid="research-adapter-notebook-title">
+              <span style={{ color: adapterNotebook.color ?? undefined }}><Icon name={adapterNotebook.icon ?? (adapterNotebooks?.kind === 'course' ? 'graduation' : 'notebook')} size={30} /></span>
+              <h2>{adapterNotebook.name}</h2>
+              {adapterNotebooks?.editSources && <button type="button" className="btn btn-ghost text-xs" onClick={() => adapterNotebooks.editSources!(adapterNotebook.id)}>{t('Editar fuentes')}</button>}
+            </header>}
+            {projectHome && activeProject && <header className="research-project-title">
+              <span style={{ color: activeProject.color ?? undefined }}><Icon name={activeProject.icon ?? 'folder'} size={30} /></span>
+              <h2>{activeProject.name}</h2>
+            </header>}
             <div className="relative flex-1 min-h-0">
+              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} webDisabled={webSearch === 'off'} disabledLayers={[...(contextLayers.ideas ? [] : ['ideas', 'graph'] as const), ...(contextLayers.documents ? [] : ['profiles', 'nodus', 'zotero', 'context'] as const)]} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {conversationNotice && (
                   <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
                     {conversationNotice}
                   </div>
                 )}
-                {messages.length === 0 && (
+                {projectHome && activeProjectId && messages.length === 0 && <ProjectFolderBrowser
+                  projectId={activeProjectId}
+                  conversations={visibleConversations}
+                  tree={folderTree}
+                  actions={folderActions}
+                  renderList={shown => <ProjectChatList conversations={shown} draggable onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                    empty={folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId ? t('No hay chats aquí. Arrastra uno sobre una carpeta para guardarlo en ella.') : undefined} />}
+                />}
+                {notebookHome && messages.length === 0 && <ProjectChatList
+                  conversations={visibleConversations.filter(conversation => conversation.notebookId === activeNotebookId)}
+                  onOpen={(id) => { if (!sending) void loadConversation(id); }}
+                  empty={adapterNotebooks?.kind === 'course' ? t('Los chats que empieces aquí leerán los materiales de este curso.')
+                    : adapterNotebooks ? t('Los chats que empieces aquí leerán las fuentes de este cuaderno.') : t('Los chats que empieces aquí leerán las colecciones de este cuaderno.')}
+                />}
+                {!projectHome && !notebookHome && messages.length === 0 && (
                   <div className="research-empty-state h-full flex flex-col items-center justify-center gap-5 px-4 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <span className="grid h-12 w-12 place-items-center rounded-full border research-accent-soft research-accent-text">
@@ -1044,6 +1084,7 @@ export function ResearchAssistantModal({
                         </button>
                       </div>
                       {message.attachments?.length ? renderAttachments(message.attachments) : null}
+                      {message.skills?.length ? <InvokedSkillPills skills={message.skills} /> : null}
                       {message.concilium && <ConciliumResponses result={message.concilium} onCitation={handleCitation} />}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
                         <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
@@ -1081,6 +1122,8 @@ export function ResearchAssistantModal({
                           {message.stats.sections.join(', ') || t('Sin secciones')} · {tx('{n} obras', { n: message.stats.works })} ·{' '}
                           {tx('{n} docs', { n: message.stats.documents })} · {tx('{n} pasajes', { n: message.stats.passages })} · {formatChars(message.stats.contextChars)}
                           {message.stats.truncated ? ` · ${t('recortado')}` : ''}
+                          {(message.stats.webSources?.length || message.stats.webSearch?.searched) && <ResearchWebSources sources={message.stats.webSources ?? []} search={message.stats.webSearch} answer={message.content} />}
+                          {message.stats.researchTraversal && <ResearchCoverage value={message.stats.researchTraversal} />}
                         </div>
                       )}
                     </div>
@@ -1089,7 +1132,7 @@ export function ResearchAssistantModal({
               </div>
               {showJumpToBottom && (
                 <button
-                  className="absolute bottom-4 right-4 h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800"
+                  className={`absolute bottom-4 ${!adapter && !isGenealogy && activityRun?.conversationId === activeId ? 'left-4' : 'right-4'} h-10 w-10 rounded-full border border-neutral-700 bg-neutral-900/95 text-neutral-200 shadow-lg transition hover:bg-neutral-800`}
                   title={t('Bajar al final')}
                   onClick={() => scrollToBottom()}
                 >
@@ -1103,8 +1146,12 @@ export function ResearchAssistantModal({
               {attachmentError && <p className="research-attachment-error" role="alert">{attachmentError}</p>}
               {attachments.some(file => file.warning) && <p className="research-attachment-error" role="status">{attachments.filter(file => file.warning).map(file => `${file.name}: ${file.warning}`).join(' · ')}</p>}
               {attaching && <p className="research-attachment-status" role="status">{t('Preparando archivos…')}</p>}
+              {activeNotebook && <NotebookIndexingBanner preparation={notebookPreparation} />}
               <div className="research-composer-shell">
+              {mention && skillsEnabled && <SkillMentionMenu options={mentionOptions} activeIndex={mentionIndex}
+                onHover={setMentionIndex} onPick={pickSkill} />}
               {attachments.length > 0 && renderAttachments(attachments, true)}
+              <InvokedSkillPills skills={invokedSkills} onRemove={id => setInvokedSkills(current => current.filter(skill => skill.id !== id))} />
               <div className="research-composer">
                 <button className="research-composer-attach" aria-label={t('Añadir archivos')} title={t('Añadir archivos')} disabled={sending || attaching} onClick={() => void addAttachments()}><Icon name="plus" size={23} /></button>
                 <textarea
@@ -1113,15 +1160,36 @@ export function ResearchAssistantModal({
                   aria-label={t('Pregunta al asistente...')}
                   rows={1}
                   value={input}
-                  placeholder={!adapter && activeMode?.starter ? t(activeMode.starter) : t('Pregunta al asistente...')}
-                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={notebookHome && (activeNotebook ?? adapterNotebook) ? tx('Nuevo chat en {name}', { name: (activeNotebook ?? adapterNotebook)!.name }) : projectHome && activeProject ? tx('Nuevo chat en {name}', { name: activeProject.name }) : t('Pregunta al asistente...')}
+                  aria-autocomplete={skillsEnabled ? 'list' : undefined}
+                  aria-controls={mention ? 'research-skill-mention' : undefined}
+                  aria-activedescendant={mention && mentionOptions.length ? `research-skill-option-${mentionIndex}` : undefined}
+                  onChange={(e) => {
+                    setInput(e.target.value);
+                    if (skillsEnabled) { setMention(findSkillMention(e.target.value, e.target.selectionStart ?? e.target.value.length)); setMentionIndex(0); }
+                  }}
+                  onBlur={() => setMention(null)}
                   onKeyDown={(e) => {
+                    if (mention && !e.nativeEvent.isComposing) {
+                      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMention(null); return; }
+                      if (mentionOptions.length && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                        e.preventDefault();
+                        setMentionIndex(index => (index + (e.key === 'ArrowDown' ? 1 : -1) + mentionOptions.length) % mentionOptions.length);
+                        return;
+                      }
+                      if (mentionOptions.length && (e.key === 'Enter' || e.key === 'Tab') && !e.shiftKey) {
+                        e.preventDefault();
+                        pickSkill(mentionOptions[Math.min(mentionIndex, mentionOptions.length - 1)]);
+                        return;
+                      }
+                    }
                     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       void send();
                     }
                   }}
                 />
+                {!adapter && !isGenealogy && <ResearchWebSearchControl value={webSearch} onChange={setWebSearch} disabled={sending} />}
                 <ResearchEffortControl model={selectedModel} value={thinkingEffort} onChange={setThinkingEffort} disabled={sending} />
                 {sending ? (
                   <button
@@ -1138,14 +1206,14 @@ export function ResearchAssistantModal({
                     aria-label={t('Enviar')}
                     title={t('Enviar')}
                     onClick={() => void send()}
-                    disabled={attaching || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
+                    disabled={attaching || notebookBlocked || (!input.trim() && !attachments.length) || attachments.some(file => file.kind === 'unsupported') || !selectedModel || !systemPrompts.ready || (adapter?.canSend === false && !canUseAttachments)}
                   >
                     <Icon name="arrowUp" size={23} />
                   </button>
                 )}
               </div>
               </div>
-              <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-600">
+              <div className="mt-1.5 flex items-center gap-1 px-1 text-[11px] text-neutral-400">
                 <kbd className="composer-kbd">Enter</kbd>
                 <span>{t('para enviar')}</span>
                 <span className="text-neutral-700">·</span>
@@ -1153,6 +1221,11 @@ export function ResearchAssistantModal({
                 <span>+</span>
                 <kbd className="composer-kbd">Enter</kbd>
                 <span>{t('salto de línea')}</span>
+                {skillsEnabled && <>
+                  <span className="text-neutral-700">·</span>
+                  <kbd className="composer-kbd">@</kbd>
+                  <span>{t('para usar skills')}</span>
+                </>}
               </div>
             </footer>
           </section>
@@ -1163,128 +1236,63 @@ export function ResearchAssistantModal({
         </div>
       </div>
 
-      {showContext &&
-        createPortal(
-          <div
-            ref={contextPanelRef}
-            role="dialog"
-            aria-label={t('Contexto del asistente')}
-            style={contextPanelStyle}
-            className="research-context-panel"
-          >
-            <header className="flex items-center gap-2 border-b border-neutral-800 px-4 py-3">
-              <Icon name="layers" className="research-accent-text" />
-              <span className="text-sm font-semibold">{t('Contexto del asistente')}</span>
-              <span className="text-xs text-neutral-500">
-                {tx('{n} seleccionados', { n: selectedCount })}
-              </span>
-              <div className="flex-1" />
-              <button className="btn btn-ghost" onClick={() => setShowContext(false)} title={t('Cerrar')}>
-                <Icon name="x" />
-              </button>
-            </header>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              <p className="mb-3 text-xs text-neutral-500">
-                {t('Elige un modo o combina las secciones del corpus que el asistente puede leer.')}
-              </p>
-              <div className="mb-4">
-                <div className="mb-2 text-[11px] uppercase text-neutral-500">{t('Modo')}</div>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-                  {ASSISTANT_MODES.map((mode) => (
-                    <button
-                      key={mode.id}
-                      className={`rounded-md border px-2.5 py-2 text-left transition-colors ${
-                        activeModeId === mode.id
-                          ? 'research-accent-soft'
-                          : 'border-neutral-800 hover:bg-neutral-900'
-                      }`}
-                      title={t(mode.description)}
-                      onClick={() => applyMode(mode)}
-                    >
-                      <div className="flex items-center gap-1.5 text-sm">
-                        <Icon
-                          name={mode.icon}
-                          size={13}
-                          className={activeModeId === mode.id ? 'research-accent-text' : 'text-neutral-500'}
-                        />
-                        <span>{t(mode.label)}</span>
-                      </div>
-                      <div className="mt-0.5 line-clamp-1 text-[11px] text-neutral-500">{t(mode.description)}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="mb-3 flex gap-2">
-                <button
-                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
-                  onClick={() => {
-                    setActiveModeId('custom');
-                    setContextTitle(t('Todo'));
-                    setSelection(current => ({ ...cloneSelection(ALL_SELECTION), sourceFilter: current.sourceFilter }));
-                  }}
-                >
-                  {t('Todo')}
-                </button>
-                <button
-                  className="btn btn-ghost flex-1 border border-neutral-700 py-1 text-xs"
-                  onClick={() => {
-                    setActiveModeId('custom');
-                    setContextTitle(t('Manual'));
-                    setSelection(current => ({ ...cloneSelection(DEFAULT_SELECTION), sourceFilter: current.sourceFilter }));
-                  }}
-                >
-                  {t('Nada')}
-                </button>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                <ContextCheckbox label={t('Ideas generadas')} checked={selection.ideas} onChange={(v) => updateSelection('ideas', v)} />
-                <ContextCheckbox label={t('Temas principales')} checked={selection.themes} onChange={(v) => updateSelection('themes', v)} />
-                <ContextCheckbox label={t('Contradicciones')} checked={selection.contradictions} onChange={(v) => updateSelection('contradictions', v)} />
-                <ContextCheckbox label={t('Huecos de investigación')} checked={selection.gaps} onChange={(v) => updateSelection('gaps', v)} />
-                <ContextCheckbox label={t('Rutas de lectura')} checked={selection.readingPath} onChange={(v) => updateSelection('readingPath', v)} />
-                <ContextCheckbox label={t('Autores')} checked={selection.authors} onChange={(v) => updateSelection('authors', v)} />
-                <ContextCheckbox label={t('Documentos relacionados')} checked={selection.documents} onChange={(v) => updateSelection('documents', v)} />
-                <ContextCheckbox label={t('Pasajes de texto completo')} checked={selection.passages} onChange={(v) => updateSelection('passages', v)} />
-                <ContextCheckbox label={t('Grafo')} checked={selection.graph} onChange={(v) => updateSelection('graph', v)} />
-              </div>
-
-              <div className={`mt-3 space-y-2 border-l border-neutral-800 pl-3 ${selection.graph ? '' : 'opacity-45'}`}>
-                <ContextCheckbox
-                  label={t('Nodos de ideas')}
-                  checked={selection.graphParts.ideaNodes}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('ideaNodes', v)}
-                />
-                <ContextCheckbox
-                  label={t('Nodos de temas')}
-                  checked={selection.graphParts.themeNodes}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('themeNodes', v)}
-                />
-                <ContextCheckbox
-                  label={t('Relaciones de ideas')}
-                  checked={selection.graphParts.ideaEdges}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('ideaEdges', v)}
-                />
-                <ContextCheckbox
-                  label={t('Grafo de autores')}
-                  checked={selection.graphParts.authorGraph}
-                  disabled={!selection.graph}
-                  onChange={(v) => updateGraphPart('authorGraph', v)}
-                />
-              </div>
+      <HeaderBalloon
+        open={showContext}
+        anchor={contextTriggerRef}
+        onClose={() => setShowContext(false)}
+        icon={<Icon name="layers" size={18} />}
+        title={t('Contexto del asistente')}
+        meta={tx('{n} seleccionados', { n: selectedCount })}
+        testId="research-context-panel"
+        className="research-context-panel"
+        bodyClassName="context-balloon-body"
+      >
+        <div className="header-balloon-tabs" role="tablist" aria-label={t('Contexto del asistente')}>
+          {([['focus', 'layers', t('Enfoque')], ...(selection.notebookId ? [] : [['library', 'library', t('Biblioteca')]])] as Array<['focus' | 'library', string, string]>).map(([id, icon, label]) => (
+            <button key={id} type="button" role="tab" className="header-balloon-tab" data-testid={`research-context-tab-${id}`} aria-selected={shownContextTab === id}
+              aria-label={label} title={label} onClick={() => setContextTab(id)}>
+              <Icon name={icon} size={16} />{shownContextTab === id && <span>{label}</span>}
+            </button>
+          ))}
+        </div>
+        {shownContextTab === 'library' ? <SourceFilterPanel key={activeId ?? 'new'} value={selection.sourceFilter} onClose={() => setShowContext(false)} onApply={async sourceFilter => {
+          const next = { ...selection, sourceFilter };
+          if (activeId) await api.saveConversationMessages(activeId, messagesRef.current, { model: selectedModel, selection: next });
+          setSelection(next);
+          setShowContext(false);
+        }} /> : <div className="context-tab-panel" role="tabpanel" aria-label={t('Enfoque')}>
+          <div className="context-tab-scroll">
+            <p className="research-context-intro">{t('Elige qué consulta el asistente antes de responder.')}</p>
+            <div className="research-context-layers" data-testid="research-context-layers">
+              {CONTEXT_LAYERS.map(layer => <ContextLayerSwitch key={layer.id} testId={`research-context-layer-${layer.id}`} icon={layer.icon} label={t(layer.label)}
+                description={t(layer.description)} checked={contextLayers[layer.id]} disabled={sending} onChange={on => setContextLayer(layer.id, on)} />)}
+              <ContextLayerSwitch testId="research-context-layer-web" icon="globe" label={t('Búsqueda web')}
+                description={t('Páginas públicas de Internet, cuando la biblioteca no basta o se lo pides.')} checked={webSearch !== 'off'} disabled={sending}
+                onChange={on => setWebSearch(on ? 'auto' : 'off')} />
             </div>
-            <footer className="research-composer-footer">
-              <button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>
-                {t('Listo')}
-              </button>
-            </footer>
-          </div>,
-          document.body
-        )}
+            {selection.notebookId ? <div className="research-context-sources" data-testid="research-context-sources">
+              <Icon name="notebook" size={15} /><span><strong>{t('Fuentes autorizadas')}</strong><small>{t('Las del cuaderno de este chat.')}</small></span>
+            </div> : <button type="button" className="research-context-sources" data-testid="research-context-sources" onClick={() => setContextTab('library')}>
+              <Icon name="filter" size={15} /><span><strong>{t('Fuentes autorizadas')}</strong><small>{authorizedSourcesSummary}</small></span>
+              <Icon name="chevronRight" size={14} />
+            </button>}
+            {!contextLayers.ideas && !contextLayers.documents && webSearch === 'off' && <p className="research-context-empty" role="status" data-testid="research-context-empty">
+              {t('Sin fuentes: el asistente responderá con conocimiento general y lo dirá en la respuesta.')}</p>}
+          </div>
+          <footer className="header-balloon-foot"><button className="btn btn-primary w-full" onClick={() => setShowContext(false)}>{t('Listo')}</button></footer>
+        </div>}
+      </HeaderBalloon>
 
+      {adapterNotebooks?.overlay}
+      {editingNotebook && <NotebookDialog notebook={editingNotebook === 'new' ? null : editingNotebook}
+        onClose={() => setEditingNotebook(null)}
+        onSaved={async (id) => {
+          const created = editingNotebook === 'new';
+          await researchNotebooks.refresh();
+          setEditingNotebook(null);
+          if (id && created) openNotebook(id);
+          else if (id && id === activeNotebookId) void refreshNotebookPreparation(id);
+        }} />}
       {pendingDelete && (
         <ConfirmModal
           title={t('Eliminar conversación')}
@@ -1333,84 +1341,29 @@ function deriveNoteTitle(content: string, contextTitle: string | null): string {
   return base.length > 80 ? `${base.slice(0, 77)}…` : base;
 }
 
-function ConversationRow({
-  conversation,
-  active,
-  onOpen,
-  onArchive,
-  onDelete,
-}: {
-  conversation: ChatConversationSummary;
-  active: boolean;
-  onOpen: () => void;
-  onArchive?: () => void;
-  onDelete: () => void;
-}) {
-  return (
-    <div
-      className={`group rounded-lg border px-2.5 py-2 cursor-pointer transition-colors ${
-        active ? 'research-accent-soft' : 'border-transparent hover:bg-neutral-900'
-      }`}
-      onClick={onOpen}
-    >
-      <div className="flex items-center gap-1.5">
-        <Icon name="chat" size={13} className={`shrink-0 ${active ? 'research-accent-text' : 'text-neutral-500'}`} />
-        <span className={`flex-1 min-w-0 truncate text-sm ${conversation.archived ? 'text-neutral-500 italic' : ''}`}>
-          {conversation.title}
-        </span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          {onArchive && <button
-            className="p-1 rounded text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800"
-            title={conversation.archived ? t('Desarchivar') : t('Archivar')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onArchive();
-            }}
-          >
-            <Icon name="archive" size={13} />
-          </button>}
-          <button
-            className="p-1 rounded text-neutral-500 hover:text-red-400 hover:bg-neutral-800"
-            title={t('Eliminar')}
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Icon name="trash" size={13} />
-          </button>
-        </div>
-      </div>
-      <div className="text-[10px] text-neutral-600 mt-0.5 pl-5">
-        {formatRelative(conversation.updated_at)} · {tx('{n} mensaje(s)', { n: conversation.messageCount })}
-      </div>
-    </div>
-  );
+/** The chats of an open project, under its composer. */
+function ProjectChatList({ conversations, onOpen, empty, draggable = false }: { conversations: ChatConversationSummary[]; onOpen: (id: string) => void; empty?: string; draggable?: boolean }) {
+  if (!conversations.length) return <p className="research-project-empty">{empty ?? t('Los chats que empieces aquí quedarán en este proyecto.')}</p>;
+  return <ul className="research-project-chats" data-testid="research-project-chats">
+    {conversations.map(conversation => <li key={conversation.id} data-testid={`research-project-chat-${conversation.id}`} {...(draggable ? chatDragProps(conversation) : {})}>
+      <button type="button" data-marquee-host onClick={() => onOpen(conversation.id)}>
+        <MarqueeText text={conversation.title} className="research-project-chat-title" />
+        <span className="research-project-chat-date">{formatRelative(conversation.updated_at)}</span>
+      </button>
+    </li>)}
+  </ul>;
 }
 
-function ContextCheckbox({
-  label,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (value: boolean) => void;
+/** One layer of the context balloon: what it reads, and a switch. */
+function ContextLayerSwitch({ testId, icon, label, description, checked, disabled, onChange }: {
+  testId: string; icon: string; label: string; description: string; checked: boolean; disabled?: boolean; onChange: (value: boolean) => void;
 }) {
-  return (
-    <label className={`flex items-center gap-2 text-sm ${disabled ? 'cursor-not-allowed text-neutral-600' : 'text-neutral-300'}`}>
-      <input
-        type="checkbox"
-        className="h-4 w-4 research-accent-checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span>{label}</span>
-    </label>
-  );
+  return <button type="button" role="switch" aria-checked={checked} disabled={disabled} className="research-context-layer" data-testid={testId}
+    onClick={() => onChange(!checked)}>
+    <Icon name={icon} size={16} />
+    <span><strong>{label}</strong><small>{description}</small></span>
+    <span className="research-context-switch" aria-hidden="true"><span /></span>
+  </button>;
 }
 
 function serializeModel(model: ModelRef): string {
@@ -1438,20 +1391,6 @@ function formatChars(chars: number): string {
   if (chars >= 1_000_000) return `${(chars / 1_000_000).toFixed(1)}M chars`;
   if (chars >= 1000) return `${Math.round(chars / 1000)}k chars`;
   return `${chars} chars`;
-}
-
-function formatRelative(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return '';
-  const diff = Date.now() - then;
-  const minutes = Math.round(diff / 60000);
-  if (minutes < 1) return t('ahora');
-  if (minutes < 60) return tx('hace {n} min', { n: minutes });
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return tx('hace {n} h', { n: hours });
-  const days = Math.round(hours / 24);
-  if (days < 7) return tx('hace {n} d', { n: days });
-  return new Date(iso).toLocaleDateString();
 }
 
 function serializeSelection(selection: ResearchContextSelection): string {

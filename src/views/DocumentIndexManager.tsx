@@ -48,9 +48,9 @@ export function DocumentIndexManager({ vaultId, onClose }: { vaultId: string | n
     + standalone.filter((job) => job.status === 'queued' || job.status === 'paused').length;
   const failed = states.filter((item) => item.status === 'failed' || item.status === 'unavailable').length;
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Índice documental')} onClick={onClose}>
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Ficha documental')} onClick={onClose}>
     <div className="card-modal flex max-h-full w-full max-w-4xl flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
-      <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><Icon name="layers" className="text-cyan-300" /><div className="flex-1"><h2 className="font-semibold">{t('Índice documental')}</h2><p className="text-xs text-neutral-500">{t('Comprensión jerárquica y auditada de las obras completas del vault')}</p></div><button onClick={onClose}><Icon name="x" /></button></header>
+      <header className="flex items-center gap-3 border-b border-neutral-800 px-5 py-4"><Icon name="layers" className="text-cyan-300" /><div className="flex-1"><h2 className="font-semibold">{t('Ficha documental')}</h2><p className="text-xs text-neutral-500">{t('Comprensión jerárquica y auditada de las obras completas del vault')}</p></div><button onClick={onClose}><Icon name="x" /></button></header>
       <main className="min-h-0 flex-1 overflow-y-auto p-5">
         <div className="grid gap-3 sm:grid-cols-5">{[[t('Preparadas'), prepared], [t('Sin analizar'), unprepared], [t('En curso'), active], [t('En cola'), queued], [t('Con incidencias'), failed]].map(([label, value]) => <div key={String(label)} className="rounded-lg border border-neutral-800 p-3"><div className="text-2xl font-semibold tabular-nums">{value}</div><div className="text-xs text-neutral-500">{label}</div></div>)}</div>
         {live && <CampaignCard live={live} liveError={liveError} busy={busy} setStatus={setStatus} onCancel={() => setConfirmCancel(true)} />}

@@ -19,10 +19,14 @@ export async function loadPdfjs(): Promise<any> {
 }
 
 export async function openPdf(filePath: string, options: { forRendering?: boolean } = {}): Promise<any> {
+  return openPdfData(new Uint8Array(fs.readFileSync(filePath)), options);
+}
+
+/** Open a PDF already in memory (a downloaded web source, never written to disk). */
+export async function openPdfData(data: Uint8Array, options: { forRendering?: boolean } = {}): Promise<any> {
   const pdfjs = await loadPdfjs();
   const requireFromHere = createRequire(__filename);
   const pdfjsRoot = path.dirname(requireFromHere.resolve('pdfjs-dist/package.json'));
-  const data = new Uint8Array(fs.readFileSync(filePath));
   // Supplying PDF.js' bundled standard fonts is essential for raster output.
   // Without it, PDFs using Helvetica/Times can expose a valid text layer while
   // rendering blank glyphs in the Node canvas used by facsimile translation.

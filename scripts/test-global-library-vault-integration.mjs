@@ -137,6 +137,26 @@ try {
     /solo lectura|no está activo/,
     'a connected reader vault never receives a local write',
   );
+  // Files dropped on a vault's Library land in the Global Library and are used in that
+  // vault in one step; dropping bytes the Library already holds reuses that item.
+  const dropped = path.join(scratch, 'dropped-note.txt');
+  await writeFile(dropped, 'Nota soltada sobre la biblioteca del vault.\n', 'utf8');
+  const first = await library.importGlobalLibraryFilesIntoVault([dropped], vault.id);
+  assert.equal(first.created, 1);
+  assert.equal(first.linked, 1, 'a dropped file is used in the vault it was dropped on');
+  const droppedItemId = first.itemIds[0];
+  assert.equal(library.listGlobalLibraryVaultLinks(droppedItemId).length, 1);
+  await withVaultDatabase(vault.id, () => {
+    const work = getDb().prepare('SELECT nodus_id FROM works WHERE nodus_id=?').get(library.listGlobalLibraryVaultLinks(droppedItemId)[0].workId);
+    assert.ok(work, 'the vault gets its analyzable work, which its automatic preparation picks up');
+  });
+  const repeated = await library.importGlobalLibraryFilesIntoVault([dropped], vault.id);
+  assert.deepEqual([repeated.created, repeated.linked, repeated.alreadyInVault], [0, 0, 1], 'dropping the same bytes twice creates nothing new');
+  assert.deepEqual(repeated.existingItemIds, [droppedItemId]);
+  const elsewhere = await library.importGlobalLibraryFilesIntoVault([dropped], reuseTarget.id);
+  assert.deepEqual([elsewhere.created, elsewhere.linked], [0, 1], 'bytes already in the Global Library are still used in another vault');
+  assert.equal(library.listGlobalLibraryVaultLinks(droppedItemId).length, 2);
+
   library.closeGlobalLibrary();
   closeDb();
   console.log('Global Library → vault reference, clean Markdown resolution and idempotency tests passed!');

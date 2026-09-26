@@ -1,4 +1,7 @@
+import * as preparationExperience from '../ai/researchPreparationExperience';
+import { onDocumentaryPreparationChanged } from '../ai/documentaryPreparationEvents';
 import { manualIndexStatus, scheduleManualIndex } from '../ai/manualIdeaIndex';
+import { embed as embedResearchQuery } from '../ai/aiClient';
 import { assertAcademicAutomation } from '../ai/academicMode';
 import { registerResearchAttachmentIpc } from './researchAttachments';
 import { dialogTitle } from '../dialogTitles';
@@ -195,6 +198,11 @@ import { extractFromPath } from '../extraction/textExtractor';
 import { runDeepScan } from '../ai/deepScan';
 import { summaryContentHash } from '../ai/summaryScan';
 import { answerResearchChat, generateChatTitle, streamResearchChat } from '../ai/researchAssistant';
+import * as researchNotebooks from '../ai/researchNotebookService';
+import { researchCorpusInventory } from '../ai/researchCorpusInventory';
+import { ResearchCorpusRun, resolveAcademicRunScope } from '../ai/researchCorpusRun';
+import * as documentaryPreparation from '../ai/documentaryPreparation';
+import { RETRIEVAL_PRESETS } from '@shared/researchCorpus';
 import { listResearchContextSources } from '../ai/researchSourceScope';
 import { answerTutorStep, buildTutorPlan, streamTutorStep } from '../ai/tutor';
 import { buildArgumentMap, discoverArgumentRoutes } from '../ai/argumentMap';
@@ -254,7 +262,11 @@ import {
 import { reprocessConnections } from '../ai/reprocessConnections';
 import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
+import { getScopedLegacyPassageDetail } from '../citations/scopedLegacyCitations';
+import { getWebPassageDetail } from '../db/researchWebRepo';
 import { getPassageDetail } from '../db/passagesRepo';
+import * as researchZotero from '../mcp/researchZotero';
+import { getDocumentaryPassageDetail } from '../citations/documentaryCitations';
 import {
   deleteDocumentProfileOverride,
   documentProfileStatuses,
@@ -293,12 +305,13 @@ import { getEmbeddingSnapshot } from '../ai/embeddingPipeline';
 import { getPassageSnapshot } from '../ai/passageEmbeddingPipeline';
 import { isSemanticBridgeRunning } from '../ai/semanticBridges';
 import * as chat from '../db/chatRepo';
+import * as chatProjects from '../db/researchChatProjectsRepo';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
-import { getDb } from '../db/database';
+import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
-import { getActiveVault } from '../vaults/vaultRegistry';
+import { getActiveVault, withOwningVault } from '../vaults/vaultRegistry';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
 // electron sub-build erases type-only @shared imports but cannot resolve the
@@ -450,7 +463,13 @@ function pageCapableLibraryCopy(nodusId: string): OpenEvidenceAtPageResult['loca
   return { itemId: nodusId, scope: inVault ? 'vault' : 'global' };
 }
 
+let releasePreparationProgress: (() => void) | null = null;
 export function registerAcademicIpc(context: IpcContext): void {
+  releasePreparationProgress?.();
+  releasePreparationProgress = onDocumentaryPreparationChanged(() => {
+    const progress = preparationExperience.getResearchPreparationProgress();
+    for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) window.webContents.send('research:preparation:progress', progress);
+  });
   const { getWindow, chatAborters } = context;
   const h: IpcContext['h'] = (channel, listener) => context.h(channel, (event, ...args) => {
     if (/^(scan:|works:(setManualDeep|analyzeBoth|process|retry|rescan|reassignThemes|summarize|synthesizeIdeas)|study:improve$|themes:reprocess|bridges:discover|queue:enqueue|notes:reorderByAI|notes:folders:suggestIdeas|ideas:(merge|dedup|audit)|dictionary:(scan|retrieve))/.test(channel)) assertAcademicAutomation();
@@ -637,7 +656,9 @@ export function registerAcademicIpc(context: IpcContext): void {
       if (ids.includes(item.nodus_id)) scanQueue.removeItem(item.id);
     }
 
-    const vaultId = getActiveVault()?.id ?? null;
+    const vaultId = getActiveVault().id;
+    return withOwningVault(vaultId, () => withVaultDatabase(vaultId, async () => {
+    await documentaryPreparation.reconcileResearchDocumentOwnership();
     const result = deleteWorks(ids, { vaultId });
     // The Global Library index lives in its own database and only needs cleanup when it
     // is configured; a failure there must not undo a delete that already happened.
@@ -651,10 +672,12 @@ export function registerAcademicIpc(context: IpcContext): void {
     // works, so let it reconcile instead of discovering the gap on its next poll.
     if (vaultId) {
       void documentIndexQueue.refreshVault(vaultId).catch((error) => {
-        console.error('[works:delete] no se pudo reconciliar el índice documental', error);
+        console.error('[works:delete] no se pudo reconciliar la ficha documental', error);
       });
     }
+    await documentaryPreparation.reconcileResearchDocumentOwnership();
     return { ok: true, running: [], deleted: result.deleted, dormantIdeas: result.dormantIdeas, globalLinks };
+    }));
   });
   h('works:processFull', async (_e, nodusId: string, model?: ModelRef | null, options?: AnalysisRunOptions) => {
     processFullChain(nodusId, model, options);
@@ -1615,6 +1638,54 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('hypothesis:generate', async (_e, request: HypothesisLabRequest) => generateHypothesisLab(request));
 
   // research assistant
+  h('research:corpus:sources', async () => researchCorpusInventory());
+  h('research:zotero:automatic', async (_e, enabled: boolean) => researchZotero.setResearchZoteroAutomatic(enabled));
+  h('research:zotero:status', async (_e, notebookId) => researchZotero.getResearchZoteroStatus(notebookId));
+  h('research:zotero:connect', async (_e, input: Parameters<typeof researchZotero.connectResearchZotero>[0]) => researchZotero.connectResearchZotero(input));
+  h('research:zotero:disconnect', async (_e, notebookId) => researchZotero.disconnectResearchZotero(notebookId));
+  h('research:zotero:read', async (_e, input: Parameters<typeof researchZotero.readResearchZotero>[0]) => researchZotero.readResearchZotero(input));
+  h('research:notebooks:list', async () => researchNotebooks.listResearchNotebooks());
+  h('research:notebooks:save', async (_e, input) => researchNotebooks.saveResearchNotebook(input));
+  h('research:notebooks:delete', async (_e, id: string) => researchNotebooks.deleteResearchNotebook(id));
+  h('research:notebooks:resolve', async (_e, id: string) => researchNotebooks.resolveResearchNotebook(id));
+  h('research:notebooks:appearance', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => researchNotebooks.updateResearchNotebookAppearance(id, patch));
+  h('research:notebooks:preparation', async (_e, id: string) => researchNotebooks.ensureNotebookPrepared(id));
+  h('research:notebooks:search', async (_e, id: string, query: string) => {
+    if (typeof query !== 'string' || query.length > 10000) throw new Error('Invalid research query');
+    const scope = researchNotebooks.resolveResearchNotebook(id);
+    const notebook = researchNotebooks.listResearchNotebooks().find(item => item.id === id)!;
+    const controller = new AbortController();
+    const release = researchNotebooks.registerNotebookRun(id, controller);
+    try {
+      const vector = scope.documents.length ? await embedResearchQuery(query, controller.signal).catch(() => null) : null;
+      controller.signal.throwIfAborted();
+      const result = await documentaryPreparation.retrieveSharedDocumentaryEvidence(scope, query, notebook.settings ?? RETRIEVAL_PRESETS.balanced, vector, controller.signal);
+      if (researchNotebooks.resolveResearchNotebook(id).id !== scope.id) throw new Error('research_scope_changed');
+      return { evidence: result.evidence, scopeId: scope.id, partial: result.traversal.partial };
+    } finally { release(); }
+  });
+  h('research:corpus:read', async (_e, input: Parameters<import('@shared/researchCorpus').ResearchCorpusApi['readResearchDocument']>[0]) => {
+    if (!input || typeof input.documentId !== 'string' || input.documentId.length > 500) throw new Error('Invalid document identifier');
+    const scope = resolveAcademicRunScope(input.notebookId);
+    const notebook = input.notebookId ? researchNotebooks.listResearchNotebooks().find(item => item.id === input.notebookId) : null;
+    const controller = new AbortController();
+    const release = input.notebookId ? researchNotebooks.registerNotebookRun(input.notebookId, controller) : () => {};
+    try { return await new ResearchCorpusRun(scope, notebook?.settings ?? RETRIEVAL_PRESETS.balanced, controller.signal).readDocument(input.documentId, input.operation); }
+    finally { release(); }
+  });
+  h('research:preparation:policy', async () => preparationExperience.getResearchPreparationPolicy());
+  h('research:preparation:policy:set', async (_e, input) => preparationExperience.setResearchPreparationPolicy(input));
+  h('research:preparation:preview', async (_e, input) => preparationExperience.previewResearchPreparation(input));
+  h('research:preparation:campaign:start', async (_e, input) => preparationExperience.startResearchPreparationCampaign(input));
+  h('research:preparation:progress', async () => preparationExperience.getResearchPreparationProgress());
+  h('research:preparation:campaign:control', async (_e, input) => preparationExperience.controlResearchPreparationCampaign(input));
+  h('research:preparation:control', async (_e, action) => preparationExperience.controlAllResearchPreparation(action));
+  h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
+  h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
+  h('research:preparation:index', async (_e, input) => preparationExperience.indexResearchWorks(input));
+  h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));
+  h('research:preparation:enabled', async (_e, enabled: boolean) => documentaryPreparation.setResearchPreparationEnabled(enabled));
+  h('research:preparation:paused', async (_e, paused: boolean) => documentaryPreparation.setResearchPreparationPaused(paused));
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
     // Track the in-flight stream so `research:chatStream:cancel` can abort it. On
@@ -1622,6 +1693,7 @@ export function registerAcademicIpc(context: IpcContext): void {
     // partial text had streamed, which the renderer keeps.
     const controller = new AbortController();
     chatAborters.set(requestId, controller);
+    const unregisterNotebook = request.selection.notebookId ? researchNotebooks.registerNotebookRun(request.selection.notebookId, controller) : () => {};
     try {
       return await streamResearchChat(
         request,
@@ -1630,10 +1702,12 @@ export function registerAcademicIpc(context: IpcContext): void {
           e.sender.send(channel, requestId, delta);
         },
         controller.signal,
-        result => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:concilium', requestId, result); }
+        result => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:concilium', requestId, result); },
+        activity => { if (!e.sender.isDestroyed()) e.sender.send('research:chatStream:activity', requestId, activity); }
       );
     } finally {
       chatAborters.delete(requestId);
+      unregisterNotebook();
     }
   });
   h('research:chatStream:cancel', async (_e, requestId: string) => {
@@ -1754,7 +1828,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('research:contextSources', async () => listResearchContextSources());
   h('chat:list', async (_e, includeArchived?: boolean) => chat.listConversations(includeArchived ?? false));
   h('chat:get', async (_e, id: string) => chat.getConversation(id));
-  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null }) =>
+  h('chat:create', async (_e, input: { model?: ModelRef | null; selection?: ResearchContextSelection | null; title?: string; projectId?: string | null; folderId?: string | null }) =>
     chat.createConversation(input ?? {})
   );
   h(
@@ -1776,6 +1850,18 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('chat:rename', async (_e, id: string, title: string) => chat.renameConversation(id, title));
   h('chat:archive', async (_e, id: string, archived: boolean) => chat.setArchived(id, archived));
   h('chat:delete', async (_e, id: string) => chat.deleteConversation(id));
+  h('chat:projects:list', async () => chatProjects.listChatProjects());
+  h('chat:projects:create', async (_e, input: { name: string; icon?: string | null; color?: string | null }) => chatProjects.createChatProject(input));
+  h('chat:projects:update', async (_e, id: string, patch: { name?: string; icon?: string | null; color?: string | null }) => chatProjects.updateChatProject(id, patch));
+  h('chat:projects:delete', async (_e, id: string) => chatProjects.deleteChatProject(id));
+  h('chat:folders:list', async () => chatProjects.listChatProjectFolders());
+  h('chat:folders:create', async (_e, input: { projectId: string; parentId?: string | null; name: string }) => chatProjects.createChatProjectFolder(input));
+  h('chat:folders:rename', async (_e, id: string, name: string) => chatProjects.renameChatProjectFolder(id, name));
+  h('chat:folders:move', async (_e, id: string, parentId: string | null, index?: number) => chatProjects.moveChatProjectFolder(id, parentId, index));
+  h('chat:folders:delete', async (_e, id: string) => chatProjects.deleteChatProjectFolder(id));
+  h('chat:setProject', async (_e, id: string, projectId: string | null) => chatProjects.setConversationProject(id, projectId));
+  h('chat:setFolder', async (_e, id: string, folderId: string | null) => chatProjects.setConversationFolder(id, folderId));
+  h('chat:setPinned', async (_e, id: string, pinned: boolean) => chatProjects.setConversationPinned(id, pinned));
 
   // notes (user-structured folders/subfolders with markdown + captured AI content)
   h('notes:tree', async (_e, includeTrashed?: boolean) => notes.getNotesTree(includeTrashed ?? false));
@@ -1974,7 +2060,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('passages:clearProgress', async () => clearPassageProgress());
   h('passages:status', async () => getPassageSnapshot());
   h('passages:workStatuses', async (_e, nodusIds?: string[]) => getWorkPassageStatuses(nodusIds));
-  h('passages:get', async (_e, passageId: string) => getPassageDetail(passageId));
+  h('passages:get', async (_e, passageId: string) => passageId.startsWith('documentary:') ? getDocumentaryPassageDetail(passageId) : passageId.startsWith('scoped:') ? getScopedLegacyPassageDetail(passageId) : passageId.startsWith('web:') ? getWebPassageDetail(passageId) : getPassageDetail(passageId));
 
   // semantic bridge discovery
   h('bridges:discover', async (_e, model?: ModelRef | null) => discoverSemanticBridges(model));

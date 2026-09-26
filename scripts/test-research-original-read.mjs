@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { installRuntimeHooks, requireElectronRuntime, repoRoot } from './lib/tsRuntimeHooks.mjs';
+if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--research-original-read')) process.exit(0);
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-original-'));
+installRuntimeHooks(root);
+const require = createRequire(import.meta.url);
+try {
+  const { buildTextPdf } = await import('./toolkit-fixtures.mjs');
+  const file = await buildTextPdf(root);
+  const input = { file, sha256: createHash('sha256').update(fs.readFileSync(file)).digest('hex'), from: 2, to: 2, maxBytes: 2000, languages: 'eng' };
+  const { readOriginalPages } = require(path.join(repoRoot, 'electron/extraction/researchOriginal.ts'));
+  const pages = await readOriginalPages(input);
+  assert.equal(pages.length, 1);
+  assert.equal(pages[0].pageNumber, 2);
+  assert.equal(pages[0].pageLabel, null, 'no printed page label is invented');
+  assert.match(pages[0].text, /Metodo/);
+  assert.doesNotMatch(pages[0].text, /Conclusiones/);
+  const bounded = await readOriginalPages({ ...input, maxBytes: 12 });
+  assert.ok(Buffer.byteLength(bounded[0].text) <= 12);
+  assert.equal(bounded[0].partial, true);
+  await assert.rejects(() => readOriginalPages({ ...input, sha256: 'wrong' }), /revision_changed/);
+  await assert.rejects(() => readOriginalPages({ ...input, to: 100 }), /invalid_page/);
+  await assert.rejects(() => readOriginalPages(input, AbortSignal.abort()), /abort/i);
+  assert.deepEqual(fs.readdirSync(root).filter(name => name !== 'sample-3pages.pdf'), [], 'a bounded original read creates no index or campaign');
+  console.log('Real native PDF original read: bounded pages, byte budget, hash fence, cancellation and no preparation writes passed.');
+} finally { fs.rmSync(root, { recursive: true, force: true }); }

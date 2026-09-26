@@ -16,6 +16,45 @@ export interface Migration {
 
 const DATABASE_RESEARCH_REPORT_TYPES_SQL = "'general', 'data_quality', 'cohort_comparison', 'temporal_anomalies', 'relationships_integrity', 'causal_impact', 'survival_retention', 'privacy_attachments', 'formulas_reconciliation'";
 
+/**
+ * Add a column only where it is missing. The migrations from 180 on were numbered
+ * differently in earlier builds of the research notebooks branch (main's attendance took
+ * 179 first), so a database from one of those builds can already have a column while its
+ * user_version points before the migration that now adds it. Like v168, these are
+ * idempotent rather than failing the vault's opening on "duplicate column name".
+ */
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+  const present = (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).some((row) => row.name === column);
+  if (!present) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/**
+ * Teaching attendance (migration 179), kept as one statement set so migration 192 can
+ * re-apply it verbatim; every object is IF NOT EXISTS.
+ */
+const TEACHING_ATTENDANCE_SQL = /* sql */ `
+      CREATE TABLE IF NOT EXISTS teaching_attendance (
+        id TEXT PRIMARY KEY,
+        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        status TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
+
+      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
+        id TEXT PRIMARY KEY,
+        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
+        date TEXT NOT NULL,
+        label TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
+    `;
+
 /** v168 is deliberately idempotent: recovery tests and older prerelease builds may
  * have the column while their user_version still points before this migration. */
 function ensureDatabaseResearchReportTypeColumns(db: Database.Database): void {
@@ -119,7 +158,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 179;
+export const SCHEMA_VERSION = 192;
 
 export const migrations: Migration[] = [
   {
@@ -9322,29 +9361,173 @@ export const migrations: Migration[] = [
     // IF NOT EXISTS: a vault that already has the tables (a differently numbered build,
     // a replayed upgrade) must reach head instead of failing on "already exists".
     version: 179,
-    up: /* sql */ `
-      CREATE TABLE IF NOT EXISTS teaching_attendance (
-        id TEXT PRIMARY KEY,
-        student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
-        date TEXT NOT NULL,
-        status TEXT NOT NULL,
-        note TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
-
-      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
-        id TEXT PRIMARY KEY,
-        group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
-        date TEXT NOT NULL,
-        label TEXT NOT NULL DEFAULT '',
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
-    `,
+    up: TEACHING_ATTENDANCE_SQL,
   },
+  { version: 180, up: `
+    CREATE TABLE IF NOT EXISTS research_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+      revision INTEGER NOT NULL DEFAULT 1, mode TEXT NOT NULL CHECK(mode IN ('fixed','linked')),
+      sources_json TEXT NOT NULL, exclusions_json TEXT NOT NULL, resolved_ids_json TEXT NOT NULL,
+      settings_json TEXT, notes_json TEXT NOT NULL DEFAULT '[]', conversation_settings_json TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS research_notebook_conversations (
+      conversation_id TEXT PRIMARY KEY REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      notebook_id TEXT NOT NULL REFERENCES research_notebooks(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS research_notebook_conversations_notebook ON research_notebook_conversations(notebook_id);
+    CREATE TABLE IF NOT EXISTS research_run_scopes (
+      id TEXT PRIMARY KEY, notebook_id TEXT, scope_json TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  ` },
+  { version: 181, up: `
+    CREATE TABLE IF NOT EXISTS research_conversation_provenance (
+      conversation_id TEXT NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+      scope_id TEXT NOT NULL REFERENCES research_run_scopes(id),
+      role TEXT NOT NULL CHECK(role IN ('user','assistant')), content_hash TEXT NOT NULL, created_at TEXT NOT NULL,
+      PRIMARY KEY(conversation_id,scope_id,role,content_hash)
+    );
+  ` },
+  { version: 182, up: `
+    CREATE TABLE IF NOT EXISTS passage_publications (
+      nodus_id TEXT PRIMARY KEY REFERENCES works(nodus_id) ON DELETE CASCADE,
+      token TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  ` },
+  // Research chat projects, their folder trees, and where each conversation sits (a project,
+  // a folder in it, pinned). Projects stay flat; folders nest inside one project. The
+  // folders' keys do the structural work: a project takes its folders with it, a folder
+  // its subfolders, and a deleted folder leaves its chats in the project, unfiled. The
+  // repo's transactions still release a project's chats and drop a conversation's
+  // placement, since placements carry no key to chat_conversations.
+  { version: 183, up: `
+    CREATE TABLE IF NOT EXISTS research_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS research_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES research_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES research_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS research_chat_project_folders_project ON research_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS research_chat_project_folders_parent ON research_chat_project_folders(parent_id);
+    CREATE TABLE IF NOT EXISTS research_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES research_chat_project_folders(folder_id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS research_chat_placements_project ON research_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS research_chat_placements_folder ON research_chat_placements(folder_id);
+  ` },
+  { version: 184, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'chat_messages', 'skills_json', 'TEXT') },
+  // A notebook shows in the chat history like a project: its own icon and colour.
+  { version: 185, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'research_notebooks', 'icon', 'TEXT') },
+  { version: 186, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'research_notebooks', 'color', 'TEXT') },
+  // Research Chat web evidence: the exact passage Nodus read, where and when, so a
+  // web citation stays verifiable after the page changes or disappears.
+  { version: 187, up: `
+    CREATE TABLE IF NOT EXISTS research_web_passages (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      final_url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      site_name TEXT,
+      domain TEXT NOT NULL,
+      byline TEXT,
+      published_at TEXT,
+      doi TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('html', 'pdf')),
+      page_number INTEGER,
+      heading TEXT,
+      text TEXT NOT NULL,
+      retrieved_at TEXT NOT NULL
+    );
+  ` },
+  // Research chat folders and placements carry their own updated_at, so a folder renamed or
+  // moved, or a chat filed, travels by newest-wins like every other synced row. Without a
+  // stamp the merge keeps whatever the receiving device already had, and a chat moved on
+  // one machine never moved on the other.
+  {
+    version: 188,
+    up: /* sql */ `SELECT 1;`,
+    after: (db) => {
+      addColumnIfMissing(db, 'research_chat_project_folders', 'updated_at', 'TEXT');
+      addColumnIfMissing(db, 'research_chat_placements', 'updated_at', 'TEXT');
+      db.exec(`
+        UPDATE research_chat_project_folders SET updated_at = created_at WHERE updated_at IS NULL;
+        UPDATE research_chat_placements SET updated_at = COALESCE(
+          (SELECT c.updated_at FROM chat_conversations c WHERE c.id = research_chat_placements.conversation_id),
+          pinned_at, '1970-01-01T00:00:00.000Z') WHERE updated_at IS NULL;
+      `);
+    },
+  },
+  // The Databases and Worldbuilding chat histories get what Research Chat has: projects,
+  // folders nested inside them, pins and notebooks, each surface in tables of its own so
+  // no history can read or write another's. The same shape and keys as migration 183
+  // plus 188's stamps; a notebook is the named set of sources its chats read, kept as the
+  // surface's own selection JSON. Placements carry no key to their conversation; the
+  // repository drops a chat's placement with it and the repair pass catches the rest.
+  { version: 189, up: `
+    CREATE TABLE IF NOT EXISTS database_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS database_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES database_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES database_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS database_chat_project_folders_project ON database_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS database_chat_project_folders_parent ON database_chat_project_folders(parent_id);
+    CREATE TABLE IF NOT EXISTS database_chat_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT, selection_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS database_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES database_chat_project_folders(folder_id) ON DELETE SET NULL,
+      notebook_id TEXT REFERENCES database_chat_notebooks(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS database_chat_placements_project ON database_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS database_chat_placements_folder ON database_chat_placements(folder_id);
+    CREATE INDEX IF NOT EXISTS database_chat_placements_notebook ON database_chat_placements(notebook_id);
+    CREATE TABLE IF NOT EXISTS world_chat_projects (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT,
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS world_chat_project_folders (
+      folder_id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL REFERENCES world_chat_projects(id) ON DELETE CASCADE,
+      parent_id TEXT REFERENCES world_chat_project_folders(folder_id) ON DELETE CASCADE,
+      name TEXT NOT NULL, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS world_chat_project_folders_project ON world_chat_project_folders(project_id);
+    CREATE INDEX IF NOT EXISTS world_chat_project_folders_parent ON world_chat_project_folders(parent_id);
+    CREATE TABLE IF NOT EXISTS world_chat_notebooks (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, icon TEXT, color TEXT, selection_json TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS world_chat_placements (
+      conversation_id TEXT PRIMARY KEY, project_id TEXT, pinned_at TEXT,
+      folder_id TEXT REFERENCES world_chat_project_folders(folder_id) ON DELETE SET NULL,
+      notebook_id TEXT REFERENCES world_chat_notebooks(id) ON DELETE SET NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS world_chat_placements_project ON world_chat_placements(project_id);
+    CREATE INDEX IF NOT EXISTS world_chat_placements_folder ON world_chat_placements(folder_id);
+    CREATE INDEX IF NOT EXISTS world_chat_placements_notebook ON world_chat_placements(notebook_id);
+  ` },
+  // Archiving, as in Research Chat: an archived chat leaves the normal history.
+  { version: 190, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'database_chat_conversations', 'archived', 'INTEGER NOT NULL DEFAULT 0') },
+  { version: 191, up: /* sql */ `SELECT 1;`, after: (db) => addColumnIfMissing(db, 'world_chat_conversations', 'archived', 'INTEGER NOT NULL DEFAULT 0') },
+  // A database from an earlier build of the research notebooks branch passed 179 under
+  // that branch's own numbering and never created main's attendance tables. The body
+  // names ON DELETE CASCADE, so the create-only backfill will not replay it; this does,
+  // and is a no-op wherever the tables exist.
+  { version: 192, up: TEACHING_ATTENDANCE_SQL },
 ];
 
 /**

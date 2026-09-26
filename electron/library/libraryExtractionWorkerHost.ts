@@ -3,7 +3,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { Worker } from 'node:worker_threads';
+import { backgroundProcess, type BackgroundProcess } from '../workers/backgroundProcess';
 import type { LibraryExtractionOptions, LibraryItemRecord } from '@shared/libraryTypes';
 import {
   extractLibraryItem,
@@ -22,7 +22,7 @@ export interface LibraryWorkerExtractionInput {
   remoteOcr?: LibraryRemoteOcr;
 }
 
-const activeWorkers = new Set<Worker>();
+const activeWorkers = new Set<BackgroundProcess>();
 
 function workerFile(): string {
   return process.env.NODUS_LIBRARY_EXTRACTION_WORKER_FILE
@@ -39,16 +39,17 @@ function abortError(): Error {
   return error;
 }
 
-/** Run the complete extraction pipeline away from Electron's main event loop. */
+/** Run the complete extraction pipeline in an owned process outside Electron's main process. */
 export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionInput): Promise<LibraryExtractionResult> {
   if (!libraryExtractionWorkerAvailable()) {
+    if (process.type === 'browser') throw new Error('Library extraction process is unavailable.');
     // Source-level unit tests do not build the worker entry. Production and
     // packaged development builds always include it; retain a functional
     // fallback for those isolated tests and explicit diagnostic opt-outs.
     return extractLibraryItem(input);
   }
   if (input.signal?.aborted) throw abortError();
-  const worker = new Worker(workerFile());
+  const worker = backgroundProcess(workerFile(), 'Nodus document extraction');
   activeWorkers.add(worker);
   worker.unref();
   return new Promise<LibraryExtractionResult>((resolve, reject) => {
@@ -60,9 +61,7 @@ export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionI
       if (forcedTermination) clearTimeout(forcedTermination);
       input.signal?.removeEventListener('abort', cancel);
       activeWorkers.delete(worker);
-      void worker.terminate().catch(() => undefined);
-      if (error) reject(error);
-      else resolve(result!);
+      void worker.terminate().finally(() => { if (error) reject(error); else resolve(result!); });
     };
     const cancel = (): void => {
       worker.postMessage({ kind: 'cancel' });
@@ -115,4 +114,36 @@ export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionI
 export function disposeLibraryExtractionWorkers(): void {
   for (const worker of activeWorkers) void worker.terminate().catch(() => undefined);
   activeWorkers.clear();
+}
+
+/** Original page reads use the same owned extractor process without a writable library. */
+export async function readResearchOriginalInWorker(input: import('../extraction/researchOriginal').OriginalPageRead, signal?: AbortSignal): Promise<import('../extraction/researchOriginal').OriginalPage[]> {
+  return originalWorker('read-original', input, signal);
+}
+export async function inspectResearchOriginalInWorker(input: { file: string; sha256?: string }, signal?: AbortSignal): Promise<import('../extraction/researchOriginal').OriginalInspection> {
+  return originalWorker('inspect-original', input, signal);
+}
+async function originalWorker<T>(kind: 'read-original' | 'inspect-original', input: unknown, signal?: AbortSignal): Promise<T> {
+  signal?.throwIfAborted();
+  if (!libraryExtractionWorkerAvailable()) throw new Error('documentary_extraction_worker_unavailable');
+  const worker = backgroundProcess(workerFile(), 'Nodus original reading');
+  activeWorkers.add(worker);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: Error, value?: T) => {
+      if (settled) return;
+      settled = true; clearTimeout(deadline); signal?.removeEventListener('abort', cancel); activeWorkers.delete(worker);
+      void worker.terminate().finally(() => error ? reject(error) : resolve(value!));
+    };
+    const cancel = () => finish(abortError());
+    const deadline = setTimeout(() => finish(new Error('research_original_read_timeout')), 30000);
+    signal?.addEventListener('abort', cancel, { once: true });
+    worker.on('message', (message: any) => {
+      if (message?.kind === 'done') finish(undefined, message.result);
+      if (message?.kind === 'error') finish(new Error(message.error));
+    });
+    worker.once('error', error => finish(error));
+    worker.once('exit', () => finish(new Error('research_original_worker_closed')));
+    worker.postMessage({ kind, input });
+  });
 }

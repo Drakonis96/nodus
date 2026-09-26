@@ -1,0 +1,85 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import http from 'node:http';
+import { createHash } from 'node:crypto';
+import { PDFDocument, StandardFonts } from 'pdf-lib';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { createResearchTestRoot, macResearchSandbox, researchTestEnvironment, verifyResearchSandbox } from './research-isolation.mjs';
+
+const root = createResearchTestRoot();
+const disposableCI = process.argv.includes('--disposable-ci') && process.env.GITHUB_ACTIONS === 'true' && process.env.RUNNER_ENVIRONMENT === 'github-hosted';
+if (process.platform !== 'darwin' && !disposableCI) throw new Error('Non-macOS runtime tests require a disposable hosted CI runner');
+const calls = [];
+let version = 3;
+const fixture = http.createServer((request, response) => {
+  calls.push({ method: request.method, url: request.url });
+  response.setHeader('Content-Type', 'application/json');
+  response.setHeader('Zotero-Server-ID', 'synthetic-server');
+  const key = request.url.split('/')[5];
+  response.end(JSON.stringify(request.url.endsWith('/fulltext')
+    ? { content: 'Synthetic evidence: the north field measured 23 units.' }
+    : { key, version, data: { key, version, title: 'Synthetic source' } }));
+});
+await new Promise(resolve => fixture.listen(0, '127.0.0.1', resolve));
+const policy = process.platform === 'darwin' ? macResearchSandbox(root, [fixture.address().port]) : null;
+const isolation = policy ? verifyResearchSandbox(root, policy) : { environment: 'disposable-hosted-ci', osWriteBoundaryVerified: false };
+const pdf = await PDFDocument.create();
+const font = await pdf.embedFont(StandardFonts.Helvetica);
+pdf.addPage().drawText('MCP ORIGINAL 41: synthetic evidence.', { x: 50, y: 700, size: 16, font });
+const bytes = Buffer.from(await pdf.save());
+const original = path.join(root, 'mcp/original.pdf');
+fs.writeFileSync(original, bytes);
+const scope = { format: 'nodus.zotero-mcp-scope/1', root,
+  serverId: 'synthetic-server',
+  endpoint: `http://127.0.0.1:${fixture.address().port}/api`,
+  items: [{ libraryType: 'user', libraryId: '0', itemKey: 'SOURCE01', version: 3, revision: 'synthetic-v3',
+    attachments: [{ key: 'ATTACH01', version: 3, path: original, sha256: createHash('sha256').update(bytes).digest('hex') }] }] };
+const manifest = path.join(root, 'mcp/scope.json');
+fs.writeFileSync(manifest, JSON.stringify(scope));
+const runtime = path.resolve(import.meta.dirname, '../build/zotero-mcp');
+const python = path.join(runtime, process.platform === 'win32' ? 'python/python.exe' : 'python/bin/python3');
+const runtimeArgs = ['-I', '-B', path.join(runtime, 'serve.py'), manifest];
+const transport = new StdioClientTransport({ command: policy ? '/usr/bin/sandbox-exec' : python, args: policy ? ['-p', policy, python, ...runtimeArgs] : runtimeArgs,
+  env: { ...researchTestEnvironment(root), HOME: root, XDG_CACHE_HOME: path.join(root, 'mcp/cache'),
+    XDG_CONFIG_HOME: path.join(root, 'mcp/config'), FASTMCP_CHECK_FOR_UPDATES: 'off' }, stderr: 'pipe' });
+const client = new Client({ name: 'nodus-scoped-integration-test', version: '1' });
+let diagnostic = '';
+transport.stderr?.on('data', data => { diagnostic += data.toString(); });
+const report = { root, isolation, endpointKind: 'synthetic-http-fixture', transport: 'stdio', passed: false };
+try {
+  await client.connect(transport);
+  const tools = (await client.listTools()).tools.map(tool => tool.name).sort();
+  assert.deepEqual(tools, ['zotero_get_item_children', 'zotero_get_item_fulltext', 'zotero_get_item_metadata', 'zotero_read_pdf_pages']);
+  const args = { library_type: 'user', library_id: '0', item_key: 'SOURCE01' };
+  const invoke = (name, extra = {}) => client.callTool({ name, arguments: { ...args, ...extra } });
+  assert.equal((await invoke('zotero_get_item_metadata')).isError, false);
+  assert.equal((await invoke('zotero_get_item_children')).isError, false);
+  assert.equal((await invoke('zotero_get_item_fulltext', { attachment_key: 'ATTACH01' })).isError, false);
+  const read = await invoke('zotero_read_pdf_pages', { attachment_key: 'ATTACH01', start_page: 1, end_page: 1 });
+  assert.equal(read.isError, false);
+  const content = read.structuredContent ?? JSON.parse(read.content.find(item => item.type === 'text').text);
+  assert.match(content.pages[0].text, /MCP ORIGINAL 41/);
+  assert.equal(content.pages[0].pageNumber, 1);
+  const beforeDenied = calls.length;
+  for (const override of [{ item_key: 'OUTSIDE1' }, { library_id: '2' }, { library_type: 'group' }]) {
+    assert.equal((await invoke('zotero_get_item_metadata', override)).isError, true);
+  }
+  assert.equal((await invoke('zotero_get_item_fulltext', { attachment_key: 'OUTSIDE2' })).isError, true);
+  assert.equal((await invoke('zotero_read_pdf_pages', { attachment_key: 'ATTACH01', start_page: 1, end_page: 99 })).isError, true);
+  assert.equal(calls.length, beforeDenied, 'rejected identities never reach Zotero');
+  version = 4;
+  assert.equal((await invoke('zotero_get_item_metadata')).isError, true, 'revision changes stop access');
+  assert.equal((await invoke('zotero_read_pdf_pages', { attachment_key: 'ATTACH01', start_page: 1, end_page: 1 })).isError, true, 'original pages recheck the live attachment revision');
+  assert.ok(calls.every(call => call.method === 'GET' && /^\/api\/users\/0\/items\/(SOURCE01|ATTACH01)(\/fulltext)?$/.test(call.url)));
+  Object.assign(report, { passed: true, tools, calls, version: client.getServerVersion() });
+} catch (error) {
+  console.error(diagnostic);
+  throw error;
+} finally {
+  await client.close();
+  await new Promise(resolve => fixture.close(resolve));
+  fs.writeFileSync(path.join(root, 'artifacts/managed-mcp.json'), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report));
+}

@@ -409,8 +409,9 @@ export async function findSimilarIdeasPaged(
   queryEmbedding: number[],
   threshold: number,
   limit: number,
-  opts: { nodusIds?: string[] } = {}
+  opts: { nodusIds?: string[]; ideaIds?: string[] } = {}
 ): Promise<{ global_id: string; type: IdeaType; label: string; statement: string; similarity: number }[]> {
+  if (limit <= 0 || opts.nodusIds?.length === 0 || opts.ideaIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
   const scoped = nodusIds.length
@@ -429,8 +430,9 @@ export async function findSimilarIdeasPaged(
              AND embedding_provider = ?
              AND embedding_model = ?
              AND embedding_dim = ?
-             AND orphaned_at IS NULL${scoped}`,
-    params: [config.provider, config.model, queryEmbedding.length, ...nodusIds],
+             AND orphaned_at IS NULL${scoped}
+             AND (? IS NULL OR global_id IN (SELECT value FROM json_each(?)))`,
+    params: [config.provider, config.model, queryEmbedding.length, ...nodusIds, opts.ideaIds ? JSON.stringify(opts.ideaIds) : null, opts.ideaIds ? JSON.stringify(opts.ideaIds) : null],
     query: queryEmbedding,
     threshold,
     limit,

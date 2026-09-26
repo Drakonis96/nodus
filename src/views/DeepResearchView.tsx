@@ -1,4 +1,8 @@
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import { useResearchEffort } from '../hooks/useResearchEffort';
+import type { ResearchEffort } from '@shared/researchReasoning';
 import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
+import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
 // chained generation queue, and tabbed readers that expand reports to full width
@@ -120,7 +124,7 @@ export type ReadFilter = 'all' | 'read' | 'unread';
  */
 type DeepResearchVariant = 'academic' | 'genealogy' | 'study' | 'unit';
 
-interface DeepResearchCopy {
+export interface DeepResearchCopy {
   heading: string;
   subtitle: string;
   newAction: string;
@@ -161,7 +165,7 @@ const REPORT_TUTORIAL = [
   },
 ];
 
-const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
+export const DEEP_RESEARCH_COPY: Record<DeepResearchVariant, DeepResearchCopy> = {
   academic: {
     heading: 'Deep Research',
     subtitle: 'Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.',
@@ -306,10 +310,14 @@ export function DeepResearchView({
   // Composer (new report) state.
   const [composerOpen, setComposerOpen] = useState(false);
   const [objective, setObjective] = useState('');
+  const [notebookId, setNotebookId] = useState<string | null>(null);
   const [approach, setApproach] = useState<DeepResearchApproach>('general');
   const [deepResearchVersion, setDeepResearchVersion] = useState<DeepResearchVersion>('v1');
   const [language, setLanguage] = useState<PromptLanguage>('es');
   const [selectedModel, setSelectedModel] = useFeatureModel(settings, 'deepResearchModel');
+  // The thinking level for that model, shared with the Research chat's memory: the level
+  // last chosen for it, or its middle level.
+  const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, selectedModel ?? null);
   const [deepSectionLimit, setDeepSectionLimit] = useState<DeepResearchSectionLimit>('auto');
   const [deepSectionLength, setDeepSectionLength] = useState<DeepResearchSectionLength>('auto');
   const [sectionLengthValid, setSectionLengthValid] = useState(true);
@@ -541,6 +549,7 @@ export function DeepResearchView({
     const outline = isTeaching && structureMode === 'manual' && deepSectionLimit !== 'single' ? unitOutline : null;
     const request = {
       objective: objective.trim(),
+      ...(!isStudy && !isTeaching && !isGenealogy ? { notebookId } : {}),
       approach,
       deepResearchVersion: normalizeDeepResearchRequestVersion(deepResearchVersion),
       language,
@@ -549,6 +558,7 @@ export function DeepResearchView({
       documentSkills: documentSkills.policy,
       ...(isStudy ? { audience } : {}),
       model: selectedModel,
+      thinkingEffort,
       decorativeImage: { enabled: includeImage, style: imageStyle },
       ...(isGenealogy ? { focusPersonId } : {}),
       ...(isStudy ? { studyMode: true } : {}),
@@ -1216,12 +1226,16 @@ export function DeepResearchView({
             if (mode === 'manual') setDeepSectionLimit('auto');
           }}
           onUnitOutline={setUnitOutline}
+          isAcademic={variant === 'academic'}
+          notebookControl={variant === 'academic' ? <ResearchNotebookControl value={notebookId} onChange={setNotebookId} /> : undefined}
           objective={objective}
           approach={approach}
           version={deepResearchVersion}
           audience={audience}
           language={language}
           model={selectedModel}
+          thinkingEffort={thinkingEffort}
+          onThinkingEffort={setThinkingEffort}
           sectionLimit={deepSectionLimit}
           sectionLength={deepSectionLength}
           onSectionLength={setDeepSectionLength}
@@ -2089,7 +2103,7 @@ function ReaderView({
         <button className="btn btn-ghost gap-1.5" onClick={onBack}>
           <Icon name="chevronLeft" /> {t('Volver a la galería')}
         </button>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-48 flex-1">
           <div className="truncate text-sm font-semibold text-neutral-100" title={appliedTranslation?.title ?? saved.title}>{appliedTranslation?.title ?? saved.title}</div>
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <span className="text-[11px] text-neutral-500">{formatDate(saved.updatedAt)}</span>
@@ -2228,6 +2242,7 @@ function ReaderView({
 
 export function ComposerModal({
   documentSkills,
+  isAcademic = false,
   settings,
   isGenealogy = false,
   isTeaching = false,
@@ -2237,11 +2252,14 @@ export function ComposerModal({
   onStructureMode,
   onUnitOutline,
   objective,
+  notebookControl,
   approach,
   version,
   audience,
   language,
   model,
+  thinkingEffort,
+  onThinkingEffort,
   sectionLimit,
   sectionLength,
   onSectionLength,
@@ -2266,6 +2284,7 @@ export function ComposerModal({
   onClose,
 }: {
   documentSkills: ReturnType<typeof useDocumentSkills>;
+  isAcademic?: boolean;
   settings: AppSettings;
   isGenealogy?: boolean;
   isTeaching?: boolean;
@@ -2275,11 +2294,14 @@ export function ComposerModal({
   onStructureMode: (v: 'ai' | 'manual') => void;
   onUnitOutline: (v: DeepResearchOutlineSection[]) => void;
   objective: string;
+  notebookControl?: React.ReactNode;
   approach: DeepResearchApproach;
   version: DeepResearchVersion;
   audience: StudyDeepResearchAudience;
   language: PromptLanguage;
   model: AppSettings['deepResearchModel'];
+  thinkingEffort: ResearchEffort;
+  onThinkingEffort: (effort: ResearchEffort) => void;
   sectionLimit: DeepResearchSectionLimit;
   sectionLength: DeepResearchSectionLength;
   onSectionLength: (v: DeepResearchSectionLength) => void;
@@ -2332,6 +2354,7 @@ export function ComposerModal({
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          {notebookControl}
           <textarea
             className="input min-h-28 w-full resize-y"
             value={objective}
@@ -2483,8 +2506,13 @@ export function ComposerModal({
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Modelo')}</span>
               <ModelPicker settings={settings} value={model} onChange={onModel} ariaLabel={t('Modelo')} className="w-full text-sm" menu />
             </label>
+            <div className="block min-w-0">
+              <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Esfuerzo de thinking')}</span>
+              <ResearchEffortControl variant="field" className="w-full !py-2 text-sm" testId="deep-research-thinking" model={model ?? null} value={thinkingEffort} onChange={onThinkingEffort} disabled={!model} />
+              {isAcademic && <p className="mt-1 text-xs text-neutral-500">{t('La planificación y la redacción usan este nivel; las verificaciones usan Estándar.')}</p>}
+            </div>
           </div>
-          <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />
+          {!isAcademic && <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />}
           <div className="flex flex-wrap items-center gap-2">
             <button
               className={`theme-toggle-button rounded-full border px-2.5 py-1 text-xs ${includeImage ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200' : 'border-neutral-700 text-neutral-500'}`}

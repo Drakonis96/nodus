@@ -35,7 +35,7 @@ test('completeJson narrative guard accepts only the engine AST and rejects model
 
 test('localized deterministic copy and prompt provenance cover every supported locale', () => {
   const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko'];
-  assert.equal(prompts.DATABASE_DEEP_RESEARCH_PROMPT_VERSION, '1.0.0');
+  assert.equal(prompts.DATABASE_DEEP_RESEARCH_PROMPT_VERSION, '1.0.2');
   for (const language of languages) {
     const labels = prompts.DATABASE_DEEP_RESEARCH_SECTION_LABELS[language];
     const copy = prompts.DATABASE_DEEP_RESEARCH_REPORT_COPY[language];

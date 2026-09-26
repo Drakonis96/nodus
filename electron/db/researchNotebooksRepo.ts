@@ -1,0 +1,91 @@
+import { randomUUID } from 'node:crypto';
+import { getDb } from './database';
+import { cleanAppearanceColor, cleanAppearanceIcon } from './chatAppearance';
+import { validateRetrievalSettings, type ResearchNotebook, type ResearchNotebookInput, type ResolvedResearchScope } from '@shared/researchCorpus';
+
+type NotebookRow = { id: string; name: string; description: string; revision: number; mode: 'fixed' | 'linked'; sources_json: string; exclusions_json: string; resolved_ids_json: string; settings_json: string | null; notes_json: string; conversation_settings_json: string | null; icon?: string | null; color?: string | null; created_at: string; updated_at: string };
+function decode(row: NotebookRow): ResearchNotebook {
+  return { id: row.id, name: row.name, description: row.description, revision: row.revision, mode: row.mode,
+    sources: JSON.parse(row.sources_json), exclusions: JSON.parse(row.exclusions_json), resolvedDocumentIds: JSON.parse(row.resolved_ids_json),
+    settings: row.settings_json ? JSON.parse(row.settings_json) : undefined, noteIds: JSON.parse(row.notes_json),
+    conversationSettings: row.conversation_settings_json ? JSON.parse(row.conversation_settings_json) : undefined,
+    icon: row.icon ?? 'notebook', color: row.color ?? null,
+    createdAt: row.created_at, updatedAt: row.updated_at };
+}
+export function listResearchNotebooks(): ResearchNotebook[] {
+  return (getDb().prepare('SELECT * FROM research_notebooks ORDER BY updated_at DESC, id').all() as NotebookRow[]).map(decode);
+}
+export function getResearchNotebook(id: string): ResearchNotebook | null {
+  const row = getDb().prepare('SELECT * FROM research_notebooks WHERE id=?').get(id) as NotebookRow | undefined;
+  return row ? decode(row) : null;
+}
+
+/** resolvedIds must come from the backend's authorized inventory. */
+export function saveResearchNotebook(input: ResearchNotebookInput, resolvedIds: string[]): ResearchNotebook {
+  if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 160) throw new Error('Invalid notebook name');
+  if (!['fixed', 'linked'].includes(input.mode) || !Array.isArray(input.sources) || input.sources.length > 10000
+    || !Array.isArray(input.exclusions) || input.exclusions.length > 10000 || input.exclusions.some(id => typeof id !== 'string')) throw new Error('Invalid notebook selection');
+  for (const source of input.sources) {
+    if (!source || !['work', 'library-item', 'library-collection', 'zotero-collection', 'note', 'conversation-attachment'].includes(source.kind)
+      || typeof source.id !== 'string' || !source.id || source.id.length > 500
+      || (source.kind === 'zotero-collection' && (!['user', 'group'].includes(source.libraryType ?? '') || !source.libraryId))) throw new Error('Invalid notebook source');
+  }
+  if ((input.description?.length ?? 0) > 10000 || input.noteIds?.some(id => typeof id !== 'string')) throw new Error('Invalid notebook metadata');
+  const conversation = input.conversationSettings;
+  if (conversation && (typeof conversation !== 'object'
+    || (conversation.systemPromptId != null && (typeof conversation.systemPromptId !== 'string' || conversation.systemPromptId.length > 200))
+    || (conversation.thinkingEffort !== undefined && !['standard', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'].includes(conversation.thinkingEffort)))) throw new Error('Invalid notebook conversation settings');
+  const existing = input.id ? getResearchNotebook(input.id) : null;
+  if (input.id && !existing) throw new Error('Notebook not found');
+  const id = existing?.id ?? randomUUID();
+  const now = new Date().toISOString();
+  getDb().prepare(`INSERT INTO research_notebooks
+    (id,name,description,revision,mode,sources_json,exclusions_json,resolved_ids_json,settings_json,notes_json,conversation_settings_json,icon,color,created_at,updated_at)
+    VALUES (@id,@name,@description,@revision,@mode,@sources,@exclusions,@resolved,@settings,@notes,@conversation,@icon,@color,@created,@now)
+    ON CONFLICT(id) DO UPDATE SET name=excluded.name,description=excluded.description,revision=excluded.revision,mode=excluded.mode,
+    sources_json=excluded.sources_json,exclusions_json=excluded.exclusions_json,resolved_ids_json=excluded.resolved_ids_json,
+    settings_json=excluded.settings_json,notes_json=excluded.notes_json,conversation_settings_json=excluded.conversation_settings_json,icon=excluded.icon,color=excluded.color,updated_at=excluded.updated_at`).run({
+    id, name: input.name.trim(), description: input.description ?? '', revision: (existing?.revision ?? 0) + 1, mode: input.mode,
+    sources: JSON.stringify(input.sources), exclusions: JSON.stringify([...new Set(input.exclusions)]), resolved: JSON.stringify([...new Set(resolvedIds)].sort()),
+    settings: input.settings ? JSON.stringify(validateRetrievalSettings(input.settings)) : null, notes: JSON.stringify(input.noteIds ?? []),
+    conversation: input.conversationSettings ? JSON.stringify(input.conversationSettings) : null,
+    icon: 'icon' in input ? cleanAppearanceIcon(input.icon) : existing?.icon ?? null, color: 'color' in input ? cleanAppearanceColor(input.color) : existing?.color ?? null,
+    created: existing?.createdAt ?? now, now,
+  });
+  return getResearchNotebook(id)!;
+}
+/** Name, icon and colour only: how the notebook looks is not what it reads, so its
+ * revision, and every scope pinned to it, stay as they are. */
+export function updateResearchNotebookAppearance(id: string, patch: { name?: string; icon?: string | null; color?: string | null }): ResearchNotebook {
+  const existing = getResearchNotebook(id);
+  if (!existing) throw new Error('Notebook not found');
+  if ('name' in patch && (typeof patch.name !== 'string' || !patch.name.trim() || patch.name.length > 160)) throw new Error('Invalid notebook name');
+  getDb().prepare('UPDATE research_notebooks SET name=?, icon=?, color=?, updated_at=? WHERE id=?').run(
+    'name' in patch ? patch.name!.trim() : existing.name,
+    'icon' in patch ? cleanAppearanceIcon(patch.icon) : existing.icon ?? null,
+    'color' in patch ? cleanAppearanceColor(patch.color) : existing.color ?? null,
+    new Date().toISOString(), id);
+  return getResearchNotebook(id)!;
+}
+export function deleteResearchNotebook(id: string): void {
+  // Only the association is cascaded. Conversations, messages, works and indexes survive.
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(`UPDATE chat_conversations SET selection_json=json_remove(selection_json,'$.notebookId')
+      WHERE json_valid(selection_json) AND json_extract(selection_json,'$.notebookId')=?`).run(id);
+    db.prepare('DELETE FROM research_notebooks WHERE id=?').run(id);
+  })();
+}
+export function associateNotebookConversation(notebookId: string | null, conversationId: string): void {
+  const db = getDb();
+  if (!notebookId) { db.prepare('DELETE FROM research_notebook_conversations WHERE conversation_id=?').run(conversationId); return; }
+  db.prepare(`INSERT INTO research_notebook_conversations(conversation_id,notebook_id) VALUES (?,?)
+    ON CONFLICT(conversation_id) DO UPDATE SET notebook_id=excluded.notebook_id`).run(conversationId, notebookId);
+}
+export function notebookForConversation(conversationId: string): string | null {
+  return (getDb().prepare('SELECT notebook_id FROM research_notebook_conversations WHERE conversation_id=?').get(conversationId) as { notebook_id: string } | undefined)?.notebook_id ?? null;
+}
+export function recordResearchScope(scope: ResolvedResearchScope): void {
+  getDb().prepare('INSERT OR IGNORE INTO research_run_scopes(id,notebook_id,scope_json,created_at) VALUES (?,?,?,?)')
+    .run(scope.id, scope.notebookId, JSON.stringify(scope), scope.resolvedAt);
+}

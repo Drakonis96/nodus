@@ -1,3 +1,4 @@
+import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
 import type { AnnouncementRefreshResult } from '@shared/announcements';
@@ -432,6 +433,7 @@ export function App() {
         scope: detail.scope,
         readerItemId: detail.itemId,
         readerPage: typeof detail.page === 'number' && detail.page > 0 ? detail.page : null,
+        readerAttachmentId: typeof detail.attachmentId === 'string' ? detail.attachmentId : null,
         nonce: Date.now(),
       });
       setView('library');
@@ -1184,12 +1186,36 @@ export function App() {
     return () => window.removeEventListener('nodus:open-library-item', openBrowserCapture);
   }, []);
 
+  // Research Chat opens a cited web page as a NEW tab of Nodus' Browser. The event
+  // comes from this renderer (web pages live in other WebContents and cannot reach
+  // it); the URL is checked again here and by the Browser's own navigation policy.
+  useEffect(() => {
+    const openWebSource = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: unknown }>).detail?.url;
+      if (typeof url !== 'string' || url.length > 4000 || !/^https?:\/\//i.test(url)) return;
+      void window.nodus.openBrowserTab(url).then(tabId => {
+        if (tabId) setView('browser');
+        else void window.nodus.openExternal(url);
+      }).catch(() => void window.nodus.openExternal(url));
+    };
+    window.addEventListener('nodus:open-browser-url', openWebSource);
+    return () => window.removeEventListener('nodus:open-browser-url', openWebSource);
+  }, [setView]);
+
   // Una nota se abre con la misma experiencia de catálogo y pestañas, bajo el nombre
   // Espacio de trabajo en la académica y Notas en las demás bóvedas.
   const openNoteFromSearch = useCallback((id: string) => {
     setNoteTarget({ id, nonce: Date.now() });
     setView(isAcademic ? 'workspace' : 'notes');
   }, [isAcademic]);
+  useEffect(() => {
+    const open = (event: Event) => {
+      const id = (event as CustomEvent<unknown>).detail;
+      if (typeof id === 'string') openNoteFromSearch(id);
+    };
+    window.addEventListener('nodus:open-research-note', open);
+    return () => window.removeEventListener('nodus:open-research-note', open);
+  }, [openNoteFromSearch]);
 
   const openResearchConversation = useCallback((target: Omit<ResearchConversationNavigationTarget, 'nonce'>) => {
     setResearchConversationTarget({ ...target, nonce: Date.now() });
@@ -1991,6 +2017,9 @@ export function App() {
         </ContinuityProvider>
       </div>
 
+      {isAcademic && activeVault && settings.onboardingComplete && <ResearchPreparationWelcome key={activeVault.id} vaultId={activeVault.id}
+        allowAutomatic={queueLive === 0 && settings.basicsTutorialVersion > 0 && settings.tourComplete && ['home', 'library'].includes(view) && !queueAnchor && !paletteOpen && !collectionsOpen && !feedbackOpen && !roadmapOpen}
+        onConfigure={() => setView('settings')} />}
       <FeedbackHost />
       <PrivacyRequestHost />
       <BrowserConnectorPairingRequestHost />

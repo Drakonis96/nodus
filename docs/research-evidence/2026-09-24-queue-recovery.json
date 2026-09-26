@@ -1,0 +1,167 @@
+{
+  "description": "Real Electron queue recovery after SIGKILL. Text-only preparation, no credentials, no model calls. Harness: scripts/verify-research-queue-recovery.mjs --pages=250 at commit 91a82aa0 (application build identical to 45665d23).",
+  "root": "/private/tmp/nodus-research-ABNYq3",
+  "proof": {
+    "writeInsideAllowed": true,
+    "writeOutsideDenied": true,
+    "descendantWriteDenied": true,
+    "externalNetworkDenied": true,
+    "forbiddenLoopbackPortDenied": true
+  },
+  "options": {
+    "documents": 4,
+    "pages": 250,
+    "kill": true
+  },
+  "modelCalls": 0,
+  "killPoint": {
+    "published": 0,
+    "requests": [
+      {
+        "state": "running",
+        "attempts": 1
+      },
+      {
+        "state": "queued",
+        "attempts": 0
+      },
+      {
+        "state": "queued",
+        "attempts": 0
+      },
+      {
+        "state": "queued",
+        "attempts": 0
+      }
+    ],
+    "processes": [
+      {
+        "pid": 92088,
+        "type": "Browser",
+        "serviceName": null
+      },
+      {
+        "pid": 92237,
+        "type": "GPU",
+        "serviceName": "GPU"
+      },
+      {
+        "pid": 92238,
+        "type": "Utility",
+        "serviceName": "network.mojom.NetworkService"
+      },
+      {
+        "pid": 92394,
+        "type": "Tab",
+        "serviceName": null
+      },
+      {
+        "pid": 92720,
+        "type": "Utility",
+        "serviceName": "node.mojom.NodeService"
+      }
+    ]
+  },
+  "orphansAfterKill": [],
+  "staleIsolatedLockDiscarded": {
+    "owner": 92088,
+    "alive": false
+  },
+  "afterRestart": [
+    {
+      "id": "nodus:4e33fca9-08b9-4515-90d7-7dd11f8664ba",
+      "lexical": "ready",
+      "status": "blocked",
+      "passages": 313,
+      "reason": "no_model"
+    },
+    {
+      "id": "nodus:759d5de5-ec50-4ec9-b5da-fd09b775cf10",
+      "lexical": "ready",
+      "status": "blocked",
+      "passages": 313,
+      "reason": "no_model"
+    },
+    {
+      "id": "nodus:854b4855-188e-45db-a91d-c8c134576f5d",
+      "lexical": "ready",
+      "status": "blocked",
+      "passages": 313,
+      "reason": "no_model"
+    },
+    {
+      "id": "nodus:c6954727-083d-47f0-9a50-773f567e5ffa",
+      "lexical": "ready",
+      "status": "blocked",
+      "passages": 313,
+      "reason": "no_model"
+    }
+  ],
+  "lastPages": [
+    {
+      "marker": "RECOVERY1P250",
+      "pageNumber": 249,
+      "pageEnd": 250,
+      "pageLabel": "pp. 249–250"
+    },
+    {
+      "marker": "RECOVERY2P250",
+      "pageNumber": 249,
+      "pageEnd": 250,
+      "pageLabel": "pp. 249–250"
+    },
+    {
+      "marker": "RECOVERY3P250",
+      "pageNumber": 249,
+      "pageEnd": 250,
+      "pageLabel": "pp. 249–250"
+    },
+    {
+      "marker": "RECOVERY4P250",
+      "pageNumber": 249,
+      "pageEnd": 250,
+      "pageLabel": "pp. 249–250"
+    }
+  ],
+  "store": {
+    "requests": [
+      {
+        "state": "blocked",
+        "attempts": 0,
+        "leaseToken": null,
+        "error": "documentary_embeddings_unavailable"
+      },
+      {
+        "state": "blocked",
+        "attempts": 0,
+        "leaseToken": null,
+        "error": "documentary_embeddings_unavailable"
+      },
+      {
+        "state": "blocked",
+        "attempts": 0,
+        "leaseToken": null,
+        "error": "documentary_embeddings_unavailable"
+      },
+      {
+        "state": "blocked",
+        "attempts": 0,
+        "leaseToken": null,
+        "error": "documentary_embeddings_unavailable"
+      }
+    ],
+    "publishedLexicalRevisionsPerDocument": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "duplicatePassageOrdinals": 0
+  },
+  "completed": true,
+  "findingsDuringDevelopment": [
+    "Templated PDF pages were stripped as running headers and extracted to nothing; the fixture now uses varying prose (baseline --no-kill run separated this from recovery).",
+    "A passage crossing pages 249-250 was cited as p. 249; fixed in 45665d23 (pp. 249–250, pageEnd, overlapping physical reads).",
+    "The isolated QA profile lock fails closed after a crash by design; the harness discards it only after proving the recorded owner is dead. Production uses Chromium single-instance locking, not exercised here."
+  ]
+}

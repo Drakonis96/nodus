@@ -25,7 +25,7 @@ const server=createServer((req,res)=>{
   }
  });
 });
-await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
+await new Promise(resolve=>server.listen(Number(process.env.NODUS_TEST_FIXTURE_PORT ?? 0),'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
 const fetch=globalThis.fetch;globalThis.fetch=(input,options)=>{const url=new URL(typeof input==='string'||input instanceof URL?input:input.url);assert.equal(url.origin,base,'no external network');return fetch(input,options);};
 try{
  load('electron/db/settingsRepo.ts').updateSettings({customProvider:{baseUrl:base+'/v1',models:['vision-fixture']},chatReasoning:'off',synthesisModel:{provider:'openai',model:'gpt-4.1'}});
