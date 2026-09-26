@@ -83,15 +83,18 @@ const layerStates: Record<ResearchActivityLayerState, string> = {
 
 function LayerIcon({ layer }: { layer: ResearchActivityLayer }) {
   if (layer === 'nodus' || layer === 'zotero') return <img src={layer === 'nodus' ? nodusMark : zoteroMark} alt="" className={`research-activity-brand ${layer}`} />;
-  return <Icon name={layers[layer][1]} size={17} />;
+  return <Icon name={layers[layer][1]} size={15} />;
 }
 
 /** A fixed list of every layer a research turn can consult, in flow order. Each row is
  * this request's live state for that layer: a turning arrow while it is being consulted,
  * then green when it contributed, orange when it answered with nothing and the flow had
  * to rely on another layer, red when its attempt failed. A new request starts over.
- * The panel only minimises to its radar; it is never closed. */
-export function ResearchActivityPanel({ activities, outcome, webDisabled = false }: { activities: ResearchActivity[]; outcome: ResearchActivityStatus; webDisabled?: boolean }) {
+ * The panel only minimises to its radar; it is never closed. A layer switched off in the
+ * context balloon reads "Desactivada" rather than "Sin consultar". */
+export function ResearchActivityPanel({ activities, outcome, webDisabled = false, disabledLayers = [] }: {
+  activities: ResearchActivity[]; outcome: ResearchActivityStatus; webDisabled?: boolean; disabledLayers?: readonly ResearchActivityLayer[];
+}) {
   const [minimized, setMinimized] = useState(() => localStorage.getItem('nodus.researchActivityMinimized') === '1');
   const toggleRef = useRef<HTMLButtonElement>(null);
   const rows = useMemo(() => summarizeResearchActivity(activities), [activities]);
@@ -102,6 +105,7 @@ export function ResearchActivityPanel({ activities, outcome, webDisabled = false
     setMinimized(value => { localStorage.setItem('nodus.researchActivityMinimized', value ? '0' : '1'); return !value; });
     requestAnimationFrame(() => toggleRef.current?.focus());
   };
+  const off = (layer: ResearchActivityLayer) => layer === 'web' ? webDisabled : disabledLayers.includes(layer);
   if (!activities.length) return null;
   const status = outcome === 'active' ? tx('{n} operaciones activas', { n: active.length }) : t(statuses[outcome]);
   const announcement = `${status}${current ? ` · ${t(layers[current.layer][0])} · ${t(operations[current.operation])}` : ''}`;
@@ -118,18 +122,19 @@ export function ResearchActivityPanel({ activities, outcome, webDisabled = false
         <button ref={toggleRef} onClick={toggle} aria-label={t('Minimizar actividad')} aria-expanded={true} title={t('Minimizar actividad')}><Icon name="minus" size={16} /></button>
       </header>
       <ol>
-        {rows.map(row => <li key={row.layer} data-status={row.state} data-layer={row.layer}>
+        {rows.map(row => {
+          const switchedOff = row.state === 'idle' && off(row.layer);
+          const detail = [row.operation && `${t(operations[row.operation])}${row.count !== undefined ? ` · ${row.count}` : ''}`, row.subject].filter(Boolean).join(' — ');
+          return <li key={row.layer} data-status={row.state} data-layer={row.layer} data-off={switchedOff || undefined} className={row.layer === 'web' && web ? 'has-detail' : undefined}>
           <span className="research-activity-icon" aria-hidden="true"><LayerIcon layer={row.layer} /></span>
-          <div className="research-activity-copy"><div><strong>{t(layers[row.layer][0])}</strong><span className="research-activity-state">{row.layer === 'web' && webDisabled && row.state === 'idle' ? t('Desactivada') : t(layerStates[row.state])}</span></div>
-            {row.layer === 'web' && web ? <WebSearchSection view={web} /> : <>
-              {row.operation && <p>{t(operations[row.operation])}{row.count !== undefined && <span> · {row.count}</span>}</p>}
-              {row.subject && <small title={row.subject}>{row.subject}</small>}
-            </>}
+          <div className="research-activity-copy"><div><strong>{t(layers[row.layer][0])}</strong><span className="research-activity-state">{switchedOff ? t('Desactivada') : t(layerStates[row.state])}</span></div>
+            {row.layer === 'web' && web ? <WebSearchSection view={web} /> : detail && <p title={detail}>{detail}</p>}
           </div>
           {row.state === 'active'
             ? <span className="research-activity-spinner" aria-hidden="true"><Icon name="rotateCw" size={13} /></span>
-            : <span className={`research-activity-indicator ${row.state}`} aria-hidden="true" />}
-        </li>)}
+            : <span className={`research-activity-indicator ${switchedOff ? 'off' : row.state}`} aria-hidden="true" />}
+        </li>;
+        })}
       </ol>
     </>}
   </section>;
