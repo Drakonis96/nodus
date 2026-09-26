@@ -20,8 +20,8 @@ async function loadPack() {
 test('research assistant packs preserve complete rules, schemas, citations and limits', async () => {
   const { researchAssistantPromptPack } = await loadPack();
   const spanish = researchAssistantPromptPack('es');
-  assert.equal(spanish.citationRules.length, 16);
-  assert.equal(spanish.citationRulesCompact.length, 6);
+  assert.equal(spanish.citationRules.length, 17);
+  assert.equal(spanish.citationRulesCompact.length, 7);
   assert.equal(spanish.genealogy.full.split('\n').length, 14);
   assert.equal(spanish.genealogy.compact.split('\n').length, 4);
   const protocol = ['nodus://idea/<id>', 'nodus://work/<nodus_id>', 'nodus://passage/<id>', 'nodus://contradiction/<id>', 'nodus://gap/<id>', '`id`', '`citation`', '`pasajes_relevantes`', '`orientacion_documental`', '`documentos_resumidos`', '`parentescos_sugeridos`', '`persona_central`', '`parentesco_con_persona_central`'];

@@ -31,6 +31,12 @@ const finishReasons: Record<string, string> = {
   not_needed: 'No era necesaria', unavailable: 'Búsqueda no disponible', disabled: 'Desactivada',
 };
 
+/** The label for a consulted page: its outcome, or how the attempt ended when the
+ * page never produced one. Kept out of the render so the translation key is always
+ * one of the table's own strings. */
+const pageOutcomeLabel = (page: { outcome?: ResearchWebPageOutcome; status: ResearchActivityStatus }): string =>
+  pageOutcomes[page.outcome ?? (page.status === 'cancelled' ? 'cancelled' : 'failed')];
+
 /** The web step in detail: searches, results found (not read), pages actually
  * consulted, the evidence kept and how it ended. Found results are listed muted
  * and hollow; consulted pages carry a document mark and their read state. */
@@ -57,7 +63,7 @@ function WebSearchSection({ view }: { view: ResearchWebView }) {
         {round.pages.map(page => <li key={page.url} data-status={page.status} data-outcome={page.outcome ?? ''} title={page.url}>
           <Icon name="fileText" size={12} /><span className="research-web-title">{page.title || page.domain}</span><span className="research-web-domain">{page.domain}</span>
           {page.status === 'active' ? <span className="research-web-tag reading"><span className="research-activity-spinner" aria-hidden="true"><Icon name="rotateCw" size={10} /></span>{t('Leyendo…')}</span>
-            : <span className={`research-web-tag ${page.outcome === 'read' ? 'consulted' : 'unread'}`}>{t(pageOutcomes[page.outcome ?? (page.status === 'cancelled' ? 'cancelled' : 'failed')])}</span>}
+            : <span className={`research-web-tag ${page.outcome === 'read' ? 'consulted' : 'unread'}`}>{t(pageOutcomeLabel(page))}</span>}
         </li>)}
       </ul>}
       {round.evidence && <p className="research-web-line research-web-evidence"><Icon name="check" size={11} />{round.evidence.status === 'active' ? t('Seleccionando evidencias…')
