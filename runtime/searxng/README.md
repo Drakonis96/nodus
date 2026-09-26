@@ -109,18 +109,21 @@ session directory, which is what the platform workflow runs.
 together: it compares the pinned commit with the tip of upstream's default branch,
 boots the staged runtime and fires three fixed queries (one humanities, one current
 affairs, one scholarly), then reports per engine how many results it contributed and
-why it was unresponsive. It exits non-zero only on a hard signal — the runtime does
-not boot, no engine answers at all, or fewer than `--min-engines` do.
+why it was unresponsive.
 
-A runner in a datacenter is treated as a hostile address by the scraped engines, so
-`.github/workflows/searxng-health.yml` runs it weekly with the loose default and
-keeps the JSON as the signal, and comments on one standing issue rather than opening
-a new one every week. On a real machine — the address users actually search from —
-run it as:
+**An engine that refuses, throttles or CAPTCHAs is reported and is not an error.**
+That is what engines do, the application already surfaces it per turn, and no bump
+fixes it. The check alerts only on the version signal and genuine breakage:
 
-```
-node scripts/check-searxng-health.mjs --min-engines 3
-```
+- the runtime does not boot, or none of the scholarly APIs answer at all;
+- an engine reports a parsing error — the thing an upstream bump fixes;
+- the pin has aged past `--max-pin-age-days` (default 90) while upstream has moved.
+
+`.github/workflows/searxng-health.yml` runs it weekly, keeps the JSON as an artifact
+and comments on one standing issue instead of opening a new one every week. A runner
+is a datacenter address, which the scraped engines treat harshly, so nothing about
+the engines themselves is concluded from a runner; `--min-engines N` (off by default)
+is there for a maintainer who wants a stricter reading on a real machine.
 
 **The bump itself is a reviewed change, never an automatic one.** The pinned commit
 and the hashed lock are what make the shipped runtime reproducible and keep an

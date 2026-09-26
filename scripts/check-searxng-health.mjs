@@ -5,17 +5,23 @@
  *
  * The version half is a plain GitHub API read. The engine half boots the staged
  * runtime exactly as the application does and fires three fixed queries — one
- * humanities, one current affairs, one scholarly — then reports, per engine, how
- * many results it contributed and why it was unresponsive. It exits non-zero only on
- * a hard signal: the runtime does not boot, no engine at all answers, or fewer than
- * `--min-engines` engines answer (which is how a maintainer runs it locally, where
- * the address is the one real users search from).
+ * humanities, one current affairs, one scholarly — then reports, per engine, how many
+ * results it contributed and why it was unresponsive.
  *
- * A runner in a datacenter is treated as a hostile address by the scraped engines,
- * so the CI job runs this with the loose default and keeps the JSON as the signal;
- * run it on a real machine with `--min-engines 3` before bumping the pin.
+ * **An engine that refuses, throttles or CAPTCHAs is reported and is not an error.**
+ * That is what engines do, the application already surfaces it per turn, and no
+ * version bump fixes it. What alerts is the version signal and genuine breakage:
  *
- *   node scripts/check-searxng-health.mjs [--json <path>] [--min-engines N] [--disposable-ci]
+ *   - the runtime does not boot, or none of the scholarly APIs answer at all;
+ *   - an engine reports a parsing error, which is what an upstream bump fixes;
+ *   - the pin has aged past `--max-pin-age-days` (default 90) while upstream has
+ *     moved, so someone can decide to bump it.
+ *
+ * `--min-engines N` (default 0, off) is an opt-in gate for a maintainer who wants a
+ * stricter local reading; a datacenter runner should leave it off, because a runner's
+ * address is treated as hostile by the scraped engines and that is not actionable.
+ *
+ *   node scripts/check-searxng-health.mjs [--json <path>] [--min-engines N] [--max-pin-age-days N] [--disposable-ci]
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,12 +34,19 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const args = process.argv.slice(2);
 const option = (name, fallback) => { const at = args.indexOf(name); return at >= 0 && args[at + 1] ? args[at + 1] : fallback; };
 const disposable = args.includes('--disposable-ci');
-const minimumEngines = Number(option('--min-engines', '1'));
+const minimumEngines = Number(option('--min-engines', '0'));
+const maxPinAgeDays = Number(option('--max-pin-age-days', '90'));
 const jsonPath = option('--json', '');
 const runtime = process.env.NODUS_RUNTIME_ROOT ? path.resolve(process.env.NODUS_RUNTIME_ROOT) : path.join(repoRoot, 'build/zotero-mcp');
 const python = path.join(runtime, 'python', process.platform === 'win32' ? 'python.exe' : 'bin/python3');
 const serve = path.join(runtime, 'searxng', 'serve.py');
 const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'runtime/searxng/manifest.json'), 'utf8'));
+/** How long the runtime has been pinned, in whole days, when the date parses. */
+const pinAgeDays = Number.isFinite(Date.parse(manifest.upstreamDate)) ? Math.floor((Date.now() - Date.parse(manifest.upstreamDate)) / 86_400_000) : null;
+
+/** Engines reached through an API rather than by scraping. They do not block
+ * datacenter addresses, so all of them going quiet means something is broken. */
+const SCHOLARLY_APIS = ['arxiv', 'openalex', 'europepmc', 'pubmed', 'semantic scholar', 'crossref'];
 
 /** Fixed, boring queries: one per kind of question the web step has to answer. */
 const PROBES = [
@@ -43,7 +56,7 @@ const PROBES = [
 ];
 
 const failures = [];
-const fail = (message) => { failures.push(message); console.log(`FAIL  ${message}`); };
+const fail = (message) => { failures.push(message); console.log(`ALERT ${message}`); };
 const note = (message) => console.log(`      ${message}`);
 
 /** Is the pinned commit still the tip of upstream's default branch? */
@@ -123,16 +136,31 @@ const run = async () => {
     console.log(`engines that answered nothing (${silent.length}):`);
     for (const [engine, entry] of silent) console.log(`  ${engine.padEnd(18)} ${Object.entries(entry.complaints).map(([reason, count]) => `${reason}×${count}`).join(', ') || 'no report'}`);
   }
-  const parsing = [...engines].filter(([, entry]) => Object.keys(entry.complaints).some(reason => /parsing/i.test(reason)));
-  if (parsing.length) note(`parser rot signal: ${parsing.map(([engine]) => engine).join(', ')} reported a parsing error — that is what an upstream bump fixes`);
 
-  if (!answering.length) fail('no engine answered any query');
-  else if (answering.length < minimumEngines) fail(`only ${answering.length} engine(s) answered, fewer than the ${minimumEngines} required`);
+  // An engine that refuses, throttles or CAPTCHAs is doing what engines do, and it is
+  // reported here without being an error: the application already surfaces it per turn
+  // and it is not something a bump fixes. What does get an alert is the version signal.
+  // A parsing error on one probe is a hiccup — Semantic Scholar's API returns records
+  // its engine sometimes fails to read, and it does so intermittently — so rot is the
+  // same engine failing to read its own results twice or more in one pass.
+  const parsingCount = (entry) => Object.entries(entry.complaints).filter(([reason]) => /parsing/i.test(reason)).reduce((sum, [, count]) => sum + count, 0);
+  const parsing = [...engines].filter(([, entry]) => parsingCount(entry) >= 2);
+  if (parsing.length) fail(`parser rot: ${parsing.map(([engine, entry]) => `${engine}×${parsingCount(entry)}`).join(', ')} failed to read its own results more than once — an upstream bump is what fixes this${drift.checked && !drift.current ? `, and upstream has moved (${drift.compare})` : ''}`);
+  else note(`no engine reported repeated parsing errors${[...engines].some(([, entry]) => parsingCount(entry) === 1) ? ' (a single hiccup was reported, which is not rot)' : ''}`);
+
+  const scholarlyAnswering = SCHOLARLY_APIS.filter(name => (engines.get(name)?.results ?? 0) > 0);
+  if (!scholarlyAnswering.length) fail(`none of the scholarly APIs answered (${SCHOLARLY_APIS.join(', ')}): that is not engine politics, the runtime or the network is broken`);
+  if (minimumEngines > 0 && answering.length < minimumEngines) fail(`only ${answering.length} engine(s) answered, fewer than the ${minimumEngines} required by --min-engines`);
+  if (pinAgeDays !== null && pinAgeDays > maxPinAgeDays) fail(`the pin is ${pinAgeDays} day${pinAgeDays === 1 ? '' : 's'} old (limit ${maxPinAgeDays}): consider bumping it — upstream is at ${drift.head ? drift.head.slice(0, 12) : 'unknown'}${drift.compare ? `, ${drift.compare}` : ''}`);
 
   if (jsonPath) {
     fs.writeFileSync(path.resolve(jsonPath), JSON.stringify({
-      checkedAt: new Date().toISOString(), upstream: { pinned: manifest.upstreamCommit, ...drift },
-      engines: Object.fromEntries([...engines].map(([engine, entry]) => [engine, entry])), answered: answering.length, required: minimumEngines, failures,
+      checkedAt: new Date().toISOString(),
+      upstream: { pinned: manifest.upstreamCommit, pinnedDate: manifest.upstreamDate, pinAgeDays, ...drift },
+      engines: Object.fromEntries([...engines].map(([engine, entry]) => [engine, entry])),
+      answered: answering.length, scholarlyAnswering, minimumEngines, maxPinAgeDays,
+      alerts: failures,
+      note: 'Engines that refuse, throttle or CAPTCHA are reported here and are not errors: the application surfaces them per turn and no version bump fixes them.',
     }, null, 2));
     note(`report written to ${jsonPath}`);
   }
@@ -143,5 +171,5 @@ try {
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 }
-console.log(failures.length ? `\n${failures.length} hard signal(s)` : '\nthe runtime answers and the pin is accounted for');
+console.log(failures.length ? `\n${failures.length} alert(s): ${failures.join(' | ')}` : '\nnothing to act on: the pin is accounted for and no engine is reporting a broken parser');
 process.exit(failures.length ? 1 : 0);

@@ -6,11 +6,12 @@ name: SearXNG engine health
 # instead of on the day a user reports it: is the pinned upstream still current, and
 # do the engines still answer?
 #
-# A GitHub runner is a datacenter address, and the scraped engines treat those
-# harshly, so the thresholds here are deliberately loose (at least one engine has to
-# answer) and the JSON artifact is the real signal. Run the same script on a real
-# machine with `--min-engines 3` before bumping the pin; that is the address real
-# users search from.
+# An engine that refuses, throttles or CAPTCHAs is REPORTED, never an error: that is
+# what engines do, the app already surfaces it per turn, and no bump fixes it. The
+# job goes red only for the version signal and genuine breakage — the runtime not
+# booting, none of the scholarly APIs answering, an engine reporting a parsing error,
+# or a pin older than 90 days while upstream has moved. The JSON artifact carries the
+# whole picture either way.
 on:
   schedule:
     - cron: '0 6 * * 1'
@@ -43,20 +44,21 @@ jobs:
           name: searxng-health
           path: searxng-health.json
           if-no-files-found: warn
-      - name: Report a hard signal once, without opening a new issue every week
+      - name: Report the alert once, without opening a new issue every week
         if: steps.health.outcome == 'failure'
         uses: actions/github-script@v8
         with:
           script: |
-            const title = 'SearXNG engine health check failed';
+            const title = 'SearXNG engine health: version signal';
             const report = require('fs').readFileSync('searxng-health.json', 'utf8');
             const body = [
-              `The scheduled check found a hard signal on ${new Date().toISOString().slice(0, 10)}.`,
+              `The scheduled check raised an alert on ${new Date().toISOString().slice(0, 10)}.`,
               '',
-              'A runner is a datacenter address, so some engines being blocked here is expected;',
-              'what is not expected is the runtime failing to boot or every engine going quiet.',
-              'Run `node scripts/check-searxng-health.mjs --min-engines 3` on a real machine before',
-              'concluding anything about the engines themselves.',
+              'This job only fails for the version signal or genuine breakage: the runtime not booting,',
+              'none of the scholarly APIs answering, an engine reporting a parsing error, or the pin having',
+              'aged past 90 days while upstream moved. Engines that refuse, throttle or CAPTCHA are in the',
+              'artifact and are not errors — a runner is a datacenter address and the scraped engines treat',
+              'those harshly, so nothing about the engines themselves can be concluded from a runner.',
               '',
               '```json',
               report.slice(0, 60000),
