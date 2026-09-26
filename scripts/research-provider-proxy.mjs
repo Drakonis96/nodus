@@ -53,7 +53,7 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
       if (body.max_tokens !== undefined && body.max_completion_tokens !== undefined) throw new Error('research_ambiguous_output_bound');
       if (body.model !== target.model || body.tools?.length || body.web_search_options || body.plugins?.length || (body.n !== undefined && body.n !== 1)) throw new Error('research_model_or_tool_not_authorized');
       const output = provider === 'deepseek' ? body.max_tokens ?? body.max_completion_tokens : 0;
-      if (!Number.isSafeInteger(output) || output < 0 || output > 16384 || (provider === 'deepseek' && output === 0)) throw new Error('research_output_bound_required');
+      if (!Number.isSafeInteger(output) || output < 0 || output > 32768 || (provider === 'deepseek' && output === 0)) throw new Error('research_output_bound_required');
       if (provider === 'deepseek' && (!Array.isArray(body.messages) || body.messages.some(message => typeof message.content !== 'string'))) throw new Error('research_text_only');
       if (provider === 'openrouter' && !(typeof body.input === 'string' || (Array.isArray(body.input) && body.input.length && body.input.every(input => typeof input === 'string')))) throw new Error('research_text_only');
       const maximumUsd = ((bytes.length * target.input + output * target.output) / 1e6) * 1.25 + .002;

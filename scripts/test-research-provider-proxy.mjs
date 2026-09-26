@@ -22,6 +22,7 @@ test('paid gate reserves before dispatch, rejects other models and never logs cr
     assert.equal((await post('deepseek', 'chat/completions', { ...base, model: 'other' })).status, 403);
     assert.equal((await post('deepseek', 'chat/completions', { ...base, tools: [{}] })).status, 403);
     assert.equal((await post('deepseek', 'chat/completions', { ...base, max_tokens: 999999 })).status, 403);
+    assert.equal((await post('deepseek', 'chat/completions', { ...base, max_tokens: 32769 })).status, 403);
     assert.equal((await post('deepseek', 'chat/completions', { ...base, max_completion_tokens: 999999 })).status, 403);
     assert.equal(dispatches, 0);
     const chat = await post('deepseek', 'chat/completions', base);
@@ -29,6 +30,11 @@ test('paid gate reserves before dispatch, rejects other models and never logs cr
     const embeddings = await post('openrouter', 'embeddings', { model: 'baai/bge-m3', input: ['Synthetic source'] });
     assert.equal(embeddings.status, 200); await embeddings.text();
     assert.equal(dispatches, 2);
+    const thinking = await post('deepseek', 'chat/completions', { ...base, max_tokens: 9000 + 8192, thinking: { type: 'enabled' }, reasoning_effort: 'low' });
+    assert.equal(thinking.status, 200, 'an Immersion answer plus thinking fits the paid gate');
+    await thinking.text();
+    assert.equal(dispatches, 3);
+    assert.ok(proxy.ledger.read().calls[2].maximumUsd > proxy.ledger.read().calls[0].maximumUsd, 'the larger output is reserved before dispatch');
     assert.equal(proxy.ledger.read().calls.every(call => call.actualUsd !== null), true);
     assert.doesNotMatch(fs.readFileSync(path.join(root, 'artifacts/provider-metrics.jsonl'), 'utf8'), /fixture-secret|Synthetic source/);
   } finally { await proxy.close(); fs.rmSync(root, { recursive: true, force: true }); }
