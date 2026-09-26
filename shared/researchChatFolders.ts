@@ -47,3 +47,15 @@ export function nextFolderName(folders: ResearchChatProjectFolder[], projectId: 
   for (let index = 2; taken.has(name); index++) name = `${base} ${index}`;
   return name;
 }
+
+/** A project's folders in tree order, every level open, each with its depth: what a
+ * "Move to folder" list shows. */
+export function folderOutline(folders: ResearchChatProjectFolder[], projectId: string): { folder: ResearchChatProjectFolder; depth: number }[] {
+  const children = folderChildren(folders, projectId);
+  const out: { folder: ResearchChatProjectFolder; depth: number }[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    for (const folder of children.get(parentId) ?? []) { out.push({ folder, depth }); walk(folder.id, depth + 1); }
+  };
+  walk(null, 0);
+  return out;
+}

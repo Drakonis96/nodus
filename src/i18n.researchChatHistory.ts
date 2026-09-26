@@ -203,4 +203,20 @@ const folderTranslations: Record<string, string[]> = {
     'ここにはチャットがありません。チャットをフォルダーにドラッグすると、そこに保存されます。'],
 };
 for (const [language, values] of Object.entries(folderTranslations)) translations[language].push(...values);
+/** "Move to folder…" in a chat's menu: the folders of its project. */
+keys.push('Mover a carpeta…', 'Sacar de la carpeta');
+const folderMenuTranslations: Record<string, string[]> = {
+  en: ['Move to folder…', 'Remove from folder'],
+  fr: ['Déplacer vers un dossier…', 'Retirer du dossier'],
+  de: ['In Ordner verschieben…', 'Aus dem Ordner entfernen'],
+  pt: ['Mover para pasta…', 'Retirar da pasta'],
+  'pt-BR': ['Mover para pasta…', 'Tirar da pasta'],
+  it: ['Sposta in cartella…', 'Togli dalla cartella'],
+  tr: ['Klasöre taşı…', 'Klasörden çıkar'],
+  'zh-CN': ['移到文件夹…', '移出文件夹'],
+  'zh-TW': ['移到資料夾…', '移出資料夾'],
+  ko: ['폴더로 이동…', '폴더에서 빼기'],
+  ja: ['フォルダーへ移動…', 'フォルダーから外す'],
+};
+for (const [language, values] of Object.entries(folderMenuTranslations)) translations[language].push(...values);
 export const RESEARCH_CHAT_HISTORY_TRANSLATIONS = Object.fromEntries(Object.entries(translations).map(([language, values]) => [language, Object.fromEntries(keys.map((key, index) => [key, values[index]]))]));

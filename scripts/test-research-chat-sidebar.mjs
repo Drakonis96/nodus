@@ -20,12 +20,16 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
 
 /** The menu mounts hidden and shows once placed. Its labels are read as text content:
- * innerText depends on layout and came back empty on CI runners for a visible menu. */
+ * innerText depends on layout and came back empty on CI runners for a visible menu. Plain
+ * items and choice (radio) items alike, in order, once the menu has its items and the focus. */
 async function placedTexts(menu) {
   await menu.waitFor();
-  await menu.page().waitForFunction(element => element && getComputedStyle(element).visibility !== 'hidden', await menu.elementHandle(), { timeout: 10000 });
-  return (await menu.getByRole('menuitem').allTextContents()).map(text => text.trim());
+  await menu.page().waitForFunction(element => element && getComputedStyle(element).visibility !== 'hidden' && element.querySelector('[role^="menuitem"]') && element.contains(document.activeElement), await menu.elementHandle(), { timeout: 10000 });
+  return (await menu.locator('[role="menuitem"], [role="menuitemradio"]').allTextContents()).map(text => text.trim());
 }
+
+/** The label of whatever has the keyboard focus. */
+const focusedText = page => page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
 
 test('research chat history: sections, search, pins, menu and projects', { timeout: 300_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
@@ -146,7 +150,8 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await menu.getByRole('menuitem', { name: 'Mover a proyecto' }).click();
       await menu.getByRole('menuitem').first().waitFor();
       assert.deepEqual(await placedTexts(menu), ['Mover a proyecto', 'Alfa', 'Zeta', 'Nuevo proyecto']);
-      await menu.getByRole('menuitem', { name: 'Zeta' }).click();
+      assert.equal(await menu.getByRole('menuitemradio', { name: 'Alfa' }).getAttribute('aria-checked'), 'false');
+      await menu.getByRole('menuitemradio', { name: 'Zeta' }).click();
       await action('move', 'c4', 'p-z');
       await menu.waitFor({ state: 'detached' });
       assert.ok(!(await order()).includes('Cartografía medieval'), 'a chat in a project leaves the general list');
@@ -201,6 +206,71 @@ test('research chat history: sections, search, pins, menu and projects', { timeo
       await action('file', 'c2', null);
       await sidebar.getByTestId('research-conversation-c2').dragTo(sidebar.getByTestId('research-folder-f-2'));
       await action('file', 'c2', 'f-2');
+    });
+
+    await t.test('"Move to folder…" files a chat in a folder of its project, by keyboard alone', async () => {
+      const row = sidebar.getByTestId('research-conversation-c2');
+      const trigger = row.getByRole('button', { name: 'Más acciones' });
+      const menu = page.getByRole('menu', { name: 'Regadío del Tormeral' });
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      assert.deepEqual(await placedTexts(menu), ['Renombrar', 'Destacar chat', 'Archivar', 'Eliminar', 'Mover a proyecto', 'Mover a carpeta…']);
+      assert.equal(await focusedText(page), 'Renombrar', 'the menu takes the focus');
+      await page.keyboard.press('End');
+      assert.equal(await focusedText(page), 'Mover a carpeta…');
+      assert.equal(await menu.getByRole('menuitem', { name: 'Mover a carpeta…' }).getAttribute('aria-haspopup'), 'menu');
+      await page.keyboard.press('ArrowRight');
+      assert.deepEqual(await placedTexts(menu), ['Mover a carpeta…', 'Sacar de la carpeta', 'Capítulo primero: fuentes, archivos y cartografía del regadío', 'Fuentes', 'Notas'],
+        'its project\'s folders in tree order, and a way out of the current one');
+      assert.equal(await focusedText(page), 'Mover a carpeta…', 'the list keeps the focus when it changes');
+      const checked = await menu.getByRole('menuitemradio').evaluateAll(items => items.map(item => [item.textContent.trim().slice(0, 8), item.getAttribute('aria-checked')]));
+      assert.deepEqual(checked, [['Capítulo', 'false'], ['Fuentes', 'true'], ['Notas', 'false']], 'the current folder is the checked one');
+      const indent = name => menu.getByRole('menuitemradio', { name, exact: typeof name === 'string' }).evaluate(item => parseFloat(getComputedStyle(item).paddingLeft));
+      assert.ok(await indent('Fuentes') > await indent(/^Capítulo primero/), 'a subfolder is indented under its parent');
+      await page.keyboard.press('ArrowLeft');
+      assert.equal(await focusedText(page), 'Renombrar', 'ArrowLeft goes back to the chat\'s actions');
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await placedTexts(menu);
+      await page.keyboard.press('End');
+      assert.equal(await focusedText(page), 'Notas');
+      await page.keyboard.press('Enter');
+      await action('file', 'c2', 'f-3');
+      await menu.waitFor({ state: 'detached' });
+      assert.equal(await page.evaluate(() => document.activeElement?.closest('[data-testid]')?.getAttribute('data-testid')), 'research-conversation-c2', 'the focus returns to the row it came from');
+      assert.equal(await sidebar.getByTestId('research-folder-f-3').locator('.research-folder-count').textContent(), '1');
+      // Out of its folder, staying in the project; Escape closes without doing anything.
+      await page.keyboard.press('Enter');
+      await placedTexts(menu);
+      await page.keyboard.press('End'); await page.keyboard.press('ArrowRight');
+      await placedTexts(menu);
+      await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+      await action('file', 'c2', null);
+      await menu.waitFor({ state: 'detached' });
+      await page.keyboard.press('Enter');
+      await placedTexts(menu);
+      await page.keyboard.press('End'); await page.keyboard.press('ArrowRight');
+      assert.deepEqual(await placedTexts(menu), ['Mover a carpeta…', 'Capítulo primero: fuentes, archivos y cartografía del regadío', 'Fuentes', 'Notas'], 'an unfiled chat has nothing to leave');
+      await page.keyboard.press('Escape');
+      await menu.waitFor({ state: 'detached' });
+      assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('aria-label')), 'Más acciones', 'Escape gives the focus back too');
+      // Back where it was, by pointer this time, closing on a click away first.
+      await trigger.click();
+      await placedTexts(menu);
+      await page.mouse.click(860, 740);
+      await menu.waitFor({ state: 'detached' });
+      await row.hover();
+      await trigger.click();
+      await menu.getByRole('menuitem', { name: 'Mover a carpeta…' }).click();
+      await menu.getByRole('menuitemradio', { name: 'Fuentes', exact: true }).click();
+      await action('file', 'c2', 'f-2');
+      // A chat outside every project has no folders to go to.
+      await sidebar.getByTestId('research-conversation-c1').hover();
+      await sidebar.getByTestId('research-conversation-c1').getByRole('button', { name: 'Más acciones' }).click();
+      const outside = page.getByRole('menu', { name: 'Sevilla en guías de viaje' });
+      assert.ok(!(await placedTexts(outside)).includes('Mover a carpeta…'));
+      await page.keyboard.press('Escape');
+      await outside.waitFor({ state: 'detached' });
     });
 
     await t.test('a folder dropped on a folder nests or reorders; never into its own subtree', async () => {

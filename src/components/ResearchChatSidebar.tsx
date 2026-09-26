@@ -10,7 +10,7 @@ import { t, tx } from '../i18n';
 import { FloatingMenu, MenuItem, RenameField } from './ResearchChatHistoryMenu';
 import { FolderTreeRowView, chatDragProps, historyError, folderTreeRows, outsideDropProps, useFolderTreeUi, type ChatFolderActions, type ChatFolderTreeState, type FolderTreeRow } from './ResearchChatFolderTree';
 import { MarqueeText } from './MarqueeText';
-import { conversationsInSelection } from '@shared/researchChatFolders';
+import { conversationsInSelection, folderOutline } from '@shared/researchChatFolders';
 
 /** The colours a project can take, plus any custom one. */
 export const PROJECT_COLORS = ['#171717', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
@@ -332,22 +332,34 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
 function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supportsProjects, ...props }: ResearchChatSidebarProps & {
   conversation: ChatConversationSummary; anchor: DOMRect; onClose: () => void; onRename: () => void; run: (action: () => Promise<unknown>) => void;
 }) {
-  const [moving, setMoving] = useState(false);
+  // The menu swaps its list in place: the chat's actions, the projects, or the folders.
+  const [list, setList] = useState<'actions' | 'projects' | 'folders'>('actions');
   const pinned = !!conversation.pinnedAt && !conversation.archived;
   // A notebook's chat belongs to its notebook; it is not moved into a project.
   const movable = supportsProjects && !(conversation.notebookId && props.notebooksOn && props.notebooks.some(notebook => notebook.id === conversation.notebookId));
+  const project = conversation.projectId ? projects.find(item => item.id === conversation.projectId) ?? null : null;
+  // The folders of the chat's own project; a folder id that no longer resolves is no folder.
+  const outline = project ? folderOutline(props.folderActions.folders, project.id) : [];
+  const currentFolder = outline.some(entry => entry.folder.id === conversation.folderId) ? conversation.folderId : null;
   const act = (action: () => Promise<unknown> | void) => { onClose(); run(async () => { await action(); }); };
-  return <FloatingMenu anchor={anchor} label={conversation.title} onClose={onClose}>
-    {moving ? <>
-      <MenuItem icon="arrowLeft" label={t('Mover a proyecto')} onSelect={() => setMoving(false)} />
+  const back = () => setList('actions');
+  return <FloatingMenu anchor={anchor} label={conversation.title} onClose={onClose} onBack={list === 'actions' ? undefined : back} focusKey={list}>
+    {list === 'projects' ? <>
+      <MenuItem icon="arrowLeft" label={t('Mover a proyecto')} onSelect={back} />
       <hr className="research-history-menu-separator" />
       {conversation.projectId && <MenuItem icon="x" label={t('Sacar del proyecto')} onSelect={() => act(() => props.onMoveConversation(conversation, null))} />}
-      {projects.map(project => <MenuItem key={project.id} icon={project.icon ?? 'folder'} color={project.color} label={project.name} checked={project.id === conversation.projectId}
-        onSelect={() => act(() => project.id === conversation.projectId ? undefined : props.onMoveConversation(conversation, project.id))} />)}
+      {projects.map(item => <MenuItem key={item.id} radio icon={item.icon ?? 'folder'} color={item.color} label={item.name} checked={item.id === conversation.projectId}
+        onSelect={() => act(() => item.id === conversation.projectId ? undefined : props.onMoveConversation(conversation, item.id))} />)}
       <MenuItem icon="folderPlus" label={t('Nuevo proyecto')} onSelect={() => act(async () => {
         const created = await props.onNewProject();
         if (created) await props.onMoveConversation(conversation, created.id);
       })} />
+    </> : list === 'folders' && project ? <>
+      <MenuItem icon="arrowLeft" label={t('Mover a carpeta…')} onSelect={back} />
+      <hr className="research-history-menu-separator" />
+      {currentFolder && <MenuItem icon="x" label={t('Sacar de la carpeta')} onSelect={() => act(() => props.folderActions.onFileConversation(conversation, null))} />}
+      {outline.map(({ folder, depth }) => <MenuItem key={folder.id} radio icon="folder" indent={depth} label={folder.name} checked={folder.id === currentFolder}
+        onSelect={() => act(() => folder.id === currentFolder ? undefined : props.folderActions.onFileConversation(conversation, folder.id))} />)}
     </> : <>
       {props.onRenameConversation && <MenuItem icon="edit" label={t('Renombrar')} onSelect={() => { onClose(); onRename(); }} />}
       {props.onRenameConversation && <hr className="research-history-menu-separator" />}
@@ -356,7 +368,9 @@ function ChatMenu({ conversation, anchor, onClose, onRename, run, projects, supp
       <MenuItem icon="trash" danger label={t('Eliminar')} onSelect={() => { onClose(); props.onDeleteConversation(conversation); }} />
       {movable && <>
         <hr className="research-history-menu-separator" />
-        <MenuItem icon="folderMove" label={t('Mover a proyecto')} trailing={<Icon name="chevronRight" size={13} />} keepOpen onSelect={() => setMoving(true)} />
+        <MenuItem icon="folderMove" label={t('Mover a proyecto')} trailing={<Icon name="chevronRight" size={13} />} keepOpen submenu onSelect={() => setList('projects')} />
+        {/* Only a chat in a project has folders to go to: those of its project. */}
+        {project && outline.length > 0 && <MenuItem icon="folder" label={t('Mover a carpeta…')} trailing={<Icon name="chevronRight" size={13} />} keepOpen submenu onSelect={() => setList('folders')} />}
       </>}
     </>}
   </FloatingMenu>;
