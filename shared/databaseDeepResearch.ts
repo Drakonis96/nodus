@@ -1,6 +1,6 @@
 import type { PromptLanguage } from './types';
 import type { DatabaseColumnType } from './databases';
-import type { DeepResearchSectionLength } from './deepResearchSectionLength';
+import { normalizeDeepResearchSectionLength, type DeepResearchSectionLength } from './deepResearchSectionLength';
 import { isResearchEffort } from './researchReasoning';
 
 /** Stable, contextual report modes. Keep `general` first for legacy callers. */
@@ -806,6 +806,7 @@ const SAFE_RESEARCH_OBJECT_KEYS = new Set([
   'statistic', 'p', 'pValue', 'qValue', 'q', 'confidence', 'interval', 'low', 'high',
   'chi2', 'dof', 'cramersV', 'expected', 'counts', 'rowLevels', 'columnLevels',
   'level', 'mean', 'median', 'mad', 'variance', 'stdDev', 'standardError', 'coefficient',
+  'min', 'max', 'sum', 'q1', 'q3', 'iqr', 'stdev', 'cv', 'skewness', 'kurtosis', 'mode', 'value', 'count', 'ci',
   'coefficients', 'hazardRatio', 'hazardRatios', 'survival', 'time', 'atRisk', 'events',
   'censored', 'points', 'sourceIndexes', 'timestamps', 'droppedMissing', 'warnings',
   'columns', 'columnIds', 'filters', 'inputs', 'output', 'seed', 'iterations',
@@ -1053,6 +1054,7 @@ export function normalizeDatabaseDeepResearchJobInput(
     depth,
     budget,
     planSections,
+    sectionLength: normalizeDeepResearchSectionLength(input.sectionLength),
     language: normalizeDatabaseDeepResearchPromptLanguage(input.language),
     audience:
       input.audience == null
