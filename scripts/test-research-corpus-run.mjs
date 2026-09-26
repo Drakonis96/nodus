@@ -99,6 +99,47 @@ try {
   assert.equal(coverage.scopeId, scope.id);
   assert.equal(coverage.queries.length, 1);
   assert.equal(coverage.sourceCount, 1);
+  // Recovery must only purchase another audit when retrieval changes its evidence.
+  {
+    const audits = load('electron/ai/researchClaimAudit.ts');
+    const originalAuditor = audits.createResearchProseAuditor;
+    const originalRetrieve = preparation.retrieveSharedDocumentaryEvidence;
+    try {
+      for (const addsEvidence of [false, true]) {
+        const judged = []; let remembered = 0; let recovering = false;
+        audits.createResearchProseAuditor = () => ({
+          audit: async (markdown, sources, record = true) => {
+            judged.push({ markdown, sources, record });
+            return { markdown: '', claims: [{ sentence: 'measure missing support', status: 'removed' }] };
+          },
+          remember: () => { remembered++; },
+        });
+        preparation.retrieveSharedDocumentaryEvidence = async (...args) => {
+          const result = await originalRetrieve(...args);
+          if (recovering && addsEvidence) result.evidence.push({
+            id: 'new-recovery-passage', documentId: scope.documents[0].id,
+            text: 'measure newly discovered support', locator: { pageLabel: '4' }, limitations: [], provenance: 'source',
+          });
+          return result;
+        };
+        const bounded = bindAcademicCorpusRun({}, { objective: 'measure', notebookId: notebook.id });
+        await bounded.buildSnapshot({ kind: 'deep_research', objective: 'measure' });
+        recovering = true;
+        const audited = await bounded.auditFactualProse('measure missing support');
+        assert.equal(judged.length, addsEvidence ? 2 : 1, 'identical evidence never triggers an identical paid audit');
+        assert.equal(remembered, addsEvidence ? 0 : 1, 'unchanged recovery still records rejected propositions');
+        assert.equal(audited.markdown, '', 'reusing a verdict never restores unsupported prose');
+        assert.equal(judged[0].record, false);
+        if (addsEvidence) {
+          assert.equal(judged[1].record, true);
+          assert.ok(judged[1].sources.some(source => source.text.includes('newly discovered')));
+        }
+      }
+    } finally {
+      audits.createResearchProseAuditor = originalAuditor;
+      preparation.retrieveSharedDocumentaryEvidence = originalRetrieve;
+    }
+  }
   // The context balloon's layers: a layer that is off is never consulted, not merely hidden.
   const realShared = preparation.retrieveSharedDocumentaryEvidence;
   const layered = async layers => {

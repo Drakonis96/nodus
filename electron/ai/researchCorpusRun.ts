@@ -353,11 +353,16 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   const auditProse = async (markdown: string) => {
     const sources = () => [...run.evidence.values()].map(item => ({ id: item.id, text: item.summary ?? '', label: item.label, citation: item.citation }));
     const expand = run.budget.settings.autoExpand && run.budget.rounds < run.budget.settings.rounds;
-    let audit = await auditor.audit(markdown, sources(), !expand);
+    const initialSources = sources();
+    let audit = await auditor.audit(markdown, initialSources, !expand);
     const missing = expand ? audit.claims.find(claim => claim.status === 'removed') : undefined;
     if (missing) {
       await run.retrieve(missing.sentence.slice(0, 1000), 1);
-      audit = await auditor.audit(markdown, sources());
+      const expandedSources = sources();
+      // An empty retrieval does not change the judge's input. Keep its completed
+      // verdicts rather than buying an identical audit that can fail or disagree.
+      if (JSON.stringify(expandedSources) === JSON.stringify(initialSources)) auditor.remember(audit);
+      else audit = await auditor.audit(markdown, expandedSources);
     } else if (expand) auditor.remember(audit);
     run.validate();
     return { ...audit, passages: [...run.evidence.values()] };
