@@ -32,7 +32,7 @@ test('library annotations are personal overlay data, not manifest data', () => {
 test('primary-source/testimony projections and permanent denylist are explicit', () => {
   assert.match(snapshot, /PRIMARY_SOURCES_SERVER_TABLES/);
   assert.match(snapshot, /TESTIMONIES_SERVER_TABLES/);
-  for (const table of ['testimony_media', 'testimony_agreements', 'teaching_students', 'teaching_grade_entries', 'study_attempts']) {
+  for (const table of ['testimony_media', 'testimony_agreements', 'teaching_students', 'teaching_grade_entries', 'teaching_attendance', 'teaching_attendance_holidays', 'study_attempts']) {
     assert.match(contract, new RegExp(`['"]${table}['"]`));
   }
   assert.match(snapshot, /DENIED_COLUMN_PATTERN/);

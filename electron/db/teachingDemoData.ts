@@ -25,6 +25,7 @@ import { DEFAULT_ACADEMIC_YEAR_START_MONTH, defaultAcademicYearRange, formatAcad
 import { assessmentProfile } from '@shared/assessment/profiles';
 import { buildRubricLevels } from '@shared/teachingRubrics';
 import { generatePseudonymCode } from '@shared/studentPseudonyms';
+import { addDays, isWeekend, toDayKey } from '@shared/teachingAttendance';
 import { clearStudyAssistantDemoConversation, seedStudyAssistantDemoConversation } from '../ai/studyAssistant';
 import { getDb } from './database';
 import { getSettings, updateSettings } from './settingsRepo';
@@ -1025,6 +1026,38 @@ export function seedTeachingDemoData(): boolean {
       insertStudent.run(student.id, ID.group, student.givenNames, student.surnames, pick(student.comments), code, index, createdAt, updatedAt);
     });
 
+    // ── Attendance ───────────────────────────────────────────────────────────
+    // The ten school days before today, or the first ten of the year when it has only
+    // just begun — so the grid never opens on an empty fortnight. One is a holiday.
+    const schoolDays = (from: string, step: 1 | -1) => {
+      const days: string[] = [];
+      for (let day = from; days.length < 10; day = addDays(day, step)) if (!isWeekend(day)) days.push(day);
+      return days.sort();
+    };
+    let attendanceDays = schoolDays(addDays(toDayKey(now), -1), -1);
+    if (attendanceDays[0] < yearRange.startDate) attendanceDays = schoolDays(yearRange.startDate, 1);
+    const holiday = attendanceDays[6];
+    db.prepare(`INSERT INTO teaching_attendance_holidays (id,group_id,date,label,created_at,updated_at) VALUES (?,?,?,?,?,?)`)
+      .run('demo-teaching-holiday-1', ID.group, holiday, pick({ es: 'Fiesta local', en: 'Local holiday', 'zh-CN': '地方假日',
+  'zh-TW': '地方假日',
+  ko: "지역 공휴일",
+  ja: "地域の祝日", }), createdAt, updatedAt);
+    const insertAttendance = db.prepare(`INSERT INTO teaching_attendance (id,student_id,date,status,note,created_at,updated_at) VALUES (?,?,?,?,?,?,?)`);
+    const attendanceRng = seededRng(20_260_926);
+    STUDENTS.forEach((student) => {
+      attendanceDays.filter((day) => day !== holiday).forEach((day, index) => {
+        const roll = attendanceRng();
+        const status = roll < 0.8 ? 'present' : roll < 0.88 ? 'late' : roll < 0.95 ? 'justified' : 'unjustified';
+        const note = status === 'justified'
+          ? pick({ es: 'Justificante médico', en: 'Doctor’s note', 'zh-CN': '医生证明',
+  'zh-TW': '醫生證明',
+  ko: "진단서",
+  ja: "診断書", })
+          : '';
+        insertAttendance.run(`${student.id}-attendance-${index}`, student.id, day, status, note, createdAt, updatedAt);
+      });
+    });
+
     // ── Rubric ───────────────────────────────────────────────────────────────
     const levels = buildRubricLevels('achievement4', promptL, 10);
     const criteria = RUBRIC_CRITERIA.map((criterion) => ({
@@ -1284,6 +1317,8 @@ export function clearTeachingDemoData(): void {
       DELETE FROM teaching_exam_questions WHERE id LIKE 'demo-teaching-%';
       DELETE FROM teaching_exams WHERE id LIKE 'demo-teaching-%';
       DELETE FROM teaching_rubrics WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM teaching_attendance WHERE id LIKE 'demo-teaching-%';
+      DELETE FROM teaching_attendance_holidays WHERE id LIKE 'demo-teaching-%';
       DELETE FROM teaching_students WHERE id LIKE 'demo-teaching-%';
       DELETE FROM teaching_groups WHERE id LIKE 'demo-teaching-%';
       DELETE FROM study_schedule_cells WHERE period_id LIKE 'demo-teaching-%';

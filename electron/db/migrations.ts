@@ -9319,9 +9319,11 @@ export const migrations: Migration[] = [
     // reached through the student, not stored twice. Holidays belong to a group — the
     // interface offers to copy one to the teacher's other groups, but each group keeps
     // its own calendar. A holiday hides the marks under it rather than deleting them.
+    // IF NOT EXISTS: a vault that already has the tables (a differently numbered build,
+    // a replayed upgrade) must reach head instead of failing on "already exists".
     version: 179,
     up: /* sql */ `
-      CREATE TABLE teaching_attendance (
+      CREATE TABLE IF NOT EXISTS teaching_attendance (
         id TEXT PRIMARY KEY,
         student_id TEXT NOT NULL REFERENCES teaching_students(id) ON DELETE CASCADE,
         date TEXT NOT NULL,
@@ -9330,9 +9332,9 @@ export const migrations: Migration[] = [
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
-      CREATE UNIQUE INDEX idx_teaching_attendance_key ON teaching_attendance(student_id, date);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_key ON teaching_attendance(student_id, date);
 
-      CREATE TABLE teaching_attendance_holidays (
+      CREATE TABLE IF NOT EXISTS teaching_attendance_holidays (
         id TEXT PRIMARY KEY,
         group_id TEXT NOT NULL REFERENCES teaching_groups(id) ON DELETE CASCADE,
         date TEXT NOT NULL,
@@ -9340,7 +9342,7 @@ export const migrations: Migration[] = [
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
-      CREATE UNIQUE INDEX idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_teaching_attendance_holidays_key ON teaching_attendance_holidays(group_id, date);
     `,
   },
 ];

@@ -132,6 +132,8 @@ try {
     ['gradebook tree', 'teaching_assessment_items', "id LIKE 'demo-teaching-%'"],
     ['grades', 'teaching_grade_entries', "id LIKE 'demo-teaching-%'"],
     ['rubric marks', 'teaching_rubric_evaluations', "id LIKE 'demo-teaching-%'"],
+    ['attendance', 'teaching_attendance', "id LIKE 'demo-teaching-%'"],
+    ['attendance holidays', 'teaching_attendance_holidays', "id LIKE 'demo-teaching-%'"],
   ]) assert.ok(count(table, where) > 0, `teaching ${label} is populated`);
   assert.ok(studyChat.listStudyAssistantConversations().some((item) => item.id === 'demo-teaching-chat-commentary'), 'teaching chat is populated');
   teaching.clearTeachingDemoData();
