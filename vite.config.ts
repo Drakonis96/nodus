@@ -291,6 +291,7 @@ export default defineConfig({
           libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
           libraryReaderWorker: 'electron/workers/libraryReaderWorker.ts',
           compassWorker: 'electron/workers/compassWorker.ts',
+          webExtractionWorker: 'electron/workers/webExtractionWorker.ts',
         },
         vite: {
           // The top-level resolve.alias only applies to the renderer build;

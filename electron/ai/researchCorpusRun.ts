@@ -27,6 +27,7 @@ import { getGlobalLibraryItem, globalLibraryAttachmentPath } from '../library/li
 import { readResearchOriginalInWorker } from '../library/libraryExtractionWorkerHost';
 import type { ModelRef } from '@shared/types';
 import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
+import type { ResearchWebGrant } from './researchWebStep';
 
 /** Compatibility requests are explicit snapshots of the active vault. A notebook
  * may additionally authorize unlinked Global Library works. Neither path uses a
@@ -44,6 +45,10 @@ export class ResearchCorpusRun {
   readonly readDocuments = new Set<string>();
   readonly ideas = new Map<string, WritingWorkshopIdeaCandidate>();
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
+  /** Research Chat only: the web step, when the user left it on. Deep Research never sets it. */
+  web?: ResearchWebGrant;
+  /** Whether the supervisor made at least one decision in this run. */
+  supervised = false;
   private readonly workIds: string[];
   private readonly ideaIds: string[];
   private originalPins?: Promise<ZoteroOriginalPins>;

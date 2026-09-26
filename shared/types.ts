@@ -2128,6 +2128,8 @@ export interface AppSettings {
    * model preferences: the level belongs to the model, not to the vault asking.
    */
   researchEffortByModel: Record<string, ResearchEffort>;
+  /** Research Chat's web step: automatic (the agent decides) or off. App-wide. */
+  researchWebSearch: ResearchWebSearchMode;
   // When using OpenRouter, bias routing toward the fastest upstream provider.
   openRouterThroughput: boolean;
   /**
@@ -5871,10 +5873,38 @@ export interface ResearchChatRequest {
   model?: ModelRef | null;
   /** Skills invoked with @ for this turn only; applied even when switched off for the chat. */
   skillIds?: string[];
+  /** Research Chat's web step. Absent means automatic; 'off' never leaves the machine. */
+  webSearch?: ResearchWebSearchMode;
+}
+
+export type ResearchWebSearchMode = 'auto' | 'off';
+/** What the web step did in one turn, persisted with the answer. */
+export interface ResearchWebSearchStats {
+  mode: ResearchWebSearchMode;
+  searched: boolean;
+  trigger?: 'supervisor' | 'explicit' | 'fallback';
+  queries: Array<{ query: string; category: 'general' | 'science'; round: number; results: number; failed?: boolean }>;
+  rounds: number;
+  found: number;
+  consulted: Array<{ url: string; title: string; domain: string; outcome: import('./researchActivity').ResearchWebPageOutcome; passages: number }>;
+  limitations: string[];
+  durationMs: number;
+}
+/** A web page whose passages reached the model, with the citations that point at it. */
+export interface ResearchWebSource {
+  url: string;
+  title: string;
+  siteName: string | null;
+  domain: string;
+  retrievedAt: string;
+  publishedAt: string | null;
+  passageIds: string[];
 }
 
 export interface ResearchContextStats {
   researchTraversal?: import('./researchCorpus').ResearchTraversal;
+  webSearch?: ResearchWebSearchStats;
+  webSources?: ResearchWebSource[];
   sections: string[];
   works: number;
   documents: number;
@@ -6397,6 +6427,21 @@ export interface CitationPreview {
   title: string;
   subtitle?: string;
   snippet?: string;
+  /** Set for web evidence: the page the passage was read from. */
+  url?: string;
+  /** Link that lands on the quoted passage (text fragment or PDF page). */
+  openUrl?: string;
+}
+
+export interface WebPassageSource {
+  url: string;
+  finalUrl: string;
+  siteName: string | null;
+  domain: string;
+  retrievedAt: string;
+  publishedAt: string | null;
+  doi: string | null;
+  kind: 'html' | 'pdf';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9417,7 +9462,9 @@ export interface PassageDetail {
   historical?: boolean;
   libraryItemId?: string | null;
   attachmentId?: string | null;
-  provenance?: 'source' | 'abstract' | 'user-note' | 'generated-report';
+  provenance?: 'source' | 'abstract' | 'user-note' | 'generated-report' | 'web';
+  /** Research Chat web evidence: where and when Nodus read this passage. */
+  web?: WebPassageSource;
   passage_id: string;
   nodus_id: string;
   text: string;

@@ -199,6 +199,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   chatReasoning: 'off',
   codexReasoningEfforts: {},
   researchEffortByModel: {},
+  researchWebSearch: 'auto',
   openRouterThroughput: true,
   providerFreeTier: {},
   unpaywallEmail: '',
@@ -381,6 +382,7 @@ export function getSettings(): AppSettings {
   }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(parsed.codexReasoningEfforts);
   merged.researchEffortByModel = sanitizeResearchEffortByModel(parsed.researchEffortByModel);
+  merged.researchWebSearch = parsed.researchWebSearch === 'off' ? 'off' : 'auto';
   merged.mascotScale = normalizeNodiScale(parsed.mascotScale);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
@@ -529,6 +531,7 @@ export function getSettings(): AppSettings {
   }
   merged.codexReasoningEfforts = sanitizeCodexReasoningEfforts(merged.codexReasoningEfforts);
   merged.researchEffortByModel = sanitizeResearchEffortByModel(merged.researchEffortByModel);
+  merged.researchWebSearch = merged.researchWebSearch === 'off' ? 'off' : 'auto';
   if ((merged.sttProvider as string) === 'local') {
     merged.sttProvider = 'transformers';
     seed.sttProvider = 'transformers';

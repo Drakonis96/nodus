@@ -1186,6 +1186,22 @@ export function App() {
     return () => window.removeEventListener('nodus:open-library-item', openBrowserCapture);
   }, []);
 
+  // Research Chat opens a cited web page as a NEW tab of Nodus' Browser. The event
+  // comes from this renderer (web pages live in other WebContents and cannot reach
+  // it); the URL is checked again here and by the Browser's own navigation policy.
+  useEffect(() => {
+    const openWebSource = (event: Event) => {
+      const url = (event as CustomEvent<{ url?: unknown }>).detail?.url;
+      if (typeof url !== 'string' || url.length > 4000 || !/^https?:\/\//i.test(url)) return;
+      void window.nodus.openBrowserTab(url).then(tabId => {
+        if (tabId) setView('browser');
+        else void window.nodus.openExternal(url);
+      }).catch(() => void window.nodus.openExternal(url));
+    };
+    window.addEventListener('nodus:open-browser-url', openWebSource);
+    return () => window.removeEventListener('nodus:open-browser-url', openWebSource);
+  }, [setView]);
+
   // Una nota se abre con la misma experiencia de catálogo y pestañas, bajo el nombre
   // Espacio de trabajo en la académica y Notas en las demás bóvedas.
   const openNoteFromSearch = useCallback((id: string) => {

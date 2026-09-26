@@ -1,0 +1,93 @@
+# Nodus managed SearXNG. serve.py copies this file into a private session
+# directory and replaces __SECRET__ before SearXNG reads it. Only the JSON API
+# is served, only on the loopback interface, and only to requests carrying the
+# per-launch token (serve.py). Engines that answer with a CAPTCHA are suspended
+# by SearXNG itself; Nodus never retries around a block.
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - bing
+      - qwant
+      - wikipedia
+      - arxiv
+      - semantic scholar
+      - openalex
+      - crossref
+      - pubmed
+      - europepmc
+      - google scholar
+
+general:
+  debug: false
+  instance_name: "Nodus"
+  enable_metrics: false
+
+search:
+  safe_search: 0
+  autocomplete: ""
+  favicon_resolver: ""
+  default_lang: "auto"
+  formats:
+    - json
+
+server:
+  bind_address: "127.0.0.1"
+  port: 0
+  base_url: false
+  limiter: false
+  public_instance: false
+  secret_key: "__SECRET__"
+  image_proxy: false
+  method: "GET"
+
+valkey:
+  url: false
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 10.0
+  pool_connections: 20
+  enable_http2: true
+
+plugins:
+  searx.plugins.tracker_url_remover.SXNGPlugin:
+    active: true
+
+engines:
+  - name: duckduckgo
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: qwant
+    disabled: true
+  - name: wikipedia
+    disabled: false
+    display_type: ["list"]
+  # The multidisciplinary scholarly engines also serve the general category: with
+  # every scraped engine blocked or parked, a general query still finds the
+  # literature instead of coming back empty. The biomedical engines (PubMed,
+  # EuropePMC) stay out of it, where their reading of "memory" or "cell" is noise.
+  - name: arxiv
+    disabled: false
+    categories: [general, science]
+  - name: semantic scholar
+    disabled: false
+    categories: [general, science]
+  - name: openalex
+    disabled: false
+    timeout: 6.0
+    categories: [general, science]
+  - name: crossref
+    disabled: true
+    timeout: 8.0
+  - name: pubmed
+    disabled: false
+  - name: europepmc
+    disabled: false
+  - name: google scholar
+    disabled: false
+    categories: [general, science]

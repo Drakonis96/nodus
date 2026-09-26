@@ -243,6 +243,8 @@ const NOT_SYNCED_TABLES = new Set([
   // permissions. Importing them would incorrectly trust another device's history.
   // Publication fencing likewise belongs to the local passage writer.
   'research_run_scopes', 'research_conversation_provenance', 'passage_publications',
+  // Web receipts are what THIS machine read; another device verifies its own.
+  'research_web_passages',
   // Source-resolution provenance is rebuilt from this machine's Zotero/library files.
   // Shipping it would create attachment locators that may not exist on the receiver.
   'work_text_sources',

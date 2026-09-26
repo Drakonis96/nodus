@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { searxngInputs, stageSearxng } from './lib/prepare-searxng.mjs';
 
 const repo = path.resolve(import.meta.dirname, '..');
 const source = path.join(repo, 'runtime/zotero-mcp');
@@ -15,7 +16,7 @@ const cache = path.join(repo, 'artifacts/zotero-mcp-downloads');
 fs.mkdirSync(cache, { recursive: true });
 fs.mkdirSync(output, { recursive: true });
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-const inputFingerprint = digest(Buffer.concat([fs.readFileSync(import.meta.filename), ...['manifest.json', 'requirements.lock', 'build-requirements.lock', 'serve.py', 'license_inventory.py', 'license_overrides.json', ...fs.readdirSync(path.join(source, 'licenses')).sort().map(name => `licenses/${name}`)].map(name => fs.readFileSync(path.join(source, name)))]));
+const inputFingerprint = digest(Buffer.concat([fs.readFileSync(import.meta.filename), ...['manifest.json', 'requirements.lock', 'build-requirements.lock', 'serve.py', 'license_inventory.py', 'license_overrides.json', ...fs.readdirSync(path.join(source, 'licenses')).sort().map(name => `licenses/${name}`)].map(name => fs.readFileSync(path.join(source, name))), ...searxngInputs().map(file => fs.readFileSync(file))]));
 const ready = path.join(output, 'runtime.json');
 if (fs.existsSync(ready) && JSON.parse(fs.readFileSync(ready, 'utf8')).inputFingerprint === inputFingerprint
     && JSON.parse(fs.readFileSync(ready, 'utf8')).platform === platform
@@ -130,6 +131,8 @@ fs.cpSync(path.join(source, 'licenses'), path.join(legal, 'supplemental'), { rec
 fs.copyFileSync(path.join(source, 'licenses/LICENSE.zlib-ng.txt'), path.join(legal, 'python/licenses/LICENSE.zlib-ng.txt'));
 fs.copyFileSync(path.join(source, 'license_overrides.json'), path.join(legal, 'license_overrides.json'));
 execFileSync(python, ['-I', path.join(source, 'license_inventory.py'), output], { stdio: 'inherit' });
+// SearXNG needs pip too, so it is staged before the build tools are removed below.
+const searxng = await stageSearxng({ python, output, cache, archive });
 fs.rmSync(upstream, { recursive: true, force: true });
 // Build tools are not runtime dependencies. Keep the private interpreter free of
 // pip, setuptools and wheel after the hash-locked installation has completed.
@@ -150,5 +153,5 @@ function inventory(directory) {
   }
 }
 inventory(output);
-fs.writeFileSync(ready, JSON.stringify({ ...manifest, platform, inputFingerprint, files }, null, 2));
+fs.writeFileSync(ready, JSON.stringify({ ...manifest, platform, inputFingerprint, searxng, files }, null, 2));
 console.log(`[zotero-mcp] prepared private runtime: ${platform}, ${files.length} files`);

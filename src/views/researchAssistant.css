@@ -587,3 +587,21 @@ p.research-notebook-banner { flex-direction: row; align-items: center; }
 .research-assistant-actions > .research-context-trigger { font-size: 12px; }
 .research-context-trigger.is-filtered { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 60%, transparent); }
 .research-source-filter-panel .research-source-filter-body { padding: 0; }
+.research-web-toggle { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 36px; padding: 0 10px; border: 0; border-radius: 18px; background: transparent; color: #a1a1aa; font-size: 13px; cursor: pointer; }
+.research-web-toggle:hover:not(:disabled) { background: #88888812; }
+.research-web-toggle.is-on { color: var(--vault-accent); background: color-mix(in srgb, var(--vault-accent) 12%, transparent); }
+.research-web-toggle:disabled { opacity: .5; cursor: default; }
+.research-web-sources { margin: 8px 0; padding: 10px 12px; border: 1px solid #d4d4d8; border-radius: 6px; font-size: 13px; }
+.dark .research-web-sources { border-color: #3f3f46; }
+.research-web-sources header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.research-web-sources header svg { color: var(--vault-accent); }
+.research-web-sources header span { font-size: 11px; color: #71717a; }
+.research-web-sources ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.research-web-sources li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.research-web-sources li button { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 4px 6px; border-radius: 6px; text-align: left; background: transparent; cursor: pointer; }
+.research-web-sources li button:hover { background: #88888814; }
+.research-web-sources li button:focus-visible { outline: 2px solid var(--vault-accent); outline-offset: 1px; }
+.research-web-source-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.research-web-source-meta { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: #71717a; }
+.research-web-source-tag { flex-shrink: 0; padding: 0 7px; border-radius: 999px; font-size: 10px; line-height: 18px; color: #71717a; background: #88888818; }
+.research-web-source-tag.cited { color: #41916d; background: #41916d22; font-weight: 600; }

@@ -403,10 +403,12 @@ function CitationLink({
         type="button"
         className="citation-link"
         data-citation-kind={citation.kind}
+        data-web-source={citation.kind === 'passage' && citation.id.startsWith('web:') ? 'true' : undefined}
         data-verified={unverified ? 'false' : undefined}
         title={
           unverified
             ? t('Fuente no encontrada: esta cita no se pudo verificar en el corpus.')
+            : citation.kind === 'passage' && citation.id.startsWith('web:') ? t('Abrir la fuente web en una pestaña nueva del navegador de Nodus')
             : `${t('Abrir fuente:')} ${citationLabel(citation.kind)}`
         }
         onClick={(e) => {
@@ -431,9 +433,10 @@ function CitationLink({
             <span className="citation-card-loading">{t('Cargando…')}</span>
           ) : (
             <>
-              <span className="citation-card-kind">{citationLabel(preview.kind)}</span>
+              <span className="citation-card-kind">{preview.url ? t('Fuente web') : citationLabel(preview.kind)}</span>
               <span className="citation-card-title">{preview.title}</span>
               {preview.subtitle && <span className="citation-card-sub">{preview.subtitle}</span>}
+              {preview.url && <span className="citation-card-url" data-testid="citation-card-url">{preview.url}</span>}
               {preview.snippet && <span className="citation-card-snippet">{preview.snippet}</span>}
             </>
           )}

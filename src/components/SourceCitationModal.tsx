@@ -1,3 +1,5 @@
+import { openWebSource } from '../researchWebSources';
+import { webPassageLink } from '@shared/webResearchRanking';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   AuthorDossier,
@@ -545,6 +547,20 @@ function PassagePanel({ passageId, onOpenTarget, onTitle, authors, onOpenLibrary
   if (missing) return <MissingPanel>{t('No se encontró el pasaje citado. Puede haberse reindexado.')}</MissingPanel>;
   if (!detail) return <LoadingPanel />;
   const page = detail.page_number ?? parsePageNumber(detail.page_label);
+  if (detail.web) {
+    const web = detail.web;
+    const open = () => openWebSource(webPassageLink(web.finalUrl, detail.text, detail.page_number));
+    return (
+      <div className="space-y-5" data-testid="source-citation-web-passage">
+        <div className="rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/10 via-neutral-900/60 to-neutral-950 p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2"><Badge color="cyan">{t('Fuente web')}</Badge>{detail.page_label && <Badge>{detail.page_label}</Badge>}
+          <button type="button" data-testid="source-citation-open-web" className="btn btn-ghost h-7 border border-sky-700/70 px-2 text-[11px] text-sky-300" onClick={open}><Icon name="globe" size={12} /> {t('Abrir en el navegador')}</button></div>
+          <h2 className="mt-3 text-xl font-semibold leading-tight text-neutral-100">{detail.work.title}</h2>
+          <p className="mt-2 break-all text-xs text-sky-300">{web.url}</p>
+          <p className="mt-1 text-[11px] text-neutral-500">{[web.siteName ?? web.domain, web.publishedAt, tx('Consultada el {date}', { date: new Date(web.retrievedAt).toLocaleString() })].filter(Boolean).join(' · ')}</p></div>
+        <Section icon="quote" title={t('Evidencia anclada')} count={1} testId="source-citation-evidence"><blockquote className="rounded-xl border border-sky-900/50 bg-sky-950/10 p-4 text-sm leading-7 text-neutral-200"><Icon name="quote" size={15} className="mb-2 text-sky-400" /><span className="whitespace-pre-wrap">{detail.text}</span></blockquote></Section>
+      </div>
+    );
+  }
   return (
     <div className="space-y-5" data-testid="source-citation-passage">
       <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-500/10 via-neutral-900/60 to-neutral-950 p-5 sm:p-6"><div className="flex flex-wrap items-center gap-2"><Badge color="green">{detail.provenance === 'abstract' ? t('Resumen') : detail.noteId ? t(detail.provenance === 'generated-report' ? 'Informe' : 'Nota') : t('Pasaje de texto completo')}</Badge>{detail.page_label && <Badge>{detail.page_label}</Badge>}{!detail.historical && !detail.conversationAttachment && page !== null && <button type="button" data-testid="source-citation-jump-passage" className="btn btn-ghost h-7 border border-emerald-700/70 px-2 text-[11px] text-emerald-300" title={t('Abrir fuente')} onClick={() => detail.libraryItemId ? requestLibraryDocumentOpen({ itemId: detail.libraryItemId, scope: 'global', page, attachmentId: detail.attachmentId }) : void openEvidenceAtPage(detail.nodus_id, evidenceLocator({ location: detail.page_label, source_ref: detail.source_ref, page_number: detail.page_number }))}><Icon name="external" size={12} /> {tx('Ver página {n}', { n: page })}</button>}</div><h2 className="mt-3 text-xl font-semibold leading-tight text-neutral-100">{detail.work.title}</h2><div className="mt-2"><AuthorLinks names={detail.work.authors} authors={authors} onOpenTarget={onOpenTarget} /></div></div>

@@ -4769,6 +4769,11 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 .citation-card-snippet {
   color: rgb(163 163 163);
 }
+.citation-card-url {
+  font-size: 11px;
+  color: rgb(129 140 248);
+  overflow-wrap: anywhere;
+}
 .citation-card-loading {
   color: rgb(115 115 115);
 }
@@ -4789,6 +4794,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
 }
 .light .citation-card-snippet {
   color: #475569;
+}
+.light .citation-card-url {
+  color: #4338ca;
 }
 
 /* ── v1.2.0 Inmersión ─────────────────────────────────────────────────────── */

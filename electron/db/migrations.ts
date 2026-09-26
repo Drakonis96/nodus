@@ -9374,6 +9374,26 @@ export const migrations: Migration[] = [
   // A notebook shows in the chat history like a project: its own icon and colour.
   { version: 184, up: `ALTER TABLE research_notebooks ADD COLUMN icon TEXT;` },
   { version: 185, up: `ALTER TABLE research_notebooks ADD COLUMN color TEXT;` },
+  // Research Chat web evidence: the exact passage Nodus read, where and when, so a
+  // web citation stays verifiable after the page changes or disappears.
+  { version: 186, up: `
+    CREATE TABLE IF NOT EXISTS research_web_passages (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      final_url TEXT NOT NULL,
+      title TEXT NOT NULL,
+      site_name TEXT,
+      domain TEXT NOT NULL,
+      byline TEXT,
+      published_at TEXT,
+      doi TEXT,
+      kind TEXT NOT NULL CHECK (kind IN ('html', 'pdf')),
+      page_number INTEGER,
+      heading TEXT,
+      text TEXT NOT NULL,
+      retrieved_at TEXT NOT NULL
+    );
+  ` },
 ];
 
 /**

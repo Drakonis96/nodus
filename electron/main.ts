@@ -62,6 +62,7 @@ import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { killGitHubCopilotSubscriptionServer } from './ai/githubCopilotSubscription';
 import { killNodusLocalServerSync } from './ai/nodusLocalAi';
+import { killSearxngSync } from './websearch/searxngService';
 import { ensureDatabaseDeepResearchLane } from './ai/databaseDeepResearchLane';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
@@ -1264,6 +1265,8 @@ app.on('window-all-closed', () => {
     destroyBrowserSubsystem();
     closeGlobalLibraryRuntime();
     killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
     documentIndexQueue.stop();
     closeDb();
     app.quit();
@@ -1310,6 +1313,8 @@ app.on('before-quit', () => {
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
   killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   documentIndexQueue.stop();
@@ -1330,6 +1335,8 @@ const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update',
 updateAwareApp.on('before-quit-for-update', () => {
   quitting = true;
   killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   if (autoBackupTimer) clearInterval(autoBackupTimer);

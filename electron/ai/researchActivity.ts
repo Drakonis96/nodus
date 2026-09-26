@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import type { ResearchActivity, ResearchActivityLayer, ResearchActivityOperation } from '@shared/researchActivity';
+import type { ResearchActivity, ResearchActivityLayer, ResearchActivityOperation, ResearchWebActivityDetail } from '@shared/researchActivity';
 
 interface ActivityContext {
   emit: (event: ResearchActivity) => void;
@@ -29,15 +29,16 @@ export async function withResearchActivity<T>(emit: ((event: ResearchActivity) =
 
 export function researchActivityEnabled(): boolean { return !!context.getStore() && !context.getStore()?.closed; }
 
-export function startResearchActivity(layer: ResearchActivityLayer, operation: ResearchActivityOperation, subject?: string) {
+export function startResearchActivity(layer: ResearchActivityLayer, operation: ResearchActivityOperation, subject?: string, web?: ResearchWebActivityDetail) {
   const owner = context.getStore();
-  if (!owner || owner.closed) return (_status: Exclude<ResearchActivity['status'], 'active'> = 'completed', _count?: number) => {};
-  const event: ResearchActivity = { id: randomUUID(), layer, operation, status: 'active', startedAt: Date.now(), ...(subject ? { subject: subject.slice(0, 240) } : {}) };
+  if (!owner || owner.closed) return (_status: Exclude<ResearchActivity['status'], 'active'> = 'completed', _count?: number, _web?: ResearchWebActivityDetail) => {};
+  const event: ResearchActivity = { id: randomUUID(), layer, operation, status: 'active', startedAt: Date.now(), ...(subject ? { subject: subject.slice(0, 240) } : {}), ...(web ? { web } : {}) };
   owner.pending.set(event.id, event);
   publish(owner, event);
-  return (status: Exclude<ResearchActivity['status'], 'active'> = 'completed', count?: number) => {
+  return (status: Exclude<ResearchActivity['status'], 'active'> = 'completed', count?: number, detail?: ResearchWebActivityDetail) => {
     if (!owner.pending.delete(event.id)) return;
-    publish(owner, { ...event, status: owner.signal?.aborted ? 'cancelled' : status, finishedAt: Date.now(), ...(count === undefined ? {} : { count }) });
+    publish(owner, { ...event, status: owner.signal?.aborted ? 'cancelled' : status, finishedAt: Date.now(), ...(count === undefined ? {} : { count }),
+      ...(detail ? { web: { ...event.web, ...detail } } : {}) });
   };
 }
 

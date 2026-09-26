@@ -1,4 +1,7 @@
 import { ResearchActivityPanel } from '../components/ResearchActivityPanel';
+import { ResearchWebSearchControl } from '../components/ResearchWebSearchControl';
+import { ResearchWebSources } from '../components/ResearchWebSources';
+import { openWebSource } from '../researchWebSources';
 import { settleResearchActivities, updateResearchActivities, type ResearchActivity, type ResearchActivityStatus } from '@shared/researchActivity';
 import { ResearchConciliumControl, ConciliumResponses } from '../components/ResearchConcilium';
 import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium';
@@ -34,6 +37,7 @@ import type {
   ResearchContextSelection,
   ResearchGraphPartsSelection,
   NoteSource,
+  ResearchWebSearchMode,
 } from '@shared/types';
 import { Icon, modelLabel, sortModelRefs } from '../components/ui';
 import type { MarkdownCitation } from '../components/Markdown';
@@ -277,6 +281,8 @@ export function ResearchAssistantModal({
   // Remembered per provider+model: a conversation keeps whatever level the model was last
   // used at, so a level the user picked is not reset by switching chats or models.
   const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, selectedModel);
+  const [webSearch, setWebSearchState] = useState<ResearchWebSearchMode>(settings.researchWebSearch === 'off' ? 'off' : 'auto');
+  const setWebSearch = (mode: ResearchWebSearchMode) => { setWebSearchState(mode); void window.nodus.updateSettings({ researchWebSearch: mode }).catch(() => undefined); };
   const [conversations, setConversations] = useState<ChatConversationSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const promptConversationKey = activeId ? `${adapter?.id ?? 'research'}:${activeId}` : null;
@@ -704,7 +710,7 @@ export function ResearchAssistantModal({
     try {
       if (requestMessages.some(message => message.attachments?.length)) await persist(conversationId, [...priorMessages, userMessage], false);
       const response = await api.researchChatStream(
-        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined, ...(skillsEnabled && skills.length ? { skillIds: skills.map(skill => skill.id) } : {}) },
+        { attachmentIds: [...new Set([...priorMessages, userMessage].flatMap(message => message.attachments?.map(file => file.id) ?? []))], messages: requestMessages, selection, model: selectedModel, conversationId, thinkingEffort, ...(!adapter ? { webSearch } : {}), systemPromptId: systemPrompts.selectedId, concilium: !adapter ? concilium ?? undefined : undefined, ...(skillsEnabled && skills.length ? { skillIds: skills.map(skill => skill.id) } : {}) },
         {
           // A terminal event may arrive after the turn settled (it travels on another IPC pipe
           // than the reply); it then replaces the placeholder the settlement wrote.
@@ -937,6 +943,15 @@ export function ResearchAssistantModal({
   const lastMessageId = messages.length ? messages[messages.length - 1].id : null;
   // Citations open their evidence workspace without replacing the conversation.
   const handleCitation = useCallback((c: MarkdownCitation) => {
+    // A web source opens where it lives: a new tab of Nodus' Browser, landing on the
+    // quoted passage. Library sources keep their citation workspace.
+    if (c.kind === 'passage' && c.id.startsWith('web:')) {
+      void window.nodus.getCitationPreview({ kind: 'passage', id: c.id }).then(preview => {
+        if (preview?.openUrl || preview?.url) openWebSource(preview.openUrl ?? preview.url!);
+        else setCitation({ kind: c.kind, id: c.id });
+      }).catch(() => setCitation({ kind: c.kind, id: c.id }));
+      return;
+    }
     setCitation({ kind: c.kind, id: c.id });
   }, []);
 
@@ -1061,7 +1076,7 @@ export function ResearchAssistantModal({
               <h2>{activeProject.name}</h2>
             </header>}
             <div className="relative flex-1 min-h-0">
-              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} />}
+              {!adapter && !isGenealogy && activityRun?.conversationId === activeId && <ResearchActivityPanel key={activityRun.turnId} activities={activityRun.activities} outcome={activityRun.outcome} webDisabled={webSearch === 'off'} />}
               <div ref={scrollRef} className="h-full overflow-y-auto p-4 space-y-3">
                 {conversationNotice && (
                   <div role="status" className="mx-auto max-w-xl rounded-lg border border-amber-800/70 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
@@ -1215,6 +1230,7 @@ export function ResearchAssistantModal({
                           {message.stats.sections.join(', ') || t('Sin secciones')} · {tx('{n} obras', { n: message.stats.works })} ·{' '}
                           {tx('{n} docs', { n: message.stats.documents })} · {tx('{n} pasajes', { n: message.stats.passages })} · {formatChars(message.stats.contextChars)}
                           {message.stats.truncated ? ` · ${t('recortado')}` : ''}
+                          {(message.stats.webSources?.length || message.stats.webSearch?.searched) && <ResearchWebSources sources={message.stats.webSources ?? []} search={message.stats.webSearch} answer={message.content} />}
                           {message.stats.researchTraversal && <ResearchCoverage value={message.stats.researchTraversal} />}
                         </div>
                       )}
@@ -1281,6 +1297,7 @@ export function ResearchAssistantModal({
                     }
                   }}
                 />
+                {!adapter && !isGenealogy && <ResearchWebSearchControl value={webSearch} onChange={setWebSearch} disabled={sending} />}
                 <ResearchEffortControl model={selectedModel} value={thinkingEffort} onChange={setThinkingEffort} disabled={sending} />
                 {sending ? (
                   <button
