@@ -237,12 +237,12 @@ try {
       auditReportConsistency: consistency,
     };
   };
-  const run = async (consistency) => orchestrateDeepResearch({ ...request, sectionLimit: undefined }, { strictDocumentaryGrounding: true, ...judge(consistency),
+  const run = async (consistency, extra = {}) => orchestrateDeepResearch({ ...request, sectionLimit: undefined }, { strictDocumentaryGrounding: true, ...judge(consistency),
     buildSnapshot: async () => evidenceSnapshot,
     planReport: async () => ({ title: 'Fixture', abstract: '', sections: [{ id: 's1', title: 'Fields', purpose: 'compare', keyClaims: ['compare'], ideaIds: [], workIds: [], gapIds: [], contradictionIds: [], passageIds: ['north', 'south', 'east'] }] }),
     writeSection: async () => '## Fields\n\nNorth field measured 23 units. South field measured 41 units. Both reports are independent measurements under one declared protocol. No temporal series exist in these sources.',
     finalize: async () => ({ title: 'Fixture', abstract: 'North field measured 23 units. The two reports are independent measurements under one declared protocol, so the comparison is sound.',
-      limitations: ['Whether temporal series exist cannot be established from these sources.'], nextSteps: [] }) });
+      limitations: ['Whether temporal series exist cannot be established from these sources.'], nextSteps: [] }), ...extra });
   const report = await run(async statements => {
     const a = statements.indexOf('No temporal series exist in these sources.'), b = statements.indexOf('Whether temporal series exist cannot be established from these sources.');
     return a >= 0 && b >= 0 ? [{ a, b, incompatible: true, quoteA: 'No temporal series exist', quoteB: 'cannot be established', reason: 'contradiction' }] : [];
@@ -268,5 +268,23 @@ try {
   assert.match(removedHeading.draft.draftMarkdown, /^## Línea argumental 1\n/m, 'the surviving body keeps a neutral section boundary');
   assert.equal(removedHeading.draft.outline[0].title, 'Línea argumental 1', 'reader navigation and published Markdown agree');
   assert.match(removedHeading.draft.draftMarkdown, /North field measured 23 units\./, 'verified facts survive the rejected heading');
+  let repairs = 0, coverageChecks = 0;
+  const missingCoverage = await run(async () => [], {
+    repairSectionCoverage: async (input, draft) => {
+      repairs++;
+      assert.deepEqual(input.section.keyClaims, ['compare']);
+      return `${draft} Unsupported addition.`;
+    },
+    checkSectionCoverage: async (input, finalDraft) => {
+      coverageChecks++;
+      assert.deepEqual(input.section.keyClaims, ['compare'], 'final coverage uses the original mandate, not audited replacement claims');
+      assert.doesNotMatch(finalDraft, /Unsupported addition/, 'the coverage repair still passes through factual audit');
+      return false;
+    },
+  });
+  assert.equal(repairs, 1);
+  assert.equal(coverageChecks, 1);
+  assert.ok(missingCoverage.draft.limitations.some(text => /proposiciones del plan/.test(text)), 'final coverage warning survives finalizer and factual reconciliation');
+  assert.equal(missingCoverage.draft.stats.truncated, true);
   console.log('Claim ledger: atomic premises, verdict agreement, silence, qualified inference, retired-claim carry-over, whole-report contradictions and orchestration passed.');
 } finally { fs.rmSync(root, { recursive: true, force: true }); }

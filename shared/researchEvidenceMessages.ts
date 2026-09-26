@@ -35,3 +35,22 @@ const consistencyMessages: Record<PromptLanguage, string> = {
   uk: 'Не вдалося перевірити внутрішню узгодженість звіту; вважайте його неперевіреною чернеткою.',
 };
 export const researchConsistencyUnverified = (language: PromptLanguage): string => consistencyMessages[language];
+
+const coverageMessages: Record<PromptLanguage, string> = {
+  "es": "El informe no desarrolla todas las proposiciones del plan con evidencia verificada. Revisa las omisiones antes de utilizarlo como respuesta completa.",
+  "en": "The report does not develop every planned proposition with verified evidence. Review the omissions before using it as a complete answer.",
+  "fr": "Le rapport ne développe pas toutes les propositions du plan avec des preuves vérifiées. Examinez les omissions avant de le considérer comme une réponse complète.",
+  "de": "Der Bericht behandelt nicht alle geplanten Aussagen mit überprüften Belegen. Prüfen Sie die Auslassungen, bevor Sie ihn als vollständige Antwort verwenden.",
+  "it": "Il rapporto non sviluppa tutte le proposizioni del piano con prove verificate. Esamina le omissioni prima di usarlo come risposta completa.",
+  "pt": "O relatório não desenvolve todas as proposições do plano com evidência verificada. Reveja as omissões antes de o usar como resposta completa.",
+  "pt-BR": "O relatório não desenvolve todas as proposições do plano com evidências verificadas. Revise as omissões antes de usá-lo como resposta completa.",
+  "tr": "Rapor, plandaki tüm önermeleri doğrulanmış kanıtlarla geliştirmiyor. Tam bir yanıt olarak kullanmadan önce eksikleri gözden geçirin.",
+  "zh-Hans": "报告未以经核实的证据展开计划中的所有命题。将其作为完整回答使用前，请检查遗漏。",
+  "zh-Hant": "報告未以經核實的證據展開計畫中的所有命題。將其作為完整回答使用前，請檢查遺漏。",
+  "ja": "計画されたすべての命題が検証済みの証拠で展開されているわけではありません。完全な回答として使用する前に欠落を確認してください。",
+  "ko": "보고서가 계획의 모든 명제를 검증된 근거로 설명하지는 않습니다. 완전한 답변으로 사용하기 전에 누락을 확인하세요.",
+  "vi": "Báo cáo chưa triển khai mọi luận điểm trong kế hoạch bằng bằng chứng đã xác minh. Hãy xem lại các phần thiếu trước khi dùng làm câu trả lời đầy đủ.",
+  "ru": "Отчёт раскрывает не все положения плана на основе проверенных доказательств. Проверьте пропуски, прежде чем использовать его как полный ответ.",
+  "uk": "Звіт розкриває не всі положення плану на основі перевірених доказів. Перегляньте пропуски, перш ніж використовувати його як повну відповідь."
+};
+export const researchCoverageIncomplete = (language: PromptLanguage): string => coverageMessages[language];

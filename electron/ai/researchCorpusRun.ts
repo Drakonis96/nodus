@@ -16,6 +16,8 @@ import { resolveResearchSourceScope, scopedIdeaEvidencePassages } from './resear
 import { getResearchPreparationInventory, retrieveSharedDocumentaryEvidence } from './documentaryPreparation';
 import { retrieveHierarchical, selectPassageEvidence } from './hierarchicalRetrieval';
 import { embed, resolveModelRef, researchModelContextWindow } from './aiClient';
+import { createResearchSectionCoverage } from './researchSectionCoverage';
+import { withResearchValidationThinking } from './thinkingEffort';
 import { withResearchRequestBudget } from './researchRequestBudget';
 import { recordScopedSourcePassage, recordScopedLegacyPassage } from '../citations/scopedLegacyCitations';
 import { documentaryCitationId } from '../citations/documentaryCitations';
@@ -350,6 +352,7 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
   // One auditor per report: a proposition rejected in any part stays rejected in
   // every later section, summary, limitation and next step.
   const auditor = createResearchProseAuditor(model, signal);
+  const coverage = createResearchSectionCoverage(model, signal);
   const auditProse = async (markdown: string) => {
     const sources = () => [...run.evidence.values()].map(item => ({ id: item.id, text: item.summary ?? '', label: item.label, citation: item.citation }));
     const expand = run.budget.settings.autoExpand && run.budget.rounds < run.budget.settings.rounds;
@@ -367,8 +370,13 @@ export function bindAcademicCorpusRun(deps: DeepResearchDeps, request: DeepResea
     run.validate();
     return { ...audit, passages: [...run.evidence.values()] };
   };
-  const bounded: DeepResearchDeps = { ...deps, strictDocumentaryGrounding: true, auditFactualProse: auditProse,
-    auditReportConsistency: statements => findResearchConflicts(statements, model, signal), buildSnapshot: async brief => {
+  const bounded: DeepResearchDeps = { ...deps, repairSectionCoverage: coverage.repair, checkSectionCoverage: coverage.check, strictDocumentaryGrounding: true, auditFactualProse: markdown => withResearchValidationThinking(model, () => auditProse(markdown)),
+    auditSectionClaims: deps.auditSectionClaims ? (...args) => withResearchValidationThinking(model, () => deps.auditSectionClaims!(...args)) : undefined,
+    auditFinalSummary: deps.auditFinalSummary ? (...args) => withResearchValidationThinking(model, () => deps.auditFinalSummary!(...args)) : undefined,
+    judgeSectionRevision: deps.judgeSectionRevision ? (...args) => withResearchValidationThinking(model, () => deps.judgeSectionRevision!(...args)) : undefined,
+    verifyCitations: deps.verifyCitations ? (...args) => withResearchValidationThinking(model, () => deps.verifyCitations!(...args)) : undefined,
+    checkCoherence: deps.checkCoherence ? (...args) => withResearchValidationThinking(model, () => deps.checkCoherence!(...args)) : undefined,
+    auditReportConsistency: statements => withResearchValidationThinking(model, () => findResearchConflicts(statements, model, signal)), buildSnapshot: async brief => {
     await run.investigate(brief.objective, model);
     const snapshot = run.snapshotFromEvidence(brief);
     if (!deps.prepareScopedSnapshot) return snapshot;

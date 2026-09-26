@@ -1,4 +1,4 @@
-import { researchConsistencyUnverified, researchEvidenceLimitation } from '@shared/researchEvidenceMessages';
+import { researchConsistencyUnverified, researchCoverageIncomplete, researchEvidenceLimitation } from '@shared/researchEvidenceMessages';
 import { reconcileResearchReport, researchProseSpans, researchSentenceKey, type ResearchConflict, type ResearchProseAudit, type ResearchClaimRecord } from '@shared/researchClaimAudit';
 // Citation naming lives in @shared/citationLabel so the reader that re-derives a
 // stored label at open time cannot drift from the writer that produced it.
@@ -642,6 +642,10 @@ export interface FinalizeResult {
  */
 export interface DeepResearchDeps {
   strictDocumentaryGrounding?: boolean;
+  /** One evidence-bounded addition before the final factual audit. */
+  repairSectionCoverage?(input: SectionInput, draft: string): Promise<string>;
+  /** Read-only final check against the original plan, after all removals. */
+  checkSectionCoverage?(input: SectionInput, draft: string): Promise<boolean>;
   auditFactualProse?(markdown: string): Promise<ResearchProseAudit & { passages?: import('@shared/types').WritingWorkshopPassageCandidate[] }>;
   /** Pairs of final statements that cannot both hold. Throws when unavailable. */
   auditReportConsistency?(statements: string[]): Promise<ResearchConflict[]>;
@@ -1450,10 +1454,15 @@ export async function orchestrateDeepResearch(
     }
   }
 
+  const coverageInputs = new Map(written.map((item, index) => [item, sectionInput(effectiveRequest, language, { ...item.section, keyClaims: [...item.section.keyClaims], coverageClaims: [...(item.section.coverageClaims ?? [])] }, index === written.length - 1, maps, written.slice(0, index), coveredIdeaIds, plan.sections)]));
   const claimLedger: ResearchClaimRecord[] = [];
   let consistency: NonNullable<NonNullable<DeepResearchMeta['factualAudit']>['consistency']> | null = null;
   if (deps.auditFactualProse) {
     for (const [index, item] of written.entries()) {
+      if (deps.repairSectionCoverage) {
+        const repaired = await deps.repairSectionCoverage(coverageInputs.get(item)!, item.markdown);
+        item.markdown = applyCitationPolicy(repaired, maps).markdown;
+      }
       const audit = await deps.auditFactualProse(item.markdown);
       if (audit.passages?.length) mergeRetrievedMaterial(maps, { passages: audit.passages });
       item.markdown = audit.markdown;
@@ -1591,6 +1600,17 @@ export async function orchestrateDeepResearch(
       stoppedReason = researchEvidenceLimitation(language);
     }
     if (!reconciled.consistencyChecked) finalize.limitations = dedupe([...finalize.limitations, researchConsistencyUnverified(language)]);
+  }
+
+  if (deps.checkSectionCoverage) {
+    for (const [item, input] of coverageInputs) {
+      const finalText = written.includes(item) ? item.markdown : '';
+      if (!await deps.checkSectionCoverage(input, finalText)) {
+        const limitation = researchCoverageIncomplete(language);
+        finalize.limitations = dedupe([...finalize.limitations, limitation]);
+        stoppedReason ||= limitation;
+      }
+    }
   }
 
   // Works actually referenced = works cited directly + the works behind every cited idea.
