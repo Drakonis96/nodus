@@ -5,6 +5,8 @@
  * `MoleculeDossier`. Research Chat injects that dossier as authoritative context
  * so a model reasons over a verified graph instead of re-reading SMILES text. */
 
+import { correctionTargetPlanRule, ROUTE_LABEL_LINES, ROUTE_SPECIES_RULES } from './routeRules';
+
 export interface MoleculeAtom {
   /** 0-based position in the parsed graph; bond endpoints use this index. */
   index: number;
@@ -48,7 +50,7 @@ export const MOLECULE_DOSSIER_SYSTEM_RULE = [
 export const ROUTE_CONTINUITY_SYSTEM_RULE = [
   'Synthesis route continuity: when you plan more than one reaction step, the intermediate carried from one step into the next must be written with the exact same systematic IUPAC name, including its stereodescriptors, in both places, so the application can confirm it is the same molecule.',
   'Do not rename, re-protonate or otherwise rewrite a carried intermediate. If a structure genuinely changes between steps, say so explicitly and justify it; otherwise the route is rejected as discontinuous.',
-  'Do not write a reaction SMILES or a reaction line: the application derives every structure and every balanced equation from the species names you list.',
+  'In a route, do not write a reaction SMILES or a reaction line: the application derives every structure and every balanced equation from the species names you list.',
 ].join(' ');
 
 /** One species of a route step, as the chemistry capability reports it. */
@@ -358,6 +360,17 @@ function conciseConditions(value: string): string {
  *  source for the temperature, time and workup the schema cannot hold; it is annotation only,
  *  never checked. Missing steps are empty strings. */
 export function findStepConditions(text: string, count: number): string[] {
+  // Read each step's conditions inside its own section, so a step without a conditions line or
+  // an extra summary "Reaction conditions:" line does not shift every later step.
+  const sections = stepSections(text);
+  if (sections) {
+    return Array.from({ length: count }, (_, index) => {
+      const section = sections[index];
+      if (!section) return '';
+      const match = new RegExp(CONDITIONS_PATTERN.source, 'i').exec(text.slice(section.start, section.end));
+      return match ? conciseConditions(match[1]) : '';
+    });
+  }
   const found: string[] = [];
   for (const match of text.matchAll(CONDITIONS_PATTERN)) {
     const value = conciseConditions(match[1]);
@@ -368,21 +381,39 @@ export function findStepConditions(text: string, count: number): string[] {
   return out;
 }
 
+/** A step's title and the first paragraph under its heading, stopping at its species lines. */
+function stepProseText(title: string, block: string): string {
+  const body = block.replace(/^[^\n]*\n?/, '');
+  const cut = body.search(/(?:`{1,2}|\*\*|__)?[ \t]*\b(?:reactants?|products?|by[-\s]?products?|agents?)[ \t]*[:：]/i);
+  const paragraph = (cut >= 0 ? body.slice(0, cut) : body).split(/\n{2,}/)[0] ?? '';
+  const prose = paragraph.replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 360);
+  return prose ? `${title} — ${prose}` : title;
+}
+
 /** The “Step N — <title>” heading and the paragraph under it for each step, in step order, so
  *  the route review can judge the transformation the author intended, not only the species.
  *  The heading already names the reaction ("Dehydration of citric acid…"); the prose explains
  *  it. Missing steps are empty strings. */
 export function findStepProse(text: string, count: number): string[] {
+  // Each step's prose is read from its own section (see findStepConditions); a duplicated summary
+  // "Step 1" heading without species is not taken for step 1.
+  const sections = stepSections(text);
+  if (sections) {
+    return Array.from({ length: count }, (_, index) => {
+      const section = sections[index];
+      if (!section) return '';
+      const block = text.slice(section.start, section.end);
+      const firstLine = block.split(/\r?\n/)[0] ?? '';
+      const title = ((HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1] ?? '').trim();
+      return stepProseText(title, block);
+    });
+  }
   const found: string[] = [];
   let pending: { title: string; start: number } | null = null;
   let offset = 0;
   const commit = (end: number) => {
     if (!pending) return;
-    const body = text.slice(pending.start, end).replace(/^[^\n]*\n?/, '');
-    const cut = body.search(/(?:`{1,2}|\*\*|__)?[ \t]*\b(?:reactants?|products?|by[-\s]?products?|agents?)[ \t]*[:：]/i);
-    const paragraph = (cut >= 0 ? body.slice(0, cut) : body).split(/\n{2,}/)[0] ?? '';
-    const prose = paragraph.replace(/[*_`>#]/g, '').replace(/\s+/g, ' ').trim().slice(0, 360);
-    found.push(prose ? `${pending.title} — ${prose}` : pending.title);
+    found.push(stepProseText(pending.title, text.slice(pending.start, end)));
     pending = null;
   };
   for (const line of text.split(/\r?\n/)) {
@@ -469,6 +500,18 @@ function lastStepHeadingOffset(headings: SectionHeading[], offset: number): numb
   let last: SectionHeading | null = null;
   for (const heading of headings) { if (heading.offset <= offset) last = heading; else break; }
   return last && last.step ? last.offset : null;
+}
+
+/** The route's steps as sections of the answer: each step heading that has species listed under
+ *  it (the same headings the species are assigned by, so a prose-only summary "Step 1" is not a
+ *  step), running to the next heading. Null when the answer has no such headings. */
+function stepSections(text: string): Array<{ start: number; end: number }> | null {
+  const headings = sectionHeadings(text);
+  if (!headings.some((heading) => heading.step)) return null;
+  const segments = roleSegments(text, NAME_ROLE_MARKER);
+  const active = [...new Set(segments.map((segment) => lastStepHeadingOffset(headings, segment.start)).filter((offset): offset is number => offset !== null))].sort((a, b) => a - b);
+  if (!active.length) return null;
+  return active.map((start) => ({ start, end: headings.find((heading) => heading.offset > start)?.offset ?? text.length }));
 }
 
 // ---------------------------------------------------------------- name-first route
@@ -636,9 +679,11 @@ export function findStepNamedSpecies(text: string, count: number): NamedSpecies[
  *  written once per side and the coefficient is left to the solver, as the contract asks: a
  *  named salt resolves to its ions, and two salts sharing an ion (`chromium(III) sulfate` and
  *  `sodium sulfate`) would otherwise put the same token on one side twice, which admits more
- *  than one balance. A step with no reactant or no product cannot form an equation. */
-export function buildRouteSteps(speciesByStep: ResolvedSpecies[][]): string[] {
-  const fragments = (step: ResolvedSpecies[], role: RouteLabelRole): string[] => {
+ *  than one balance. A step with no reactant or no product cannot form an equation: it stays as
+ *  an empty line, so every later step keeps its number and lines up with its labels, prose and
+ *  conditions, and the checker reports that step as unbuilt. */
+export function buildRouteSteps(speciesByStep: Array<Array<Pick<ResolvedSpecies, 'role' | 'smiles'>>>): string[] {
+  const fragments = (step: Array<Pick<ResolvedSpecies, 'role' | 'smiles'>>, role: RouteLabelRole): string[] => {
     const seen = new Set<string>();
     const out: string[] = [];
     for (const entry of step.filter((item) => item.role === role)) {
@@ -657,7 +702,27 @@ export function buildRouteSteps(speciesByStep: ResolvedSpecies[][]): string[] {
     const products = fragments(step, 'product');
     if (!reactants.length || !products.length) return '';
     return `${reactants.join('.')}>${agents.join('.')}>${products.join('.')}`;
-  }).filter(Boolean);
+  });
+}
+
+/** Whether a SMILES contains carbon: an organic-subset `C`/`c`, or a bracket atom whose element is
+ *  carbon (`[C@@H]`, `[cH]`), never `Cl`, `Ca`, `Cs` or `Co`. */
+export function smilesHasCarbon(smiles: string): boolean {
+  for (const match of smiles.matchAll(/\[([^\]]+)\]|Cl|Br|[BCNOPSFI]|[bcnops]/g)) {
+    const element = match[1] !== undefined ? (/^\d*([A-Z][a-z]?|[a-z]{1,2})/.exec(match[1])?.[1] ?? '') : match[0];
+    if (element === 'C' || element === 'c') return true;
+  }
+  return false;
+}
+
+/** A carbon-free species a step lists as a main product beside an organic one — sodium chloride,
+ *  water, a hydrogen halide — is a co-product, so it is shown, corrected and looked up as a
+ *  byproduct. Products and byproducts are both the product side of the equation, so the equation
+ *  the checker balances, and its coefficients, are unchanged. */
+export function classifyCoProducts<T extends { role: RouteLabelRole; byproduct: boolean; smiles?: string }>(step: T[]): T[] {
+  const organicProduct = step.some((entry) => entry.role === 'product' && !entry.byproduct && entry.smiles && smilesHasCarbon(entry.smiles));
+  if (!organicProduct) return step;
+  return step.map((entry) => entry.role === 'product' && !entry.byproduct && entry.smiles && !smilesHasCarbon(entry.smiles) ? { ...entry, byproduct: true } : entry);
 }
 
 /** Attach the resolved SMILES to each species entry in place, replacing any declared SMILES.
@@ -725,13 +790,50 @@ export function formatNameCorrectionNote(corrections: string[]): string {
   return entries.length ? `Name corrections: ${entries.join('; ')}` : '';
 }
 
+/** App report sections an assistant turn carries, as they appear in replayed history. The route
+ *  drawings are always dropped: once their pictures are stripped, only empty step labels and a
+ *  "Not drawn" list repeating the route check remain. The structure and route checks are kept
+ *  for the latest answer only, as are the model review, its "Not verified" recap and the known
+ *  reactions: that is the route the next turn corrects, and every earlier one has been superseded
+ *  (a correction prompt repeats the failures it asks about anyway). */
+const HISTORY_ALWAYS_DROPPED = ['### Route drawings (RDKit)'];
+const HISTORY_LATEST_ONLY = [
+  '### Structure check (RDKit)', '### Route check (RDKit)',
+  '### Route review (model)', '### Route review (model, advisory)',
+  '### Known reactions (Open Reaction Database)',
+];
+/** App notes that follow the reports without a heading of their own; a dropped section ends there. */
+const HISTORY_NOTE = /^(?:Name corrections:|Author-supplied structures)/;
+
+/** An earlier correction prompt as replayed in history: what failed and what could change are
+ *  kept, the shared species rules it carried are not — every correction repeats the same rules,
+ *  and the current prompt carries them in full. Any other message is returned unchanged. */
+export function routeFixPromptForHistory(text: string): string {
+  if (!isRouteFixPrompt(text)) return text;
+  const cut = text.indexOf('\nRules for every step:');
+  return cut < 0 ? text : `${text.slice(0, cut).trimEnd()}\n[The shared route rules followed here.]`;
+}
+
+export function routeReportsForHistory(prose: string, latest: boolean): string {
+  const dropped = latest ? HISTORY_ALWAYS_DROPPED : [...HISTORY_ALWAYS_DROPPED, ...HISTORY_LATEST_ONLY];
+  const kept: string[] = [];
+  let skipping = false;
+  for (const line of prose.split('\n')) {
+    if (dropped.includes(line.trim())) { skipping = true; continue; }
+    if (skipping && (/^#{1,3}\s/.test(line) || HISTORY_NOTE.test(line))) skipping = false;
+    if (!skipping) kept.push(line);
+  }
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /** The request's target, from the usual phrasing "a synthesis of <name> (SMILES: <smiles>)".
  *  A SMILES named after "from", "starting" or "using" is a starting material, not the target,
  *  so the match stops there rather than guess. */
-// The target named after "synthesis of/for … SMILES:". The name may wrap, so the run before
-// SMILES crosses newlines; it stops at a "from/starting/using/with" clause so it never wanders
-// into the starting materials.
-const TARGET_PATTERN = /\bsynthes[a-z]*\s+(?:of|for)\b(?:(?!\b(?:from|starting|using|with)\b)[\s\S]){0,160}?\bSMILES\s*[:=]\s*`?([^\s`,;]+)/i;
+// The target named after "synthesis of/for …", "synthesize …", "preparation of …" or "route to/for
+// …", then "SMILES:". The name may wrap and may be a long systematic name, so the run before SMILES
+// crosses newlines (up to 400 characters); it stops at a "from/starting/using/with" clause so it
+// never wanders into the starting materials.
+const TARGET_PATTERN = /\b(?:synthes[a-z]*(?:\s+(?:of|for))?|preparation\s+of|route\s+(?:to|for))\b(?:(?!\b(?:from|starting|using|with)\b)[\s\S]){0,400}?\bSMILES\s*[:=]\s*`?([^\s`,;]+)/i;
 
 export function findRequestedTarget(text: string): string | null {
   const match = TARGET_PATTERN.exec(text);
@@ -750,6 +852,12 @@ export const ROUTE_FIX_PROMPT_LEAD = 'Correction needed for the synthesis route 
 export const ROUTE_FIX_STEP_LEAD = 'Correction needed for step ';
 export const ROUTE_CLARIFICATION_LEAD = 'The species names in the synthesis route above do not match the prose, or the prose is ambiguous, and the correction could not be resolved automatically. Please confirm the intended chemistry.';
 export const ROUTE_UNRESOLVED_LEAD = 'The application could not resolve some species names to structures, so those steps could not be built. For each unresolved species give its correct systematic IUPAC name, or — when you cannot name it — its isomeric SMILES (write it as its name followed by the SMILES in backticks).';
+/** Said in place of a route check the application could not run, so a missing report is never
+ *  mistaken for a route that needed none. */
+export function formatRouteCheckUnavailable(reason: string): string {
+  return `_Route check unavailable: ${reason.replace(/\s+/g, ' ').trim().slice(0, 300) || 'the chemistry package failed'}. The route above has not been checked._`;
+}
+
 export const ROUTE_MISSING_SPECIES_LEAD = 'The synthesis route describes steps but does not list the species under the four required labels, so the application could not check or draw it.';
 
 /** Whether a user message is a correction the application generated (a route-fix chip or a
@@ -765,11 +873,20 @@ export function isRouteFixPrompt(text: string): boolean {
 }
 
 /** The target of the conversation's current synthesis request. A correction carries no target
- *  of its own, so every generated correction is skipped and the original request is used. */
+ *  of its own, and neither does an ordinary follow-up ("why is step 2 needed?"), so both are
+ *  skipped back to the request that named one. A new synthesis request ends the search even
+ *  when it names no SMILES, so an earlier route's target never carries over into a new route. */
+// A request for a new route ("propose a synthesis of…", "synthesize…", "suggest a route to…"), as
+// opposed to a question about the current one ("why does the synthesis need step 2?").
+const NEW_ROUTE_REQUEST = /\b(?:propose|suggest|design|plan|give|outline|devise|provide)\b[^.?!\n]{0,60}\b(?:synthes[a-z]*|route)\b|\bsynthesi[sz]e\b/i;
+
 export function requestedTargetFor(userMessages: string[]): string | null {
   for (let index = userMessages.length - 1; index >= 0; index--) {
-    if (isRouteFixPrompt(userMessages[index])) continue;
-    return findRequestedTarget(userMessages[index]);
+    const message = userMessages[index];
+    if (isRouteFixPrompt(message)) continue;
+    const target = findRequestedTarget(message);
+    if (target) return target;
+    if (NEW_ROUTE_REQUEST.test(message)) return null;
   }
   return null;
 }
@@ -832,13 +949,15 @@ function normalizeRouteStep(entry: unknown, index: number): RouteStepAudit | nul
     index: numberOr(value.index, index),
     reaction,
     ok: boolOr(value.ok, false),
-    ...(typeof value.error === 'string' && value.error ? { error: value.error.slice(0, 400) } : {}),
+    // The checker's messages end with the instruction to fix them; keep them whole so a correction
+    // prompt never quotes one cut off mid-sentence.
+    ...(typeof value.error === 'string' && value.error ? { error: value.error.slice(0, 1000) } : {}),
     reactants: routeSpecies(value.reactants),
     agents: routeSpecies(value.agents),
     products: routeSpecies(value.products),
     balanced: typeof value.balanced === 'boolean' ? value.balanced : null,
     chargeBalanced: typeof value.chargeBalanced === 'boolean' ? value.chargeBalanced : null,
-    differences: stringArray(value.differences).map((entry) => entry.slice(0, 200)),
+    differences: stringArray(value.differences).map((entry) => entry.slice(0, 1000)),
     unspecifiedStereocentres: numberOr(value.unspecifiedStereocentres, 0),
     ...(stringArray(value.nameProblems).length ? { nameProblems: stringArray(value.nameProblems).map((entry) => entry.slice(0, 300)).slice(0, 24) } : {}),
     ...(value.racemic === true ? { racemic: true } : {}),
@@ -975,10 +1094,10 @@ export const ROUTE_REVIEW_SYSTEM = [
   'You review a proposed multi-step synthesis for problems that a balance checker cannot see. Every equation may balance and every intermediate may carry over, yet the plan can still be wrong.',
   'You are given the researcher\'s request, the requested target, each step\'s own description of its transformation, and the species its author named.',
   'Each step carries its author\'s description (a heading such as "Dehydration of citric acid to aconitic acid" and the prose under it). Use it: a named, standard reaction — dehydration, decarboxylation, hydration, esterification, hydrolysis, reduction, oxidation, condensation, Mannich, Michael addition — is a possible step. Report a step only when the species named cannot come from the transformation described, never merely because the reaction is uncommon, advanced, or not one you would have chosen.',
-  'A cheminformatics toolkit has already verified that every equation balances and that every intermediate is carried over as the same structure. Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem: that is the checker\'s job and it has passed. A step that forms several bonds or combines bond-forming events into one balanced net equation is allowed — a one-pot cascade such as the Robinson tropinone synthesis is one step — so do not report a step merely for merging or splitting transformations.',
+  'A cheminformatics toolkit has already checked that every equation balances and that every intermediate is carried over as the same structure; the request says which steps, if any, it refused. Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem: that is the checker\'s job, and its findings are reported separately. A step that forms several bonds or combines bond-forming events into one balanced net equation is allowed — a one-pot cascade such as the Robinson tropinone synthesis is one step — so do not report a step merely for merging or splitting transformations, with one exception: a separate workup folded into a transformation (see "blocking" below).',
   'Every structure below is a canonical isomeric SMILES, and so is the target. Two identical SMILES strings are the same compound; two different strings are different compounds. The checker has already compared each product to the target by canonical structure and reports in the request whether the target is formed — when it says the target is formed, do not report that step\'s product as a different compound from the target.',
   'Report only a specific, confident problem from this list, and set its "severity":',
-  '- "blocking" when the named structure is wrong for the step: a product that is a different compound than the requested target; a product whose formula matches the intended one but whose connectivity or regiochemistry differs — a swapped substituent, or the wrong ring or epoxide regioisomer; a step whose prose describes a different transformation than the species named; or an atom-inconsistent or impossible byproduct. These are the mistakes the balance checker cannot see, so they stop the route.',
+  '- "blocking" when the named structure is wrong for the step: a product that is a different compound than the requested target; a product whose formula matches the intended one but whose connectivity or regiochemistry differs — a swapped substituent, or the wrong ring or epoxide regioisomer; a step whose prose describes a different transformation than the species named; or an atom-inconsistent or impossible byproduct; or a step that folds a separate workup into a different transformation — an acidification, basification or quench that converts the transformation\'s product into another form (a Kolbe–Schmitt carboxylation and the acidification that frees the acid, written as one step), which are two operations and belong in two steps. These are the mistakes the balance checker cannot see, so they stop the route.',
   '- "advisory" for everything else — a step you doubt can give the named product under the stated conditions (the wrong reagent for the transformation, an unusual or advanced route, feasibility, conditions, yield or mechanism), a one-pot cascade, a named reaction you would not have chosen, or a redundant or pointless step. An advisory finding is shown to the reader but never blocks the route.',
   'Be conservative. Never invent a compound, reaction or mechanism, and never report a step that is merely unusual but chemically possible. Do not repeat an equation or continuity problem the checker already found.',
   'Return EXCLUSIVELY one JSON object: {"status":"ok"} when there is no such problem, or {"status":"problems","problems":[{"step":<1-based step number, or 0 for a route-level problem>,"severity":"blocking"|"advisory","detail":"<one sentence>"}]}. A problem with no severity is treated as advisory. Do not write anything outside the JSON.',
@@ -1076,7 +1195,9 @@ function formatRouteReview(review: RouteReview): string[] {
  *  legitimately reach the high single digits, so this is an advisory note, never a refusal. */
 const LARGE_COEFFICIENT = 6;
 
-export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][] = [], review: RouteReview | null = null): string {
+/** `reviewPending` is set for the interim repaint shown while the model review still runs: a
+ *  route whose checks pass is then reported as passing so far, not as verified. */
+export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][] = [], review: RouteReview | null = null, reviewPending = false): string {
   const names = routeLabelNames(labels);
   const lines: string[] = [
     '### Route check (RDKit)',
@@ -1084,7 +1205,7 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     'Every step was parsed with RDKit and every equation and intermediate link was checked. This block is generated by the application, not by the model.',
     '',
   ];
-  const failing = (step: RouteStepAudit): boolean => !step.ok || step.balanced !== true || Boolean(step.assemblyProblem) || (step.nameProblems?.length ?? 0) > 0 || (step.unspecifiedStereocentres > 0 && step.racemic !== true);
+  const failing = (step: RouteStepAudit): boolean => routeStepFailure(step) !== null;
   const failedSteps = audit.steps.filter(failing).map((step) => step.index + 1);
   const assembled = audit.steps.filter((step) => Boolean(step.assemblyProblem)).map((step) => step.index + 1);
   const isolated = isolatedSteps(audit);
@@ -1098,7 +1219,9 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
   if (reviewProblems.length) reasons.push(`a route review raised ${reviewProblems.length} problem(s)`);
   const verified = !reasons.length;
   lines.push(verified
-    ? `**Route verified** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}.`
+    ? reviewPending
+      ? `**Route checks passed** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}. The model review is still running.`
+      : `**Route verified** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}.`
     : `**Route not verified** — ${reasons.join('; ')}.`);
   for (const step of audit.steps) {
     const label = `Step ${step.index + 1}`;
@@ -1172,7 +1295,7 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
   const recap = [...audit.blocked];
   if (reviewProblems.length) recap.push(`The route review raised ${reviewProblems.length} problem(s).`);
   lines.push('', verified
-    ? 'Route verified: every intermediate is carried over as the same structure.'
+    ? reviewPending ? 'Checks passed so far; the verdict waits for the model review.' : 'Route verified: every intermediate is carried over as the same structure.'
     : `Not verified: ${recap.join(' ')}`.trimEnd());
   return lines.join('\n');
 }
@@ -1231,7 +1354,9 @@ function labelledStepLines(labels: RouteSpeciesLabel[][], step: RouteStepAudit):
 }
 
 /** Why a step's own equation needs correcting, or null when it passes on its own terms. */
-function namedStepFailure(step: RouteStepAudit): string | null {
+/** Why a step fails the route check, or null when it passes. The one verdict every part of the
+ *  report uses — the FAIL lines, the drawings and the correction prompts — so they never disagree. */
+export function routeStepFailure(step: RouteStepAudit): string | null {
   if (step.nameProblems?.length) return step.nameProblems.join('; ');
   if (!step.ok) return step.error ?? 'could not be parsed';
   if (step.balanced !== true) return `not balanced (${step.differences.join('; ')})`;
@@ -1247,34 +1372,20 @@ function namedStepFailure(step: RouteStepAudit): string | null {
  *  any plan problem the model route review found in it. */
 function namedStepReasons(step: RouteStepAudit, isolated: Set<number>, review: string[] = []): string[] {
   const reasons: string[] = [];
-  const failure = namedStepFailure(step);
+  const failure = routeStepFailure(step);
   if (failure) reasons.push(failure);
   if (isolated.has(step.index)) reasons.push('disconnected from the rest of the route — none of its species is made by an earlier step or used by a later one');
   for (const detail of review) reasons.push(`review: ${detail}`);
   return reasons;
 }
 
-const NAMES_ONLY_FORMAT = [
-  '  Reactants: <systematic IUPAC name>; <systematic IUPAC name>',
-  '  Products: <systematic IUPAC name>',
-  '  Byproducts: <systematic IUPAC name>',
-  '  Agents: <catalyst or solvent, or none>',
-];
+const NAMES_ONLY_FORMAT = ROUTE_LABEL_LINES.map((line) => `  ${line}`);
 
-const NAMES_ONLY_RULES = [
-  'Do not write SMILES, formulae or a reaction line — the application derives the structure and the balanced equation from your names, with one exception. Rules that resolve these failures:',
-  '- If, and only if, you cannot give a systematic name a reference service will resolve — an exotic fused cage or a named literature intermediate — write that species as its name followed by its isomeric SMILES in backticks (`name — `SMILES``); the application uses the SMILES as the structure and checks it with RDKit. Give the name alone for every species a systematic name will resolve.',
-  '- Keep every step that already passes exactly as it is, and never duplicate one. You may split a rejected step into consecutive steps. Combine two consecutive steps only when together they are one net transformation that balances as a single equation; never merge two distinct transformations. The route must still reach the requested target.',
-  '- Keep the single target chemistry-plan block (kind "structure") for the requested target; re-emit it unchanged if it is missing. Never emit a chemistry-plan for a step.',
-  '- Conserve every element and the total charge on both sides. A species that is short on one side is a missing reagent (Reactants) or byproduct (Products/Byproducts); list it by systematic IUPAC name.',
-  '- List every species that is consumed or produced once per side, under one role only. A true catalyst or solvent goes under Agents; never list a species that takes no part.',
-  '- Agents are true catalysts or solvents only. A species the step consumes is a Reactant, never an Agent, even when the prose calls it a catalyst or says it is derived from another reagent.',
-  '- A multi-component step lists every consumed reactant and every byproduct it releases (a condensation often releases water, carbon dioxide, or both); name each of them.',
-  '- Give every species you make its stereodescriptors. If an outcome is racemic or a centre is genuinely unspecified, say so in the prose; never drop a descriptor silently.',
-  '- A metal that enters as a reagent leaves as its salt: name the metal-containing product or byproduct (for example sodium salicylate, sodium chloride).',
-  '- Carry a species from one step into the next with the same systematic IUPAC name, including its stereodescriptors.',
-  '- If a step cannot balance as one equation, split it into consecutive steps rather than merging transformations.',
-];
+/** The rules every correction ends with: the same species rules the first request was given,
+ *  then what to do with the target drawing. */
+function correctionRules(target: string | null | undefined): string[] {
+  return ['Rules for every step:', ...ROUTE_SPECIES_RULES.map((rule) => `- ${rule}`), '', correctionTargetPlanRule(target)];
+}
 
 /** The route-level problems: a step that connects to nothing, and a target no step forms. */
 function namedRouteProblems(labels: RouteSpeciesLabel[][], audit: RouteAudit): string[] {
@@ -1338,30 +1449,34 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
     .map((step) => ({ step, reasons: namedStepReasons(step, isolated, reviewByStep.get(step.index + 1) ?? []) }))
     .filter((entry) => entry.reasons.length);
   const failures = flagged
-    .filter((entry) => namedStepFailure(entry.step) !== null)
-    .map((entry) => `- Step ${entry.step.index + 1}: ${namedStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}`);
+    .filter((entry) => routeStepFailure(entry.step) !== null)
+    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}`);
   if (!flagged.length && !problems.length && !reviewProblems.length) return '';
 
   const target = routeTargetDescriptor(audit);
   const atTarget = target ? ` (${target})` : '';
+  const quotedTarget = audit.target?.input;
+  const relabel = 'Re-output the complete route, in order: each step keeps its prose and ends with the four labelled lines of systematic IUPAC names, names only (except the structure fallback in the rules):';
   const chips: RouteFixChip[] = [];
   chips.push({
     label: 'Ask the model to fix the failed steps',
     prompt: [
       ...namedFixPreamble(failures, problems, reviewProblems),
-      `Re-output the complete route, keeping the prose for each step. Keep every step that already passes exactly as it is; you may insert, remove, split or merge steps when that is what the failures require, as long as the route still reaches the requested target${atTarget}. Give every step as four labelled lines of systematic IUPAC names, names only:`,
+      relabel,
       ...NAMES_ONLY_FORMAT,
-      ...NAMES_ONLY_RULES,
+      `What may change: only the rejected steps above and what their failures require. You may split a rejected step, combine it with a neighbour (see the rules below), insert a missing step, or remove a step reported above as disconnected or redundant. Every other step keeps its prose and names exactly, and no step is duplicated. The route must still reach the requested target${atTarget}.`,
+      ...correctionRules(quotedTarget),
     ].join('\n'),
   });
   chips.push({
     label: 'Fix from the target backwards',
     prompt: [
       ...namedFixPreamble(failures, problems, reviewProblems),
-      `Work backwards from the final step. First make the last step name the requested target${atTarget} as a Product and balance it. Then move to the step before it and make its Products line name exactly the species the next step consumes as a Reactant, and balance it. Continue back to step 1, so every step's product is the next step's reactant (or a permitted starting material). Insert, remove, split or merge steps when that is what the failures require.`,
-      'Give the complete route again, in order, as four labelled lines of systematic IUPAC names per step, names only:',
+      `Work backwards from the final step. First make the last step name the requested target${atTarget} as a Product. Then move to the step before it and make its Products line name exactly the species the next step consumes as a Reactant. Continue back to step 1, so every step's product is the next step's reactant (or a permitted starting material).`,
+      'What may change: this is the one correction that may rename a species in a step that already passes — only so that its Products line names exactly the species the next step consumes. Otherwise a passing step keeps its prose and names. Split, combine, insert or remove steps only where the failures above require it.',
+      relabel,
       ...NAMES_ONLY_FORMAT,
-      ...NAMES_ONLY_RULES,
+      ...correctionRules(quotedTarget),
     ].join('\n'),
   });
   for (const entry of [...flagged].reverse()) {
@@ -1385,9 +1500,10 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
           ? `  Step ${next + 1} Reactants: ${namedRoleNames(labels, next, 'reactant')}`
           : `  It is the last step, so its Products must include the requested target${atTarget}.`,
         '',
-        `Re-output the complete route, keeping every other step exactly as it is, and correcting only step ${index + 1}. You may split step ${index + 1} into consecutive steps, or combine it with an adjacent step when together they are one net transformation that balances as a single equation — combining folds the neighbour into step ${index + 1}, so its line disappears. Give every step as four labelled lines of systematic IUPAC names, names only:`,
+        relabel,
         ...NAMES_ONLY_FORMAT,
-        ...NAMES_ONLY_RULES,
+        `What may change: only step ${index + 1}. You may split step ${index + 1} into consecutive steps, or combine it with an adjacent step when together they are one net transformation that balances as a single equation (never a workup — see the rules) — the combined step replaces both, so the absorbed neighbour is the only other step that changes and its own line disappears. Every other step keeps its prose and names exactly.`,
+        ...correctionRules(quotedTarget),
       ].join('\n'),
     });
   }
@@ -1476,7 +1592,7 @@ export function formatAuthorStructureNote(entries: string[]): string {
 
 /** The escalation when a name cannot be resolved to a structure even after the feedback
  *  loop: name the species and why, so the user can confirm or correct it. */
-export function formatUnresolvedNameClarification(unresolved: UnresolvedName[]): string {
+export function formatUnresolvedNameClarification(unresolved: UnresolvedName[], target?: string | null): string {
   const lines = unresolved.map((entry) => `- Step ${entry.step} ${entry.byproduct ? 'byproduct' : entry.role} "${entry.name}"${entry.feedback ? `: ${entry.feedback}` : ''}`);
   const prompt = [
     ROUTE_UNRESOLVED_LEAD,
@@ -1484,22 +1600,21 @@ export function formatUnresolvedNameClarification(unresolved: UnresolvedName[]):
     'Unresolved species:',
     ...lines,
     '',
-    'Reply with the corrected name for each species, or its isomeric SMILES when you cannot name it.',
+    'Re-output the complete route, in order, with each unresolved species corrected. What may change: only those names — every step keeps its prose and every other name exactly. Each step ends with the four labelled lines of systematic IUPAC names, names only:',
+    ...NAMES_ONLY_FORMAT,
+    ...correctionRules(target),
   ].join('\n');
   return `\`\`\`nodus-route-fix\n${JSON.stringify({ label: 'Confirm the intended structure', prompt })}\n\`\`\``;
 }
 
 /** Offered when a route describes steps but lists no species under the four required labels, so
  *  nothing could be checked. One click asks the model to re-emit with the labelled lines. */
-export function formatMissingSpeciesPrompt(): string {
+export function formatMissingSpeciesPrompt(target?: string | null): string {
   const prompt = [
     ROUTE_MISSING_SPECIES_LEAD,
-    'Re-output the same route in the same order. Keep the prose for each step, and add exactly four lines after it:',
-    'Reactants: <systematic IUPAC name>; <systematic IUPAC name>',
-    'Products: <systematic IUPAC name>',
-    'Byproducts: <systematic IUPAC name>',
-    'Agents: <catalyst or solvent, or none>',
-    'Give every species as a systematic IUPAC name only, separated by semicolons. Do not add SMILES or a reaction line.',
+    'Re-output the same route in the same order. What may change: nothing but the added lines — keep the prose for each step, and add exactly the four labelled lines after it:',
+    ...NAMES_ONLY_FORMAT,
+    ...correctionRules(target),
   ].join('\n');
   return `\`\`\`nodus-route-fix\n${JSON.stringify({ label: 'Ask the model to list the species', prompt })}\n\`\`\``;
 }

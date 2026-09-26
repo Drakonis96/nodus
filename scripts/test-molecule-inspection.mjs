@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification, routeReportsForHistory, classifyCoProducts, smilesHasCarbon, routeStepFailure, routeFixPromptForHistory, formatRouteCheckUnavailable } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -252,7 +252,8 @@ test('a review finding is kept whole or cut on a word boundary, never mid-word',
 });
 
 test('the route review is told not to re-check balance and to allow one-pot cascades', () => {
-  assert.match(ROUTE_REVIEW_SYSTEM, /already verified that every equation balances/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /already checked that every equation balances/);
+  assert.doesNotMatch(ROUTE_REVIEW_SYSTEM, /it has passed/, 'the review is not told a failed route passed');
   assert.match(ROUTE_REVIEW_SYSTEM, /Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem/);
   assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade/);
   // The checker owns balance; the reviewer still owns the plan problem it can see.
@@ -279,11 +280,13 @@ test('the template asks for names and roles only, and forbids the model from wri
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('systematic IUPAC name ONLY'));
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('Reactants:'), 'the role labels are spelled out');
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('semicolons'), 'species are separated by semicolons');
-  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('Do NOT write any SMILES'), 'the model is told not to author SMILES');
-  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('Every step MUST end with the four labelled lines'), 'the species lists are mandatory');
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('Do not write SMILES'), 'the model is told not to author SMILES');
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('Every step ends with the four labelled lines'), 'the species lists are mandatory');
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('metal-oxo oxidation'), 'redox guidance is present');
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('rearrangement or isomerisation'), 'rearrangement guidance is present');
-  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('never your job'), 'the equation is the application\'s job');
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('You never choose coefficients'), 'the equation is the application\'s job');
+  // The format example follows its own rules: a released species is a Byproduct, not a Product.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Products: sodium ethanoate\n\s+Byproducts: water/);
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('chemistry-plan'), 'the target plan is still requested');
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('true catalyst'), 'the agents field is for true catalysts only');
   assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('racemic'), 'a racemate can be stated in the prose');
@@ -336,7 +339,17 @@ test('the requested target is read from the synthesis request', () => {
   // A per-step chip does not start with the all-steps lead; it must still be skipped.
   const stepFix = 'Correction needed for step 3 of the synthesis route above.\n\nStep 3 was rejected: not balanced.';
   assert.equal(requestedTargetFor([request, stepFix]), 'CN1C2CCC1CC(=O)C2', 'a per-step correction keeps the target too');
-  assert.equal(requestedTargetFor([request, 'are you saying the stereochemistry does not matter?']), null, 'a new question has its own (absent) target');
+  // A follow-up about the route keeps its target, so a route revised in reply is still checked
+  // against it; a new synthesis request ends the search even when it names no SMILES.
+  assert.equal(requestedTargetFor([request, 'are you saying the stereochemistry does not matter?']), 'CN1C2CCC1CC(=O)C2', 'a follow-up keeps the target');
+  assert.equal(requestedTargetFor([request, 'Now propose a synthesis of cocaine from tropinone.']), null, 'a new route request without a SMILES has no target');
+  assert.equal(requestedTargetFor([request, 'Propose a synthesis of ethanol (SMILES: CCO).']), 'CCO', 'a new route request with a SMILES has its own');
+  assert.equal(requestedTargetFor([request, 'Why does the synthesis need step 2?']), 'CN1C2CCC1CC(=O)C2', 'a question about the route is not a new request');
+  // Other phrasings of the request, and a long systematic name before the SMILES.
+  assert.equal(findRequestedTarget('Synthesize acetylsalicylic acid (SMILES: CC(=O)Oc1ccccc1C(=O)O) from phenol.'), 'CC(=O)Oc1ccccc1C(=O)O');
+  assert.equal(findRequestedTarget('Suggest a route to 4-aminobenzenesulfonamide (SMILES: Nc1ccc(cc1)S(N)(=O)=O).'), 'Nc1ccc(cc1)S(N)(=O)=O');
+  const longName = '(8R,9S,13S,14S)-3-hydroxy-13-methyl-6,7,8,9,11,12,13,14,15,16-decahydro-17H-cyclopenta[a]phenanthren-17-one, the steroid hormone estrone, with its four ring-junction stereocentres defined';
+  assert.equal(findRequestedTarget(`Propose a synthesis of ${longName.replace(', with', ',')} (SMILES: CC12CCC3c4ccc(O)cc4CCC3C1CCC2=O).`), 'CC12CCC3c4ccc(O)cc4CCC3C1CCC2=O', 'a long systematic name before the SMILES');
   assert.equal(requestedTargetFor([]), null);
 });
 
@@ -490,7 +503,7 @@ test('the rules say a consumed species is a Reactant, never an Agent', () => {
   const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: ['x'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
   const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit));
   assert.match(chips[0].prompt, /A species the step consumes is a Reactant, never an Agent/);
-  assert.match(chips[0].prompt, /lists every consumed reactant and every byproduct it releases/);
+  assert.match(chips[0].prompt, /lists every consumed species under Reactants and every released species under Byproducts/);
 });
 
 // ---------------------------------------------------------------- IUPAC names in the route
@@ -646,8 +659,9 @@ test('reaction lines are derived from resolved species, never the model', () => 
     { role: 'agent', byproduct: false, name: 'tetrahydrofuran', status: 'resolved', smiles: 'C1CCOC1', source: 'pubchem' },
   ]];
   assert.deepEqual(buildRouteSteps(resolved), ['C#C.[NH2-].[Na+]>C1CCOC1>CCC#C.N']);
-  // A step with no resolvable reactant cannot form an equation.
-  assert.deepEqual(buildRouteSteps([[{ role: 'product', byproduct: false, name: 'x', status: 'unresolved' }]]), []);
+  // A step with no resolvable reactant cannot form an equation; it stays as an empty line so the
+  // steps after it keep their numbers.
+  assert.deepEqual(buildRouteSteps([[{ role: 'product', byproduct: false, name: 'x', status: 'unresolved' }]]), ['']);
 });
 
 test('an ion shared by two salts is written once per side so the balance is unique', () => {
@@ -732,7 +746,13 @@ test('a route derived from names is corrected with a names-only chip set, never 
   }
   assert.match(chips[0].prompt, /Reactants: phenol; sodium hydroxide/);
   assert.match(chips[0].prompt, /Products: sodium phenoxide/);
-  assert.match(chips[0].prompt, /insert, remove, split or merge/, 'fix-all may re-plan');
+  assert.match(chips[0].prompt, /You may split a rejected step, combine it with a neighbour \(see the rules below\), insert a missing step, or remove a step/, 'fix-all may re-plan');
+  for (const chip of chips) {
+    assert.match(chip.prompt, /What may change:/, `${chip.label} states what it may change`);
+    assert.doesNotMatch(chip.prompt, /\bmerg/i, `${chip.label} says "combine", never "merge"`);
+  }
+  assert.match(chips[1].prompt, /the one correction that may rename a species in a step that already passes/);
+  assert.match(chips[2].prompt, /What may change: only step 1\./);
   assert.match(chips[1].prompt, /Work backwards from the final step/);
   assert.match(chips[2].prompt, /Step 1 was rejected: not balanced/);
   assert.match(chips[2].prompt, /You may split step 1 into consecutive steps, or combine it with an adjacent step/);
@@ -815,12 +835,42 @@ test('the backwards correction names the requested target with its structure', (
   const back = chips.find((chip) => chip.label === 'Fix from the target backwards');
   assert.match(back.prompt, /name the requested target \(2-\[4-\(2-methylpropyl\)phenyl\]propanoic acid, canonical SMILES `/);
   assert.ok(back.prompt.includes('`' + smiles + '`'), 'the target SMILES anchors the name');
-  assert.match(back.prompt, /\) as a Product and balance it\./);
-  assert.match(chips[0].prompt, /as long as the route still reaches the requested target \(2-\[4-\(2-methylpropyl\)phenyl\]propanoic acid, canonical SMILES `/);
+  assert.match(back.prompt, /\) as a Product\./);
+  assert.match(chips[0].prompt, /The route must still reach the requested target \(2-\[4-\(2-methylpropyl\)phenyl\]propanoic acid, canonical SMILES `/);
   // With no target in the audit the sentence is unchanged.
   const bare = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: ['x'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
   const plain = routeFixChips(formatNamedRouteFixPrompts(labels, bare)).find((chip) => chip.label === 'Fix from the target backwards');
-  assert.match(plain.prompt, /name the requested target as a Product and balance it\./);
+  assert.match(plain.prompt, /name the requested target as a Product\./);
+  // The target drawing quotes the request's own target, so the drawing tool accepts it; with no
+  // target the correction asks for no drawing rather than one that would be refused.
+  assert.ok(back.prompt.includes(`The requested target, exactly as the original request gave it: \`${smiles}\`.`));
+  assert.ok(back.prompt.includes(`"input":{"kind":"smiles","value":"${smiles}"}`));
+  assert.match(plain.prompt, /Do not emit a chemistry-plan block in this correction/);
+});
+
+test('the first request and every correction carry the same species rules, once', () => {
+  const rules = SYNTHESIS_TEMPLATE_ADDENDUM.split('\n').filter((line) => line.startsWith('   - ')).map((line) => line.slice(5));
+  assert.ok(rules.length >= 10, 'the contract lists the shared rules');
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' },
+    { role: 'product', byproduct: false, name: 'sodium phenoxide', smiles: '[Na+].[O-]c1ccccc1' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'x', ok: true, balanced: false, chargeBalanced: true, differences: ['x'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const prompts = [
+    ...routeFixChips(formatNamedRouteFixPrompts(labels, audit)).map((chip) => chip.prompt),
+    fixPayload(formatMissingSpeciesPrompt('CCO')).prompt,
+    fixPayload(formatUnresolvedNameClarification([{ step: 1, role: 'reactant', byproduct: false, name: 'x' }], 'CCO')).prompt,
+  ];
+  for (const prompt of prompts) {
+    for (const rule of rules) {
+      const count = prompt.split(rule).length - 1;
+      assert.equal(count, 1, `each rule appears exactly once in: ${prompt.slice(0, 60)}`);
+    }
+  }
+  // The two prompts without an audit still quote the request's target for the drawing.
+  assert.ok(prompts.at(-2).includes('exactly as the original request gave it: `CCO`'));
+  assert.ok(prompts.at(-1).includes('exactly as the original request gave it: `CCO`'));
+  assert.match(prompts.at(-1), /What may change: only those names/);
 });
 
 test('a route with no species lists offers a one-click prompt to add them', () => {
@@ -830,4 +880,137 @@ test('a route with no species lists offers a one-click prompt to add them', () =
   assert.match(payload.prompt, /Reactants:/);
   assert.match(payload.prompt, /systematic IUPAC name/);
   assert.ok(splitChatVisuals(fence).some((part) => part.kind === 'route-fix'), 'the interface can render it');
+});
+
+test('replayed history keeps the app route reports for the latest answer only', () => {
+  const answer = [
+    '## Route', 'Step 1 prose.', '',
+    '### Structure check (RDKit)', '', 'Every SMILES below was parsed.', '',
+    '### Route check (RDKit)', '', '- Step 1 FAIL — not balanced', '',
+    '### Route drawings (RDKit)', '', '**Step 1**', '', 'Not drawn:', '- Step 2 — not balanced', '',
+    '### Known reactions (Open Reaction Database)', '', '- ✔ Exact match', '',
+    'Name corrections: salicylic acid → 2-hydroxybenzoic acid',
+  ].join('\n');
+  const latest = routeReportsForHistory(answer, true);
+  assert.match(latest, /### Route check/, 'the latest route report is kept');
+  assert.match(latest, /### Structure check/);
+  assert.doesNotMatch(latest, /Route drawings|\*\*Step 1\*\*|Not drawn/, 'drawing leftovers are never replayed');
+  assert.match(latest, /### Known reactions/);
+  assert.match(latest, /Name corrections: salicylic acid/, 'the app note after the reports survives');
+  const earlier = routeReportsForHistory(answer, false);
+  assert.doesNotMatch(earlier, /Route check|Structure check|FAIL/, 'a superseded report is not re-sent');
+  assert.match(earlier, /Step 1 prose\./, 'the model\'s own prose is kept');
+  assert.match(earlier, /Name corrections:/);
+});
+
+test('carbon is found only where the SMILES has a carbon atom', () => {
+  for (const smiles of ['C', 'c1ccccc1', '[C@@H](O)F', '[cH]1ccccc1', 'O=C=O', '[13CH4]']) assert.ok(smilesHasCarbon(smiles), smiles);
+  for (const smiles of ['[Na+].[Cl-]', 'O', 'Cl', '[Ca+2]', '[Cs+]', 'O=S(=O)(O)O', '[Co]', 'Br', '[Na+].[OH-]']) assert.ok(!smilesHasCarbon(smiles), smiles);
+});
+
+test('an inorganic co-product listed as a Product becomes a byproduct, and the equation is unchanged', () => {
+  // The fix-turn step the model wrote: NaCl beside salicylic acid under Products.
+  const step = [
+    { role: 'reactant', byproduct: false, name: 'sodium phenoxide', smiles: '[Na+].[O-]c1ccccc1' },
+    { role: 'reactant', byproduct: false, name: 'carbon dioxide', smiles: 'O=C=O' },
+    { role: 'reactant', byproduct: false, name: 'hydrogen chloride', smiles: 'Cl' },
+    { role: 'product', byproduct: false, name: 'salicylic acid', smiles: 'O=C(O)c1ccccc1O' },
+    { role: 'product', byproduct: false, name: 'sodium chloride', smiles: '[Cl-].[Na+]' },
+    { role: 'agent', byproduct: false, name: 'water', smiles: 'O' },
+  ];
+  const classified = classifyCoProducts(step);
+  assert.equal(classified.find((entry) => entry.name === 'sodium chloride').byproduct, true, 'NaCl is a byproduct');
+  assert.equal(classified.find((entry) => entry.name === 'salicylic acid').byproduct, false, 'the organic product stays the product');
+  assert.equal(classified.find((entry) => entry.name === 'water').byproduct, false, 'an agent is untouched');
+  // Balancing reads roles only: the equation handed to the checker is byte-identical.
+  assert.deepEqual(buildRouteSteps([classified]), buildRouteSteps([step]));
+  // A step whose only product is inorganic keeps it: there is nothing else to call the product.
+  const inorganic = [{ role: 'reactant', byproduct: false, name: 'x', smiles: 'CCO' }, { role: 'product', byproduct: false, name: 'water', smiles: 'O' }];
+  assert.equal(classifyCoProducts(inorganic)[1].byproduct, false);
+});
+
+test('a checker message reaches the correction prompt whole', () => {
+  const message = 'The declared species cannot be balanced: "Na", "OH", "H2O" take(s) no part (coefficient 0), so the equation balances only if those molecules are removed. Delete the molecule the step neither consumes nor produces — water and a solvent are the usual ones.';
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['x'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: [message], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  assert.equal(audit.steps[0].differences[0], message, 'no truncation at 200 characters');
+  const labels = [[{ role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' }, { role: 'product', byproduct: false, name: 'salicylic acid', smiles: 'O=C(O)c1ccccc1O' }]];
+  const chip = routeFixChips(formatNamedRouteFixPrompts(labels, audit)).find((entry) => entry.label === 'Fix step 1');
+  assert.ok(chip.prompt.includes('water and a solvent are the usual ones.'), 'the instruction at the end survives');
+});
+
+test('the route review blocks a workup folded into another transformation', () => {
+  assert.match(ROUTE_REVIEW_SYSTEM, /folds a separate workup into a different transformation/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /Kolbe–Schmitt carboxylation and the acidification/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade such as the Robinson tropinone synthesis is one step/, 'true cascades stay allowed');
+});
+
+test('the first request draws the target from its SMILES when the request gives one', () => {
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /If my request gives the\s+target's SMILES, use it \(kind "smiles"\)/);
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('"input":{"kind":"smiles","value":"EXACT TARGET SMILES FROM MY REQUEST"}'));
+});
+
+test('an unbuildable step keeps every later step on its own number', () => {
+  const species = (reactant, product) => [
+    { role: 'reactant', byproduct: false, name: reactant, smiles: reactant },
+    { role: 'product', byproduct: false, name: product, smiles: product },
+  ];
+  const resolved = [species('CCO', 'CC=O'), [{ role: 'product', byproduct: false, name: 'unknown', status: 'unresolved' }], species('CC=O', 'CC(=O)O')];
+  const steps = buildRouteSteps(resolved);
+  assert.equal(steps.length, 3, 'one line per step');
+  assert.equal(steps[1], '', 'the unbuilt step is an empty line');
+  assert.equal(steps[2], 'CC=O>>CC(=O)O', 'step 3 is still at index 2');
+});
+
+test('the report, the drawings and the corrections share one step verdict', () => {
+  const assembled = { index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [], assemblyProblem: 'the equation can only balance by taking more product molecules' };
+  assert.equal(routeStepFailure(assembled), assembled.assemblyProblem, 'an assembly problem fails the step (so it is not drawn)');
+  assert.equal(routeStepFailure(passingStep(0, 'a>>b')), null);
+  assert.match(routeStepFailure({ ...passingStep(0, 'a>>b'), ok: false, error: 'This step could not be built' }), /could not be built/);
+});
+
+test('the shared rules keep a workup as its own step, as the review requires', () => {
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /A workup — an acidification, basification or quench .* is always its own step/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /except in the single structure fallback below and the one target chemistry-plan/);
+  assert.match(ROUTE_CONTINUITY_SYSTEM_RULE, /In a route, do not write a reaction SMILES/, 'single-reaction drawings stay allowed');
+});
+
+test('history drops the review and known reactions of superseded answers, and repeated correction rules', () => {
+  const answer = ['## Route', 'prose', '', '### Route check (RDKit)', '- Step 1 OK', '', '### Route review (model)', '- Step 1: folded workup', '', 'Not verified: The route review raised 1 problem(s).', '', '### Known reactions (Open Reaction Database)', '- ✔ Exact match'].join('\n');
+  const earlier = routeReportsForHistory(answer, false);
+  assert.doesNotMatch(earlier, /Route review|folded workup|Not verified|Known reactions/);
+  const latest = routeReportsForHistory(answer, true);
+  assert.match(latest, /Route review/);
+  assert.match(latest, /Known reactions/);
+  const correction = 'Correction needed for step 2 of the synthesis route above.\n\nStep 2 was rejected: x\n\nWhat may change: only step 2.\nRules for every step:\n- rule one\n- rule two';
+  const replayed = routeFixPromptForHistory(correction);
+  assert.match(replayed, /Step 2 was rejected: x/);
+  assert.match(replayed, /What may change: only step 2\./);
+  assert.doesNotMatch(replayed, /rule one/);
+  assert.equal(routeFixPromptForHistory('Why is step 2 slow?'), 'Why is step 2 slow?', 'an ordinary message is untouched');
+});
+
+test('the interim report says checks passed, not verified, while the review runs', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  assert.match(formatRouteAudit(audit, [], null, true), /\*\*Route checks passed\*\*.*The model review is still running\./);
+  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route verified/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.match(formatRouteCheckUnavailable('worker crashed'), /Route check unavailable: worker crashed\. The route above has not been checked\./);
+});
+
+test('conditions and prose are read inside each step, not by position', () => {
+  const answer = [
+    '## Summary', '', 'Reaction conditions: see each step.', '',
+    '### Step 1 — Oxidation of ethanol', 'Ethanol is oxidised to ethanal.', '',
+    'Reactants: ethanol; oxygen', 'Products: ethanal', 'Byproducts: water', 'Agents: none', '',
+    '### Step 2 — Oxidation of ethanal', 'Ethanal is oxidised further.', 'Reagents and conditions: KMnO4, H2O, 25 °C', '',
+    'Reactants: ethanal; oxygen', 'Products: ethanoic acid', 'Byproducts: none', 'Agents: none',
+  ].join('\n');
+  // Step 1 has no conditions line; the summary line above it must not be taken for step 1, and
+  // step 2's line must stay on step 2.
+  const conditions = findStepConditions(answer, 2);
+  assert.equal(conditions[0], '', 'step 1 has no conditions of its own');
+  assert.match(conditions[1], /KMnO4/, 'step 2 keeps its own conditions');
+  const prose = findStepProse(answer, 2);
+  assert.match(prose[0], /^Step 1 — Oxidation of ethanol — Ethanol is oxidised to ethanal\./);
+  assert.match(prose[1], /^Step 2 — Oxidation of ethanal/);
 });

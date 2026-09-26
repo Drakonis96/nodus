@@ -1,7 +1,7 @@
 import { validateConcilium, type ConciliumConfig, type ConciliumResult } from '@shared/researchConcilium';
 import type { ModelRef } from '@shared/types';
 
-type Delta = (delta: string, kind?: 'content' | 'reasoning') => void;
+type Delta = (delta: string, kind?: 'content' | 'reasoning' | 'replace') => void;
 /** No tools are exposed here. The research driver explicitly gives skills only to synthesize. */
 export async function runConcilium<T extends { answer: string; aborted?: boolean }>(
   config: ConciliumConfig,
@@ -21,6 +21,7 @@ export async function runConcilium<T extends { answer: string; aborted?: boolean
       const response = await assess(member.model, (delta, kind) => {
         if (signal?.aborted) return;
         if (kind === 'reasoning') member.reasoning = (member.reasoning ?? '') + delta;
+        else if (kind === 'replace') member.answer = delta;
         else member.answer += delta;
         emit();
       });

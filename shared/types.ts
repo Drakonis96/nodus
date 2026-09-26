@@ -5889,6 +5889,9 @@ export interface ResearchChatResponse {
 export interface ResearchChatStreamHandlers {
   onConcilium?(result: import('./researchConcilium').ConciliumResult): void;
   onDelta(delta: string): void;
+  /** The whole answer so far, replacing what has streamed: the application's interim repaints
+   *  (the target drawing, then the route report) while slower checks still run. */
+  onReplace?(text: string): void;
   /** Reasoning/thinking trace, streamed for live display only. */
   onReasoning?(delta: string): void;
   onStats?(stats: ResearchContextStats): void;
