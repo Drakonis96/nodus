@@ -75,7 +75,8 @@ const run = async () => {
   if (!fs.existsSync(python) || !fs.existsSync(serve)) return;
 
   // 1. Ready, loopback only, token enforced, real results.
-  const first = launch(session());
+  const firstDirectory = session();
+  const first = launch(firstDirectory);
   const port = await first.ready;
   check('it reports ready with the port it chose', Number.isInteger(port) && port > 0, `port ${port}`);
   const refused = await request(port, null, 'represión franquista historiografía');
@@ -134,8 +135,10 @@ const run = async () => {
   check('a parent killed with SIGKILL leaves no orphan behind', gone === true, `pid ${orphanPid}`);
   if (!gone) { try { process.kill(orphanPid, 'SIGKILL'); } catch { /* already gone */ } }
 
-  // 4. The session directory holds what the runtime wrote, nowhere else.
-  const written = fs.readdirSync(parentDirectory);
+  // 4. The session directory holds what the runtime wrote, nowhere else. Read from the
+  // instance that reached ready and answered a search: the one killed above dies about a
+  // second into its start, and on a slow runner it has not opened its cache yet.
+  const written = fs.readdirSync(firstDirectory);
   check('the session keeps its own settings and cache', written.includes('settings.yml') && written.some(name => name.startsWith('sxng_cache')), written.join(', '));
 };
 
