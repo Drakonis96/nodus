@@ -34,6 +34,12 @@ export function thinkingOutputAllowance(model: ModelRef, effort: ResearchEffort,
   if (isLocalProvider(model.provider) || model.provider === 'nodus') return 0;
   const profile = researchReasoningProfile(model, info);
   const native = resolveResearchEffort(profile, effort);
+  // DeepSeek's effort is not a token cap. Flash used 5,420 reasoning tokens at
+  // low in a real JSON review, exhausting the old 1,024-token reserve and cutting
+  // off the answer. Reserve room before the first request; retries stay invariant.
+  if (model.provider === 'deepseek') {
+    return ({ low: 8192, high: 16384, max: 32768 } as Partial<Record<NativeResearchEffort, number>>)[native ?? 'none'] ?? researchThinkingAllowance(native);
+  }
   // Adaptive thinking is always on, so its reserve stands in for the `budget_tokens` the
   // manual mode would otherwise cap at a much smaller number.
   return profile.mode === 'anthropic-adaptive'

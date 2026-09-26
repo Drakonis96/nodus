@@ -70,6 +70,17 @@ try {
   const standard = await withJobThinkingEffort('standard', gpt, () => call(gpt, 'job standard'));
   assert.equal(standard.reasoning_effort, 'none', 'Standard, chosen, is the model\'s own first level (thinking off for GPT-5.4)');
 
+  const deepseek = { provider: 'deepseek', model: 'deepseek-flash' };
+  for (const kind of ['text', 'json', 'stream']) {
+    const body = await withJobThinkingEffort('low', deepseek, () => call(deepseek, `DeepSeek low ${kind}`, kind));
+    assert.equal(body.thinking.type, 'enabled');
+    assert.equal(body.reasoning_effort, 'low');
+    assert.ok(budget(body) >= 1000 + 5420, 'the visible answer still fits after the observed low-effort reasoning usage');
+  }
+  const deepseekStandard = await withJobThinkingEffort('standard', deepseek, () => call(deepseek, 'DeepSeek standard', 'json'));
+  assert.equal(deepseekStandard.thinking.type, 'disabled');
+  assert.equal(budget(deepseekStandard), 1000, 'Standard does not reserve thinking tokens');
+
   // Only the job's model: a call to another model in the same job keeps its usual reasoning.
   const audit = await withJobThinkingEffort('high', gpt, () => call(other, 'audit model'));
   const auditBaseline = await call(other, 'audit baseline');
