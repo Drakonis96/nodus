@@ -86,8 +86,17 @@ export function createCapabilityAdapters(context: TrustedTurnContext): Capabilit
         // One lock per interpreter version the package supports, named for it. A package
         // that supports only one ships `lock.json` and gets it whatever the interpreter is.
         const locks = path.join(path.dirname(runtime.entryPath), 'runtimes', runtimeId);
+        // A package whose archive is target-independent (`compatibility.targets: ["any"]`) still
+        // needs platform-specific wheels, so it may ship its locks under a `<platform>-<arch>`
+        // subdirectory. Prefer that, then fall back to the flat layout a per-target archive uses.
+        const target = `${process.platform}-${process.arch}`;
         const selectLock = (pythonVersion: string) => {
-          for (const file of [`lock-${pythonVersion}.json`, 'lock.json']) {
+          for (const file of [
+            path.join(target, `lock-${pythonVersion}.json`),
+            path.join(target, 'lock.json'),
+            `lock-${pythonVersion}.json`,
+            'lock.json',
+          ]) {
             try { return validateRuntimeLock(JSON.parse(fs.readFileSync(path.join(locks, file), 'utf8'))); }
             catch { /* try the next */ }
           }

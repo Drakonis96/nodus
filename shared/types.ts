@@ -23,6 +23,7 @@ import type { ToolkitApi } from './api/toolkit';
 import type { TestimoniesApi } from './api/testimonies';
 import type { LibraryApi } from './api/library';
 import type { RadarApi } from './api/radar';
+import type { ReactionIndexApi } from './api/reactionIndex';
 import type { CompassApi } from './api/compass';
 import type { LogsApi } from './api/logs';
 import type { LibraryAttachmentRecord } from './libraryTypes';
@@ -5942,6 +5943,9 @@ export interface ResearchChatStreamHandlers {
   onActivity?(activity: import('./researchActivity').ResearchActivity): void;
   onConcilium?(result: import('./researchConcilium').ConciliumResult): void;
   onDelta(delta: string): void;
+  /** The whole answer so far, replacing what has streamed: the application's interim repaints
+   *  (the target drawing, then the route report) while slower checks still run. */
+  onReplace?(text: string): void;
   /** Reasoning/thinking trace, streamed for live display only. */
   onReasoning?(delta: string): void;
   onStats?(stats: ResearchContextStats): void;
@@ -9156,7 +9160,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, CompassApi, BrowserApi, LogsApi {
+export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
