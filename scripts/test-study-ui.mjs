@@ -460,13 +460,17 @@ test('student calendar exposes month, week and year views with durable event act
   assert.match(view, /data-testid="study-calendar-event-detail"/);
   assert.match(view, /data-testid="study-calendar-event-actions"/);
   assert.match(view, /title=\{t\('Editar'\)\}[\s\S]{0,200}editEvent\(selectedEvent\)/);
-  assert.match(view, /title=\{t\('Añadir a iCloud'\)\}/);
-  assert.match(view, /title=\{t\('Añadir a Google Calendar'\)\}/);
+  assert.match(view, /title=\{t\('Exportar a Outlook \(\.ics\)'\)\}[\s\S]{0,200}exportCalendar\(selectedEvent\.id\)/);
+  assert.match(view, /title=\{t\('Añadir a Google Calendar'\)\}[\s\S]{0,300}exportCalendar\(selectedEvent\.id, 'google'\)/);
   assert.match(view, /title=\{t\('Eliminar'\)\}/);
   assert.match(view, /<ConfirmModal zIndex=\{180\}/);
-  assert.match(view, /const openEvent = \(event: StudyCalendarEvent\) => setSelectedEvent\(event\)/);
-  assert.match(view, /addStudyCalendarEventToExternal\(editor\.id!, 'icloud'\)/);
-  assert.match(view, /addStudyCalendarEventToExternal\(editor\.id!, 'google'\)/);
+  assert.match(view, /const openEvent = \(event: StudyCalendarEvent\) => \{ setExported\(false\); setError\(''\); setSelectedEvent\(event\); \}/);
+  // iCloud is no longer a one-off .ics copy opened from the event: the Apple panel owns
+  // that destination and keeps the copy in step, so only Outlook and Google stay manual.
+  assert.match(view, /<AppleCalendarSyncPanel \/>/);
+  assert.match(view, /data-testid="study-calendar-outlook-export"/);
+  assert.match(view, /exportCalendar\(editor\.id!\)/);
+  assert.match(view, /exportCalendar\(editor\.id!, 'google'\)/);
   assert.match(navigation, /studyCalendar/); assert.match(app, /<StudyCalendarView/); assert.match(sidebar, /studyCalendar/);
   assert.match(types, /updateStudyCalendarEvent/); assert.match(types, /deleteStudyCalendarEvent/);
   assert.match(preload, /study:planner:event:external/); assert.match(ipc, /calendar\.google\.com/); assert.match(ipc, /params\.append\('sprop', 'name:Nodus'\)/);
@@ -476,6 +480,30 @@ test('student calendar exposes month, week and year views with durable event act
   assert.match(reminders, /nodiText\(delayed \? 'studyCalendarLateBody' : 'studyCalendarBody'/);
   assert.match(reminders, /datetime: new Date\(String\(row\.starts_at\)\)\.toISOString\(\)/);
   assert.match(notificationCatalogue, /Aviso mostrado con retraso/);
+});
+
+test('apple calendar panel asks for consent only on an explicit action and needs a destination', async () => {
+  const [panel, preload, ipc] = await Promise.all([
+    read('src/components/AppleCalendarSyncPanel.tsx'), read('@bridge'), read('@main'),
+  ]);
+  // Mounting the view reads the status; only the button may enumerate accounts, because
+  // that call is the one that raises the macOS permission dialog.
+  assert.equal((panel.match(/listAppleCalendarDestinations/g) ?? []).length, 1);
+  assert.match(panel, /const choose = async \(\) => \{[\s\S]{0,300}listAppleCalendarDestinations\(\)/);
+  assert.match(panel, /getAppleCalendarSyncStatus\?\.\(\)/);
+  // Missing native module, platform or packaging keeps the panel out of the way.
+  assert.match(panel, /if \(!status\?\.available\) return null/);
+  // Enabling always names the calendar: no implicit destination and no free-text id.
+  assert.match(panel, /disabled=\{busy \|\| !selected\} onClick=\{\(\) => void configure\(true\)\}/);
+  assert.match(panel, /configureAppleCalendarSync\(\{ enabled, calendarId: selected \|\| status\?\.calendarId \|\| undefined \}\)/);
+  assert.match(panel, /configure\(false\)/, 'sync can always be turned off again');
+  assert.match(preload, /study:calendar:apple:status/);
+  assert.match(preload, /study:calendar:apple:destinations/);
+  assert.match(preload, /study:calendar:apple:configure/);
+  // The handler resolves the vault on the main process, never from the renderer.
+  assert.match(ipc, /getAppleCalendarSyncStatus\(getActiveVault\(\)\.id\)/);
+  assert.match(ipc, /configureAppleCalendarSync\(getActiveVault\(\)\.id, input\)/);
+  assert.match(ipc, /listAppleCalendars\(true\)/);
 });
 
 test('study editor keeps Crepe controls contained and uses a compact icon toolbar', async () => {
