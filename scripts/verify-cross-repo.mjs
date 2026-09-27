@@ -23,7 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createHash, generateKeyPairSync, sign as signBytes } from 'node:crypto';
 import { build } from 'esbuild';
-import { verifyPublishedBootstrap } from './lib/published-bootstrap.mjs';
+import { assertBootstrapVersion, verifyPublishedBootstrap } from './lib/published-bootstrap.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-cross-repo-'));
@@ -310,9 +310,9 @@ try {
     assert.deepEqual(bootstrap.packages.map(entry => entry.id).sort(), needed);
   });
   for (const entry of bootstrap.packages) {
-    check(`${entry.id}: the pinned version is the one the marketplace publishes`, () => {
+    check(`${entry.id}: the bootstrap version is current or a pinned earlier release`, () => {
       const manifest = JSON.parse(marketplaceRead(`plugins/${entry.id}/plugin.json`));
-      assert.equal(entry.version, manifest.version, 'the bootstrap pins a version the marketplace does not publish');
+      assertBootstrapVersion(entry, manifest.version, sdk.compareSemver);
     });
     check(`${entry.id}: a pinned release is fully described`, () => {
       if (!entry.releaseUrl) {
