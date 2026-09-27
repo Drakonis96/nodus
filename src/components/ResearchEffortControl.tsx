@@ -48,10 +48,10 @@ export function ResearchEffortControl({ model, value, onChange, disabled, varian
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
-      const width = Math.min(300, window.innerWidth - 24);
+      const width = Math.min(260, window.innerWidth - 24);
       // Above the trigger, as in the composer; below it when there is no room above (a
       // field near the top of a form).
-      const height = panel.current?.offsetHeight ?? 170;
+      const height = panel.current?.offsetHeight ?? 124;
       const below = rect.top - 12 < height + 12;
       setPosition({ '--vault-accent': getComputedStyle(trigger.current!).getPropertyValue('--vault-accent').trim() || 'var(--a-500)', position: 'fixed', zIndex: 10060, width,
         left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
