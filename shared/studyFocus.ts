@@ -40,6 +40,12 @@ export interface StudyFocusApi {
   onStudyFocusChanged(callback: (snapshot: FocusSnapshot) => void): () => void;
   onStudyFocusCompleted(callback: (snapshot: FocusSnapshot) => void): () => void;
 }
+/** The system notification shown when a phase ends while Nodus is in the background. */
+export const FOCUS_NOTIFICATION_COPY = {
+  title: { es: 'Nodus · Concentración', en: 'Nodus · Focus', fr: 'Nodus · Concentration', de: 'Nodus · Fokus', pt: 'Nodus · Concentração', 'pt-BR': 'Nodus · Concentração', it: 'Nodus · Concentrazione', tr: 'Nodus · Odak', 'zh-CN': 'Nodus · 专注', 'zh-TW': 'Nodus · 專注', ja: 'Nodus · 集中', ko: 'Nodus · 집중' },
+  workDone: { es: 'Bloque completado. Tu descanso está listo.', en: 'Block complete. Your break is ready.', fr: 'Bloc terminé. Votre pause est prête.', de: 'Block abgeschlossen. Ihre Pause ist bereit.', pt: 'Bloco concluído. A sua pausa está pronta.', 'pt-BR': 'Bloco concluído. Sua pausa está pronta.', it: 'Blocco completato. La tua pausa è pronta.', tr: 'Blok tamamlandı. Molanız hazır.', 'zh-CN': '专注时段已完成。可以开始休息了。', 'zh-TW': '專注時段已完成。可以開始休息了。', ja: 'ブロック完了。休憩の準備ができました。', ko: '블록을 마쳤습니다. 휴식을 시작할 수 있습니다.' },
+  breakDone: { es: 'Descanso completado. Puedes comenzar otro bloque.', en: 'Break complete. You can start another block.', fr: 'Pause terminée. Vous pouvez commencer un autre bloc.', de: 'Pause beendet. Sie können einen weiteren Block beginnen.', pt: 'Pausa concluída. Pode começar outro bloco.', 'pt-BR': 'Pausa concluída. Você pode começar outro bloco.', it: 'Pausa completata. Puoi iniziare un altro blocco.', tr: 'Mola tamamlandı. Yeni bir bloğa başlayabilirsiniz.', 'zh-CN': '休息结束。可以开始下一个专注时段。', 'zh-TW': '休息結束。可以開始下一個專注時段。', ja: '休憩終了。次のブロックを始められます。', ko: '휴식을 마쳤습니다. 다음 블록을 시작할 수 있습니다.' },
+} as const;
 export const DEFAULT_FOCUS_PREFERENCES: FocusPreferences = {
   workMinutes: 25, breakMinutes: 5, longBreakMinutes: 15, dailyGoalMinutes: null, sound: true,
 };

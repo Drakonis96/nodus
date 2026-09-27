@@ -3,6 +3,9 @@ import { getDb, onBeforeDatabaseClose } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { setMascotFocusSuppressed } from '../mascotWindow';
 import { FocusService } from '../study/focusService';
+import { getSettings } from '../db/settingsRepo';
+import { uiText } from '../../shared/uiLanguage';
+import { FOCUS_NOTIFICATION_COPY } from '../../shared/studyFocus';
 import type { FocusAction, FocusPreferences, FocusSnapshot } from '../../shared/studyFocus';
 import type { IpcContext } from './context';
 
@@ -21,7 +24,9 @@ export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
         const win = getWindow();
         win?.webContents.send('studyFocus:completed', payload);
         if ((!win || !win.isFocused() || win.isMinimized()) && Notification.isSupported()) {
-          new Notification({ title: 'Nodus · Concentración', body: state.phase === 'work' ? 'Bloque completado. Tu descanso está listo.' : 'Descanso completado. Puedes comenzar otro bloque.', silent: true }).show();
+          const language = getSettings().uiLanguage;
+          const body = state.phase === 'work' ? FOCUS_NOTIFICATION_COPY.workDone : FOCUS_NOTIFICATION_COPY.breakDone;
+          new Notification({ title: uiText(language, FOCUS_NOTIFICATION_COPY.title), body: uiText(language, body), silent: true }).show();
         }
       });
     }

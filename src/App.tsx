@@ -1,5 +1,6 @@
-import { useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { openFocusTimer, useStudyFocusActions, useStudyFocusReduced } from './components/focus/StudyFocusContext';
 import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
+import { FocusRail, type FocusRailItem } from './components/focus/FocusRail';
 import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
@@ -136,6 +137,7 @@ function HeaderAction({
   inboxTrigger = false,
   notificationsTrigger = false,
   queueTrigger = false,
+  focusKeep = false,
 }: {
   icon: string;
   label: string;
@@ -154,6 +156,8 @@ function HeaderAction({
   notificationsTrigger?: boolean;
   /** Same, for the queue panel. */
   queueTrigger?: boolean;
+  /** Still shown in the Study focus mode, which clears the rest of the rail. */
+  focusKeep?: boolean;
 }) {
   const titleText = kbd ? `${title ?? label} · ${kbd}` : title ?? label;
   return (
@@ -163,6 +167,7 @@ function HeaderAction({
       data-inbox-trigger={inboxTrigger ? '' : undefined}
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
       data-queue-trigger={queueTrigger ? '' : undefined}
+      data-focus-keep={focusKeep ? '' : undefined}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -183,6 +188,7 @@ function HeaderAction({
 
 export function App() {
   const focusReduced = useStudyFocusReduced();
+  const focusActions = useStudyFocusActions();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
@@ -776,6 +782,34 @@ export function App() {
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // Focus mode swaps the sidebar for the focus rail. It offers the same sections in
+  // the same saved order (plus Biblioteca), so the mode clears the screen without
+  // taking a single study tool away.
+  const openStudySection = useCallback((target: View) => {
+    setStudyTarget(null);
+    if (target !== 'studyLibrary') setStudyMaterialTarget(null);
+    if (target !== 'studyRecordings') setStudyRecordingTarget(null);
+    setStudyGraphTarget(null);
+    setView(target);
+  }, [setView]);
+  const focusRailItems = useMemo<FocusRailItem[]>(() => {
+    if (!isEstudio || !focusReduced) return [];
+    const explore = navGroups.find((group) => group.id === 'explore')?.items ?? [];
+    const rest = navGroups.filter((group) => group.id !== 'explore').flatMap((group) => group.items);
+    // Notas is hidden from a Study sidebar by default, but working is what this mode is
+    // for: it stays out only when the student chose to hide it.
+    const notesItem = NAV_ITEMS.find((n) => n.id === 'notes');
+    const notesHiddenByChoice = Boolean(settings?.sidebarCustomized && settings.sidebarHidden?.includes('notes'));
+    const extra = notesItem && !notesHiddenByChoice && !rest.some((n) => n.id === 'notes') ? [notesItem] : [];
+    return [...explore, libraryItem, ...extra, ...rest].map((n): FocusRailItem => 'toolkitPage' in n
+      ? { key: n.id, label: t(n.label), icon: n.icon, active: view === 'toolkit' && toolkitPage === n.toolkitPage, open: () => { setToolkitPage(n.toolkitPage); setView('toolkit'); } }
+      : { key: n.id, label: t(navItemLabel(n, activeVault?.type)), icon: n.icon, active: view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home'), open: () => { if (n.id === 'toolkit') setToolkitPage('home'); openStudySection(n.id); } });
+  }, [isEstudio, focusReduced, navGroups, libraryItem, view, toolkitPage, activeVault?.type, settings?.uiLanguage, settings?.sidebarCustomized, settings?.sidebarHidden, setView, openStudySection]);
+  const openFocusSubject = useCallback((id: string) => { setStudyTarget({ kind: 'subject', id }); setView('studyCourses'); }, [setView]);
+  const openFocusDocument = useCallback((id: string) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }, [setView]);
+  const openFocusMaterial = useCallback((id: string) => { setStudyMaterialTarget({ id, pageNumber: null, slideNumber: null }); setView('studyLibrary'); }, [setView]);
+  const openFocusLibrary = useCallback(() => openStudySection('studyLibrary'), [openStudySection]);
+
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
       setLoadError(t('El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.'));
@@ -1300,6 +1334,12 @@ export function App() {
         void window.nodus.updateSettings({ appTheme: next }).then(reloadSettings);
       } },
     ];
+    if (isEstudio && focusActions) {
+      actions.unshift(
+        { id: 'act:focus-mode', label: focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración'), section: t('Acciones'), icon: 'focus', keywords: 'concentración concentracion focus pomodoro distracciones estudio', run: () => focusActions.setReduced(!focusReduced) },
+        { id: 'act:focus-timer', label: t('Temporizador de concentración'), section: t('Acciones'), icon: 'focus', keywords: 'pomodoro temporizador timer bloque descanso concentración', run: openFocusTimer },
+      );
+    }
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
@@ -1310,7 +1350,7 @@ export function App() {
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings, toggleVaults]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, focusReduced, focusActions, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings, toggleVaults]);
 
   // The startup sequence, as an ordered list of guards rather than a run of early
   // returns. It also sets this render's authoritative language, which is why it is
@@ -1509,7 +1549,7 @@ export function App() {
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
-          {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} onNavigate={() => setPaletteOpen(true)} />}
+          {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} />}
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
           <HeaderAction
@@ -1519,6 +1559,7 @@ export function App() {
             kbd={PALETTE_HINT}
             tone="text-neutral-400"
             onClick={() => setPaletteOpen(true)}
+            focusKeep
           />
           <HeaderAction
             icon="chat"
@@ -1599,6 +1640,7 @@ export function App() {
             title={isDark ? t('Cambiar a modo claro') : t('Cambiar a modo oscuro')}
             onClick={() => void toggleTheme()}
             dataTour="theme-toggle"
+            focusKeep
           />
           {readyVersion && <HeaderAction
             icon="download"
@@ -1606,6 +1648,7 @@ export function App() {
             title={t('Actualización lista')}
             showLabel
             onClick={() => setDeferredUpdate(null)}
+            focusKeep
           />}
           {/* Queue and task progress, moved here from the bottom strip: same dropdown
               treatment as the notification centre, with a live-work badge. */}
@@ -1617,6 +1660,7 @@ export function App() {
               title={queueActivity.attention ? `${t('Cola y tareas')} · ${t('Error')}` : t('Cola y tareas')}
               queueTrigger
               onClick={(e) => toggleQueue(e.currentTarget)}
+              focusKeep
             />
             {(queueLive > 0 || queueActivity.attention) && (
               <span className={`header-action-badge ${queueActivity.attention ? '!bg-red-600 !text-white' : ''}`}>{queueActivity.attention && queueLive === 0 ? '!' : queueLive > 9 ? '9+' : queueLive}</span>
@@ -1725,7 +1769,16 @@ export function App() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
-        {!navCollapsed && !focusReduced && (
+        {isEstudio && focusReduced && (
+          <FocusRail
+            items={focusRailItems}
+            onOpenSubject={openFocusSubject}
+            onOpenDocument={openFocusDocument}
+            onOpenMaterial={openFocusMaterial}
+            onOpenLibrary={openFocusLibrary}
+          />
+        )}
+        {!navCollapsed && !(isEstudio && focusReduced) && (
           <nav
             data-testid="resizable-sidebar"
             data-sidebar-compact={sidebarCompact ? 'true' : 'false'}

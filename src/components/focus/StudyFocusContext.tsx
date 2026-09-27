@@ -1,19 +1,36 @@
-import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
-import type { FocusAction, FocusPreferences, FocusSnapshot } from '@shared/studyFocus';
+import { createContext, useContext, useEffect, useMemo, useState, useRef, useCallback, type ReactNode } from 'react';
+import type { FocusAction, FocusPhase, FocusPreferences, FocusSnapshot } from '@shared/studyFocus';
 
-interface FocusContextValue {
-  snapshot: FocusSnapshot | null; reduced: boolean; error: string | null;
-  notice: string | null; dismissNotice: () => void;
+/** What `start` should record; leave a field undefined to keep the previous block's. */
+export interface FocusStartOptions { subjectId?: string | null; task?: string | null }
+/** The phase that has just ended; the notice text is chosen (and translated) when rendered. */
+export type FocusNotice = FocusPhase;
+
+interface FocusActions {
   setReduced: (value: boolean) => void;
-  act: (action: FocusAction, subjectId?: string | null) => Promise<void>;
+  act: (action: FocusAction, options?: FocusStartOptions) => Promise<void>;
   configure: (patch: Partial<FocusPreferences>) => Promise<void>;
+  dismissNotice: () => void;
 }
-// The editor and shell consume only appearance, so the one-second clock does
-// not rerender the working document or the entire application.
+interface FocusContextValue extends FocusActions {
+  snapshot: FocusSnapshot | null; reduced: boolean; error: unknown;
+  notice: FocusNotice | null;
+}
+// The editor and shell consume only appearance and actions, so the one-second clock
+// does not rerender the working document or the entire application.
 const FocusAppearanceContext = createContext(false);
 export const useStudyFocusReduced = () => useContext(FocusAppearanceContext);
+const FocusActionsContext = createContext<FocusActions | null>(null);
+export const useStudyFocusActions = () => useContext(FocusActionsContext);
 const FocusContext = createContext<FocusContextValue | null>(null);
 export const useStudyFocus = () => useContext(FocusContext);
+
+/** The palette and the focus rail open the header's timer panel through this event. */
+export const OPEN_FOCUS_TIMER_EVENT = 'nodus:open-focus-timer';
+export function openFocusTimer(): void {
+  window.dispatchEvent(new Event(OPEN_FOCUS_TIMER_EVENT));
+}
+
 function chime() {
   try {
     const context = new AudioContext();
@@ -31,11 +48,11 @@ function chime() {
 export function StudyFocusProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<FocusSnapshot | null>(null);
   const [reduced, reduce] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [notice, setNotice] = useState<FocusNotice | null>(null);
   const vault = useRef<string | null>(null);
   const latest = useRef<FocusSnapshot | null>(null);
-  const fail = (reason: unknown) => setError(reason instanceof Error ? reason.message : String(reason));
+  const fail = useCallback((reason: unknown) => setError(reason ?? null), []);
   const receive = useCallback((next: FocusSnapshot) => {
     if (next.vaultId !== vault.current) return;
     latest.current = next; setSnapshot(next);
@@ -60,30 +77,35 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
     const offComplete = window.nodus.onStudyFocusCompleted(next => {
       if (next.vaultId !== vault.current) return;
       receive(next);
-      setNotice(next.state.phase === 'work' ? 'Bloque completado. Tu descanso está listo.' : 'Descanso completado. Puedes comenzar otro bloque.');
+      setNotice(next.state.phase);
       if (next.state.preferences.sound) chime();
     });
     const initial = generation;
     void window.nodus.getActiveVault().then(active => { if (generation === initial) void open(active); }).catch(fail);
     return () => { alive = false; offVault(); offState(); offComplete(); };
-  }, [receive]);
-  const act = useCallback(async (action: FocusAction, subjectId?: string | null) => {
+  }, [receive, fail]);
+  const act = useCallback(async (action: FocusAction, options: FocusStartOptions = {}) => {
     const current = latest.current;
     if (!current) return;
     setError(null);
-    try { receive(await window.nodus.actStudyFocus(current.vaultId, action, current.state.revision, subjectId)); setNotice(null); }
+    try { receive(await window.nodus.actStudyFocus(current.vaultId, action, current.state.revision, options.subjectId, options.task)); setNotice(null); }
     catch (reason) { fail(reason); }
-  }, [receive]);
+  }, [receive, fail]);
   const configure = useCallback(async (patch: Partial<FocusPreferences>) => {
     const current = latest.current;
     if (!current) return;
     setError(null);
     try { receive(await window.nodus.configureStudyFocus(current.vaultId, patch)); }
     catch (reason) { fail(reason); }
-  }, [receive]);
-  const setReduced = (value: boolean) => {
+  }, [receive, fail]);
+  const setReduced = useCallback((value: boolean) => {
+    // Only a Study vault has the mode; elsewhere the request is simply ignored.
+    if (!vault.current) return;
     reduce(value);
     void window.nodus.setStudyFocusDistractions(value).catch(reason => { reduce(!value); fail(reason); });
-  };
-  return <FocusAppearanceContext.Provider value={reduced}><FocusContext.Provider value={{ snapshot, reduced, setReduced, act, configure, error, notice, dismissNotice: () => setNotice(null) }}>{children}</FocusContext.Provider></FocusAppearanceContext.Provider>;
+  }, [fail]);
+  const dismissNotice = useCallback(() => setNotice(null), []);
+  const actions = useMemo<FocusActions>(() => ({ setReduced, act, configure, dismissNotice }), [setReduced, act, configure, dismissNotice]);
+  const value = useMemo<FocusContextValue>(() => ({ ...actions, snapshot, reduced, error, notice }), [actions, snapshot, reduced, error, notice]);
+  return <FocusAppearanceContext.Provider value={reduced}><FocusActionsContext.Provider value={actions}><FocusContext.Provider value={value}>{children}</FocusContext.Provider></FocusActionsContext.Provider></FocusAppearanceContext.Provider>;
 }
