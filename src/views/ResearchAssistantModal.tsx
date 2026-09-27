@@ -617,6 +617,12 @@ export function ResearchAssistantModal({
             if (activeIdRef.current !== conversationId) return;
             setMessages(current => current.map(message => message.id === assistantId ? { ...message, concilium: result } : message));
           },
+          onReplace: (text) => {
+            streamed = text;
+            if (activeIdRef.current !== conversationId) return;
+            setMessages((current) => current.map((message) => message.id === assistantId ? { ...message, content: text } : message));
+            window.setTimeout(updateJumpIndicator, 0);
+          },
           onDelta: (delta) => {
             streamed += delta;
             if (activeIdRef.current !== conversationId) return; // user switched away

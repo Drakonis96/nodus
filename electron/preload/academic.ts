@@ -567,12 +567,17 @@ export const academicApi: AcademicApi = {
     const onReasoning = (_e: unknown, id: string, delta: string) => {
       if (id === requestId) handlers.onReasoning?.(delta);
     };
+    // A handler without onReplace (an older view) keeps the provisional stream as it was.
+    const onReplace = (_e: unknown, id: string, text: string) => {
+      if (id === requestId) handlers.onReplace?.(text);
+    };
     const onConcilium = (_e: unknown, id: string, result: import('@shared/researchConcilium').ConciliumResult) => {
       if (id === requestId) handlers.onConcilium?.(result);
     };
     ipcRenderer.on('research:chatStream:concilium', onConcilium);
     ipcRenderer.on('research:chatStream:delta', onDelta);
     ipcRenderer.on('research:chatStream:reasoning', onReasoning);
+    ipcRenderer.on('research:chatStream:replace', onReplace);
     activeChatRequestId = requestId;
     try {
       const response = await ipcRenderer.invoke('research:chatStream', requestId, request);
@@ -583,6 +588,7 @@ export const academicApi: AcademicApi = {
       ipcRenderer.removeListener('research:chatStream:concilium', onConcilium);
       ipcRenderer.removeListener('research:chatStream:delta', onDelta);
       ipcRenderer.removeListener('research:chatStream:reasoning', onReasoning);
+      ipcRenderer.removeListener('research:chatStream:replace', onReplace);
     }
   },
   cancelResearchChat: async () => {

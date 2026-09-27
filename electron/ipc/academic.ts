@@ -1626,7 +1626,7 @@ export function registerAcademicIpc(context: IpcContext): void {
       return await streamResearchChat(
         request,
         (delta, kind) => {
-          const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : 'research:chatStream:delta';
+          const channel = kind === 'reasoning' ? 'research:chatStream:reasoning' : kind === 'replace' ? 'research:chatStream:replace' : 'research:chatStream:delta';
           e.sender.send(channel, requestId, delta);
         },
         controller.signal,
