@@ -327,11 +327,16 @@ body.cursor-press .cursor { width: 26px; height: 26px; margin: -13px 0 0 -13px; 
 .download-tooltip {
   position: absolute; z-index: 60; top: calc(100% + 9px); right: 0;
   /* The box grows leftwards from the chip, which sits at the right end of the
-     header, and it is capped by the room the window actually has left of the
-     edge: a fixed 300px is what let the tail of the sentence reach past the
-     window on a narrow one, where the chip is already close to the edge. */
+     header: it is as wide as the sentence needs, but never wider than the room
+     the window actually has left of that edge. A fixed measure is what let the
+     tail reach past the window on a narrow one. */
   width: max-content;
-  max-width: min(300px, 80vw, calc(100vw - 2 * clamp(14px, 3vw, 30px)));
+  max-width: min(360px, 80vw, calc(100vw - 2 * clamp(14px, 3vw, 30px)));
+  /* The chip holds its own row on a single line and `white-space` inherits: the
+     sentence could not wrap inside a box the cap had made narrower than itself,
+     so it spilled out of the right edge instead of fitting. The tooltip takes
+     its own line breaking back, and the cap trims the box, not the text. */
+  white-space: normal; overflow-wrap: break-word;
   padding: 8px 11px;
   border: 1px solid var(--membrane); border-radius: 9px;
   background: var(--raised); color: var(--ink);

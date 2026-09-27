@@ -123,12 +123,17 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
     assert.match(styles, /\[hidden\] \{ display: none !important; \}/);
     // The downloads tooltip grows leftwards from the chip, the last item before
     // the window edge, so its width is capped by the room the window has and not
-    // by a fixed measure: no viewport can push its tail off the edge.
+    // by a fixed measure: no viewport can push its tail off the edge. It also
+    // has to take its own line breaking back — the chip is a single row and
+    // `white-space` inherits — or the sentence spills out of a box the cap has
+    // made narrower than itself instead of wrapping inside it.
     const tooltip = styles.match(/\.download-tooltip \{[\s\S]*?\n\}/)?.[0];
     assert.ok(tooltip, 'both stylesheets place the downloads tooltip');
     assert.match(tooltip, /right: 0;/);
-    assert.match(tooltip, /max-width: min\(300px, 80vw, calc\(100vw - 2 \* clamp\(14px, 3vw, 30px\)\)\);/,
+    assert.match(tooltip, /max-width: min\(360px, 80vw, calc\(100vw - 2 \* clamp\(14px, 3vw, 30px\)\)\);/,
       'the tooltip is capped by the window, not by a fixed width');
+    assert.match(tooltip, /white-space: normal;/,
+      'the tooltip wraps rather than inheriting the chip\'s single row');
   }
   // the demo shell has to reserve the row the fixed header occupies
   assert.match(read('site/demo/demo.css'), /body\.demo-page > \[data-nodus-site-header\] \{ display: block; height: 62px; \}/);
