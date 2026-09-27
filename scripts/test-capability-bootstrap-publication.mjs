@@ -6,13 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
-import { verifyPublishedBootstrap } from './lib/published-bootstrap.mjs';
+import { assertBootstrapVersion, verifyPublishedBootstrap } from './lib/published-bootstrap.mjs';
 
 const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-bootstrap-publication-'));
 test.after(() => rm(tmp, { recursive: true, force: true }));
 const outfile = path.join(tmp, 'signature.mjs');
-await build({ entryPoints: [path.resolve(import.meta.dirname, '../packages/capability-api/src/signature.ts')], outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' });
-const { verifyReleaseManifest } = await import(pathToFileURL(outfile));
+await build({ entryPoints: [path.resolve(import.meta.dirname, '../packages/capability-api/src/index.ts')], outfile, bundle: true, platform: 'node', format: 'esm', logLevel: 'silent' });
+const { verifyReleaseManifest, compareSemver } = await import(pathToFileURL(outfile));
 const { publicKey, privateKey } = generateKeyPairSync('ed25519');
 const keys = [{ keyId: 'test01', publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString() }];
 const asset = { target: 'any', asset: 'chemistry-studio-2.5.7-any.nodus-plugin', bytes: 10, sha256: createHash('sha256').update('test bytes').digest('hex') };
@@ -37,3 +37,15 @@ test('the published version must match the pin', () => assert.rejects(verify(ent
 test('a pin cannot substitute a different digest', () => assert.rejects(verify({ ...entry, assets: [{ ...asset, sha256: '0'.repeat(64) }] }), /differs from the signed release/));
 test('a signed manifest with no downloadable archive is refused', () => assert.rejects(verify(entry, { archive: false }), /HTTP 404/));
 test('the published archive size must match', () => assert.rejects(verify(entry, { size: 11 }), /published size differs/));
+
+test('an older signed published bootstrap can coexist with a newer marketplace', async () => {
+  assertBootstrapVersion(entry, '2.5.8', compareSemver);
+  await verify();
+  await assert.rejects(verify(entry, { published: false }), /HTTP 404/);
+  await assert.rejects(verify(entry, { invalidSignature: true }), /signature does not verify/);
+});
+test('an older source-only pin and a version ahead of the marketplace are refused', () => {
+  assert.throws(() => assertBootstrapVersion({ ...entry, releaseUrl: null }, '2.5.8', compareSemver), /no published release/);
+  assert.throws(() => assertBootstrapVersion({ ...entry, assets: [] }, '2.5.8', compareSemver), /no published release/);
+  assert.throws(() => assertBootstrapVersion(entry, '2.5.6', compareSemver), /ahead of the marketplace/);
+});

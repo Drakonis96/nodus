@@ -1,5 +1,15 @@
 // Verify the actual published release, not just a reproducible marketplace source build.
 // Archive digests are checked again when prepare-capability-bootstrap downloads the bytes.
+export function assertBootstrapVersion(entry, marketplaceVersion, compareSemver) {
+  if (entry.version === marketplaceVersion) return;
+  // A bootstrap is an offline migration fallback, not a request for the latest catalog
+  // version. Marketplace releases and app changes must be able to land independently.
+  // Older pins are accepted only alongside the live signature/availability checks below.
+  if (!entry.releaseUrl || !entry.assets?.length || compareSemver(entry.version, marketplaceVersion) > 0) {
+    throw new Error(`${entry.id}: bootstrap version is ahead of the marketplace or has no published release pin`);
+  }
+}
+
 export async function verifyPublishedBootstrap(entry, { keys, verifyReleaseManifest, fetcher = fetch }) {
   if (!entry.releaseUrl) return;
   const get = async (name, limit) => {
