@@ -92,10 +92,10 @@ function LayerIcon({ layer }: { layer: ResearchActivityLayer }) {
  * to rely on another layer, red when its attempt failed. A new request starts over.
  * The panel only minimises to its radar; it is never closed. A layer switched off in the
  * context balloon reads "Desactivada" rather than "Sin consultar". */
-export function ResearchActivityPanel({ activities, outcome, webDisabled = false, disabledLayers = [] }: {
-  activities: ResearchActivity[]; outcome: ResearchActivityStatus; webDisabled?: boolean; disabledLayers?: readonly ResearchActivityLayer[];
+export function ResearchActivityPanel({ activities, outcome, webDisabled = false, disabledLayers = [], label, startMinimized = false }: {
+  label?: string; startMinimized?: boolean; activities: ResearchActivity[]; outcome: ResearchActivityStatus; webDisabled?: boolean; disabledLayers?: readonly ResearchActivityLayer[];
 }) {
-  const [minimized, setMinimized] = useState(() => localStorage.getItem('nodus.researchActivityMinimized') === '1');
+  const [minimized, setMinimized] = useState(() => startMinimized || localStorage.getItem('nodus.researchActivityMinimized') === '1');
   const toggleRef = useRef<HTMLButtonElement>(null);
   const rows = useMemo(() => summarizeResearchActivity(activities), [activities]);
   const web = useMemo(() => summarizeWebActivity(activities), [activities]);
@@ -109,7 +109,7 @@ export function ResearchActivityPanel({ activities, outcome, webDisabled = false
   if (!activities.length) return null;
   const status = outcome === 'active' ? tx('{n} operaciones activas', { n: active.length }) : t(statuses[outcome]);
   const announcement = `${status}${current ? ` · ${t(layers[current.layer][0])} · ${t(operations[current.operation])}` : ''}`;
-  return <section className={`research-activity ${minimized ? 'is-minimized' : ''} ${web && !minimized ? 'has-web' : ''}`} aria-label={t('Actividad del Research chat')} data-testid="research-activity" data-outcome={outcome} onKeyDown={event => {
+  return <section className={`research-activity ${minimized ? 'is-minimized' : ''} ${web && !minimized ? 'has-web' : ''}`} aria-label={label ?? t('Actividad del Research chat')} data-testid="research-activity" data-outcome={outcome} onKeyDown={event => {
     if (event.key === 'Escape' && !minimized) { event.stopPropagation(); toggle(); }
   }}>
     <span className="sr-only" role="status" aria-live="polite">{announcement}</span>
@@ -118,7 +118,7 @@ export function ResearchActivityPanel({ activities, outcome, webDisabled = false
           then turns green when it completed, red when it failed and grey when cancelled. */}
       <span className={`research-activity-radar ${outcome}`} aria-hidden="true"><Icon name="radar" size={20} /></span>
     </button> : <>
-      <header><div><h2>{t('Actividad del Research chat')}</h2><p>{status}</p></div>
+      <header><div><h2>{label ?? t('Actividad del Research chat')}</h2><p>{status}</p></div>
         <button ref={toggleRef} onClick={toggle} aria-label={t('Minimizar actividad')} aria-expanded={true} title={t('Minimizar actividad')}><Icon name="minus" size={16} /></button>
       </header>
       <ol>

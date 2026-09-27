@@ -1,6 +1,11 @@
 /** Dictionary surface translations. Spanish is the source key language. */
 export const DICTIONARY_TRANSLATIONS = {
   en: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "Concepts grounded in your library and, when needed, the web.",
+    "Consultar la web cuando sea necesario": "Consult the web when needed",
+    "Automática": "Automatic",
+    "Actividad del Diccionario": "Dictionary activity",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "Generation searches the works, ideas and documents in the selected scope. You can review the sources under Evidence.",
     Diccionario: "Dictionary",
     "Nueva entrada del Diccionario": "New Dictionary entry",
     "Cambiar dirección de orden": "Change sort direction",
@@ -214,6 +219,11 @@ export const DICTIONARY_TRANSLATIONS = {
     Italiano: "Italian",
   },
   fr: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "Concepts fondés sur votre bibliothèque et, si nécessaire, sur le Web.",
+    "Consultar la web cuando sea necesario": "Consulter le Web si nécessaire",
+    "Automática": "Automatique",
+    "Actividad del Diccionario": "Activité du Dictionnaire",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "La génération consulte les œuvres, idées et documents du périmètre choisi. Vous pouvez examiner les sources dans Preuves.",
     Diccionario: "Dictionnaire",
     "Nueva entrada del Diccionario": "Nouvelle entrée de dictionnaire",
     "Nodus buscará la evidencia más relevante y generará la definición automáticamente.":
