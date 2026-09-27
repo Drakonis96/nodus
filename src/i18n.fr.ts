@@ -4580,7 +4580,7 @@ export const FR: Record<string, string> = {
   'Publicación': 'Publication',
   'Editor / marca': 'Éditeur / marque',
   'Ubicación': 'Emplacement',
-  'Material': 'Matériau',
+  'Material': 'Support',
   'Inscripción': 'Inscription',
   'Estado de conservación': 'État de conservation',
   'Figura de protección': 'Statut de protection',

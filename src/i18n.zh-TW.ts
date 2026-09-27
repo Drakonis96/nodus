@@ -3901,7 +3901,7 @@ export const ZH_TW: Record<string, string> = {
   "Titular": "標題",
   "Publicación": "出版物",
   "Editor / marca": "出版商 / 品牌",
-  "Material": "材質",
+  "Material": "資料",
   "Inscripción": "銘文",
   "Estado de conservación": "儲存狀況",
   "Figura de protección": "保護等級",

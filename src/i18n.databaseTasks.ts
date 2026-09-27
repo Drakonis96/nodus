@@ -178,7 +178,7 @@ export const DATABASE_TASK_TRANSLATIONS = {
     "Plana": "평평한",
     "Planificado": "예정",
     "Activo": "달리기",
-    "Completado": "완벽한",
+    "Completado": "완료",
     "{n} filas · {m} plantillas": "{n} 행 · {m} 템플릿",
     "none": "없음",
     "daily": "일일",

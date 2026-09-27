@@ -4834,7 +4834,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "Cola e historial privados": "개인 큐 및 기록",
     "En cola": "대기 중",
     "Procesando": "처리",
-    "Completado": "완벽한",
+    "Completado": "완료",
     "Cancelado": "취소",
     "Fallido": "실패한",
     "Cancelar": "취소",
