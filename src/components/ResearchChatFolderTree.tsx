@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState, type DragEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type DragEvent, type ReactNode } from 'react';
 import type { ChatConversationSummary, ResearchChatProjectFolder } from '@shared/types';
-import { UNFILED_FOLDER, canNestFolder, conversationsInSelection, folderChildren, type ChatFolderSelection } from '@shared/researchChatFolders';
+import { UNFILED_FOLDER, canNestFolder, folderChildren, type ChatFolderSelection } from '@shared/researchChatFolders';
 import { ConfirmModal } from './ConfirmModal';
 import { FloatingMenu, MenuItem, RenameField } from './ResearchChatHistoryMenu';
 import { MarqueeText } from './MarqueeText';
@@ -8,11 +8,9 @@ import { Icon } from './ui';
 import { t, tx } from '../i18n';
 
 /*
- * The folder tree inside a research chat project. One tree, drawn in two places — under
- * the project's row in the history and on the project's page — from the same rows, with
- * the same selection and the same drag semantics:
+ * The folder tree under a research chat project in the history:
  *   · a chat dropped on a folder is filed there (and joins the folder's project);
- *   · a folder dropped on a folder nests inside it, or before/after it near its edges;
+ *   · a folder dropped on a folder nests inside it;
  *   · dropped anywhere else in the project (its row, "No folder", the free space), a chat
  *     leaves its folder and a folder goes back to the project's root.
  */
@@ -26,7 +24,7 @@ export function historyError(message: string): string {
   return message;
 }
 
-/** Selection and expanded folders, owned once and handed to both places. */
+/** The selected folder and expanded folders in the history. */
 export interface ChatFolderTreeState {
   selection: ChatFolderSelection | null;
   select: (selection: ChatFolderSelection | null) => void;
@@ -63,24 +61,6 @@ export type FolderTreeRow =
   | { kind: 'root'; projectId: string; count: number }
   | { kind: 'folder'; folder: ResearchChatProjectFolder; depth: number; count: number; hasChildren: boolean; expanded: boolean }
   | { kind: 'unfiled'; projectId: string; count: number };
-
-/** A project's tree, flattened in display order. "No folder" closes it once folders exist. */
-export function folderTreeRows(projectId: string, folders: ResearchChatProjectFolder[], conversations: ChatConversationSummary[], expanded: ReadonlySet<string>, withRoot = false): FolderTreeRow[] {
-  const children = folderChildren(folders, projectId);
-  const rows: FolderTreeRow[] = [];
-  if (withRoot) rows.push({ kind: 'root', projectId, count: conversationsInSelection(conversations, folders, projectId, null).length });
-  const walk = (parentId: string | null, depth: number) => {
-    for (const folder of children.get(parentId) ?? []) {
-      const hasChildren = !!children.get(folder.id)?.length;
-      const open = hasChildren && expanded.has(folder.id);
-      rows.push({ kind: 'folder', folder, depth, hasChildren, expanded: open, count: conversationsInSelection(conversations, folders, projectId, folder.id).length });
-      if (open) walk(folder.id, depth + 1);
-    }
-  };
-  walk(null, 0);
-  if (children.size) rows.push({ kind: 'unfiled', projectId, count: conversationsInSelection(conversations, folders, projectId, UNFILED_FOLDER).length });
-  return rows;
-}
 
 // ── Dragging ────────────────────────────────────────────────────────────────
 // What is being dragged lives here, not in dataTransfer: a dragover cannot read the
@@ -330,50 +310,5 @@ function FolderRow({ row, tree, ui, actions, run, baseIndent, contentsInline }: 
       <button type="button" className="research-history-action" aria-label={t('Más acciones')} title={t('Más acciones')} aria-haspopup="menu"
         onClick={event => { event.stopPropagation(); ui.openMenu(folder, event.currentTarget.getBoundingClientRect()); }}><Icon name="moreVertical" size={14} /></button>
     </span>
-  </div>;
-}
-
-// ── The project's page ──────────────────────────────────────────────────────
-
-/** A project's page below its composer: the tree beside the chats of what it selects. */
-export function ProjectFolderBrowser({ projectId, conversations, tree, actions, renderList }: {
-  projectId: string;
-  /** Every chat; the browser keeps the project's own. */
-  conversations: ChatConversationSummary[];
-  tree: ChatFolderTreeState;
-  actions: ChatFolderActions;
-  renderList: (conversations: ChatConversationSummary[]) => ReactNode;
-}) {
-  const [notice, setNotice] = useState<string | null>(null);
-  const run = (action: () => Promise<unknown>) => {
-    setNotice(null);
-    void action().catch((reason: unknown) => setNotice(historyError(reason instanceof Error ? reason.message : String(reason))));
-  };
-  const ui = useFolderTreeUi(actions, tree, run);
-  const inProject = useMemo(() => conversations.filter(conversation => conversation.projectId === projectId), [conversations, projectId]);
-  const rows = useMemo(() => folderTreeRows(projectId, actions.folders, inProject, tree.expanded, true), [projectId, actions.folders, inProject, tree.expanded]);
-  const folderId = tree.selection?.projectId === projectId ? tree.selection.folderId : null;
-  const shown = conversationsInSelection(inProject, actions.folders, projectId, folderId);
-  const heading = folderId === UNFILED_FOLDER ? t('Sin carpeta') : actions.folders.find(folder => folder.id === folderId)?.name ?? t('Todos los chats');
-  // A folder chosen in another project, or one gone with its parent, leaves nothing to show.
-  useEffect(() => {
-    if (folderId && folderId !== UNFILED_FOLDER && !actions.folders.some(folder => folder.id === folderId)) tree.select({ projectId, folderId: null });
-  }, [folderId, actions.folders, projectId, tree]);
-  return <div className="research-project-browser" data-testid="research-project-browser" {...outsideDropProps(actions, run, projectId)}>
-    <nav className="research-project-tree" aria-label={t('Carpetas')} data-testid="research-project-tree">
-      <div className="research-project-tree-head">
-        <span>{t('Carpetas')}</span>
-        <button type="button" className="research-history-action" data-testid="research-new-folder" aria-label={t('Nueva carpeta')} title={t('Nueva carpeta')}
-          onClick={() => ui.create(projectId, null)}><Icon name="folderPlus" size={15} /></button>
-      </div>
-      {rows.map(row => <FolderTreeRowView key={row.kind === 'folder' ? row.folder.id : row.kind} row={row} tree={tree} ui={ui} actions={actions} run={run} baseIndent={6} />)}
-      {rows.length === 1 && <p className="research-project-tree-empty">{t('Crea carpetas para ordenar los chats del proyecto. Arrastra un chat sobre una carpeta para guardarlo en ella.')}</p>}
-    </nav>
-    <section className="research-project-browser-list" aria-label={heading}>
-      <h3 className="research-project-browser-heading"><MarqueeText text={heading} className="min-w-0 flex-1" /></h3>
-      {notice && <p role="alert" className="px-3 text-[11px] text-amber-500">{notice}</p>}
-      {renderList(shown)}
-    </section>
-    {ui.overlays}
   </div>;
 }

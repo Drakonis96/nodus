@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ResearchChatSidebar } from '../../../src/components/ResearchChatSidebar';
-import { ProjectFolderBrowser, chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../../../src/components/ResearchChatFolderTree';
+import { chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../../../src/components/ResearchChatFolderTree';
 import { MarqueeText } from '../../../src/components/MarqueeText';
 import { folderSubtree, nextFolderName } from '../../../shared/researchChatFolders';
 import { setActiveLang } from '../../../src/i18n';
@@ -92,14 +92,13 @@ function App() {
       folderActions={folderActions}
     />
   </aside>
-  {/* The project's page for Alfa: the same tree, the same selection. */}
+  {/* Project homes include all their chats, independent of folder selection. */}
   <main data-testid="project-home" style={{ width: 580 }}>
-    <ProjectFolderBrowser projectId="p-a" conversations={conversations} tree={folderTree} actions={folderActions}
-      renderList={shown => <ul className="research-project-chats" data-testid="research-project-chats">
-        {shown.map(conversation => <li key={conversation.id} data-testid={`home-chat-${conversation.id}`} {...chatDragProps(conversation)}>
-          <button type="button" data-marquee-host><MarqueeText text={conversation.title} className="research-project-chat-title" /></button>
-        </li>)}
-      </ul>} />
+    <ul className="research-project-chats" data-testid="research-project-chats">
+      {conversations.filter(conversation => conversation.projectId === 'p-a').map(conversation => <li key={conversation.id} data-testid={`home-chat-${conversation.id}`} {...chatDragProps(conversation)}>
+        <button type="button" data-marquee-host><MarqueeText text={conversation.title} className="research-project-chat-title" /></button>
+      </li>)}
+    </ul>
   </main>
   </div>
   {/* Other chat histories, below: Study's courses as its notebooks, and a Databases-style one. */}

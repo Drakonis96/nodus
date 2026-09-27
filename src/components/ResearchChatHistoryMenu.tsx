@@ -71,7 +71,13 @@ export function FloatingMenu({ anchor, label, onClose, onBack, focusKey, childre
     const menu = ref.current;
     return () => {
       const focused = document.activeElement;
-      if (opener?.isConnected && (!focused || focused === document.body || menu?.contains(focused))) opener.focus();
+      if (!focused || focused === document.body || menu?.contains(focused)) {
+        // Moving a chat also moves its row in this commit. Restore focus after
+        // that DOM move, which otherwise clears the focus we just returned.
+        queueMicrotask(() => {
+          if (opener?.isConnected && (document.activeElement === document.body || menu?.contains(document.activeElement))) opener.focus();
+        });
+      }
     };
   }, [ref, opener]);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {

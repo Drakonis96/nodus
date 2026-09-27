@@ -15,9 +15,9 @@ import { NotebookDialog, useResearchNotebooks } from '../components/ResearchNote
 import { NotebookHomeHeader, NotebookIndexingBanner } from '../components/ResearchNotebookHome';
 import { HeaderBalloon } from '../components/HeaderBalloon';
 import { ResearchChatSidebar, formatRelative } from '../components/ResearchChatSidebar';
-import { ProjectFolderBrowser, chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../components/ResearchChatFolderTree';
+import { chatDragProps, useChatFolderTreeState, type ChatFolderActions } from '../components/ResearchChatFolderTree';
 import { MarqueeText } from '../components/MarqueeText';
-import { UNFILED_FOLDER, nextFolderName } from '@shared/researchChatFolders';
+import { nextFolderName } from '@shared/researchChatFolders';
 import { InvokedSkillPills, SkillMentionMenu, findSkillMention, rankSkillMentions, removeMention, type InvokedSkill } from '../components/SkillMention';
 import { useSkillLibrary } from '../components/skillLibrary';
 import type { ResearchNotebook, ResearchNotebookPreparation } from '@shared/researchCorpus';
@@ -176,8 +176,7 @@ export function ResearchAssistantModal({
   const supportsProjects = !!organizer;
   const [projects, setProjects] = useState<ResearchChatProject[]>([]);
   const [editingProjectInstructions, setEditingProjectInstructions] = useState<ResearchChatProject | null>(null);
-  // Folders inside projects. The tree's selection is one state, shown in the history and
-  // on the project's page alike.
+  // Folder navigation belongs to the history; project homes always show every chat.
   const [projectFolders, setProjectFolders] = useState<ResearchChatProjectFolder[]>([]);
   const folderTree = useChatFolderTreeState();
   // A project's page: shown while it is open and no conversation has started in it.
@@ -192,9 +191,7 @@ export function ResearchAssistantModal({
   const mentionOptions = skillsEnabled && mention ? rankSkillMentions(skillLibrary.skills, mention.query) : [];
   const projectHome = supportsProjects && !!activeProjectId && !activeId;
   const activeProject = projects.find(project => project.id === activeProjectId) ?? null;
-  // A chat started on a project's page while one of its folders is selected starts in it.
-  const homeFolderId = projectHome && folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId !== UNFILED_FOLDER ? folderTree.selection.folderId : null;
-  const projectPlacement = projectHome ? { projectId: activeProjectId, ...(homeFolderId ? { folderId: homeFolderId } : {}) } : {};
+  const projectPlacement = projectHome ? { projectId: activeProjectId } : {};
   const researchNotebooks = useResearchNotebooks(!adapter && !isGenealogy);
   // A notebook's page, like a project's: shown while it is open and no chat has started in it.
   const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
@@ -978,13 +975,9 @@ export function ResearchAssistantModal({
                     {conversationNotice}
                   </div>
                 )}
-                {projectHome && activeProjectId && messages.length === 0 && <ProjectFolderBrowser
-                  projectId={activeProjectId}
-                  conversations={visibleConversations}
-                  tree={folderTree}
-                  actions={folderActions}
-                  renderList={shown => <ProjectChatList conversations={shown} draggable onOpen={(id) => { if (!sending) void loadConversation(id); }}
-                    empty={folderTree.selection?.projectId === activeProjectId && folderTree.selection.folderId ? t('No hay chats aquí. Arrastra uno sobre una carpeta para guardarlo en ella.') : undefined} />}
+                {projectHome && activeProjectId && messages.length === 0 && <ProjectChatList
+                  conversations={visibleConversations.filter(conversation => conversation.projectId === activeProjectId)}
+                  draggable onOpen={(id) => { if (!sending) void loadConversation(id); }}
                 />}
                 {notebookHome && messages.length === 0 && <ProjectChatList
                   conversations={visibleConversations.filter(conversation => conversation.notebookId === activeNotebookId)}

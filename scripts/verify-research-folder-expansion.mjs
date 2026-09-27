@@ -73,7 +73,23 @@ try {
   await visible(seed.grandchild);
   await history.getByTestId('research-chat-search').fill(''); await absent(seed.grandchild);
   report.checks.push('search still finds conversations inside collapsed folders');
+  // A selected empty folder must never filter its project's home page.
   await open(seed.parent);
+  await open(seed.zeta);
+  const projectRow = history.getByTestId(`research-project-${seed.project.id}`);
+  await projectRow.getByRole('button', { name: `Abrir ${seed.project.name}`, exact: true }).click();
+  const home = page.getByTestId('research-project-home');
+  await home.waitFor();
+  assert.equal(await home.getByTestId('research-project-tree').count(), 0);
+  assert.equal(await home.getByTestId('research-project-chat-' + seed.own.id).count(), 1);
+  for (const item of [seed.child, seed.grandchild, seed.leafChat, seed.unfiled]) await home.getByTestId(`research-project-chat-${item.id}`).waitFor();
+  assert.equal(await home.locator('.research-project-chats li').count(), 5);
+  await page.screenshot({ path: path.join(out, 'project-home-all-chats.png') });
+  await home.getByTestId(`research-project-chat-${seed.grandchild.id}`).getByRole('button').click();
+  await projectRow.getByRole('button', { name: `Abrir ${seed.project.name}`, exact: true }).click();
+  assert.equal(await home.locator('.research-project-chats li').count(), 5);
+  report.checks.push('project home lists all five chats across nested folders, independent of sidebar selection, without a folder panel');
+
   await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setMinimumSize(800, 600); w.setContentSize(800, 1000); });
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'light', uiLanguage: 'en' }));
   await history.getByTestId(`folder:${seed.parent.id}:chats`).getByText('Chats', { exact: true }).waitFor();
