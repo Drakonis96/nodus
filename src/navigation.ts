@@ -99,7 +99,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Study mode — scoped to the 'estudio' vault type.
   { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
   { id: 'studySchedule', label: 'Horarios', icon: 'clock', group: 'explore' },
-  { id: 'studyFocus', label: 'Concentración', icon: 'clock', group: 'explore' },
+  { id: 'studyFocus', label: 'Concentración', icon: 'focus', group: 'explore' },
   { id: 'studyCalendar', label: 'Calendario', icon: 'calendar', group: 'explore' },
   { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
   { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },

@@ -9,7 +9,7 @@ import { DemoOfferCard, HomeIntroCard } from './HomeView';
 const STUDY_DESTINATIONS: Array<{ view: View; icon: string; title: string; description: string }> = [
   { view: 'studyCourses', icon: 'graduation', title: 'Cursos y asignaturas', description: 'Organiza cursos, asignaturas, temas y apuntes.' },
   { view: 'studySchedule', icon: 'clock', title: 'Horarios', description: 'Distribuye tus asignaturas por días y franjas horarias.' },
-  { view: 'studyFocus', icon: 'clock', title: 'Concentración', description: 'Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.' },
+  { view: 'studyFocus', icon: 'focus', title: 'Concentración', description: 'Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.' },
   { view: 'studyCalendar', icon: 'calendar', title: 'Calendario', description: 'Organiza eventos y recibe avisos de Nodi.' },
   { view: 'studySearch', icon: 'search', title: 'Buscar en el estudio', description: 'Encuentra fragmentos, páginas y momentos de audio.' },
   { view: 'studyLibrary', icon: 'book', title: 'Materiales de estudio', description: 'Reúne documentos, grabaciones y fuentes.' },
