@@ -1,5 +1,7 @@
 // An isolated test profile cannot reach a provider's model catalogue (the OS sandbox
-// denies the network), so "Cargar modelos" lists exactly what the paid gate forwards.
+// denies the network). OpenRouter's embeddings list exactly what the paid gate forwards;
+// DeepSeek's chat catalogue is read live through the gate's free /models route, so the
+// application supplies no list of its own for it.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
@@ -22,13 +24,14 @@ test('outside an isolated run every provider lists its real catalogue', () => {
   assert.equal(ids('openrouter', 'embedding'), null);
 });
 
-test('inside an isolated run the gated providers list exactly the models the gate forwards', () => {
+test('inside an isolated run the gated providers list what the gate forwards or serves', () => {
   process.env.NODUS_RESEARCH_PROVIDER_PROXY = 'http://127.0.0.1:1/00000000-0000-0000-0000-000000000000';
   try {
     const gate = fs.readFileSync(path.join(repo, 'scripts/research-provider-proxy.mjs'), 'utf8');
     const forwarded = Object.fromEntries([...gate.matchAll(/(deepseek|openrouter): \{ model: '([^']+)', route: '([^']+)'/g)].map(([, provider, model, route]) => [provider, { model, route }]));
     assert.deepEqual(forwarded, { deepseek: { model: 'deepseek-flash', route: '/chat/completions' }, openrouter: { model: 'baai/bge-m3', route: '/embeddings' } });
-    assert.deepEqual(ids('deepseek', 'chat'), [forwarded.deepseek.model]);
+    assert.equal(ids('deepseek', 'chat'), null, 'DeepSeek chat metadata comes from the live catalogue the gate serves');
+    assert.match(gate, /provider === 'deepseek' && match\[2\] === '\/models'/, 'the gate serves that catalogue route');
     assert.deepEqual(ids('openrouter', 'embedding'), [forwarded.openrouter.model]);
     assert.deepEqual(ids('openrouter', 'chat'), [], 'OpenRouter chat is not forwarded');
     assert.equal(ids('openai', 'chat'), null, 'other providers keep their own behaviour');
