@@ -49,7 +49,7 @@ export const studyViews = {
     />
   ),
   studySchedule: () => <StudyScheduleView />,
-  studyCalendar: () => <StudyCalendarView />,
+  studyCalendar: (ctx) => <StudyCalendarView key={ctx.activeVault?.id} />,
   studySearch: (ctx) => (
     <StudySearchView
       onOpenDocument={openDocument(ctx)}

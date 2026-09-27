@@ -31,6 +31,7 @@ exports.default = async function beforePack(context) {
   console.log('[beforePack] Built the canonical Chrome connector ZIP');
 
   if (context.electronPlatformName !== 'darwin') return;
+  require('../scripts/build-apple-calendar.cjs').buildAppleCalendar(Arch[context.arch]);
   const source = path.join(__dirname, 'docktile');
   const output = path.join(__dirname, 'NodusDockTile.docktileplugin');
   const contents = path.join(output, 'Contents');
