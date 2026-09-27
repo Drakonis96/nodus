@@ -153,18 +153,39 @@ class ReactionIndexService {
   /** Download (or resume) every index file, then write the verification descriptor. */
   async ensure(): Promise<ReactionIndexStatus> {
     if (this.inflight) return this.inflight;
-    this.inflight = this.run().finally(() => {
-      this.inflight = null;
-    });
+    this.inflight = (async () => {
+      try {
+        await this.run();
+      } catch (error) {
+        await this.finish();
+        throw error;
+      }
+      return this.finish();
+    })();
     return this.inflight;
   }
 
-  private async run(): Promise<ReactionIndexStatus> {
+  private async finish(): Promise<ReactionIndexStatus> {
+    this.abort = null;
+    this.received.clear();
+    let status: ReactionIndexStatus;
+    try {
+      status = { ...await this.status(), downloading: false };
+    } finally {
+      // Keep concurrent callers joined until the terminal status is ready. Clear before
+      // notifying listeners so a retry from a listener starts a new operation.
+      this.inflight = null;
+    }
+    this.emit(status);
+    return status;
+  }
+
+  private async run(): Promise<void> {
     const source = this.source();
     if (source === 'none') {
       throw new Error('The reaction index has no published release yet.');
     }
-    if (source === 'override') return this.status();
+    if (source === 'override') return;
 
     const releaseUrl = REACTION_INDEX.releaseUrl!;
     const dir = this.directory();
@@ -198,9 +219,6 @@ class ReactionIndexService {
     } finally {
       this.abort = null;
     }
-    const status = await this.status();
-    this.emit(status);
-    return status;
   }
 
   private async writeDescriptor(dir: string): Promise<void> {

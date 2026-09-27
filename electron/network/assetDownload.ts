@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import type { ReadableStream } from 'node:stream/web';
 
 /**
  * Small, dependency-free asset downloader for pinned artifacts: HTTP Range resume, exact byte
@@ -45,7 +48,7 @@ export interface AssetDownload {
   bytes?: number;
   /** Lowercase hex SHA-256 of the complete file. */
   sha256?: string;
-  /** Reports absolute bytes now present in the file (completed size, or each streamed chunk). */
+  /** Reports byte increments, including any verified file or resumed prefix once. */
   onBytes?: (bytes: number) => void;
   signal?: AbortSignal;
 }
@@ -70,8 +73,9 @@ export async function downloadAsset(asset: AssetDownload): Promise<void> {
   }
 
   const partial = `${target}.download`;
-  let resumedBytes = (await fsp.stat(partial).catch(() => null))?.size ?? 0;
-  if (expectedBytes && resumedBytes > expectedBytes) {
+  const partialStat = await fsp.stat(partial).catch(() => null);
+  let resumedBytes = partialStat?.size ?? 0;
+  if (partialStat?.size === 0 || (expectedBytes && resumedBytes > expectedBytes)) {
     await fsp.rm(partial, { force: true });
     resumedBytes = 0;
   }
@@ -105,7 +109,6 @@ export async function downloadAsset(asset: AssetDownload): Promise<void> {
     resumedBytes = 0;
   }
 
-  const file = fs.createWriteStream(partial, { flags: resumed ? 'a' : 'wx' });
   const hash = createHash('sha256');
   let received = resumedBytes;
   try {
@@ -113,19 +116,20 @@ export async function downloadAsset(asset: AssetDownload): Promise<void> {
       for await (const chunk of fs.createReadStream(partial)) hash.update(chunk as Buffer);
       onBytes?.(resumedBytes);
     }
-    const reader = response.body.getReader();
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = Buffer.from(value);
-      received += chunk.length;
-      hash.update(chunk);
-      if (!file.write(chunk)) await new Promise<void>((resolve) => file.once('drain', resolve));
-      onBytes?.(chunk.length);
-    }
-    await new Promise<void>((resolve, reject) => file.end((error?: Error | null) => (error ? reject(error) : resolve())));
+    // pipeline handles backpressure, disk errors and cancellation together. Waiting for
+    // drain alone leaves the download pending forever when the output stream fails.
+    await pipeline(
+      Readable.fromWeb(response.body as ReadableStream<Uint8Array>),
+      new Transform({ transform(chunk: Buffer, _encoding, callback) {
+        received += chunk.length;
+        hash.update(chunk);
+        onBytes?.(chunk.length);
+        callback(null, chunk);
+      } }),
+      fs.createWriteStream(partial, { flags: resumed ? 'a' : 'wx' }),
+      { signal },
+    );
   } catch (error) {
-    file.destroy();
     // Keep a bounded partial so a later attempt resumes it; verification still guards corruption.
     if (signal?.aborted) throw cancelledDownloadError();
     throw error;

@@ -59,6 +59,12 @@ try {
   await downloadAsset({ url, target: full, bytes: body.length, sha256: sha });
   assert.deepEqual(await readFile(full), body, 'a verified download lands intact');
 
+  // A disk error can leave an empty partial; exclusive creation must not block its retry.
+  const empty = path.join(tmp, 'empty.bin');
+  await writeFile(`${empty}.download`, Buffer.alloc(0));
+  await downloadAsset({ url, target: empty, bytes: body.length, sha256: sha });
+  assert.deepEqual(await readFile(empty), body, 'a zero-byte partial can be retried');
+
   // resume from a partial
   const resumed = path.join(tmp, 'b.bin');
   await writeFile(`${resumed}.download`, body.subarray(0, 40000));
