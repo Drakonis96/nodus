@@ -69,3 +69,30 @@ test('calls beyond the two dispatch slots wait for a slot instead of being refus
     assert.equal(proxy.ledger.read().calls.length, 5);
   } finally { await proxy.close(); fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+
+test('free catalogues preserve provider metadata and only list the authorised model', async () => {
+  const root = createResearchTestRoot();
+  let reads = 0;
+  const allowed = { id: 'deepseek-flash', effort: { supported_levels: ['low', 'high', 'max'], default_level: 'high' } };
+  const proxy = await startResearchProviderProxy(root, { dispatch: async () => { throw new Error('No paid inference expected'); }, catalogDispatch: async (url, init) => {
+    reads++;
+    assert.equal(url, 'https://api.deepseek.com/models');
+    assert.equal(init.method, 'GET');
+    assert.equal(init.redirect, 'error');
+    return Response.json({ data: [allowed, { id: 'deepseek-pro' }] });
+  } });
+  const get = suffix => fetch(`${proxy.url}/${suffix}`, { headers: { Authorization: 'Bearer fixture-secret' } });
+  try {
+    const response = await get('deepseek/models');
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).data, [allowed]);
+    assert.equal(reads, 1);
+    assert.deepEqual(proxy.ledger.read().calls, [], 'a free catalogue does not reserve paid inference');
+    for (const route of ['deepseek/models?extra=1', 'deepseek/other', 'openrouter/models']) assert.equal((await get(route)).status, 403);
+    assert.equal(reads, 1);
+    const log = fs.readFileSync(path.join(root, 'artifacts/provider-metrics.jsonl'), 'utf8');
+    assert.doesNotMatch(log, /fixture-secret/);
+    assert.equal(JSON.parse(log).accountedUsd, 0);
+  } finally { await proxy.close(); fs.rmSync(root, { recursive: true, force: true }); }
+});

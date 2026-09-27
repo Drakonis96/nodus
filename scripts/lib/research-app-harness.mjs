@@ -37,6 +37,7 @@ export function simulatedUpstream(behaviour = () => null) {
   const calls = [];
   const dispatch = async (url, init) => {
     const provider = url.includes('openrouter') ? 'openrouter' : 'deepseek';
+    if (init.method === 'GET') return Response.json({ data: [{ id: 'deepseek-flash', effort: { supported_levels: ['low', 'high', 'max'] } }] });
     const body = JSON.parse(Buffer.from(init.body).toString('utf8'));
     const call = { provider, at: Date.now(), index: calls.length };
     calls.push(call);
@@ -71,8 +72,8 @@ export function simulatedUpstream(behaviour = () => null) {
 export async function createResearchApp({ provider = null, realProvider = null, extraPorts = [], extraEnv = {} } = {}) {
   const root = createResearchTestRoot();
   let proxy = null;
-  if (provider) proxy = await startResearchProviderProxy(root, { dispatch: provider.dispatch });
-  else if (realProvider) proxy = await startResearchProviderProxy(realProvider.campaignRoot, realProvider.dispatch ? { dispatch: realProvider.dispatch } : {});
+  if (provider) proxy = await startResearchProviderProxy(root, { dispatch: provider.dispatch, catalogDispatch: provider.dispatch });
+  else if (realProvider) proxy = await startResearchProviderProxy(realProvider.campaignRoot, realProvider.dispatch ? { dispatch: realProvider.dispatch, catalogDispatch: fetch } : {});
   const ports = [...extraPorts, ...(proxy ? [Number(new URL(proxy.url).port)] : [])];
   const sandbox = macResearchSandbox(root, ports);
   const proof = { ...verifyResearchSandbox(root, sandbox), allowedLoopbackPorts: ports };

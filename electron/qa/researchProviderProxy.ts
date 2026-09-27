@@ -14,13 +14,15 @@ export function researchTestProviderBase(provider: AiProvider): string | null {
   return `${endpoint.href}/${provider}`;
 }
 
-/** The models the loopback gate forwards (scripts/research-provider-proxy.mjs). An
- * isolated profile cannot reach a provider's catalogue, so it lists exactly these. */
+/** Fixed embedding lists for the isolated proxy. DeepSeek chat capabilities are read
+ * through its free catalogue route instead of being supplied by the application. */
 const RESEARCH_TEST_MODELS: Record<'chat' | 'embedding', Partial<Record<string, string[]>>> = {
-  chat: { deepseek: ['deepseek-flash'], openrouter: [] },
+  chat: { openrouter: [] },
   embedding: { openrouter: ['baai/bge-m3'] },
 };
 export function researchTestProviderModels(provider: string, kind: 'chat' | 'embedding'): ModelInfo[] | null {
   if (!process.env.NODUS_RESEARCH_PROVIDER_PROXY || !['deepseek', 'openrouter'].includes(provider)) return null;
+  // Chat metadata must come through the free live catalogue route too.
+  if (provider === 'deepseek' && kind === 'chat') return null;
   return (RESEARCH_TEST_MODELS[kind][provider] ?? []).map(id => ({ id, name: id }));
 }

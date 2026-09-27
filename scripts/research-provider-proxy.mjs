@@ -13,7 +13,7 @@ const ENDPOINTS = {
 // Peak/cache-miss prices verified 2026-09-23. Reservation adds 25% and $0.002.
 // https://api-docs.deepseek.com/quick_start/pricing/
 // https://openrouter.ai/baai/bge-m3
-export async function startResearchProviderProxy(root, { dispatch = fetch, port = 0 } = {}) {
+export async function startResearchProviderProxy(root, { dispatch = fetch, catalogDispatch = dispatch === fetch ? fetch : null, port = 0 } = {}) {
   const canonical = fs.realpathSync(root);
   const marker = JSON.parse(fs.readFileSync(path.join(canonical, 'isolation.json'), 'utf8'));
   if (marker.format !== 'nodus.isolated-research-profile/1' || marker.root !== canonical) throw new Error('Invalid campaign root');
@@ -40,10 +40,22 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, port 
     try {
       const url = new URL(request.url, 'http://127.0.0.1');
       const match = new RegExp(`^/${nonce}/(deepseek|openrouter)(/.*)$`).exec(url.pathname);
-      if (stopped || request.method !== 'POST' || !match || url.search) throw new Error('research_dispatch_not_authorized');
+      if (stopped || !match || url.search) throw new Error('research_dispatch_not_authorized');
       provider = match[1];
       const target = ENDPOINTS[provider];
-      if (match[2] !== target.route) throw new Error('research_dispatch_not_authorized');
+      if (request.method === 'GET' && provider === 'deepseek' && match[2] === '/models' && catalogDispatch) {
+        if (!request.headers.authorization?.startsWith('Bearer ')) throw new Error('research_credential_missing');
+        controllers.add(controller);
+        const upstream = await catalogDispatch('https://api.deepseek.com/models', { method: 'GET', redirect: 'error',
+          headers: { Authorization: request.headers.authorization }, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]) });
+        if (!upstream.ok) throw new Error('research_catalog_unavailable');
+        const catalog = await upstream.json();
+        response.writeHead(200, { 'Content-Type': 'application/json' });
+        response.end(JSON.stringify({ object: 'list', data: (catalog.data ?? []).filter(model => model.id === target.model) }));
+        fs.appendFileSync(log, JSON.stringify({ provider, route: '/models', status: 200, accountedUsd: 0, accounting: 'free_catalog' }) + '\n', { mode: 0o600 });
+        return;
+      }
+      if (request.method !== 'POST' || match[2] !== target.route) throw new Error('research_dispatch_not_authorized');
       if (!request.headers.authorization?.startsWith('Bearer ')) throw new Error('research_credential_missing');
       await acquireSlot(); admitted = true; controllers.add(controller);
       const chunks = []; let size = 0;
