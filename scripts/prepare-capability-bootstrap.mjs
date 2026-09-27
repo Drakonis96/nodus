@@ -39,7 +39,7 @@ function marketplaceCheckout() {
 const required = process.env.NODUS_REQUIRE_BOOTSTRAP === '1';
 
 async function download(url, limit) {
-  const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(300_000) });
+  const response = await fetch(url, { redirect: 'follow', cache: 'no-store', signal: AbortSignal.timeout(300_000) });
   if (!response.ok) throw new Error(`${url} returned ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > limit) throw new Error(`${url} is larger than the pinned size`);
