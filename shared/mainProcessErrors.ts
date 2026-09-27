@@ -4559,6 +4559,36 @@ export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
   'zh-TW': "評分量規至少需要一個權重為正的指標。",
   ko: "기준표에는 양의 가중치가 있는 기준이 하나 이상 필요합니다.",
   ja: "ルーブリックには、正の重みを持つ少なくとも1つの基準が必要です。", },
+
+  // ── Study: focus sessions and the daily goal ────────────────────────────────
+  // The focus timer is desktop-only, so its IPC guards and its preference validation
+  // are the paths that fail with no renderer string to fall back on. Each sentence is
+  // prose a reader has to understand, not a transport detail, so each is catalogued
+  // rather than left to the generic line.
+  'Concentración está disponible en bóvedas de Estudio.': { en: 'Focus is available in Study vaults.', fr: 'La concentration est disponible dans les espaces d’étude.', de: 'Fokus ist in Studien-Arbeitsbereichen verfügbar.', pt: 'A concentração está disponível em espaços de estudo.', 'pt-BR': 'A concentração está disponível em espaços de estudo.', it: 'La concentrazione è disponibile nelle volte dello studio.', tr: 'Odak, stüdyo kasalarında kullanılabilir.' , "zh-CN": "专注可在学习资料库中使用。" ,
+  'zh-TW': "專注可在學習資料庫中使用。",
+  ko: "집중은 연구실에서 사용할 수 있습니다.",
+  ja: "集中は研究用金庫で利用できます。", },
+  'La bóveda ha cambiado.': { en: 'The vault has changed.', fr: 'Le vault a changé.', de: 'Der Vault wurde gewechselt.', pt: 'O vault mudou.', 'pt-BR': 'O vault mudou.', it: 'Il vault è cambiato.', tr: 'Vault değişti.' , "zh-CN": "资料库已更改。" ,
+  'zh-TW': "資料庫已更改。",
+  ko: "볼트가 바뀌었습니다.",
+  ja: "金庫が変わりました。", },
+  'Valor inválido.': { en: 'Invalid value.', fr: 'Valeur non valide.', de: 'Ungültiger Wert.', pt: 'O valor indicado é inválido.', 'pt-BR': 'O valor indicado é inválido.', it: 'Valore non valido.', tr: 'Geçersiz değer.' , "zh-CN": "值无效。" ,
+  'zh-TW': "值無效。",
+  ko: "잘못된 값입니다.",
+  ja: "値が無効です。", },
+  'La duración debe ser un número entero entre 1 y 180 minutos (meta: hasta 1440).': { en: 'The duration must be a whole number between 1 and 180 minutes (daily goal: up to 1440).', fr: 'La durée doit être un nombre entier entre 1 et 180 minutes (objectif : jusqu’à 1440).', de: 'Die Dauer muss eine ganze Zahl zwischen 1 und 180 Minuten sein (Tagesziel: bis 1440).', pt: 'A duração deve ser um número inteiro entre 1 e 180 minutos (meta: até 1440).', 'pt-BR': 'A duração deve ser um número inteiro entre 1 e 180 minutos (meta: até 1440).', it: 'La durata deve essere un numero intero tra 1 e 180 minuti (obiettivo: fino a 1440).', tr: 'Süre 1 ile 180 dakika arasında bir tam sayı olmalıdır (günlük hedef: 1440’a kadar).' , "zh-CN": "时长必须是 1 到 180 分钟之间的整数（每日目标：最多 1440）。" ,
+  'zh-TW': "時長必須是 1 到 180 分鐘之間的整數（每日目標：最多 1440）。",
+  ko: "시간은 1~180분 사이의 정수여야 합니다(일일 목표: 최대 1440분).",
+  ja: "時間は1〜180分の整数で指定してください（1日の目標：最大1440分）。", },
+  'Preferencia de sonido inválida.': { en: 'Invalid sound preference.', fr: 'Préférence de son non valide.', de: 'Ungültige Sound-Einstellung.', pt: 'Preferência de som inválida.', 'pt-BR': 'Preferência de som inválida.', it: 'Preferenza audio non valida.', tr: 'Geçersiz ses tercihi.' , "zh-CN": "声音设置无效。" ,
+  'zh-TW': "音效設定無效。",
+  ko: "잘못된 소리 설정입니다.",
+  ja: "サウンド設定が無効です。", },
+  'Asignatura no encontrada.': { en: 'Subject not found.', fr: 'Matière introuvable.', de: 'Fach nicht gefunden.', pt: 'Disciplina não encontrada.', 'pt-BR': 'Disciplina não encontrada.', it: 'Materia non trovata.', tr: 'Ders bulunamadı.' , "zh-CN": "未找到科目。" ,
+  'zh-TW': "找不到科目。",
+  ko: "과목을 찾을 수 없습니다.",
+  ja: "科目が見つかりません。", },
 };
 
 /**

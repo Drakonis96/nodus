@@ -13,7 +13,7 @@ export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
   const emit = () => { if (service) getWindow()?.webContents.send('studyFocus:changed', snapshot()); };
   const current = () => {
     const vault = getActiveVault();
-    if (vault.type !== 'estudio') throw new Error('Concentración está disponible en bóvedas Study.');
+    if (vault.type !== 'estudio') throw new Error('Concentración está disponible en bóvedas de Estudio.');
     if (!service) {
       vaultId = vault.id;
       service = new FocusService(getDb(), undefined, undefined, state => {

@@ -22,7 +22,7 @@ try {
   for (const table of tables.slice(1)) db.exec(`ALTER TABLE ${table.projects} DROP COLUMN instructions`);
   db.pragma('user_version = 192'); runMigrations(db); runMigrations(db);
   assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 193);
+  assert.equal(SCHEMA_VERSION, 194);
   assert.deepEqual(db.pragma('foreign_key_check'), []);
   const custom = load('electron/db/researchSystemPromptsRepo.ts').saveResearchSystemPrompt({ name: 'Chat style', instructions: 'CHAT_STYLE: use two paragraphs.' });
   const model = { provider: 'deepseek', model: 'deepseek-flash' };

@@ -3,6 +3,7 @@ import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -143,6 +144,7 @@ export const TR: Record<string, string> = {
   ...STUDY_BANK_TRANSLATIONS.tr,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.tr,
   ...STUDY_SOURCE_TRANSLATIONS["tr"],
+  ...STUDY_FOCUS_TRANSLATIONS["tr"],
   ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
