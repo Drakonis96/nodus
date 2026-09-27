@@ -1,26 +1,42 @@
 #!/usr/bin/env node
 // Whole-library idea-graph consistency audit — Phase 1 of the stray-analysis plan.
 //
-// assertDeepDataIntegrity() (electron/db/ideasRepo.ts) runs these same 9 checks, but
-// SCOPED to one work, and only at the moment that work is (re)scanned. Nothing ever
-// re-validates a work that already finished — so a LATER, unrelated purge can silently
-// break an earlier, already-audited work's data (the class of bug fixed in PR #962),
-// and any drift that predates 2026-09-02 (when assertDeepDataIntegrity was added) was
-// never checked at all. This script runs the identical checks with no work-scoping,
-// against a vault's real database, read-only, so it can be run anytime without risk —
-// including while a scan is in progress.
+// The first 9 checks mirror assertDeepDataIntegrity() (electron/db/ideasRepo.ts)
+// exactly, but that function runs SCOPED to one work, and only at the moment that
+// work is (re)scanned. Nothing ever re-validates a work that already finished — so a
+// LATER, unrelated purge can silently break an earlier, already-audited work's data
+// (the class of bug fixed in PR #962), and any drift that predates 2026-09-02 (when
+// assertDeepDataIntegrity was added) was never checked at all. This script runs the
+// identical checks with no work-scoping, against a vault's real database, read-only,
+// so it can be run anytime without risk — including while a scan is in progress.
+//
+// A further 4 checks (theme links→themes, theme links→works, work themes→themes,
+// work themes→works) cover ground assertDeepDataIntegrity never checked at all, at
+// any point — the write path has no equivalent guard for a theme reference the way
+// it does for an idea reference. See the comment on those checks in CHECKS below;
+// they surfaced real, live drift (1,005 dangling theme_id references on the first
+// vault this ran against), likely from the same "global cleanup with no awareness of
+// another write in flight" bug shape as #962, just in the themes subsystem — not yet
+// investigated or fixed the way #961/#962 were for ideas.
+//
+// Ideas, and bridges / other semantic-relationship edges, are both already covered:
+// ideas by 6 of the first 9 checks constraining against a missing/dormant idea;
+// bridges by the `edges→active ideas` check, which is agnostic to an edge's trace
+// method ('bridge', 'reprocess', 'deep', 'fusion') or a null source_work.
 //
 // This is detection only. It never writes anything. A narrower, separate repair pass
-// (reviving an idea that's dormant but still referenced by a live edge — provably safe,
-// matching the invariant PR #962 now enforces going forward) is a deliberately separate
-// follow-up, not part of this script.
+// for the one class it's currently possible to repair safely (reviving an idea that's
+// dormant but still referenced by a live edge — provably safe, matching the invariant
+// PR #962 now enforces going forward) is scripts/repair-graph-integrity.mjs, Phase 2.
+// The theme_id checks below have no equivalent repair yet: a theme row is hard-deleted
+// (not soft-dormant like an idea), so there's nothing to revive.
 //
-// Mirrors assertDeepDataIntegrity's check list exactly (electron/db/ideasRepo.ts). If
-// that function's checks ever change, update the CHECKS array below to match — this
-// duplication is intentional: the two run in very different contexts (inside a write
-// transaction vs. read-only over a whole vault) and don't share a runtime, so keeping
-// them as plain, dependency-free SQL here is simpler and safer than threading Electron
-// or vault-switching machinery through a diagnostic script.
+// Where these mirror assertDeepDataIntegrity, keep the two in sync if that function's
+// checks ever change — this duplication is intentional: the two run in very different
+// contexts (inside a write transaction vs. read-only over a whole vault) and don't
+// share a runtime, so keeping them as plain, dependency-free SQL here is simpler and
+// safer than threading Electron or vault-switching machinery through a diagnostic
+// script.
 //
 // Usage:
 //   node scripts/audit-graph-integrity.mjs                   # every vault in vaults.json
@@ -221,6 +237,62 @@ const CHECKS = [
       FROM edge_traces et
       LEFT JOIN edges e ON e.id = et.edge_id
       WHERE e.id IS NULL LIMIT 200`,
+  },
+  // The four checks below are NOT part of assertDeepDataIntegrity — the write path
+  // never validates theme references at all, at any point. Added here because a live
+  // audit found real, sizable drift the write path has no equivalent check for: 1,005
+  // idea_theme_links rows pointing at a deleted theme, on the first vault this was run
+  // against. Likely cause: pruneOrphanThemes() (electron/db/themesRepo.ts, called from
+  // reprocessConnections.ts) deletes any theme currently unreferenced ACROSS THE WHOLE
+  // LIBRARY — the same "global cleanup with no awareness of another write in flight"
+  // shape as the bug #962 fixed for ideas, just for themes instead, and not yet fixed.
+  // Bridges and other semantic-relationship edges need no separate check here: they
+  // are plain rows in `edges` (trace method 'bridge' / 'reprocess', `source_work`
+  // often NULL) and are already covered by the `edges→active ideas` check above,
+  // which doesn't care about method or a null source_work.
+  {
+    label: 'theme links→themes',
+    count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
+      LEFT JOIN themes t ON t.theme_id = itl.theme_id
+      WHERE t.theme_id IS NULL`,
+    detail: `SELECT itl.nodus_id, w.title, itl.global_id, itl.theme_id
+      FROM idea_theme_links itl
+      LEFT JOIN themes t ON t.theme_id = itl.theme_id
+      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
+      WHERE t.theme_id IS NULL
+      ORDER BY w.title LIMIT 200`,
+  },
+  {
+    label: 'theme links→works',
+    count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
+      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
+      WHERE w.nodus_id IS NULL`,
+    detail: `SELECT itl.nodus_id, itl.global_id, itl.theme_id
+      FROM idea_theme_links itl
+      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
+      WHERE w.nodus_id IS NULL LIMIT 200`,
+  },
+  {
+    label: 'work themes→themes',
+    count: `SELECT COUNT(*) AS n FROM work_themes wt
+      LEFT JOIN themes t ON t.theme_id = wt.theme_id
+      WHERE t.theme_id IS NULL`,
+    detail: `SELECT wt.nodus_id, w.title, wt.theme_id
+      FROM work_themes wt
+      LEFT JOIN themes t ON t.theme_id = wt.theme_id
+      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
+      WHERE t.theme_id IS NULL
+      ORDER BY w.title LIMIT 200`,
+  },
+  {
+    label: 'work themes→works',
+    count: `SELECT COUNT(*) AS n FROM work_themes wt
+      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
+      WHERE w.nodus_id IS NULL`,
+    detail: `SELECT wt.nodus_id, wt.theme_id
+      FROM work_themes wt
+      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
+      WHERE w.nodus_id IS NULL LIMIT 200`,
   },
 ];
 
