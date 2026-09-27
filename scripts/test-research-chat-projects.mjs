@@ -147,11 +147,11 @@ try {
     { id: 'foreign', title: 'Other project', projectId: 'other', folderId: 'parent' },
   ];
   const history = ids => tree.projectFolderHistoryRows('display', displayFolders, displayChats, new Set(ids));
-  const compact = rows => rows.map(row => row.kind === 'folder' ? row.folder.id : row.kind === 'chat' ? row.conversation.id : row.section);
+  const compact = rows => rows.map(row => row.kind === 'folder' ? row.folder.id : row.conversation.id);
   assert.deepEqual(compact(history([])), ['parent'], 'collapsed folders hide all their contents');
-  assert.deepEqual(compact(history(['parent'])), ['parent', 'folders', 'a', 'z', 'chats', 'own-new', 'own-old']);
+  assert.deepEqual(compact(history(['parent'])), ['parent', 'a', 'z', 'own-new', 'own-old']);
   const allOpen = history(['parent', 'a']);
-  assert.deepEqual(compact(allOpen), ['parent', 'folders', 'a', 'chats', 'child', 'z', 'chats', 'own-new', 'own-old']);
+  assert.deepEqual(compact(allOpen), ['parent', 'a', 'child', 'z', 'own-new', 'own-old']);
   assert.equal(allOpen.find(row => row.kind === 'chat' && row.conversation.id === 'child').depth, 2);
   assert.equal(allOpen.find(row => row.kind === 'folder' && row.folder.id === 'a').hasChildren, true, 'a leaf with chats expands');
   assert.equal(allOpen.find(row => row.kind === 'folder' && row.folder.id === 'z').hasChildren, false, 'empty folders have no disclosure');

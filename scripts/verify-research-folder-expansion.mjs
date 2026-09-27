@@ -49,9 +49,8 @@ try {
   await visible(seed.own); await absent(seed.child); await absent(seed.grandchild);
   await before(folder(seed.alpha), folder(seed.zeta));
   await before(folder(seed.zeta), chat(seed.own));
-  await history.getByTestId(`folder:${seed.parent.id}:folders`).waitFor();
-  await history.getByTestId(`folder:${seed.parent.id}:chats`).waitFor();
-  report.checks.push('folder label opens alphabetic subfolders above direct conversations in separate sections');
+  assert.deepEqual(await history.locator('.research-history-heading').allTextContents(), ['Proyectos'], 'no section headings inside expanded folders');
+  report.checks.push('folder label opens alphabetic subfolders above direct conversations without section headings');
   await open(seed.alpha); await visible(seed.child); await absent(seed.grandchild);
   await before(folder(seed.deep), chat(seed.child)); await before(chat(seed.child), folder(seed.zeta));
   await open(seed.deep); await visible(seed.grandchild);
@@ -92,7 +91,7 @@ try {
 
   await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setMinimumSize(800, 600); w.setContentSize(800, 1000); });
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'light', uiLanguage: 'en' }));
-  await history.getByTestId(`folder:${seed.parent.id}:chats`).getByText('Chats', { exact: true }).waitFor();
+  await history.locator('.research-history-heading').getByText('Projects', { exact: true }).waitFor();
   await page.screenshot({ path: path.join(out, 'expanded-800-light-en.png') });
   report.checks.push('800px light theme and English labels');
   report.passed = true;

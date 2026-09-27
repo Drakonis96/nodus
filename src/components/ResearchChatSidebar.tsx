@@ -47,7 +47,7 @@ export function formatRelative(iso: string): string {
 const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
 
 type Row =
-  | { kind: 'header'; id: string; label: string; depth?: number }
+  | { kind: 'header'; id: string; label: string }
   | { kind: 'project'; project: ResearchChatProject; expanded: boolean; count: number }
   | { kind: 'chat'; conversation: ChatConversationSummary; nested: boolean; depth?: number }
   | { kind: 'notebook'; notebook: ChatHistoryNotebookEntry; expanded: boolean; count: number }
@@ -150,7 +150,6 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         if (!open) continue;
         for (const row of projectFolderHistoryRows(project.id, folders, chats, folderTree.expanded)) {
           if (row.kind === 'folder') out.push({ kind: 'folder', row });
-          else if (row.kind === 'section') out.push({ kind: 'header', id: `folder:${row.folderId}:${row.section}`, label: row.section === 'folders' ? t('Carpetas') : t('Chats'), depth: row.depth });
           else out.push({ kind: 'chat', conversation: row.conversation, nested: true, depth: row.depth });
         }
         const unfiled = conversationsInSelection(chats, folders, project.id, UNFILED_FOLDER);
@@ -226,7 +225,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         className="flex-1 min-h-0 px-2 pb-2"
         empty={<div className="px-2 py-6 text-center text-xs text-neutral-600">{t('Aún no hay conversaciones. Escribe abajo para empezar.')}</div>}
         renderItem={row => {
-          if (row.kind === 'header') return <div className="research-history-heading" style={row.depth === undefined ? undefined : { paddingLeft: 14 + row.depth * 14 }} data-testid={row.depth === undefined ? undefined : row.id}>{row.label}</div>;
+          if (row.kind === 'header') return <div className="research-history-heading">{row.label}</div>;
           if (row.kind === 'empty') return <div className="research-history-empty px-2 py-2 text-xs text-neutral-500">{row.label}</div>;
           if (row.kind === 'folder') return <FolderTreeRowView row={row.row} tree={folderTree} ui={folderUi} actions={folderActions} run={run} baseIndent={14} contentsInline />;
           if (row.kind === 'notebook') {
