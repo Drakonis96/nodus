@@ -1084,7 +1084,7 @@ export function ResearchAssistantModal({
                       {message.skills?.length ? <InvokedSkillPills skills={message.skills} /> : null}
                       {message.concilium && <ConciliumResponses result={message.concilium} onCitation={handleCitation} />}
                       {message.role === 'assistant' && message.reasoning?.trim() && (
-                        <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60" open={!message.content.trim()}>
+                        <details className="mb-2 rounded border border-neutral-800 bg-neutral-950/60">
                           <summary className="cursor-pointer select-none px-2 py-1 text-[11px] text-neutral-400 hover:text-neutral-200">
                             {t('Razonamiento')}
                           </summary>
