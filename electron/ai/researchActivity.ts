@@ -13,7 +13,7 @@ function publish(owner: ActivityContext, event: ResearchActivity): void {
   try { owner.emit(event); } catch { /* An observer must never fail a research request. */ }
 }
 
-/** Only Research Chat installs this context. Shared Deep Research helpers stay silent. */
+/** Research Chat and Dictionary install this context. Other shared callers stay silent. */
 export async function withResearchActivity<T>(emit: ((event: ResearchActivity) => void) | undefined, signal: AbortSignal | undefined, run: () => Promise<T>): Promise<T> {
   if (!emit) return run();
   const owner: ActivityContext = { emit, signal, pending: new Map() };

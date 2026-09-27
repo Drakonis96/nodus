@@ -57,8 +57,8 @@ export const academicApi: AcademicApi = {
     ipcRenderer.invoke('dictionary:update', id, patch, expectedUpdatedAt),
   deleteDictionaryEntries: (ids) => ipcRenderer.invoke('dictionary:delete', ids),
   detectDictionaryDuplicates: (name, aliases) => ipcRenderer.invoke('dictionary:duplicates', name, aliases),
-  retrieveDictionaryEvidence: (entryId) => ipcRenderer.invoke('dictionary:retrieve', entryId),
-  scanDictionaryNewEvidence: (entryId) => ipcRenderer.invoke('dictionary:scan', entryId),
+  retrieveDictionaryEvidence: (entryId, options) => ipcRenderer.invoke('dictionary:retrieve', entryId, options),
+  scanDictionaryNewEvidence: (entryId, options) => ipcRenderer.invoke('dictionary:scan', entryId, options),
   scanChangedDictionaryEntries: (limit) => ipcRenderer.invoke('dictionary:scanChanged', limit),
   listDictionaryEvidence: (request) => ipcRenderer.invoke('dictionary:evidence:list', request),
   setDictionaryEvidenceDecision: (entryId, refs, decision) =>

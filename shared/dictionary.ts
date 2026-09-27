@@ -263,6 +263,7 @@ export interface DictionaryProgress {
   error?: string;
   degradationReason?: DictionaryDegradationReason;
   attempts?: number;
+  activity?: import('./researchActivity').ResearchActivity;
 }
 
 export interface DictionaryGenerationRequest {
@@ -270,7 +271,11 @@ export interface DictionaryGenerationRequest {
   mode: "creation" | "update" | "regeneration";
   model?: ModelRef | null;
   language?: import('./types').PromptLanguage;
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
+  webSearch?: import('./types').ResearchWebSearchMode;
 }
+
+export type DictionaryResearchOptions = Pick<DictionaryGenerationRequest, 'model' | 'thinkingEffort' | 'webSearch'>;
 
 export interface DictionaryRelation {
   id: string;

@@ -241,8 +241,8 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   updateDictionaryEntry(id: string, patch: DictionaryEntryPatch, expectedUpdatedAt: string): Promise<DictionaryEntry>;
   deleteDictionaryEntries(ids: string[]): Promise<number>;
   detectDictionaryDuplicates(name: string, aliases: string[]): Promise<DictionaryDuplicateMatch[]>;
-  retrieveDictionaryEvidence(entryId: string): Promise<DictionaryEntryDetail>;
-  scanDictionaryNewEvidence(entryId: string): Promise<DictionaryEntryDetail>;
+  retrieveDictionaryEvidence(entryId: string, options?: import('../dictionary').DictionaryResearchOptions): Promise<DictionaryEntryDetail>;
+  scanDictionaryNewEvidence(entryId: string, options?: import('../dictionary').DictionaryResearchOptions): Promise<DictionaryEntryDetail>;
   scanChangedDictionaryEntries(limit?: number): Promise<string[]>;
   listDictionaryEvidence(request: DictionaryEvidenceRequest): Promise<DictionaryEvidencePage>;
   setDictionaryEvidenceDecision(entryId: string, refs: DictionaryEvidenceRef[], decision: DictionaryEvidenceDecision): Promise<void>;

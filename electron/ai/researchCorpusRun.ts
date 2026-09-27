@@ -48,9 +48,9 @@ export class ResearchCorpusRun {
   readonly readDocuments = new Set<string>();
   readonly ideas = new Map<string, WritingWorkshopIdeaCandidate>();
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
-  /** Research Chat only: the web step, when the user left it on. Deep Research never sets it. */
+  /** Research Chat and Dictionary: the web step, when the user left it on. Deep Research never sets it. */
   web?: ResearchWebGrant;
-  /** Research Chat only: the layers the user left on in the context balloon. Deep Research
+  /** Research Chat and Dictionary: the layers the user left on in the context balloon. Deep Research
    * reads both. A layer that is off is never consulted, not merely left out of the prompt. */
   layers: ResearchContextLayers = { ideas: true, documents: true };
   /** Whether the supervisor made at least one decision in this run. */

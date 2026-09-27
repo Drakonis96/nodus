@@ -37,8 +37,8 @@ const OUTCOME_LIMITATIONS: Record<string, string> = {
   web_search_unavailable: 'web_unavailable', web_plan_unavailable: 'web_partial', web_deadline: 'web_partial', web_engine_blocked: 'web_partial', web_no_evidence: 'web_no_evidence',
 };
 
-/** Grants one Research Chat turn the web step. Deep Research and every other
- * caller never construct it, so the supervisor offers them no web action. */
+/** Grants a Research Chat turn or Dictionary investigation the web step.
+ * Callers without a grant are never offered a web action. */
 export class ResearchWebGrant {
   readonly evidence = new Map<string, { id: string; item: WebEvidence }>();
   private readonly outcomes: Array<WebResearchOutcome & { trigger: 'supervisor' | 'explicit' | 'fallback' }> = [];

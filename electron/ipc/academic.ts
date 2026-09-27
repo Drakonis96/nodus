@@ -248,7 +248,7 @@ import * as dictionaryRepo from '../db/dictionaryRepo';
 import {
   detectDictionaryDuplicatesSemantic,
   generateDictionaryEntry,
-  retrieveDictionaryEvidence,
+  retrieveDictionaryResearchEvidence,
   scanChangedDictionaryEntries,
 } from '../ai/dictionary';
 import { ensureDeepResearchLane } from '../ai/deepResearchLane';
@@ -403,16 +403,7 @@ function announceDictionaryProgress(progress: DictionaryProgress): void {
 
 const dictionaryGenerationJobs = new DictionaryGenerationQueue(
   async (request, report) => {
-    const current = dictionaryRepo.getDictionaryEntryDetail(request.entryId);
-    const needsInitialRetrieval = request.mode === 'creation' && (current?.coverage.included ?? 0) === 0;
-    if (needsInitialRetrieval) {
-      report({ entryId: request.entryId, phase: 'retrieving', message: 'Analizando corpus' });
-      await retrieveDictionaryEvidence(request.entryId, 'initial');
-      announceDictionary(request.entryId);
-    }
-
-    report({ entryId: request.entryId, phase: 'generating', message: 'Generando definición' });
-    const version = await generateDictionaryEntry(request);
+    const version = await generateDictionaryEntry(request, report);
     announceDictionary(request.entryId);
     return version;
   },
@@ -502,13 +493,13 @@ export function registerAcademicIpc(context: IpcContext): void {
     return changed;
   });
   h('dictionary:duplicates', async (_e, name: string, aliases: string[]) => detectDictionaryDuplicatesSemantic(name, aliases));
-  h('dictionary:retrieve', async (_e, entryId: string) => {
-    const detail = await retrieveDictionaryEvidence(entryId, 'initial');
+  h('dictionary:retrieve', async (_e, entryId: string, options?: import('@shared/dictionary').DictionaryResearchOptions) => {
+    const detail = await retrieveDictionaryResearchEvidence(entryId, 'initial', options);
     announceDictionary(entryId);
     return detail;
   });
-  h('dictionary:scan', async (_e, entryId: string) => {
-    const detail = await retrieveDictionaryEvidence(entryId, 'scan');
+  h('dictionary:scan', async (_e, entryId: string, options?: import('@shared/dictionary').DictionaryResearchOptions) => {
+    const detail = await retrieveDictionaryResearchEvidence(entryId, 'scan', options);
     announceDictionary(entryId);
     return detail;
   });
