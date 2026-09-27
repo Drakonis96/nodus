@@ -1,3 +1,4 @@
+import { studyFocusApi } from './studyFocus';
 // The whole window.nodus contract, assembled from the per-domain slices.
 //
 // It lives here rather than in the entry file because three window classes now
@@ -70,6 +71,7 @@ function readInitialOverlayPlacement(): NodiOverlayPlacement {
 }
 
 export const nodusApi: NodusApi = {
+  ...studyFocusApi,
   ...libraryApi,
   ...browserApi,
   ...logsApi,

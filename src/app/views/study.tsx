@@ -16,6 +16,7 @@ const StudyChatView = lazy(() => import('../../views/StudyChatView').then((modul
 const StudyIdeasView = lazy(() => import('../../views/StudyIdeasView').then((module) => ({ default: module.StudyIdeasView })));
 const StudyGraphView = lazy(() => import('../../views/StudyGraphView').then((module) => ({ default: module.StudyGraphView })));
 const StudyBankView = lazy(() => import('../../views/StudyBankView').then((module) => ({ default: module.StudyBankView })));
+const StudyFocusView = lazy(() => import('../../views/StudyFocusView').then((module) => ({ default: module.StudyFocusView })));
 const StudyReviewView = lazy(() => import('../../views/StudyReviewView').then((module) => ({ default: module.StudyReviewView })));
 const DeepResearchView = lazy(() => import('../../views/DeepResearchView').then((module) => ({ default: module.DeepResearchView })));
 
@@ -107,6 +108,7 @@ export const studyViews = {
       onOpenRecording={openRecording(ctx)}
     />
   ),
+  studyFocus: () => <StudyFocusView />,
   studyReview: () => <StudyReviewView />,
   studyDeepResearch: (ctx) => (
     <DeepResearchView

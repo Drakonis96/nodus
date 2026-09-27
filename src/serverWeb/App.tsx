@@ -310,6 +310,7 @@ const GENEALOGY_VIEW_IDS: View[] = [
 ];
 
 const SERVER_TOOL_VIEWS = new Set<View>([
+  "studyFocus", // Timer and per-vault focus history are desktop-only.
   "browser",
   "radar",
   "compass",

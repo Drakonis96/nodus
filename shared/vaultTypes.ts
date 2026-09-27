@@ -396,6 +396,7 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // The question bank is shared with teaching (its Evaluación section).
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
+  studyFocus: ['estudio'],
   studyDeepResearch: ['estudio'],
   // Student rosters, the exam paper builder and rubrics belong to teaching only.
   teachingGroups: ['docencia'],

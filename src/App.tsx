@@ -1,3 +1,5 @@
+import { useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
 import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
@@ -180,6 +182,7 @@ function HeaderAction({
 }
 
 export function App() {
+  const focusReduced = useStudyFocusReduced();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
@@ -1423,6 +1426,7 @@ export function App() {
       className="h-full flex flex-col"
       style={{ '--vault-accent': dockColorForVaultType(activeVault?.type) } as React.CSSProperties}
       data-testid="app-shell"
+      data-focus-reduced={focusReduced}
       data-interface-scale={settings.interfaceScale}
       data-high-contrast={settings.highContrast ? 'true' : 'false'}
       data-reduce-motion={settings.reduceMotion ? 'true' : 'false'}
@@ -1505,6 +1509,7 @@ export function App() {
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
+          {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} onNavigate={() => setPaletteOpen(true)} />}
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
           <HeaderAction
@@ -1695,6 +1700,7 @@ export function App() {
         />
       </header>
 
+      {isEstudio && <FocusCompletionNotice />}
       {updateProgress && (showStartupProgress || (updateNoticeKey && deferredUpdate !== updateNoticeKey)) && <UpdateReadyNotice
         update={updateProgress}
         onUpdate={setUpdateProgress}
@@ -1719,7 +1725,7 @@ export function App() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
-        {!navCollapsed && (
+        {!navCollapsed && !focusReduced && (
           <nav
             data-testid="resizable-sidebar"
             data-sidebar-compact={sidebarCompact ? 'true' : 'false'}
@@ -2263,7 +2269,7 @@ export function App() {
           <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
         )}
 
-      {!manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings={settings} />}
+      {!focusReduced && !manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings={settings} />}
     </div>
   );
 }

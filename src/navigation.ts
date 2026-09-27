@@ -3,7 +3,7 @@ import type { LibraryScope } from '@shared/libraryTypes';
 import { type VaultType, normalizeVaultType } from '@shared/vaultTypes';
 import type { ToolkitToolPage } from '@shared/toolkitNavigation';
 
-export type View = 'researchChat' | 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'dbDeepResearch' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
+export type View = 'researchChat' | 'home' | 'search' | 'testimonyInterviews' | 'testimonyParticipants' | 'testimonyContrasts' | 'library' | 'graph' | 'argument' | 'ideas' | 'dictionary' | 'authors' | 'persons' | 'prosopSearch' | 'prosopPopulation' | 'prosopPersons' | 'prosopSources' | 'prosopAnalysis' | 'prosopNetworks' | 'encyclopedia' | 'continuity' | 'conflicts' | 'arcs' | 'rules' | 'questions' | 'worldChat' | 'manuscript' | 'characters' | 'places' | 'factions' | 'cultures' | 'dynasties' | 'scenes' | 'timeline' | 'tree' | 'relations' | 'map' | 'archive' | 'pages' | 'databases' | 'dbSearch' | 'dbAnalysis' | 'dbChat' | 'dbDeepResearch' | 'studyCourses' | 'studySchedule' | 'studyCalendar' | 'studySearch' | 'studyLibrary' | 'studyRecordings' | 'studyChat' | 'studyIdeas' | 'studyGraph' | 'studyQuestions' | 'studyFocus' | 'studyReview' | 'studyDeepResearch' | 'teachingGroups' | 'teachingGrades' | 'teachingExams' | 'teachingRubrics' | 'teachingUnits' | 'immersion' | 'gaps' | 'debate' | 'research' | 'hypothesis' | 'reading' | 'writing' | 'deepResearch' | 'projects' | 'notes' | 'workspace' | 'browser' | 'radar' | 'compass' | 'toolkit' | 'settings';
 
 export type GraphPresetId = 'overview' | 'contradictions' | 'gaps' | 'reading' | 'unread' | 'authors';
 
@@ -99,6 +99,7 @@ export const NAV_ITEMS: NavItem[] = [
   // Study mode — scoped to the 'estudio' vault type.
   { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
   { id: 'studySchedule', label: 'Horarios', icon: 'clock', group: 'explore' },
+  { id: 'studyFocus', label: 'Concentración', icon: 'clock', group: 'explore' },
   { id: 'studyCalendar', label: 'Calendario', icon: 'calendar', group: 'explore' },
   { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
   { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
@@ -340,7 +341,7 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
   estudio: [
     'studyCourses', 'studySchedule', 'studyCalendar', 'studySearch', 'studyLibrary',
     'studyRecordings', 'studyChat', 'studyIdeas', 'studyGraph', 'studyQuestions',
-    'studyReview', 'studyDeepResearch', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+    'studyReview', 'studyFocus', 'studyDeepResearch', 'notes', 'browser', 'radar', 'compass', 'toolkit',
   ],
   docencia: [
     'studyCourses', 'teachingGroups', 'studySchedule', 'studyCalendar', 'studyLibrary',

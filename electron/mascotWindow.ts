@@ -252,6 +252,12 @@ export function endMascotWindowDrag(): void {
 }
 
 /** Create, show or tear down the mascot window to match the current settings. */
+let focusSuppressed = false;
+export function setMascotFocusSuppressed(value: boolean, refresh = true): void {
+  focusSuppressed = value;
+  if (refresh) applyMascotWindow();
+}
+
 export function applyMascotWindow(): void {
   let want = false;
   try {
@@ -260,7 +266,7 @@ export function applyMascotWindow(): void {
   } catch {
     want = false;
   }
-  if (want && !tutorialVisible) {
+  if (want && !tutorialVisible && !focusSuppressed) {
     if (!mascotWindow || mascotWindow.isDestroyed()) {
       mascotWindow = createMascotWindow();
     } else {
@@ -269,7 +275,7 @@ export function applyMascotWindow(): void {
       placeWindowAroundNodi(mascotWindow, nodi.x, nodi.y);
       mascotWindow.showInactive();
     }
-  } else if (tutorialVisible && mascotWindow && !mascotWindow.isDestroyed()) {
+  } else if ((tutorialVisible || focusSuppressed) && mascotWindow && !mascotWindow.isDestroyed()) {
     mascotWindow.hide();
   } else if (mascotWindow && !mascotWindow.isDestroyed()) {
     mascotWindow.close();

@@ -1,0 +1,103 @@
+.focus-page, .focus-popover { --focus-accent: var(--vault-accent, var(--a-500, #0f766e)); --focus-muted: var(--n-500, #737373); --focus-line: var(--n-200, #e5e5e5); --focus-panel: var(--n-50, #fafafa); color: var(--app-text); }
+.dark .focus-page, .dark .focus-popover { --focus-line: var(--n-800, #262626); --focus-panel: var(--n-900, #171717); --focus-muted: var(--n-400, #a3a3a3); }
+.focus-page { padding: 30px; }
+.focus-page-inner { max-width: 1200px; margin: auto; display: grid; gap: 22px; }
+.focus-page-heading, .focus-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.focus-page-heading h1 { font-size: 30px; font-weight: 650; letter-spacing: -.035em; margin: 6px 0; }
+.focus-eyebrow { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600; letter-spacing: .08em; color: var(--focus-muted); }
+.focus-private { font-size: 11px; border: 1px solid var(--focus-line); border-radius: 30px; padding: 6px 12px; color: var(--focus-muted); white-space: nowrap; }
+.focus-muted { color: var(--focus-muted); font-size: 12px; line-height: 1.65; }
+.focus-card { border: 1px solid var(--focus-line); border-radius: 16px; padding: 24px; background: var(--focus-panel); min-width: 0; }
+.focus-main-grid { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(360px, 1.4fr); gap: 22px; align-items: start; }
+.focus-timer-card { position: sticky; top: 0; background: linear-gradient(160deg, color-mix(in srgb, var(--focus-accent) 7%, var(--focus-panel)), var(--focus-panel) 75%); }
+.focus-overview { display: grid; gap: 16px; min-width: 0; }
+.focus-section-heading h2 { font-size: 15px; font-weight: 600; }
+.focus-clock { font-size: clamp(48px, 5vw, 76px); font-weight: 450; font-variant-numeric: tabular-nums; letter-spacing: -.05em; margin: 25px 0 20px; text-align: center; line-height: 1.1; }
+.focus-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--focus-muted); }
+.focus-dot.active { background: var(--focus-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--focus-accent) 12%, transparent); }
+.focus-track { height: 4px; background: var(--focus-line); border-radius: 9px; overflow: hidden; }
+.focus-track span { display: block; height: 100%; background: var(--focus-accent); transition: width .3s ease; }
+.focus-cycle { text-align: center; margin: 12px 0 24px; }
+.focus-label { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--focus-muted); }
+.focus-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; }
+.focus-actions .btn-primary { flex: 1; justify-content: center; min-height: 38px; }
+.focus-toggle { display: flex; align-items: center; gap: 10px; font-size: 12px; margin-top: 18px; cursor: pointer; }
+.focus-toggle input { accent-color: var(--focus-accent); width: 15px; height: 15px; flex-shrink: 0; }
+.focus-toggle small { display: block; font-size: 11px; margin-top: 2px; }
+.focus-settings { border-top: 1px solid var(--focus-line); margin-top: 24px; padding-top: 16px; font-size: 12px; }
+.focus-settings summary, .focus-text-data summary { cursor: pointer; }
+.focus-duration-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0 10px; }
+.focus-duration-grid input { padding: 7px; }
+.focus-today-metrics { display: grid; grid-template-columns: 1fr 1fr; margin: 18px 0; gap: 20px; }
+.focus-today-metrics > div + div { border-left: 1px solid var(--focus-line); padding-left: 24px; }
+.focus-today-metrics strong { display: block; font-size: 40px; font-weight: 500; letter-spacing: -.04em; line-height: 1.2; }
+.focus-today-metrics small { font-size: 14px; color: var(--focus-muted); margin-left: 5px; letter-spacing: 0; }
+.focus-goal-enable { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--focus-muted); }
+.focus-goal-enable:hover { color: var(--focus-accent); }
+.focus-goal-line { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 7px; }
+.focus-goal-progress { display: block; width: 100%; height: 5px; appearance: none; border: 0; }
+.focus-goal-progress::-webkit-progress-bar { background: var(--focus-line); border-radius: 10px; }
+.focus-goal-progress::-webkit-progress-value { background: var(--focus-accent); border-radius: 10px; }
+.focus-goal-edit { display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 12px; }
+.focus-goal-edit label { display: flex; align-items: center; gap: 8px; }
+.focus-goal-edit input { width: 65px; padding: 3px 6px; font-size: 11px; }
+.focus-goal-edit button { font-size: 11px; }
+.focus-motivation { display: flex; align-items: center; gap: 12px; padding: 2px 8px; color: var(--focus-muted); font-size: 12px; line-height: 1.6; }
+.focus-motivation svg { color: var(--focus-accent); flex-shrink: 0; }
+.focus-range { display: flex; border: 1px solid var(--focus-line); border-radius: 7px; padding: 2px; font-size: 11px; }
+.focus-range button { padding: 4px 9px; border-radius: 4px; color: var(--focus-muted); }
+.focus-range [aria-pressed=true] { background: color-mix(in srgb, var(--focus-accent) 13%, transparent); color: var(--app-text); }
+.focus-chart { height: 130px; display: flex; gap: 8px; margin-top: 20px; border-bottom: 1px solid var(--focus-line); }
+.focus-bar-column { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 2px; border-radius: 4px; }
+.focus-bar-well { height: 106px; width: 100%; display: flex; align-items: end; justify-content: center; }
+.focus-bar { width: 65%; max-width: 30px; min-height: 2px; border-radius: 4px 4px 0 0; background: color-mix(in srgb, var(--focus-accent) 80%, transparent); }
+.focus-bar-column:hover .focus-bar, .focus-bar-column:focus .focus-bar { background: var(--focus-accent); }
+.focus-bar-label { font-size: 10px; color: var(--focus-muted); }
+.focus-chart-detail { min-height: 18px; margin-top: 10px; font-size: 11px; color: var(--focus-muted); }
+.focus-text-data { margin-top: 10px; font-size: 11px; color: var(--focus-muted); }
+.focus-page table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-top: 14px; }
+.focus-page th { font-weight: 500; color: var(--focus-muted); }
+.focus-page td, .focus-page th { padding: 12px 10px; border-bottom: 1px solid var(--focus-line); }
+.focus-page tr:last-child td { border-bottom: 0; }
+.focus-session-table { overflow-x: auto; }
+.focus-session-table table { min-width: 480px; }
+.focus-session-status { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 10px; background: var(--focus-line); }
+.focus-session-status.completed { background: color-mix(in srgb, var(--focus-accent) 12%, transparent); }
+.focus-heatmap { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-template-columns: repeat(12, 1fr); gap: 5px; margin-top: 20px; }
+.focus-heat-day { height: 12px; border-radius: 3px; background: var(--focus-line); }
+.focus-heat-day[data-level="1"], .focus-heat-legend i[data-level="1"] { background: color-mix(in srgb, var(--focus-accent) 25%, var(--focus-panel)); }
+.focus-heat-day[data-level="2"], .focus-heat-legend i[data-level="2"] { background: color-mix(in srgb, var(--focus-accent) 55%, var(--focus-panel)); }
+.focus-heat-day[data-level="3"], .focus-heat-legend i[data-level="3"] { background: var(--focus-accent); }
+.focus-heat-legend { display: flex; justify-content: space-between; color: var(--focus-muted); font-size: 10px; margin: 10px 0; }
+.focus-heat-legend span { display: flex; align-items: center; gap: 4px; }
+.focus-heat-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--focus-line); }
+.focus-activity-list { columns: 3; margin-top: 10px; line-height: 2; }
+.focus-empty { display: flex; align-items: center; flex-direction: column; gap: 10px; padding: 30px 12px 15px; text-align: center; }
+.focus-empty > svg { color: var(--focus-muted); }
+.focus-empty h3 { font-size: 15px; font-weight: 500; }
+.focus-empty .btn { margin-top: 6px; }
+.focus-footer { text-align: center; color: var(--focus-muted); font-size: 11px; }
+.focus-header-actions { flex-shrink: 0; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.focus-header-actions .btn { font-size: 12px; }
+.focus-header-button { font-variant-numeric: tabular-nums; }
+.focus-popover { position: fixed; z-index: 10001; top: 50px; right: 16px; width: min(360px, calc(100vw - 24px)); max-height: calc(100vh - 70px); overflow-y: auto; padding: 20px; border: 1px solid var(--focus-line); border-radius: 14px; background: var(--focus-panel); box-shadow: 0 16px 50px #0003; }
+.focus-popover h2 { font-size: 13px; }
+.focus-popover .focus-eyebrow { margin-top: 16px; }
+.focus-popover .focus-clock { font-size: 52px; margin: 16px 0; }
+.focus-popover .focus-cycle { margin-bottom: 16px; }
+.focus-popover .focus-settings { margin-top: 16px; }
+.focus-notice { --focus-accent: var(--vault-accent, var(--a-500, #0f766e)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 22px; background: color-mix(in srgb, var(--vault-accent, var(--a-500, #0f766e)) 10%, var(--app-canvas)); font-size: 12px; }
+[data-focus-reduced=true] [data-testid=header-actions] > :not([data-testid=browser-media-header-action]):not(.focus-header-actions) { display: none; }
+[data-focus-reduced=true] [data-testid=header-vault-badge], [data-focus-reduced=true] [data-testid=sidebar-header-toggle] { visibility: hidden; }
+[data-focus-reduced=true] [data-testid=sidebar-header-toggle] { width: 72px !important; }
+@media(max-width: 950px) { .focus-main-grid { grid-template-columns: 1fr; } .focus-timer-card { position: static; } .focus-controls:not(.is-compact) .focus-clock { font-size: 60px; margin: 18px 0; } .focus-page { padding: 20px; } }
+@media(max-width: 560px) { .focus-page { padding: 14px; } .focus-card { padding: 18px; } .focus-private, .focus-consistency .focus-section-heading > span { display: none; } .focus-page-heading h1 { font-size: 26px; } .focus-chart { gap: 2px; } .focus-activity-list { columns: 1; } .focus-header-actions .btn { padding: 4px 6px; font-size: 11px; } }
+@media(prefers-reduced-motion: reduce) { .focus-track span { transition: none; } }
+[data-reduce-motion=true] .focus-track span { transition: none; }
+
+.focus-popover .focus-track span { transition: none; }
+/* Keep readable white labels even on bright custom accents and hover states. */
+.focus-controls .btn.btn-primary, .focus-empty .btn.btn-primary, .focus-notice .btn.btn-primary {
+  background: color-mix(in srgb, var(--focus-accent) 45%, #000) !important;
+  color: #fff !important;
+}
