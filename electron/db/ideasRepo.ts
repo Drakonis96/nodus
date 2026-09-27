@@ -500,6 +500,19 @@ export function embeddedIdeaCount(): number {
   return row.count;
 }
 
+/**
+ * Restore a dormant idea to active status. `findSimilarIdeas(..., { includeDormant: true })`
+ * deliberately surfaces dormant ideas as fusion candidates so a rescan can re-attach an old
+ * concept, but a dormant idea is only "referenced again" once something in the live graph
+ * actually points at it — either a new occurrence (a work discusses it) or a new edge (a work
+ * relates something to it). Any caller that gives a dormant idea a fresh reference must call
+ * this, or the idea stays orphaned while the graph now claims it is active — exactly the state
+ * `assertDeepDataIntegrity`'s `edges→active ideas` check exists to catch.
+ */
+export function reviveIdea(globalId: string): void {
+  getDb().prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
+}
+
 export function upsertOccurrence(
   globalId: string,
   nodusId: string,
@@ -515,7 +528,7 @@ export function upsertOccurrence(
   ).run(globalId, nodusId, role, development, confidence);
   // Revival: re-attaching a work to a dormant idea restores it everywhere
   // (graph, search) with its original global_id intact.
-  db.prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
+  reviveIdea(globalId);
 }
 
 export function addEvidence(
