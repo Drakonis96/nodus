@@ -134,6 +134,29 @@ try {
   assert.equal(tree.canNestFolder(folderList, byId(chapters.id), foreign.id), false);
   assert.equal(tree.canNestFolder(folderList, byId(sources.id), one.id), true);
 
+  // Sidebar expansion: alphabetical siblings precede only the folder's direct chats.
+  const displayFolders = [
+    { id: 'parent', projectId: 'display', parentId: null, name: 'Parent', position: 0 },
+    { id: 'z', projectId: 'display', parentId: 'parent', name: 'zeta', position: 0 },
+    { id: 'a', projectId: 'display', parentId: 'parent', name: 'Álpha', position: 1 },
+  ];
+  const displayChats = [
+    { id: 'own-new', title: 'Newest', projectId: 'display', folderId: 'parent' },
+    { id: 'child', title: 'Child', projectId: 'display', folderId: 'a' },
+    { id: 'own-old', title: 'Older', projectId: 'display', folderId: 'parent' },
+    { id: 'foreign', title: 'Other project', projectId: 'other', folderId: 'parent' },
+  ];
+  const history = ids => tree.projectFolderHistoryRows('display', displayFolders, displayChats, new Set(ids));
+  const compact = rows => rows.map(row => row.kind === 'folder' ? row.folder.id : row.kind === 'chat' ? row.conversation.id : row.section);
+  assert.deepEqual(compact(history([])), ['parent'], 'collapsed folders hide all their contents');
+  assert.deepEqual(compact(history(['parent'])), ['parent', 'folders', 'a', 'z', 'chats', 'own-new', 'own-old']);
+  const allOpen = history(['parent', 'a']);
+  assert.deepEqual(compact(allOpen), ['parent', 'folders', 'a', 'chats', 'child', 'z', 'chats', 'own-new', 'own-old']);
+  assert.equal(allOpen.find(row => row.kind === 'chat' && row.conversation.id === 'child').depth, 2);
+  assert.equal(allOpen.find(row => row.kind === 'folder' && row.folder.id === 'a').hasChildren, true, 'a leaf with chats expands');
+  assert.equal(allOpen.find(row => row.kind === 'folder' && row.folder.id === 'z').hasChildren, false, 'empty folders have no disclosure');
+  assert.deepEqual(compact(history(['a'])), ['parent'], 'a collapsed ancestor hides an expanded descendant');
+
   // Deleting a folder takes its subfolders and unfiles, never deletes, every chat below it.
   projects.deleteChatProjectFolder(chapters.id);
   assert.deepEqual(children(null), ['Fuentes primarias']);

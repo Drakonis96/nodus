@@ -8,9 +8,9 @@ import { Icon } from './ui';
 import { useDismissableLayer } from '../hooks';
 import { t, tx } from '../i18n';
 import { FloatingMenu, MenuItem, RenameField } from './ResearchChatHistoryMenu';
-import { FolderTreeRowView, chatDragProps, historyError, folderTreeRows, outsideDropProps, useFolderTreeUi, type ChatFolderActions, type ChatFolderTreeState, type FolderTreeRow } from './ResearchChatFolderTree';
+import { FolderTreeRowView, chatDragProps, historyError, outsideDropProps, useFolderTreeUi, type ChatFolderActions, type ChatFolderTreeState, type FolderTreeRow } from './ResearchChatFolderTree';
 import { MarqueeText } from './MarqueeText';
-import { conversationsInSelection, folderOutline } from '@shared/researchChatFolders';
+import { conversationsInSelection, folderOutline, projectFolderHistoryRows, UNFILED_FOLDER } from '@shared/researchChatFolders';
 
 /** The colours a project can take, plus any custom one. */
 export const PROJECT_COLORS = ['#171717', '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
@@ -47,9 +47,9 @@ export function formatRelative(iso: string): string {
 const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase();
 
 type Row =
-  | { kind: 'header'; id: string; label: string }
+  | { kind: 'header'; id: string; label: string; depth?: number }
   | { kind: 'project'; project: ResearchChatProject; expanded: boolean; count: number }
-  | { kind: 'chat'; conversation: ChatConversationSummary; nested: boolean }
+  | { kind: 'chat'; conversation: ChatConversationSummary; nested: boolean; depth?: number }
   | { kind: 'notebook'; notebook: ChatHistoryNotebookEntry; expanded: boolean; count: number }
   | { kind: 'folder'; row: FolderTreeRow }
   | { kind: 'empty'; id: string; label: string };
@@ -148,10 +148,14 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         const open = expanded.has(`project:${project.id}`);
         out.push({ kind: 'project', project, expanded: open, count: chats.length });
         if (!open) continue;
-        // Its folders, then the chats of whatever the tree has selected in it.
-        out.push(...folderTreeRows(project.id, folders, chats, folderTree.expanded).map(row => ({ kind: 'folder' as const, row })));
-        const selected = folderTree.selection?.projectId === project.id ? folderTree.selection.folderId : null;
-        out.push(...conversationsInSelection(chats, folders, project.id, selected).map(conversation => ({ kind: 'chat' as const, conversation, nested: true })));
+        for (const row of projectFolderHistoryRows(project.id, folders, chats, folderTree.expanded)) {
+          if (row.kind === 'folder') out.push({ kind: 'folder', row });
+          else if (row.kind === 'section') out.push({ kind: 'header', id: `folder:${row.folderId}:${row.section}`, label: row.section === 'folders' ? t('Carpetas') : t('Chats'), depth: row.depth });
+          else out.push({ kind: 'chat', conversation: row.conversation, nested: true, depth: row.depth });
+        }
+        const unfiled = conversationsInSelection(chats, folders, project.id, UNFILED_FOLDER);
+        if (folders.some(folder => folder.projectId === project.id)) out.push({ kind: 'folder', row: { kind: 'unfiled', projectId: project.id, count: unfiled.length } });
+        out.push(...unfiled.map(conversation => ({ kind: 'chat' as const, conversation, nested: true })));
       }
     }
     if (notebooksOn && notebooks.length) {
@@ -175,7 +179,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
       out.push(...rest.map(conversation => ({ kind: 'chat' as const, conversation, nested: false })));
     }
     return out;
-  }, [query, conversations, projects, notebooks, supportsProjects, notebooksOn, projectById, notebookById, expanded, folders, folderTree.expanded, folderTree.selection]);
+  }, [query, conversations, projects, notebooks, supportsProjects, notebooksOn, projectById, notebookById, expanded, folders, folderTree.expanded]);
 
   const toggleGroup = (id: string) => setExpanded(current => {
     const next = new Set(current);
@@ -222,9 +226,9 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
         className="flex-1 min-h-0 px-2 pb-2"
         empty={<div className="px-2 py-6 text-center text-xs text-neutral-600">{t('Aún no hay conversaciones. Escribe abajo para empezar.')}</div>}
         renderItem={row => {
-          if (row.kind === 'header') return <div className="research-history-heading">{row.label}</div>;
+          if (row.kind === 'header') return <div className="research-history-heading" style={row.depth === undefined ? undefined : { paddingLeft: 14 + row.depth * 14 }} data-testid={row.depth === undefined ? undefined : row.id}>{row.label}</div>;
           if (row.kind === 'empty') return <div className="research-history-empty px-2 py-2 text-xs text-neutral-500">{row.label}</div>;
-          if (row.kind === 'folder') return <FolderTreeRowView row={row.row} tree={folderTree} ui={folderUi} actions={folderActions} run={run} baseIndent={14} />;
+          if (row.kind === 'folder') return <FolderTreeRowView row={row.row} tree={folderTree} ui={folderUi} actions={folderActions} run={run} baseIndent={14} contentsInline />;
           if (row.kind === 'notebook') {
             const { notebook } = row;
             const key = `notebook:${notebook.id}`;
@@ -278,6 +282,7 @@ export function ResearchChatSidebar(props: ResearchChatSidebarProps) {
           return (
             <div className={`research-history-row group ${row.nested ? 'is-nested' : ''} ${conversation.id === activeId ? 'is-active' : ''} ${pinned ? 'is-pinned' : ''} ${menu?.kind === 'chat' && menu.row === key ? 'is-menu-open' : ''}`}
               data-testid={`research-conversation-${conversation.id}`} data-marquee-host
+              style={row.depth === undefined ? undefined : { paddingLeft: 14 + row.depth * 14 + 18 }}
               {...(supportsProjects && !(locksMoves && inNotebook(conversation)) && renaming !== key ? chatDragProps(conversation) : {})}>
               {renaming === key
                 ? <RenameField value={conversation.title} onDone={title => { setRenaming(null); if (title && title !== conversation.title && props.onRenameConversation) run(() => props.onRenameConversation!(conversation, title)); }} />

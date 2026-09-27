@@ -14,6 +14,45 @@ export function folderChildren(folders: ResearchChatProjectFolder[], projectId: 
   return byParent;
 }
 
+export type ProjectFolderHistoryRow =
+  | { kind: 'folder'; folder: ResearchChatProjectFolder; depth: number; count: number; hasChildren: boolean; expanded: boolean }
+  | { kind: 'section'; folderId: string; section: 'folders' | 'chats'; depth: number }
+  | { kind: 'chat'; conversation: ChatConversationSummary; depth: number };
+
+/** Expanded folders contain alphabetic subfolders first, then their own chats.
+ * Keep the input chat order (recency) and never repeat a descendant's chats in its parent. */
+export function projectFolderHistoryRows(projectId: string, folders: ResearchChatProjectFolder[], conversations: ChatConversationSummary[], expanded: ReadonlySet<string>): ProjectFolderHistoryRow[] {
+  const children = folderChildren(folders, projectId);
+  for (const siblings of children.values()) siblings.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) || a.id.localeCompare(b.id));
+  const chats = new Map<string, ChatConversationSummary[]>();
+  for (const conversation of conversations) if (conversation.projectId === projectId && conversation.folderId) {
+    const list = chats.get(conversation.folderId) ?? [];
+    list.push(conversation);
+    chats.set(conversation.folderId, list);
+  }
+  const rows: ProjectFolderHistoryRow[] = [];
+  const walk = (parentId: string | null, depth: number) => {
+    for (const folder of children.get(parentId) ?? []) {
+      const ownChats = chats.get(folder.id) ?? [];
+      const hasFolders = !!children.get(folder.id)?.length;
+      const hasChildren = hasFolders || ownChats.length > 0;
+      const open = hasChildren && expanded.has(folder.id);
+      rows.push({ kind: 'folder', folder, depth, hasChildren, expanded: open, count: conversationsInSelection(conversations, folders, projectId, folder.id).length });
+      if (!open) continue;
+      if (hasFolders) {
+        rows.push({ kind: 'section', folderId: folder.id, section: 'folders', depth: depth + 1 });
+        walk(folder.id, depth + 1);
+      }
+      if (ownChats.length) {
+        rows.push({ kind: 'section', folderId: folder.id, section: 'chats', depth: depth + 1 });
+        rows.push(...ownChats.map(conversation => ({ kind: 'chat' as const, conversation, depth: depth + 1 })));
+      }
+    }
+  };
+  walk(null, 0);
+  return rows;
+}
+
 /** A folder and every folder below it. */
 export function folderSubtree(folders: ResearchChatProjectFolder[], folderId: string): Set<string> {
   const ids = new Set([folderId]);

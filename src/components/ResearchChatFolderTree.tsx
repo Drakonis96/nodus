@@ -163,10 +163,11 @@ export function outsideDropProps(actions: ChatFolderActions, run: (action: () =>
   };
 }
 
-function useFolderDrop(folder: ResearchChatProjectFolder, actions: ChatFolderActions, run: (action: () => Promise<unknown>) => void, expand: (id: string) => void) {
+function useFolderDrop(folder: ResearchChatProjectFolder, actions: ChatFolderActions, run: (action: () => Promise<unknown>) => void, expand: (id: string) => void, contentsInline = false) {
   const [hint, setHint] = useState<Zone | null>(null);
   const zoneOf = (event: DragEvent): Zone => {
-    if (dragged?.kind !== 'folder') return 'inside';
+    // Alphabetical inline trees support nesting, not manual sibling reordering.
+    if (contentsInline || dragged?.kind !== 'folder') return 'inside';
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const y = (event.clientY - box.top) / Math.max(1, box.height);
     return y < 0.28 ? 'before' : y > 0.72 ? 'after' : 'inside';
@@ -256,7 +257,7 @@ export function useFolderTreeUi(actions: ChatFolderActions, tree: ChatFolderTree
 const INDENT = 14;
 
 /** One row of a project's tree: the project's root, a folder, or "No folder". */
-export function FolderTreeRowView({ row, tree, ui, actions, run, baseIndent = 10, rootLabel }: {
+export function FolderTreeRowView({ row, tree, ui, actions, run, baseIndent = 10, rootLabel, contentsInline = false }: {
   row: FolderTreeRow;
   tree: ChatFolderTreeState;
   ui: FolderTreeUi;
@@ -265,6 +266,8 @@ export function FolderTreeRowView({ row, tree, ui, actions, run, baseIndent = 10
   /** Left padding of a top-level folder, so the tree lines up with its surroundings. */
   baseIndent?: number;
   rootLabel?: string;
+  /** The sidebar expands folders to reveal their own chats as well as subfolders. */
+  contentsInline?: boolean;
 }) {
   if (row.kind !== 'folder') {
     const folderId = row.kind === 'unfiled' ? UNFILED_FOLDER : null;
@@ -284,18 +287,23 @@ export function FolderTreeRowView({ row, tree, ui, actions, run, baseIndent = 10
       <span className="research-folder-actions-spacer" aria-hidden="true" />
     </div>;
   }
-  return <FolderRow row={row} tree={tree} ui={ui} actions={actions} run={run} baseIndent={baseIndent} />;
+  return <FolderRow row={row} tree={tree} ui={ui} actions={actions} run={run} baseIndent={baseIndent} contentsInline={contentsInline} />;
 }
 
-function FolderRow({ row, tree, ui, actions, run, baseIndent }: {
+function FolderRow({ row, tree, ui, actions, run, baseIndent, contentsInline }: {
   row: Extract<FolderTreeRow, { kind: 'folder' }>; tree: ChatFolderTreeState; ui: FolderTreeUi; actions: ChatFolderActions;
-  run: (action: () => Promise<unknown>) => void; baseIndent: number;
+  run: (action: () => Promise<unknown>) => void; baseIndent: number; contentsInline: boolean;
 }) {
   const { folder } = row;
-  const drop = useFolderDrop(folder, actions, run, tree.expand);
+  const drop = useFolderDrop(folder, actions, run, tree.expand, contentsInline);
   const selected = tree.selection?.folderId === folder.id;
   const renaming = ui.renaming === folder.id;
-  const select = () => tree.select(selected ? { projectId: folder.projectId, folderId: null } : { projectId: folder.projectId, folderId: folder.id });
+  const select = () => {
+    if (contentsInline) {
+      tree.select({ projectId: folder.projectId, folderId: folder.id });
+      tree.toggle(folder.id);
+    } else tree.select(selected ? { projectId: folder.projectId, folderId: null } : { projectId: folder.projectId, folderId: folder.id });
+  };
   return <div className={`research-history-row research-folder-row group ${selected ? 'is-active' : ''} ${ui.menuFolderId === folder.id ? 'is-menu-open' : ''} ${drop.hint ? `is-drop-${drop.hint}` : ''}`}
     style={{ paddingLeft: baseIndent + row.depth * INDENT }} data-marquee-host data-testid={`research-folder-${folder.id}`}
     draggable={!renaming} onDragStart={event => beginDrag(event, { kind: 'folder', folder }, folder.name)} onDragEnd={endDrag}
@@ -313,7 +321,7 @@ function FolderRow({ row, tree, ui, actions, run, baseIndent }: {
           if (next !== folder.name) run(() => actions.onRenameFolder(folder, next));
         }} /></>
       : <button type="button" className="research-history-main" aria-pressed={selected} title={tx('{n} chat(s)', { n: row.count })}
-        onClick={select} onDoubleClick={() => { tree.select({ projectId: folder.projectId, folderId: folder.id }); ui.setRenaming(folder.id); }}>
+        aria-expanded={contentsInline && row.hasChildren ? row.expanded : undefined} onClick={select} onDoubleClick={() => { tree.select({ projectId: folder.projectId, folderId: folder.id }); ui.setRenaming(folder.id); }}>
         <span className="shrink-0 text-neutral-500"><Icon name="folder" size={15} /></span>
         <MarqueeText text={folder.name} className="min-w-0 flex-1" />
       </button>}

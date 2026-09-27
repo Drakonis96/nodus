@@ -73,6 +73,10 @@ try {
     await page.waitForFunction(() => window.native.get('native-1').folderId === 'folder-1');
     assert.equal((await chat('native-1')).projectId, 'project-1', `${view}: filed in the folder, in its project`);
 
+    // Filing places the chat inside a collapsed leaf folder; reveal its contents.
+    await history.getByTestId('research-folder-folder-1').getByRole('button', { name: 'Capítulo 1', exact: true }).click();
+    await nested.waitFor();
+
     // Pin, rename and archive, from the row and its menu.
     await nested.hover();
     await nested.getByRole('button', { name: 'Destacar chat' }).click();
