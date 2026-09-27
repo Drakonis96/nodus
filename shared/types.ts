@@ -1650,7 +1650,7 @@ export interface ModelRef {
 /** One model as returned by a provider's model-list endpoint. */
 export interface ModelInfo {
   id: string;
-  /** Native LM Studio reasoning choices, discovered from /api/v1/models. */
+  /** Exact native reasoning choices advertised by the provider, in display order. */
   researchReasoningLevels?: import('./researchReasoning').NativeResearchEffort[];
   name?: string;
   /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */

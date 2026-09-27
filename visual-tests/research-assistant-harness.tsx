@@ -114,7 +114,15 @@ window.nodus = new Proxy({
   streamStudyAssistant: nativeStream,
   worldChatStream: nativeStream,
   getActiveVault: async () => ({ id: 'test', type: vaultType }),
-  listModels: async () => [{ id: 'gpt-6-astra', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(reasoningEffort => ({ reasoningEffort, description: '' })) }],
+  // Explicit synthetic catalogue entries; production never infers picker choices from IDs.
+  listModels: async (provider: string) => ({
+    openai: [{ id: 'gpt-5.4', researchReasoningLevels: ['none', 'low', 'medium', 'high', 'xhigh'] }, { id: 'gpt-4.1' }],
+    deepseek: [{ id: 'deepseek-flash', researchReasoningLevels: ['low', 'high', 'max'] }],
+    gemini: [{ id: 'gemini-3-pro-preview', researchReasoningLevels: ['low', 'high'] }],
+    codex: [{ id: 'gpt-6-astra', supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'].map(reasoningEffort => ({ reasoningEffort, description: '' })) }],
+    xiaomi: [{ id: 'mimo-v2.5' }],
+    'opencode-go': [{ id: 'deepseek-flash' }],
+  } as Record<string, unknown[]>)[provider] ?? [],
   listResearchContextSources: async () => ({ authors: [
     { id: 'arendt', name: 'Hannah Arendt', workIds: ['human', 'origins'] },
     { id: 'foucault', name: 'Michel Foucault', workIds: ['discipline'] },

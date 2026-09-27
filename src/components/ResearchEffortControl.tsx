@@ -1,14 +1,14 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { ModelRef } from '@shared/types';
-import { researchEffortChoices, researchReasoningProfile, type ResearchEffort } from '@shared/researchReasoning';
+import { researchAdvertisedEfforts, type NativeResearchEffort, type ResearchEffort } from '@shared/researchReasoning';
 import { useResearchModelInfo } from '../hooks/useResearchModelInfo';
 import { t } from '../i18n';
 import { Icon } from './ui';
 import './researchEffort.css';
 
-const labels: Record<ResearchEffort, string> = {
-  standard: 'Estándar', minimal: 'Mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto',
+const labels: Record<NativeResearchEffort, string> = {
+  none: 'Desactivado', off: 'Desactivado', minimal: 'Mínimo', low: 'Bajo', medium: 'Medio', high: 'Alto',
   xhigh: 'Muy alto', max: 'Máximo', ultra: 'Ultra', on: 'Thinking activado',
 };
 
@@ -18,9 +18,9 @@ const labels: Record<ResearchEffort, string> = {
  * where the ladder comes with it). `field` renders the trigger as a form field, for the
  * Deep Research and Immersion forms; the Research chat composer uses the compact one.
  */
-export function ResearchEffortControl({ model, value, onChange, disabled, variant = 'composer', testId, className = '' }: {
+export function ResearchEffortControl({ model, value, onChange, disabled, variant = 'composer', label = false, testId, className = '' }: {
   model: ModelRef | null; value: ResearchEffort; onChange: (effort: ResearchEffort) => void; disabled: boolean;
-  variant?: 'composer' | 'field'; testId?: string; className?: string;
+  variant?: 'composer' | 'field'; label?: boolean; testId?: string; className?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<CSSProperties>({});
@@ -29,17 +29,11 @@ export function ResearchEffortControl({ model, value, onChange, disabled, varian
   const slider = useRef<HTMLInputElement>(null);
   const id = useId();
   const info = useResearchModelInfo(model);
-  const profile = useMemo(
-    () => researchReasoningProfile(model, info),
-    [model?.provider, model?.model, info]
-  );
-  const choices = useMemo(() => researchEffortChoices(profile), [profile]);
-  const index = Math.max(0, choices.indexOf(value));
+  const choices = useMemo(() => researchAdvertisedEfforts(info), [info]);
+  const index = Math.max(0, choices.indexOf(value as NativeResearchEffort));
   const current = choices[index];
-  const description = profile.levels.length === 0 ? t('Este modelo no publica un control de thinking.')
-    : current !== 'standard' ? t('Más esfuerzo puede mejorar tareas complejas y tardar más.')
-    : ['none', 'off'].includes(profile.levels[0]) ? t('Thinking desactivado por defecto.')
-    : t('Este modelo requiere thinking; estándar usa el mínimo disponible.');
+  const description = ['none', 'off'].includes(current) ? t('Desactivado')
+    : t('Más esfuerzo puede mejorar tareas complejas y tardar más.');
 
   useEffect(() => { setOpen(false); }, [model?.provider, model?.model]);
 
@@ -80,7 +74,9 @@ export function ResearchEffortControl({ model, value, onChange, disabled, varian
 
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
-  return <>
+  if (!choices.length) return null;
+
+  const content = <>
     <button ref={trigger} type="button" className={`${variant === 'field' ? 'research-effort-field input' : 'research-effort-trigger'} ${className}`} disabled={disabled || !model} data-testid={testId}
       aria-label={`${t('Esfuerzo de thinking')}: ${t(labels[current])}`} aria-haspopup="dialog" aria-expanded={open}
       aria-controls={open ? id : undefined} onClick={() => setOpen(!open)}>
@@ -101,4 +97,8 @@ export function ResearchEffortControl({ model, value, onChange, disabled, varian
       <p id={`${id}-description`} className="research-effort-description">{description}</p>
     </div>, document.body)}
   </>;
+  return label ? <div className="block min-w-0">
+    <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Esfuerzo de thinking')}</span>
+    {content}
+  </div> : content;
 }

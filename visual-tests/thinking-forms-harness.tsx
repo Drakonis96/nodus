@@ -36,7 +36,18 @@ win.nodus = new Proxy({
     sessionStorage.setItem('prefs', JSON.stringify(win.prefs));
     return { ...settings, ...win.prefs };
   },
-  listModels: async () => [{ id: model.model, reasoning: true, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'].map(reasoningEffort => ({ reasoningEffort })) }],
+  // Synthetic catalogues are explicit fixtures, not inferred production capabilities.
+  listModels: async () => {
+    if (params.get('catalog') === 'error') throw new Error('Catalogue unavailable');
+    const levels = params.get('catalog') === 'absent' ? undefined : ({
+      'openai:gpt-5.4': ['none', 'low', 'medium', 'high', 'xhigh'],
+      'deepseek:deepseek-flash': ['low', 'high', 'max'],
+      'gemini:gemini-3-pro-preview': ['low', 'high'],
+      'anthropic:claude-opus-4-7': ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+      'codex:gpt-5.5': ['low', 'medium', 'high', 'xhigh'],
+    } as Record<string, string[]>)[`${provider}:${model.model}`];
+    return [{ id: model.model, reasoning: true, researchReasoningLevels: levels }];
+  },
   listDocumentSkills: async () => [],
   getActiveVault: async () => ({ id: 'vault', type: 'academic' }),
 }, { get(target: any, key: string) { return target[key] ?? (key.startsWith('on') ? () => () => {} : async () => []); } });

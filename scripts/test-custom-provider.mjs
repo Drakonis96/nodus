@@ -81,7 +81,7 @@ async function fakeGateway({ catalogue }) {
       return;
     }
     response.writeHead(200, { 'content-type': 'application/json' });
-    response.end(JSON.stringify({ data: catalogue.map((id) => ({ id })) }));
+    response.end(JSON.stringify({ data: catalogue.map((model) => typeof model === 'string' ? { id: model } : model) }));
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   return {
@@ -284,4 +284,51 @@ test('the reasoning-model heuristic only matches ids that announce it', () => {
   assert.equal(looksLikeReasoningModelId('gpt-4o'), false);
   assert.equal(looksLikeReasoningModelId(''), false);
   assert.equal(looksLikeReasoningModelId(undefined), false);
+});
+
+
+test('model catalogue preserves advertised native efforts without manufacturing a ladder', async () => {
+  const gateway = await fakeGateway({ catalogue: [
+    { id: 'deepseek-flash', effort: { supported_levels: ['low', 'high', 'max'], default_level: 'high' } },
+    { id: 'unknown', effort: { supported_levels: ['high', 'low', 'high', 'standard', 'turbo'] } },
+    { id: 'gpt-5.4', capabilities: { reasoning: true } },
+    { id: 'malformed', effort: { supported_levels: 'low' } },
+  ] });
+  try {
+    configure(`${gateway.origin}/v1`, ['deepseek-flash']);
+    const models = await listModels('custom', null);
+    assert.deepEqual(models.find(m => m.id === 'deepseek-flash').researchReasoningLevels, ['low', 'high', 'max']);
+    assert.deepEqual(models.find(m => m.id === 'unknown').researchReasoningLevels, ['high', 'low']);
+    assert.deepEqual(models.find(m => m.id === 'gpt-5.4').researchReasoningLevels, []);
+    assert.deepEqual(models.find(m => m.id === 'malformed').researchReasoningLevels, []);
+  } finally { await gateway.close(); }
+});
+
+
+test('DeepSeek, Anthropic and OpenRouter read their native effort metadata', async () => {
+  const original = globalThis.fetch;
+  const fixtures = {
+    deepseek: [
+      { id: 'deepseek-flash', effort: { supported_levels: ['low', 'high', 'max'] } },
+      { id: 'deepseek-pro' },
+    ],
+    anthropic: [
+      { id: 'claude-opus-4-7', capabilities: { effort: { supported: true, max: { supported: true }, xhigh: { supported: false }, medium: { supported: true }, low: { supported: true } } } },
+      { id: 'claude-unknown', capabilities: { effort: { supported: false, high: { supported: true } } } },
+    ],
+    openrouter: [
+      { id: 'deepseek/deepseek-v4-flash', reasoning: { supported_efforts: ['xhigh', 'high'] } },
+      { id: 'openai/gpt-5.4', supported_parameters: ['reasoning'] },
+    ],
+  };
+  globalThis.fetch = async url => Response.json({ data: fixtures[Object.keys(fixtures).find(provider => String(url).includes(provider))] });
+  try {
+    assert.deepEqual((await listModels('deepseek', 'fixture')).map(m => m.researchReasoningLevels), [['low', 'high', 'max'], []]);
+    const anthropic = await listModels('anthropic', 'fixture');
+    assert.deepEqual(anthropic.find(m => m.id === 'claude-opus-4-7').researchReasoningLevels, ['low', 'medium', 'max']);
+    assert.deepEqual(anthropic.find(m => m.id === 'claude-unknown').researchReasoningLevels, []);
+    const router = await listModels('openrouter', null);
+    assert.deepEqual(router.find(m => m.id === 'deepseek/deepseek-v4-flash').researchReasoningLevels, ['high', 'xhigh']);
+    assert.deepEqual(router.find(m => m.id === 'openai/gpt-5.4').researchReasoningLevels, []);
+  } finally { globalThis.fetch = original; }
 });

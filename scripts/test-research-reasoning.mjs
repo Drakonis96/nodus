@@ -9,7 +9,7 @@ import { researchOpenAiModels } from './fixtures/research-openai-models.mjs';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'research-reasoning-'));
 await build({ entryPoints: ['shared/researchReasoning.ts'], outfile: path.join(dir, 'reasoning.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { researchReasoningProfile: profile, researchEffortChoices: choices, researchReasoningBody: body, resolveResearchEffort: resolve, researchOmitsTemperature: omit } = await import(pathToFileURL(path.join(dir, 'reasoning.mjs')));
+const { researchReasoningProfile: profile, researchEffortChoices: choices, researchReasoningBody: body, resolveResearchEffort: resolve, researchOmitsTemperature: omit, researchAdvertisedEfforts: advertised } = await import(pathToFileURL(path.join(dir, 'reasoning.mjs')));
 const ref = (provider, model) => ({ provider, model });
 const request = (provider, model, effort = 'standard', info) => body(ref(provider, model), effort, 16000, info);
 test.after(() => rm(dir, { recursive: true, force: true }));
@@ -18,7 +18,7 @@ for (const { model, levels } of researchOpenAiModels) {
   test(`${model}: every selectable effort matches its API contract`, () => {
     const p = profile(ref('openai', model));
     assert.deepEqual(p.levels, levels);
-    assert.deepEqual(choices(p), ['standard', ...levels.slice(1)]);
+    assert.deepEqual(choices(p), levels);
     for (const [index, effort] of choices(p).entries()) {
       assert.equal(request('openai', model, effort).reasoning_effort, levels[index]);
     }
@@ -42,7 +42,7 @@ test('Gemini minimum is explicit; Pro never gets a disabling value', () => {
   assert.deepEqual(config('gemini-2.5-flash'), { thinking_budget: 0 });
   assert.deepEqual(config('gemini-2.5-pro'), { thinking_budget: 1024 });
   assert.deepEqual(config('gemini-3-pro-preview'), { thinking_level: 'low' });
-  assert.deepEqual(choices(profile(ref('gemini', 'gemini-3-pro-preview'))), ['standard', 'high']);
+  assert.deepEqual(choices(profile(ref('gemini', 'gemini-3-pro-preview'))), ['low', 'high']);
   assert.deepEqual(config('gemini-3-flash-preview'), { thinking_level: 'minimal' });
   assert.deepEqual(config('gemini-3.8-flash'), { thinking_level: 'low' });
   assert.deepEqual(config('gemini-3.1-pro-preview', 'medium'), { thinking_level: 'medium' });
@@ -59,11 +59,11 @@ test('Claude uses manual budgets or adaptive thinking with legal effort values',
 test('DeepSeek, MiMo and hosted open models expose real levels, including toggles', () => {
   assert.deepEqual(request('deepseek', 'deepseek-v4-flash'), { thinking: { type: 'disabled' } });
   assert.deepEqual(request('deepseek', 'deepseek-v4-pro', 'max'), { thinking: { type: 'enabled' }, reasoning_effort: 'max' });
-  assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-v4-pro'))), ['standard', 'low', 'high', 'max']);
+  assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-v4-pro'))), ['none', 'low', 'high', 'max']);
   // The unversioned ids are the same served model and must get the same toggle/budget.
   assert.deepEqual(request('deepseek', 'deepseek-flash'), { thinking: { type: 'disabled' } });
   assert.deepEqual(request('deepseek', 'deepseek-pro', 'max'), { thinking: { type: 'enabled' }, reasoning_effort: 'max' });
-  assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-flash'))), ['standard', 'low', 'high', 'max']);
+  assert.deepEqual(choices(profile(ref('deepseek', 'deepseek-flash'))), ['none', 'low', 'high', 'max']);
   // The live native catalogue serves exactly these two ids; a served model must never fall
   // back to "no control published", which is what the `/v4/`-only match did to the new one.
   for (const model of ['deepseek-flash', 'deepseek-v4-pro']) {
@@ -83,9 +83,8 @@ test('the OpenCode Go route gives the unversioned DeepSeek ids the same levels a
   // while the model itself reasons by default.
   assert.deepEqual(request('opencode-go', 'deepseek-flash'), { reasoning_effort: 'low' });
   assert.deepEqual(request('opencode-go', 'deepseek-flash', 'max'), { reasoning_effort: 'max' });
-  // "Standard" is the floor on this route — the slider reads Standard/High/Max, exactly
-  // like the pinned sibling's.
-  assert.deepEqual(choices(profile(ref('opencode-go', 'deepseek-flash'))), ['standard', 'high', 'max']);
+  // Legacy Standard remains the floor on this route; native choices keep their names.
+  assert.deepEqual(choices(profile(ref('opencode-go', 'deepseek-flash'))), ['low', 'high', 'max']);
   assert.deepEqual(profile(ref('opencode-go', 'deepseek-pro')).levels, profile(ref('opencode-go', 'deepseek-v4-flash')).levels);
   assert.deepEqual(choices(profile(ref('opencode-go', 'deepseek-flash'))), choices(profile(ref('opencode-go', 'deepseek-v4-flash'))));
   // The pinned sibling keeps its contract, and the two routes stay distinct: the Go route
@@ -94,12 +93,12 @@ test('the OpenCode Go route gives the unversioned DeepSeek ids the same levels a
   assert.deepEqual(request('deepseek', 'deepseek-flash', 'high'), { thinking: { type: 'enabled' }, reasoning_effort: 'high' });
 });
 
-test('subscription and LM Studio catalogues are authoritative and sorted', () => {
+test('subscription and LM Studio catalogues preserve the provider display order', () => {
   const info = { id: 'model', supportedReasoningEfforts: ['xhigh', 'low', 'high', 'medium'].map(reasoningEffort => ({ reasoningEffort, description: '' })) };
   for (const provider of ['codex', 'github-copilot']) {
     const p = profile(ref(provider, 'model'), info);
     assert.equal(resolve(p, 'standard'), 'low');
-    assert.deepEqual(choices(p), ['standard', 'medium', 'high', 'xhigh']);
+    assert.deepEqual(choices(p), ['xhigh', 'low', 'high', 'medium']);
     assert.equal(resolve(p, 'ultra'), 'low');
   }
   const local = { id: 'model', researchReasoningLevels: ['on', 'off'] };
@@ -165,4 +164,25 @@ test('OpenCode Go carries thinking through all three protocols', async () => {
     await run('gpt-5.6-sol', 'max'); assert.deepEqual(seen.at(-1).body.reasoning, { effort: 'max' });
     await run('gpt-5.6-sol', 'standard'); assert.deepEqual(seen.at(-1).body.reasoning, { effort: 'none' });
   } finally { globalThis.fetch = original; }
+});
+
+
+test('picker choices require exact provider metadata; no Standard or inferred levels', () => {
+  for (const info of [undefined, { id: 'deepseek-flash' }, { id: 'gpt-5.4', reasoning: true }, { id: 'unknown', supported_parameters: ['reasoning'] }]) {
+    assert.deepEqual(advertised(info), []);
+  }
+  const info = { id: 'deepseek-flash', researchReasoningLevels: ['low', 'high', 'max'] };
+  assert.deepEqual(advertised(info), ['low', 'high', 'max']);
+  for (const effort of advertised(info)) assert.deepEqual(request('deepseek', info.id, effort, info), { thinking: { type: 'enabled' }, reasoning_effort: effort });
+  assert.deepEqual(request('deepseek', info.id, 'standard', info), { thinking: { type: 'disabled' } }, 'internal bounded validators retain their legacy budget');
+  assert.deepEqual(advertised({ id: 'new', researchReasoningLevels: ['high', 'low', 'high', 'standard', 'turbo', null] }), ['high', 'low']);
+  assert.deepEqual(request('custom', 'new-model', 'medium', { id: 'new-model', researchReasoningLevels: ['low', 'medium'] }), { reasoning_effort: 'medium' }, 'a new model can publish its own levels');
+});
+
+
+test('native metadata can add transport levels without changing legacy validators', () => {
+  const info = { id: 'deepseek/deepseek-v4-flash', researchReasoningLevels: ['high', 'xhigh'] };
+  assert.deepEqual(request('openrouter', info.id, 'xhigh', info), { reasoning: { effort: 'xhigh' } });
+  const claude = { id: 'claude-next', researchReasoningLevels: ['low', 'medium', 'high'] };
+  assert.deepEqual(request('anthropic', claude.id, 'medium', claude), { output_config: { effort: 'medium' } });
 });

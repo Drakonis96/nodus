@@ -33,11 +33,12 @@ try {
   const models = page.locator('select').first();
   // A level belongs to the model it was picked for.
   await models.selectOption('deepseek::deepseek-flash');
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).count(), 1, 'a model that was never used opens on its middle level (DeepSeek: low, the lighter of low and high)');
   await models.selectOption('openai::gpt-5.4');
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Alto', exact: true }).count(), 1, 'reopening a model restores the level picked for it');
   await models.selectOption('gemini::gemini-3-pro-preview');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).click();
   assert.equal(await slider.getAttribute('max'), '1');
   await slider.press('Escape');
   await models.selectOption('codex::gpt-6-astra');
@@ -51,9 +52,7 @@ try {
   await models.selectOption('codex::gpt-6-astra');
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Ultra', exact: true }).count(), 1, 'a catalogue-driven model restores its level too');
   await models.selectOption('openai::gpt-4.1');
-  await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).click();
-  assert.equal(await slider.count(), 0);
-  await page.keyboard.press('Escape');
+  assert.equal(await page.getByRole('button', { name: /Esfuerzo de thinking:/ }).count(), 0, 'no selector when no levels are published');
   await input.fill('Pregunta estándar'); await input.press('Enter');
   await page.waitForFunction(() => window.requests.length === 2);
   assert.equal(await page.evaluate(() => window.requests[1].thinkingEffort), 'standard');
@@ -85,9 +84,11 @@ try {
   assert.equal(await page.evaluate(() => window.requests[0].thinkingEffort), 'xhigh', 'the remembered level is restored on open and sent');
   const restoredModels = page.locator('select').first();
   await restoredModels.selectOption('deepseek::deepseek-flash');
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Máximo', exact: true }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Máximo', exact: true }).count(), 1, 'every model keeps its own remembered level');
   await restoredModels.selectOption('gemini::gemini-3-pro-preview');
-  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Estándar', exact: true }).count(), 1, 'and a model with no memory opens on its middle level (Gemini 3 Pro: low, its Standard)');
+  await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Esfuerzo de thinking: Bajo', exact: true }).count(), 1, 'and a model with no memory opens on its middle level (Gemini 3 Pro: low)');
   // A remembered level the model no longer publishes — a catalogue that changed under the
   // memory — is never shown or sent: the model opens on its middle level instead, and the
   // store is left alone until the user picks.

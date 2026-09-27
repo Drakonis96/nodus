@@ -1,6 +1,6 @@
 // The Deep Research and Immersion forms offer the model's thinking levels, open on the
 // middle one (medium, or the level nearest to it), remember what the user picks per
-// provider+model — Standard included — and send it with the request. And a skill with tools
+// provider+model — Disabled included — and send it with the request. And a skill with tools
 // looks like any other skill in the picker: only its tag tells it apart.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
@@ -27,7 +27,7 @@ try {
     await page.getByTestId(testId).click();
     const slider = page.getByRole('slider', { name: 'Esfuerzo de thinking' });
     await slider.waitFor();
-    assert.equal(await slider.getAttribute('max'), '4', `${view}: five stops, Standard to Very high`);
+    assert.equal(await slider.getAttribute('max'), '4', `${view}: five stops, Disabled to Very high`);
     const panel = await page.getByRole('dialog', { name: 'Esfuerzo de thinking' }).boundingBox();
     assert.ok(panel.y >= 0 && panel.y + panel.height <= 900, `${view}: the balloon stays in the window`);
     await page.screenshot({ path: `${output}/${view}-open.png` });
@@ -37,7 +37,7 @@ try {
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: submit }).click();
     assert.deepEqual(await page.evaluate(() => window.sent.at(-1)?.thinkingEffort), 'xhigh', `${view}: the request carries the level`);
-    // Reopening the form restores it; Standard, once picked, is remembered too.
+    // Reopening the form restores it; Disabled, once picked, is remembered too.
     await open(`view=${view}&model=openai:gpt-5.4`);
     await page.getByTestId(testId).waitFor();
     await page.waitForFunction(id => document.querySelector(`[data-testid="${id}"]`)?.textContent?.includes('Muy alto'), testId);
@@ -45,15 +45,29 @@ try {
     await page.getByRole('slider', { name: 'Esfuerzo de thinking' }).press('Home');
     await page.keyboard.press('Escape');
     await open(`view=${view}&model=openai:gpt-5.4`);
-    await page.waitForFunction(id => document.querySelector(`[data-testid="${id}"]`)?.textContent?.includes('Estándar'), testId);
-    assert.equal(await label(testId), 'Estándar', `${view}: Standard, once chosen, stays chosen`);
+    await page.waitForFunction(id => document.querySelector(`[data-testid="${id}"]`)?.textContent?.includes('Desactivado'), testId);
+    assert.equal(await label(testId), 'Desactivado', `${view}: Disabled, once chosen, stays chosen`);
     // Other ladders: the level nearest to medium, the lighter one on a tie.
-    for (const [model, expected] of [['deepseek:deepseek-flash', 'Bajo'], ['gemini:gemini-3-pro-preview', 'Estándar'], ['anthropic:claude-opus-4-7', 'Medio'], ['codex:gpt-5.5', 'Medio']]) {
+    for (const [model, expected] of [['deepseek:deepseek-flash', 'Bajo'], ['gemini:gemini-3-pro-preview', 'Bajo'], ['anthropic:claude-opus-4-7', 'Medio'], ['codex:gpt-5.5', 'Medio']]) {
       await open(`view=${view}&model=${model}`, true);
       await page.getByTestId(testId).waitFor();
       await page.waitForFunction(([id, text]) => document.querySelector(`[data-testid="${id}"]`)?.textContent?.includes(text), [testId, expected]);
       assert.equal(await label(testId), expected, `${view}: ${model} opens on ${expected}`);
     }
+    for (const catalog of ['absent', 'error']) {
+      await open(`view=${view}&model=deepseek:deepseek-flash&catalog=${catalog}`, true);
+      await page.getByRole('button', { name: submit }).waitFor();
+      assert.equal(await page.getByTestId(testId).count(), 0, `${view}: no invented levels when catalogue is ${catalog}`);
+    }
+    await open(`view=${view}&model=deepseek:deepseek-flash`, true);
+    await page.getByTestId(testId).click();
+    const nativeSlider = page.getByRole('slider', { name: 'Esfuerzo de thinking' });
+    assert.equal(await nativeSlider.getAttribute('max'), '2', 'DeepSeek has exactly three native levels');
+    await nativeSlider.press('Home');
+    assert.equal(await nativeSlider.getAttribute('aria-valuetext'), 'Bajo');
+    await nativeSlider.press('End');
+    assert.equal(await nativeSlider.getAttribute('aria-valuetext'), 'Máximo');
+    await page.screenshot({ path: `${output}/${view}-deepseek-native.png` });
     await open(`view=${view}&model=openai:gpt-5.4&theme=dark`, true);
     await page.getByTestId(testId).waitFor();
     await page.screenshot({ path: `${output}/${view}-dark.png` });
@@ -70,5 +84,5 @@ try {
   assert.equal(await card('prompt-on').getByText('Con herramientas', { exact: true }).count(), 0);
   await page.screenshot({ path: `${output}/skills.png` });
   assert.deepEqual(errors, []);
-  console.log('Thinking forms: Deep Research and Immersion open on the middle level of each ladder, remember picks per model (Standard included) and send them; tool skills share the ordinary card. No paid calls.');
+  console.log('Thinking forms: Deep Research and Immersion open on the middle level of each ladder, remember picks per model (Disabled included) and send them; tool skills share the ordinary card. No paid calls.');
 } finally { await browser.close(); }

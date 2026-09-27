@@ -33,13 +33,22 @@ if (!process.argv.includes('--electron-research-effort')) {
   const {
     researchEffortMemoryKey: memoryKey,
     withResearchEffort,
-    researchEffortFor,
+    researchEffortFor: effortFor,
     researchReasoningBody,
     researchDefaultEffort,
     researchReasoningProfile,
   } = await import(pathToFileURL(moduleFile).href);
 
   // ---- 1. One selection, one key -------------------------------------------------------
+  const catalogs = {
+    'deepseek:deepseek-flash': ['low', 'high', 'max'],
+    'deepseek:deepseek-pro': ['low', 'high', 'max'],
+    'opencode-go:deepseek-flash': ['low', 'high', 'max'],
+    'openai:gpt-5.4': ['none', 'low', 'medium', 'high', 'xhigh'],
+    'openrouter:xiaomi/mimo-v2.5': ['off', 'on'],
+  };
+  const researchEffortFor = (memory, ref) => effortFor(memory, ref, ref && catalogs[`${ref.provider}:${ref.model}`]
+    ? { id: ref.model, researchReasoningLevels: catalogs[`${ref.provider}:${ref.model}`] } : undefined);
   const deepseekFlash = { provider: 'deepseek', model: 'deepseek-flash' };
   const openCodeFlash = { provider: 'opencode-go', model: 'deepseek-flash' };
   const routedXiaomi = { provider: 'openrouter', model: 'xiaomi/mimo-v2.5' };
@@ -64,7 +73,7 @@ if (!process.argv.includes('--electron-research-effort')) {
   assert.deepEqual(withResearchEffort(undefined, deepseekFlash, 'max'), { 'deepseek:deepseek-flash': 'max' }, 'the first choice works with no map yet');
 
   // ---- 3. Reading it back --------------------------------------------------------------
-  // DeepSeek publishes none, low, high and max: no medium, so its middle is the lighter of
+  // The synthetic DeepSeek catalogue publishes low, high and max: no medium, so its middle is the lighter of
   // the two nearest (low).
   assert.equal(researchEffortFor(both, deepseekFlash), 'max');
   assert.equal(researchEffortFor(both, openCodeFlash), 'high', 'one provider\'s level never answers for another provider');
@@ -73,11 +82,14 @@ if (!process.argv.includes('--electron-research-effort')) {
   assert.equal(researchEffortFor(undefined, deepseekFlash), 'low', 'a model never used opens on its middle level');
   assert.equal(researchEffortFor({ 'deepseek:deepseek-flash': 'turbo' }, deepseekFlash), 'low', 'a hand-edited file cannot inject a level this build does not know');
   assert.equal(researchEffortFor({ 'deepseek:deepseek-flash': 7 }, deepseekFlash), 'low');
-  assert.equal(researchEffortFor({ 'deepseek:deepseek-flash': 'standard' }, deepseekFlash), 'standard', 'Standard, once chosen, is remembered');
+  assert.equal(researchEffortFor({ 'deepseek:deepseek-flash': 'standard' }, deepseekFlash), 'low', 'legacy Standard is replaced by an advertised native choice');
   assert.equal(researchEffortFor({ 'openai:gpt-5.4': 'max' }, { provider: 'openai', model: 'gpt-5.4' }), 'medium',
     'a remembered level the model no longer publishes gives way to its middle level');
   assert.equal(researchEffortFor({ 'openrouter:vendor/new': 'xhigh' }, { provider: 'openrouter', model: 'vendor/new' }), 'xhigh',
     'a catalogue-driven model keeps its remembered level until its catalogue says otherwise');
+
+  assert.equal(effortFor({ 'deepseek:deepseek-flash': 'max' }, deepseekFlash, { id: deepseekFlash.model }), 'standard', 'no published levels means no picker override');
+  assert.equal(effortFor({ 'openai:gpt-5.4': 'standard' }, { provider: 'openai', model: 'gpt-5.4' }, { id: 'gpt-5.4', researchReasoningLevels: ['none', 'low', 'high'] }), 'none', 'an advertised off level preserves the old preference');
 
   // ---- 3b. The middle of every kind of ladder -------------------------------------------
   const middle = (provider, model) => researchDefaultEffort(researchReasoningProfile({ provider, model }));
@@ -85,10 +97,10 @@ if (!process.argv.includes('--electron-research-effort')) {
   assert.equal(middle('openai', 'gpt-6'), 'medium', 'low … max: medium');
   assert.equal(middle('anthropic', 'claude-opus-4-7'), 'medium');
   assert.equal(middle('gemini', 'gemini-3-flash-preview'), 'medium', 'minimal … high: medium');
-  assert.equal(middle('gemini', 'gemini-3-pro-preview'), 'standard', 'low and high only: Standard, which is low for this model, on the tie');
+  assert.equal(middle('gemini', 'gemini-3-pro-preview'), 'low', 'low and high only: Standard, which is low for this model, on the tie');
   assert.equal(middle('deepseek', 'deepseek-flash'), 'low', 'none, low, high, max: low');
-  assert.equal(middle('openai', 'gpt-5-pro'), 'standard', 'a single level has no middle but itself');
-  assert.equal(middle('xiaomi', 'mimo-v2.5'), 'standard', 'an on/off switch has no middle and stays on Standard');
+  assert.equal(middle('openai', 'gpt-5-pro'), 'high', 'a single level has no middle but itself');
+  assert.equal(middle('xiaomi', 'mimo-v2.5'), 'none', 'an on/off switch has no middle and stays on Standard');
   assert.equal(middle('openai', 'gpt-4o'), 'standard', 'a model with no thinking control has nothing to choose');
   assert.equal(researchDefaultEffort(researchReasoningProfile({ provider: 'openrouter', model: 'vendor/model' }, { id: 'vendor/model', reasoning: true })), 'medium',
     'a routed model\'s ladder from its catalogue has a medium');

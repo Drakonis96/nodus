@@ -50,7 +50,7 @@ export function thinkingOutputAllowance(model: ModelRef, effort: ResearchEffort,
 /** The live catalogue entry for providers whose thinking levels come with it. Known
  *  families still work when the catalogue cannot be read, so a failure is not an error. */
 export async function thinkingCatalogInfo(model: ModelRef, signal?: AbortSignal): Promise<ModelInfo | undefined> {
-  if (!['openrouter', 'lmstudio'].includes(model.provider)) return undefined;
+  if (!['anthropic', 'deepseek', 'openai', 'custom', 'groq', 'cerebras', 'xiaomi', 'openrouter', 'lmstudio'].includes(model.provider)) return undefined;
   try {
     const deadline = AbortSignal.timeout(5000);
     return (await listModels(model.provider, getApiKey(model.provider), signal ? AbortSignal.any([signal, deadline]) : deadline)).find(entry => entry.id === model.model);
