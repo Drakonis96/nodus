@@ -67,11 +67,19 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
       const theme_id = getOrCreateTheme(normalizeThemeLabel(label));
       db.prepare('INSERT OR IGNORE INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run(nodusId, theme_id);
     }
-    // Prune orphan auto-themes, but keep user-curated (pinned) ones so they survive a
-    // reprocess even before any work is assigned to them.
-    db.prepare(
-      'DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)'
-    ).run();
+    // No global prune here. This runs per-work, from deepScan.ts and lightScan.ts,
+    // inside THAT work's own transaction, at a point where this work's own idea-level
+    // theme links (idea_theme_links) may not be rewritten yet (deepScan.ts calls this
+    // via unionWorkThemes BEFORE its per-idea setIdeaThemeLinks loop). A "delete any
+    // theme nothing anywhere currently references" sweep run at that moment can delete
+    // a theme a DIFFERENT, unrelated work's committed idea_theme_links row still needs —
+    // getOrCreateTheme silently mints a fresh theme_id for the scanning work's own
+    // re-add, so its own data stays consistent, but the other work is left holding a
+    // theme_id that no longer exists (found via scripts/audit-graph-integrity.mjs: 1,005
+    // such dangling references across 60 works on a real vault). Orphan-theme cleanup
+    // belongs only where it can see a complete, already-finished picture: reprocessConnections()
+    // calls pruneOrphanThemes() explicitly, once, after every idea/work it touches in a
+    // pass has already been rewritten — that call is unaffected by removing this one.
   });
   tx();
 }
