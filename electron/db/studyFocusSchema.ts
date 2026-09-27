@@ -14,3 +14,9 @@ CREATE TABLE IF NOT EXISTS study_focus_intervals (
 CREATE INDEX IF NOT EXISTS idx_study_focus_intervals_day ON study_focus_intervals(day);
 CREATE INDEX IF NOT EXISTS idx_study_focus_sessions_started ON study_focus_sessions(started_at);
 `;
+
+/** Migration 195: what the student meant to do with each block (optional, free text). */
+export function ensureStudyFocusTaskColumn(db: { prepare(sql: string): { all(): unknown[] }; exec(sql: string): unknown }): void {
+  const columns = db.prepare('PRAGMA table_info(study_focus_sessions)').all() as Array<{ name: string }>;
+  if (!columns.some((column) => column.name === 'task')) db.exec('ALTER TABLE study_focus_sessions ADD COLUMN task TEXT');
+}

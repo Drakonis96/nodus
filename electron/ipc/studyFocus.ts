@@ -32,8 +32,11 @@ export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
   h('studyFocus:configure', (_e, id: string, patch: Partial<FocusPreferences>) => {
     checkVault(id); current().configure(patch); emit(); return snapshot();
   });
-  h('studyFocus:act', (_e, id: string, action: FocusAction, revision: number, subjectId?: string | null) => {
-    checkVault(id); current().act(action, revision, subjectId); emit(); return snapshot();
+  h('studyFocus:act', (_e, id: string, action: FocusAction, revision: number, subjectId?: string | null, task?: string | null) => {
+    checkVault(id);
+    if (subjectId !== undefined && subjectId !== null && typeof subjectId !== 'string') throw new Error('Valor inválido.');
+    if (task !== undefined && task !== null && typeof task !== 'string') throw new Error('Valor inválido.');
+    current().act(action, revision, subjectId, task); emit(); return snapshot();
   });
   h('studyFocus:stats', () => current().stats());
   h('studyFocus:distractions', (_e, value: boolean) => {

@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { DEFAULT_FOCUS_PREFERENCES, focusDayKey, splitFocusInterval } from '../../shared/studyFocus';
+import { DEFAULT_FOCUS_PREFERENCES, focusDayKey, normalizeFocusTask, splitFocusInterval } from '../../shared/studyFocus';
 import type { FocusAction, FocusPreferences, FocusState, FocusStats } from '../../shared/studyFocus';
 
 /** Owns one vault connection. All transitions and interval writes are one transaction. */
@@ -11,10 +11,14 @@ export class FocusService {
   private wallAnchor = 0;
   constructor(private db: Database.Database, private now = () => Date.now(), private monotonic = () => performance.now(), private completed: (state: FocusState) => void = () => {}) {
     const row = db.prepare('SELECT state_json FROM study_focus_state WHERE id = 1').get() as { state_json: string } | undefined;
-    this.state = row ? JSON.parse(row.state_json) : {
+    const stored = row ? JSON.parse(row.state_json) as Partial<FocusState> : null;
+    // State written before migration 195 has no `task`; older fields keep their value.
+    this.state = {
       revision: 0, phase: 'work', status: 'ready', durationMs: 25 * 60000, elapsedMs: 0,
-      cycleBlocks: 0, sessionId: null, subjectId: null, recovered: false, preferences: { ...DEFAULT_FOCUS_PREFERENCES },
-    };
+      cycleBlocks: 0, sessionId: null, subjectId: null, task: null, recovered: false,
+      ...stored,
+      preferences: { ...DEFAULT_FOCUS_PREFERENCES, ...stored?.preferences },
+    } as FocusState;
     if (this.state.status === 'running') {
       this.state.status = 'paused';
       this.state.recovered = true;
@@ -78,7 +82,8 @@ export class FocusService {
     try { this.persist(); } catch (error) { this.state.preferences = previous; throw error; }
     return this.snapshot();
   }
-  act(action: FocusAction, revision: number, subjectId: string | null = null) {
+  /** `subjectId` and `task` apply to `start`; undefined keeps the previous block's, null clears it. */
+  act(action: FocusAction, revision: number, subjectId?: string | null, task?: string | null) {
     // Stale / duplicated commands cannot start a subsequent phase or resume a new session.
     if (revision !== this.state.revision) return this.snapshot();
     this.tick(true);
@@ -95,12 +100,19 @@ export class FocusService {
           s.phase = s.status === 'complete' && s.phase === 'work' ? (s.cycleBlocks % 4 === 0 ? 'longBreak' : 'break') : 'work';
           s.elapsedMs = 0;
           s.durationMs = s.preferences[s.phase === 'work' ? 'workMinutes' : s.phase === 'break' ? 'breakMinutes' : 'longBreakMinutes'] * 60000;
-          s.subjectId = subjectId;
+          // A break never asks again, so the subject and intention chosen for the
+          // previous block carry over to the next one unless the caller changes them.
+          if (subjectId !== undefined) s.subjectId = subjectId || null;
+          if (task !== undefined) s.task = normalizeFocusTask(task);
           s.sessionId = s.phase === 'work' ? randomUUID() : null;
           if (s.sessionId) {
-            const subject = subjectId ? this.db.prepare('SELECT name FROM study_subjects WHERE id = ?').get(subjectId) as { name: string } | undefined : undefined;
-            if (subjectId && !subject) throw new Error('Asignatura no encontrada.');
-            this.db.prepare("INSERT INTO study_focus_sessions (id, started_at, status, subject_id, subject_name) VALUES (?, ?, 'running', ?, ?)").run(s.sessionId, this.now(), subjectId, subject?.name ?? null);
+            let subject = s.subjectId ? this.db.prepare('SELECT name FROM study_subjects WHERE id = ? AND deleted_at IS NULL').get(s.subjectId) as { name: string } | undefined : undefined;
+            if (s.subjectId && !subject) {
+              // An explicit choice must exist; a carried-over one may have been deleted since.
+              if (subjectId) throw new Error('Asignatura no encontrada.');
+              s.subjectId = null; subject = undefined;
+            }
+            this.db.prepare("INSERT INTO study_focus_sessions (id, started_at, status, subject_id, subject_name, task) VALUES (?, ?, 'running', ?, ?, ?)").run(s.sessionId, this.now(), s.subjectId, subject?.name ?? null, s.task);
           }
           s.status = 'running';
         } else if (action === 'pause' || action === 'resume') {
@@ -132,7 +144,7 @@ export class FocusService {
       const day = focusDayKey(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 83 + i));
       return { day, milliseconds: byDay.get(day) ?? 0, blocks: byBlocks.get(day) ?? 0 };
     });
-    const recent = this.db.prepare('SELECT id, started_at AS startedAt, ended_at AS endedAt, milliseconds, status, subject_id AS subjectId, subject_name AS subjectName FROM study_focus_sessions ORDER BY started_at DESC, rowid DESC LIMIT 20').all() as FocusStats['recent'];
+    const recent = this.db.prepare('SELECT id, started_at AS startedAt, ended_at AS endedAt, milliseconds, status, subject_id AS subjectId, subject_name AS subjectName, task FROM study_focus_sessions ORDER BY started_at DESC, rowid DESC LIMIT 20').all() as FocusStats['recent'];
     return { days, recent };
   }
 }

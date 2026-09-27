@@ -14,18 +14,19 @@ const temp = mkdtempSync(path.join(tmpdir(), 'nodus-focus-test-'));
 try {
   buildSync({ entryPoints: ['electron/study/focusService.ts', 'electron/db/studyFocusSchema.ts', 'shared/studyFocus.ts'], outdir: temp, outbase: '.', bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' });
   const { FocusService } = require(path.join(temp, 'electron/study/focusService.js'));
-  const { STUDY_FOCUS_SQL } = require(path.join(temp, 'electron/db/studyFocusSchema.js'));
+  const { STUDY_FOCUS_SQL, ensureStudyFocusTaskColumn } = require(path.join(temp, 'electron/db/studyFocusSchema.js'));
   const { splitFocusInterval } = require(path.join(temp, 'shared/studyFocus.js'));
   const Database = require('better-sqlite3');
   let cases = 0;
   const check = (name, fn) => { fn(); cases++; console.log(`✓ ${name}`); };
   const fixture = (start = new Date(2026, 8, 27, 10).getTime(), file = ':memory:') => {
-    const db = new Database(file); db.exec(STUDY_FOCUS_SQL); db.exec('CREATE TABLE IF NOT EXISTS study_subjects (id TEXT, name TEXT)');
+    const db = new Database(file); db.exec(STUDY_FOCUS_SQL); db.exec('CREATE TABLE IF NOT EXISTS study_subjects (id TEXT, name TEXT, deleted_at TEXT)'); ensureStudyFocusTaskColumn(db);
     let wall = start, mono = 0, notices = 0;
     const make = () => new FocusService(db, () => wall, () => mono, () => { notices++; });
     let service = make();
     return { db, get service() { return service; }, advance(ms) { wall += ms; mono += ms; }, changeWall(ms) { wall += ms; }, restart() { service = make(); }, notices: () => notices,
-      act(action, subject = null) { return service.act(action, service.snapshot().revision, subject); } };
+      act(action, subject = null, task) { return service.act(action, service.snapshot().revision, subject, task); },
+      actKeeping(action) { return service.act(action, service.snapshot().revision); } };
   };
   check('four work blocks, manual transitions, long break, exactly one completion notice per phase', () => {
     const f = fixture(); f.service.configure({ workMinutes: 1, breakMinutes: 1, longBreakMinutes: 2 });
@@ -81,7 +82,7 @@ try {
     }
   });
   check('per-vault isolation, empty days, subject snapshots and reopen persistence', () => {
-    const a = fixture(); const b = fixture(); a.db.prepare('INSERT INTO study_subjects VALUES (?, ?)').run('history', 'Historia');
+    const a = fixture(); const b = fixture(); a.db.prepare('INSERT INTO study_subjects (id, name) VALUES (?, ?)').run('history', 'Historia');
     a.act('start', 'history'); a.advance(12345); a.service.pause(); a.restart();
     assert.equal(a.service.stats().recent[0].subjectName, 'Historia'); assert.equal(a.service.stats().recent[0].milliseconds, 12345);
     assert.equal(b.service.stats().recent.length, 0); assert.equal(b.service.stats().days.length, 84); assert.ok(b.service.stats().days.every(d => d.milliseconds === 0));
@@ -92,6 +93,30 @@ try {
     f.db.exec("CREATE TRIGGER reject_focus BEFORE INSERT ON study_focus_intervals BEGIN SELECT RAISE(ABORT, 'test failure'); END;");
     assert.throws(() => f.service.tick()); assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM study_focus_intervals').get().n, 0);
     f.db.exec('DROP TRIGGER reject_focus'); f.service.tick(); f.act('finish'); assert.equal(f.service.stats().days.at(-1).milliseconds, 15000); f.db.close();
+  });
+  check('subject and intention carry across the break into the next block until changed', () => {
+    const f = fixture(); f.db.prepare('INSERT INTO study_subjects (id, name) VALUES (?, ?)').run('history', 'Historia');
+    f.service.configure({ workMinutes: 1, breakMinutes: 1 });
+    f.act('start', 'history', '  Repasar   el tema 3 '); assert.equal(f.service.snapshot().task, 'Repasar el tema 3');
+    f.advance(60000); f.service.tick(); f.actKeeping('start'); assert.equal(f.service.snapshot().phase, 'break');
+    f.advance(60000); f.service.tick(); f.actKeeping('start');
+    const next = f.service.snapshot(); assert.equal(next.phase, 'work'); assert.equal(next.subjectId, 'history'); assert.equal(next.task, 'Repasar el tema 3');
+    assert.deepEqual(f.service.stats().recent.map(s => [s.subjectName, s.task]), [['Historia', 'Repasar el tema 3'], ['Historia', 'Repasar el tema 3']]);
+    f.act('finish'); f.act('start', null, ''); assert.equal(f.service.snapshot().subjectId, null); assert.equal(f.service.snapshot().task, null);
+    assert.equal(f.service.stats().recent[0].subjectName, null); f.db.close();
+  });
+  check('a carried-over subject deleted meanwhile is dropped; an explicit unknown one is refused', () => {
+    const f = fixture(); f.db.prepare('INSERT INTO study_subjects (id, name) VALUES (?, ?)').run('history', 'Historia');
+    f.act('start', 'history'); f.act('finish');
+    f.db.prepare("UPDATE study_subjects SET deleted_at = 'now' WHERE id = 'history'").run();
+    f.actKeeping('start'); assert.equal(f.service.snapshot().subjectId, null); assert.equal(f.service.stats().recent[0].subjectName, null);
+    f.act('finish'); assert.throws(() => f.act('start', 'missing'), /Asignatura no encontrada/); assert.equal(f.service.snapshot().status, 'ready'); f.db.close();
+  });
+  check('state saved before the intention existed still loads, with every default filled in', () => {
+    const f = fixture();
+    f.db.prepare('INSERT INTO study_focus_state (id, state_json) VALUES (1, ?)').run(JSON.stringify({ revision: 3, phase: 'work', status: 'ready', durationMs: 1500000, elapsedMs: 0, cycleBlocks: 2, sessionId: null, subjectId: null, recovered: false, preferences: { workMinutes: 30, breakMinutes: 5, longBreakMinutes: 15, dailyGoalMinutes: null } }));
+    f.restart(); const state = f.service.snapshot();
+    assert.equal(state.task, null); assert.equal(state.cycleBlocks, 2); assert.equal(state.preferences.workMinutes, 30); assert.equal(state.preferences.sound, true); f.db.close();
   });
   console.log(`${cases} focus integration cases passed (real SQLite).`);
 } finally { rmSync(temp, { recursive: true, force: true }); }
