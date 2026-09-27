@@ -235,26 +235,32 @@ try {
   await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   await page.screenshot({ path: path.join(os.tmpdir(), 'nodus-library-vault-filters-dark-wide.png'), fullPage: true });
 
+  // The filters are a balloon anchored to their button: a three-position switch per
+  // analysis condition, closed by clicking elsewhere, never reopened by itself.
+  const ideasSwitch = page.getByTestId('library-status-switch-ideas');
+  assert.equal(await ideasSwitch.getAttribute('data-state'), 'off');
+  await ideasSwitch.getByRole('radio', { name: 'Ideas extraídas', exact: true }).click();
+  assert.equal(await ideasSwitch.getAttribute('data-state'), 'pos');
+  await ideasSwitch.getByRole('radio', { name: 'Sin ideas extraídas', exact: true }).click();
+  assert.equal(await ideasSwitch.getAttribute('data-state'), 'neg');
+  await ideasSwitch.getByRole('radio', { name: 'Indiferente', exact: true }).click();
+  assert.equal(await ideasSwitch.getAttribute('data-state'), 'off');
   const unstartedFilter = page.getByRole('button', { name: 'Sin analizar', exact: true });
   await unstartedFilter.click();
   await page.locator('[data-tour="nav-home"]').click();
   await page.locator('[data-tour="nav-library"]').click();
+  assert.equal(await page.getByTestId('library-vault-filters-panel').count(), 0, 'the filter balloon closes when the section is left');
+  await vaultFiltersToggle.click();
   await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   assert.match(await unstartedFilter.getAttribute('class'), /is-active/, 'an active Library filter survives leaving the section');
   await unstartedFilter.click();
   await page.locator('[data-tour="nav-home"]').click();
   await page.locator('[data-tour="nav-library"]').click();
+  await vaultFiltersToggle.click();
   await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
   assert.doesNotMatch(await unstartedFilter.getAttribute('class'), /is-active/, 'an explicitly removed Library filter stays removed');
-  await vaultFiltersToggle.click();
-  await page.locator('[data-tour="nav-home"]').click();
-  await page.locator('[data-tour="nav-library"]').click();
-  assert.equal(await page.getByTestId('library-vault-filters-panel').count(), 0, 'an explicitly closed Library filter panel stays closed');
-  await vaultFiltersToggle.click();
-  await page.locator('[data-tour="nav-home"]').click();
-  await page.locator('[data-tour="nav-library"]').click();
-  await page.getByTestId('library-vault-filters-panel').waitFor({ state: 'visible' });
-  await vaultFiltersToggle.click();
+  await page.getByTestId('library-vault-search').click();
+  assert.equal(await page.getByTestId('library-vault-filters-panel').count(), 0, 'clicking elsewhere closes the balloon');
   await page.getByTestId('library-collections-menu-toggle').click();
   await page.getByTestId('library-collections-menu').waitFor({ state: 'visible' });
   assert.match(await page.getByTestId('open-nodus-collections').innerText(), /Colecciones de Nodus[\s\S]*Global/);

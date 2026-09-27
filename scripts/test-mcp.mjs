@@ -1162,7 +1162,9 @@ try {
   assert.ok(finished.job.savedDraftId, 'save=true files the finished report as a draft');
   assert.ok(finished.report.draft.title, 'includeReport returns the report itself');
   assert.equal(finished.report.meta.structure, 'single', 'MCP queue preserves the requested continuous structure');
-  assert.equal(finished.report.meta.sections, 1, 'the queued continuous report publishes one logical block');
+  assert.equal(finished.report.meta.sections, 0, 'a query without retrieved evidence returns a limitation, not a fabricated report section');
+  assert.deepEqual(finished.report.draft.outline, []);
+  assert.ok(finished.report.meta.stoppedReason, 'the evidence-free response explains why research stopped');
   assert.equal((finished.report.draft.draftMarkdown.match(/^#{1,6}\s+/gmu) ?? []).length, 0, 'the queued continuous report has no section headings');
   const savedByQueue = await callTool(server, 'nodus_list_writing_drafts', {
     sort: 'newest',

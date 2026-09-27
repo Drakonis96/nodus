@@ -22,6 +22,7 @@ import type {
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
+  LibraryVaultFileImportReport,
   LibraryBibliographyImportReport,
   LibraryDuplicateGroup,
   LibraryItemMetadata,
@@ -99,6 +100,8 @@ export interface LibraryApi {
   auditGlobalLibraryRecovery(): Promise<LibraryRecoveryReport>;
   importGlobalLibraryFiles(collectionId?: string | null): Promise<LibraryLocalImportReport>;
   importDroppedGlobalLibraryFiles(filePaths: string[], collectionId?: string | null): Promise<LibraryLocalImportReport>;
+  /** Dropped on a vault's Library: imported to the Global Library and used in that vault. */
+  importDroppedFilesIntoVault(filePaths: string[], vaultId: string): Promise<LibraryVaultFileImportReport>;
   importGlobalBibliographyFiles(collectionId?: string | null): Promise<LibraryBibliographyImportReport>;
   createGlobalLibraryItem(metadata: LibraryItemMetadata, collectionIds?: string[]): Promise<LibraryItemRecord>;
   /** Add a reference from what the reader pasted: a supported identifier, or a URL that

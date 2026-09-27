@@ -4,6 +4,7 @@ import type { ConciliumConfig, ConciliumResult } from '@shared/researchConcilium
 import { PROVIDER_LABELS, isLocalModelProvider } from '@shared/providers';
 import { SearchableModelSelect } from './SearchableModelSelect';
 import { Markdown, type MarkdownCitation } from './Markdown';
+import { HeaderBalloon } from './HeaderBalloon';
 import { Icon, modelLabel } from './ui';
 import { t, tx } from '../i18n';
 import './researchConcilium.css';
@@ -60,7 +61,15 @@ export function ResearchConciliumControl({ value, onChange, models, selectedMode
   const choices = models.map(model => ({ ...model, label: model.model, providerLabel: PROVIDER_LABELS[model.provider], local: isLocalModelProvider(model.provider) }));
   const change = (next: ConciliumConfig) => { setDraft(next); if (value) onChange(next); };
   const remaining = models.filter(model => !config.models.some(chosen => key(chosen) === key(model)));
-  return <CouncilPopover label="Concilium" disabled={disabled} className={value ? 'is-active' : ''} trigger={<><ConciliumIcon /><span>Concilium</span>{value && <span className="concilium-count">{value.models.length}</span>}</>}>
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  return <div className={`concilium-control ${value ? 'is-active' : ''}`}>
+    <button ref={trigger} type="button" className="concilium-trigger" disabled={disabled} aria-label="Concilium" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(current => !current)}>
+      <ConciliumIcon /><span>Concilium</span>{value && <span className="concilium-count">{value.models.length}</span>}
+    </button>
+    <HeaderBalloon open={open && !disabled} anchor={trigger} onClose={() => setOpen(false)} width={440}
+      icon={<ConciliumIcon size={18} />} title="Concilium" meta={value ? tx('{n} modelos', { n: value.models.length }) : t('Desactivado')}
+      testId="concilium-panel" className="concilium-balloon">
     <p className="concilium-intro">{t('Varias perspectivas. Una respuesta compartida.')}</p>
     <div className="concilium-toggle"><div><strong>{t('Activar Concilium')}</strong><span>{t('De 2 a 5 modelos, incluido el chairman.')}</span></div><button type="button" role="switch" aria-label={t('Activar Concilium')} aria-checked={!!value} disabled={config.models.length < 2} onClick={() => { setDraft(config); onChange(value ? null : config); }}><span /></button></div>
     <div className="concilium-roster">{config.models.map((model, index) => <div className="concilium-seat" key={index}>
@@ -70,7 +79,8 @@ export function ResearchConciliumControl({ value, onChange, models, selectedMode
     <button type="button" className="concilium-add" disabled={config.models.length >= 5 || !remaining.length} onClick={() => change({ ...config, models: [...config.models, remaining[0]] })}><Icon name="plus" size={14} />{t('Añadir miembro')}<span>{config.models.length}/5</span></button>
     <p className="concilium-footnote">{t('Cada modelo responde por separado. El chairman contrasta las respuestas y entrega el consenso. Solo el chairman puede usar skills.')}</p>
     {models.length < 2 && <p role="status" className="concilium-footnote">{t('Añade al menos dos modelos a tus favoritos en Ajustes.')}</p>}
-  </CouncilPopover>;
+    </HeaderBalloon>
+  </div>;
 }
 
 const statusLabel = (status: string) => ({ waiting: t('En espera'), thinking: t('Analizando'), complete: t('Listo'), error: t('Error'), cancelled: t('Detenido') }[status] ?? status);

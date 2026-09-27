@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import type { DocumentUnderstandingState, WorkView } from '@shared/types';
 import { Icon } from '../components/ui';
-import { notifyDataChanged } from '../hooks';
+import { notifyDataChanged, useDismissableLayer } from '../hooks';
 import { RETRYABLE_STEP_STATES, STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
 import { localizeRuntimeError } from '@shared/uiLanguage';
 import { getActiveLang, t, tx } from '../i18n';
@@ -332,7 +332,8 @@ export function WorkStatusModal({
               <Icon name="layers" size={16} className="mt-0.5 shrink-0 text-cyan-600 dark:text-cyan-300" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-neutral-900 dark:text-neutral-200">{t('Índice documental')}</span>
+                  <span className="text-sm font-medium text-neutral-900 dark:text-neutral-200">{t('Ficha documental')}</span>
+                  <DocumentProfileHelp />
                   <em data-testid="work-status-documentary-beta" className="library-action-menu-badge is-beta">BETA</em>
                   <span className={`work-step-state inline-flex items-center rounded-md border px-1.5 py-0.5 text-[11px] ${DOCUMENT_STATUS_TONE[displayedDocumentStatus]}`}>
                     {t(DOCUMENT_STATUS_LABEL[displayedDocumentStatus])}
@@ -383,5 +384,29 @@ export function WorkStatusModal({
         </div>
       </div>
     </div>
+  );
+}
+
+/** A "?" beside the document record's name: one paragraph on what it is, closed by any
+ * click outside it (or Escape). */
+function DocumentProfileHelp() {
+  const [open, setOpen] = useState(false);
+  const ref = useDismissableLayer<HTMLSpanElement>({ open, onDismiss: () => setOpen(false), group: 'document-profile-help' });
+  return (
+    <span ref={ref} className="relative inline-flex">
+      <button type="button" className="grid h-5 w-5 place-items-center rounded-full text-neutral-500 hover:text-cyan-700 dark:hover:text-cyan-300"
+        aria-label={t('¿Qué es la ficha documental?')} title={t('¿Qué es la ficha documental?')} aria-expanded={open}
+        data-testid="document-profile-help" onClick={() => setOpen((value) => !value)}>
+        <Icon name="help" size={14} />
+      </button>
+      {open && (
+        // Opens upward: this row is the last one in the modal's scrolling body, so a
+        // balloon below it is cut off by that container.
+        <span role="tooltip" data-testid="document-profile-help-bubble"
+          className="absolute bottom-full left-0 z-20 mb-1.5 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-xs font-normal leading-5 text-neutral-700 shadow-xl dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300">
+          {t('La ficha documental es una lectura completa de la obra: Nodus reconstruye su estructura por capítulos y secciones, resume cada parte, sintetiza el conjunto y audita cada campo antes de publicarlo. El chat, Nodi y Deep Research la usan para orientarse en la obra, pero las citas siguen apuntando al texto original. Es opcional: buscar y citar dependen de la indexación, no de la ficha.')}
+        </span>
+      )}
+    </span>
   );
 }

@@ -1,3 +1,6 @@
+import { withJobThinkingEffort } from './thinkingEffort';
+import { registerNotebookRun } from './researchNotebookService';
+import { bindAcademicCorpusRun } from './researchCorpusRun';
 import { withDocumentVisualPlanning } from './documentVisualContext';
 import { documentSkillCatalog } from '../../shared/documentSkills';
 import { listDocumentSkills } from '../capabilities/documentCatalog';
@@ -109,9 +112,19 @@ function sectionClaimsForWriting(section: DeepResearchPlanSection): string[] {
 
 export async function generateDeepResearchReport(request: DeepResearchRequest, onProgress?: (p: DeepResearchProgress) => void, signal?: AbortSignal): Promise<DeepResearchReport> {
   const settings = getSettings();
-  const hints = await prepareDocumentVisualHints(request.documentSkills, request.objective, request.model ?? settings.deepResearchModel ?? settings.synthesisModel, signal);
+  const academic = getActiveVault().type === 'academic';
+  if (request.notebookId && !academic) throw new Error('Research notebooks require an academic vault');
+  if (academic) request = { ...request, studyMode: false, unitMode: false, documentSkills: undefined };
+  const hints = academic ? [] : await prepareDocumentVisualHints(request.documentSkills, request.objective, request.model ?? settings.deepResearchModel ?? settings.synthesisModel, signal);
   const catalog = request.documentSkills ? documentSkillCatalog(listDocumentSkills(), request.documentSkills) : '[]';
-  return withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, signal, hints));
+  const controller = new AbortController();
+  const release = request.notebookId ? registerNotebookRun(request.notebookId, controller) : () => undefined;
+  const runSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  try {
+    // The thinking level chosen in the form applies to every call the report makes to its model.
+    return await withJobThinkingEffort(request.thinkingEffort, request.model ?? settings.deepResearchModel ?? settings.synthesisModel,
+      () => withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints)), runSignal);
+  } finally { release(); }
 }
 
 async function generateDeepResearchReportWithVisualPlan(
@@ -164,14 +177,14 @@ async function generateDeepResearchReportWithVisualPlan(
   }
   // Both academic routes are graph-first. Full-document profiles are prepared and
   // queried only after the orchestrator has frozen the argument.
-  const deps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
+  const baseDeps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
       ? legacyAcademicDeps(model, signal)
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
       ? legacySpecializedAcademicDeps(model, approach, versionedRequest, signal)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
       ? realDeps(model, signal)
       : specializedAcademicDeps(model, approach, versionedRequest, signal);
-  report = await orchestrateDeepResearch({ ...versionedRequest, model }, deps, onProgress, signal);
+  report = await orchestrateDeepResearch({ ...versionedRequest, model }, bindAcademicCorpusRun(baseDeps, versionedRequest, signal), onProgress, signal);
   return finish(report);
 }
 
@@ -199,13 +212,14 @@ export async function generateDeepResearchPlanPreview(request: DeepResearchReque
   const approach = normalizeDeepResearchApproach(request.approach);
   const deepResearchVersion = parseDeepResearchRequestVersion(request.deepResearchVersion);
   const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion };
-  const deps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
+  const baseDeps = deepResearchEnginePath(deepResearchVersion, approach) === 'v1-general'
       ? legacyAcademicDeps(model)
     : deepResearchEnginePath(deepResearchVersion, approach) === 'v1-specialized'
       ? legacySpecializedAcademicDeps(model, approach, versionedRequest)
       : deepResearchEnginePath(deepResearchVersion, approach) === 'v2-general'
       ? realDeps(model)
       : specializedAcademicDeps(model, approach, versionedRequest);
+  const deps = bindAcademicCorpusRun(baseDeps, versionedRequest);
   const language = request.language ?? 'es';
   const brief = {
     kind: 'deep_research' as const,
@@ -470,6 +484,19 @@ function legacySpecializedAcademicDeps(
     relationships: [],
   };
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const retrieval = await planApproachRetrieval({ approach, variant: 'academic', objective: request.objective,
+        language: request.language ?? 'es', model, corpusPreview: {
+          themes: ordinary.themes.slice(0, 16).map(item => item.label),
+          works: ordinary.works.slice(0, 24).map(item => ({ title: item.title, authors: item.authors, year: item.year })),
+          contradictions: ordinary.contradictions.slice(0, 16).map(item => item.summary),
+          gaps: ordinary.gaps.slice(0, 16).map(item => item.summary),
+        } });
+      const supplemental = await extend(retrieval.probes);
+      const merged = mergeApproachSnapshots(ordinary, supplemental, approach);
+      context = { ...context, retrieval, relationships: academicRelationshipContext(merged) };
+      return merged;
+    },
     buildSnapshot: async (brief) => {
       const ordinary = await buildHistoricalWritingWorkshopSnapshot(brief);
       const retrieval = await planApproachRetrieval({
@@ -503,6 +530,11 @@ function realDeps(model: ModelRef | null, signal?: AbortSignal): DeepResearchDep
   const experimentalProse = process.env.NODUS_EXPERIMENTAL_DEEP_RESEARCH_PROSE === '1';
   let relationships: ReturnType<typeof academicRelationshipContext> = [];
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const snapshot = await extend(academicObjectiveProbes(ordinary.brief.objective));
+      relationships = academicRelationshipContext(snapshot);
+      return snapshot;
+    },
     buildSnapshot: async (brief) => {
       const snapshot = await buildIdeaFirstWritingWorkshopSnapshot(brief, academicObjectiveProbes(brief.objective));
       relationships = academicRelationshipContext(snapshot);
@@ -558,6 +590,19 @@ function specializedAcademicDeps(
     relationships: [],
   };
   return {
+    prepareScopedSnapshot: async (ordinary, extend) => {
+      const retrieval = await planApproachRetrieval({ approach, variant: 'academic', objective: request.objective,
+        language: request.language ?? 'es', model, corpusPreview: {
+          themes: ordinary.themes.slice(0, 16).map(item => item.label),
+          works: ordinary.works.slice(0, 24).map(item => ({ title: item.title, authors: item.authors, year: item.year })),
+          contradictions: ordinary.contradictions.slice(0, 16).map(item => item.summary),
+          gaps: ordinary.gaps.slice(0, 16).map(item => item.summary),
+        } });
+      const supplemental = await extend(retrieval.probes);
+      const merged = mergeApproachSnapshots(ordinary, supplemental, approach);
+      context = { ...context, retrieval, relationships: academicRelationshipContext(merged) };
+      return merged;
+    },
     buildSnapshot: async (brief) => {
       // Specialized probes may broaden the IDEA graph before planning. Document
       // profiles and passages remain excluded until the resulting plan is fixed.
@@ -907,6 +952,7 @@ async function aiReviseSection(
   approach?: AcademicApproachContext,
 ): Promise<string> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
     narrativeRules: deepResearchNarrativeRules(input.language),
   }).sectionEditor;
@@ -1010,6 +1056,7 @@ async function aiAuditPlanCoverage(
 
 async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<DeepResearchPlan> {
   const promptPack = deepResearchPlanningPromptPack(input.language, {
+    documentaryEvidence: input.passages.length > 0,
     sectionCount: input.sectionCount,
     sectionMode: input.sectionMode,
     approachRules: approach?.rules.planner ?? [],
@@ -1038,6 +1085,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
       huecos: input.gaps,
       contradicciones: input.contradictions,
       obras: input.works,
+      pasajes_documentales: input.passages,
       relaciones_del_grafo: approach?.relationships?.length ? approach.relationships : (input.relationships ?? []),
       ...(approach ? {
         enfoque_de_investigacion: approach.approach,
@@ -1060,6 +1108,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
       ideas: input.ideas.slice(0, 70),
       huecos: input.gaps.slice(0, 16),
       contradicciones: input.contradictions.slice(0, 16),
+      pasajes_documentales: input.passages,
       relaciones_del_grafo: approach?.relationships?.length ? approach.relationships : (input.relationships ?? []),
       plan_candidato: draft,
     }, null, 2);
@@ -1084,6 +1133,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
     const ideaById = new Map(input.ideas.map((item) => [item.id, item]));
     const gapById = new Map(input.gaps.map((item) => [item.id, item]));
     const contradictionById = new Map(input.contradictions.map((item) => [item.id, item]));
+    const passageById = new Map(input.passages.map((item) => [item.id, item]));
     const redTeamUser = JSON.stringify({
       objetivo_con_exclusiones_vinculantes: input.objective,
       preguntas_de_cobertura_obligatoria: input.coverageQuestions,
@@ -1093,6 +1143,7 @@ async function aiPlanReport(input: PlanInput, model: ModelRef | null, approach?:
         ideas: section.ideaIds.map((id) => ideaById.get(id)).filter(Boolean),
         huecos: section.gapIds.map((id) => gapById.get(id)).filter(Boolean),
         contradicciones: section.contradictionIds.map((id) => contradictionById.get(id)).filter(Boolean),
+        pasajes_documentales: section.passageIds.map((id) => passageById.get(id)).filter(Boolean),
       })),
     }, null, 2);
     const redTeamed = planFromAi(await completeJson<AiPlan>(
@@ -1271,6 +1322,7 @@ async function aiPlanSectionEvidence(
   const copy = deepResearchWritingRuntimeCopy(input.language);
   const lengthPlan = sectionLengthPlanOf(input);
   const base = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
   }).evidencePlan;
   // A longer section is planned as MORE distinct evidence-bearing paragraphs, not
@@ -1362,6 +1414,7 @@ async function aiWriteSection(
   const lengthPlan = sectionLengthPlanOf(input);
   const lengthPack = deepResearchLengthPromptPack(input.language);
   const base = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.writer ?? [],
     narrativeRules: deepResearchNarrativeRules(input.language),
     isConclusion: input.isConclusion,
@@ -1452,6 +1505,7 @@ async function aiWriteSectionParagraphByParagraph(
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
     if (!evidence.length) continue;
     const paragraphBase = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
       approachRules: approach?.rules.writer ?? [],
       narrativeRules: deepResearchNarrativeRules(input.language),
     }).paragraphWriter;
@@ -1506,6 +1560,7 @@ function isAiFinal(v: unknown): v is AiFinal {
 
 async function aiFinalize(input: FinalizeInput, model: ModelRef | null, approach?: AcademicApproachContext): Promise<FinalizeResult> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.finalizer ?? [],
   }).finalizer;
   const user = JSON.stringify(
@@ -1542,6 +1597,7 @@ async function aiAuditFinalSummary(
   approach?: AcademicApproachContext,
 ): Promise<FinalizeResult> {
   const system = deepResearchWritingPromptPack(input.language, {
+    documentaryEvidence: getActiveVault().type === 'academic',
     approachRules: approach?.rules.finalizer ?? [],
   }).finalAudit;
   const user = JSON.stringify({

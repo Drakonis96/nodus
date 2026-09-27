@@ -6,7 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   Worker,
   isMainThread,
@@ -142,6 +142,9 @@ try {
     ["galant-work", "fuentes-work", "tercera-work"],
     "automatic ranking retains the strongest hit but surfaces distinct works before repeated neighboring passages",
   );
+  const webCandidates = [1, 2, 3].map(i => ({ ...sourceCandidate(`web-${i}`, 1, "", ""), works: [], authors: [], reason: "Web: https://example.org/page" }));
+  const webBalanced = ai.__balanceDictionaryCandidatesForTesting([...webCandidates, sourceCandidate("local", 0.9, "local-work", "Local")]);
+  assert.equal(webBalanced[1].refId, "local", "repeated passages from one web page cannot crowd out a library work");
   const coverageEvidence = repeatedSourceCandidates
     .filter((item) => !item.refId.endsWith("-2") && !item.refId.endsWith("-3"))
     .map((item) => ({
@@ -302,6 +305,29 @@ try {
     "automatic retrieval selects relevant ideas/passages before generation",
   );
   const structuredEvidence = repo.includedEvidence(automatic.id).slice(0, 2);
+  const longEvidence = structuredEvidence.map((item, index) => ({
+    ...item, kind: index === 0 ? "idea" : "passage",
+    id: `scoped:receipt ${index}:${"a".repeat(140)}`,
+  }));
+  const aliases = ai.__dictionaryEvidenceAliasesForTesting(longEvidence);
+  const compactClaims = { paragraphs: [{ claims: longEvidence.map((item, index) => ({
+    text: "Una afirmación verificable.", evidence: [{ kind: item.kind, id: `E${index + 1}` }],
+  })) }] };
+  const restoredClaims = aliases.restoreClaims(compactClaims);
+  assert.deepEqual(restoredClaims.paragraphs[0].claims.map(c => c.evidence[0].id), longEvidence.map(e => e.id));
+  const aliasRendered = ai.__renderStructuredDictionaryForTesting(restoredClaims, longEvidence);
+  assert.equal(aliasRendered.invalidEvidenceRefs, 0);
+  assert.doesNotMatch(aliasRendered.markdown, /nodus:\/\/(?:idea|passage)\/E\d/);
+  assert.equal(aliases.restoreMarkdown(aliases.compactMarkdown(aliasRendered.markdown)), aliasRendered.markdown,
+    "encoded durable citation targets survive the model alias round trip");
+  assert.ok(ai.__dictionaryEvidencePromptForTesting(aliases.items).length < ai.__dictionaryEvidencePromptForTesting(longEvidence).length - 400,
+    "model context and repeated output refs omit long receipt IDs");
+  const invalidAliases = aliases.restoreClaims({ paragraphs: [{ claims: [{ text: "Invalid.", evidence: [
+    { kind: "passage", id: "E1" }, { kind: "idea", id: "E999" },
+  ] }] }] });
+  assert.equal(ai.__renderStructuredDictionaryForTesting(invalidAliases, longEvidence).invalidEvidenceRefs, 2,
+    "unknown aliases and kind mismatches cannot acquire another source's citation");
+  assert.equal(compactClaims.paragraphs[0].claims[0].evidence[0].id, "E1", "mapping does not mutate provider output");
   const renderedStructured = ai.__renderStructuredDictionaryForTesting(
     {
       paragraphs: [
@@ -390,6 +416,27 @@ try {
     generated.id,
     "generated version is persisted as current",
   );
+
+  const narrowed = repo.createDictionaryEntry({ name: "Narrowed scope", aliases: [], focusPrompt: "",
+    scope: { kind: "works", workIds: ["work-2"] }, outputLanguage: "es", detailLevel: "concise" });
+  repo.upsertDictionaryEvidence(narrowed.id, [evidence("passage", "work-1#0", "included", "Obra Uno", "La memoria colectiva cambia entre generaciones.")]);
+  await assert.rejects(() => ai.__generateDictionaryEntryForTesting({ entryId: narrowed.id, mode: "creation" },
+    async () => { throw new Error("writer must not run"); }), /evidencia relevante suficiente/, "previously included sources outside the current scope cannot reach the writer");
+
+  const webRepo = require(path.join(repoRoot, "electron/db/researchWebRepo.ts"));
+  const webText = "La memoria colectiva cambia entre generaciones.";
+  const webId = webRepo.recordWebPassage({ url: "https://example.org/memory", finalUrl: "https://example.org/memory",
+    title: "Memory study", siteName: "Example", domain: "example.org", byline: null, publishedAt: null,
+    doi: null, kind: "html", pageNumber: null, heading: null, text: webText, retrievedAt: new Date().toISOString() });
+  const webEntry = repo.createDictionaryEntry({ name: "Web receipts", aliases: [], focusPrompt: "",
+    scope: { kind: "vault" }, outputLanguage: "es", detailLevel: "concise" });
+  repo.upsertDictionaryEvidence(webEntry.id, [{ ...evidence("passage", webId, "included", "Memory study", webText),
+    workId: "", works: [], authors: [] }]);
+  assert.equal(repo.includedEvidence(webEntry.id)[0].unavailable, false, "web receipt is available without a legacy passage row");
+  await assert.rejects(() => ai.__generateDictionaryEntryForTesting({ entryId: webEntry.id, mode: "creation", webSearch: "off" },
+    async () => { throw new Error("writer must not run"); }), /evidencia relevante suficiente/, "web-off excludes saved web evidence too");
+  db.prepare("UPDATE research_web_passages SET text=? WHERE id=?").run("changed", webId.slice(4));
+  assert.equal(repo.includedEvidence(webEntry.id)[0].unavailable, true, "tampered web receipt cannot revive captured Dictionary evidence");
 
   const stalePassageEntry = repo.createDictionaryEntry({
     name: "Pasaje mutable",
@@ -1108,7 +1155,7 @@ function installTsHook() {
     return originalLoad.call(this, request, parent, isMain);
   };
   require.extensions[".ts"] = function loadTs(module, filename) {
-    const source = fs.readFileSync(filename, "utf8");
+    const source = fs.readFileSync(filename, "utf8").replace(/\bimport\.meta\.url\b/g, JSON.stringify(pathToFileURL(filename).href));
     const output = ts.transpileModule(source, {
       fileName: filename,
       compilerOptions: {

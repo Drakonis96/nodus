@@ -228,7 +228,7 @@ export const databasesApi: DatabasesApi = {
   cancelDbChat: async () => {
     if (activeDbChatRequestId) await ipcRenderer.invoke('db:chatStream:cancel', activeDbChatRequestId);
   },
-  listDatabaseChatConversations: () => ipcRenderer.invoke('db:chatHistory:list'),
+  listDatabaseChatConversations: (includeArchived) => ipcRenderer.invoke('db:chatHistory:list', includeArchived),
   getDatabaseChatConversation: (id) => ipcRenderer.invoke('db:chatHistory:get', id),
   createDatabaseChatConversation: (input) => ipcRenderer.invoke('db:chatHistory:create', input),
   saveDatabaseChatConversation: (id, messages, databaseIds) => ipcRenderer.invoke('db:chatHistory:save', id, messages, databaseIds),

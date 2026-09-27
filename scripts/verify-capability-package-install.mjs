@@ -243,7 +243,7 @@ try {
           assert.equal(again.find(skill=>skill.id===chosen.id).enabled.assistant,true);
           assert.ok(again.find(skill=>skill.id===chosen.id).instructions.endsWith('Custom local instruction.'),'local edits survive');
           assert.ok(enabledChatSkills('assistant').some(skill=>skill.id===chosen.id),'the enabled workflow reaches the chat prompt');
-          assert.ok(!enabledChatSkills('nodi').some(skill=>skill.id===chosen.id),'Nodi activation is independent');
+          assert.ok(enabledChatSkills('nodi').some(skill=>skill.id===chosen.id),'one activation applies to every chat, Nodi included');
           const workflowPath = path.join(activePluginRoot(payload.packageId), 'skills/research-images/skill.json');
           const originalWorkflow = fs.readFileSync(workflowPath, 'utf8');
           const beforeInvalid = JSON.stringify(listChatSkills());

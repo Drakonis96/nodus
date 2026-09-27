@@ -305,13 +305,13 @@ assert.match(
 );
 assert.match(
   academicIpc,
-  /new DictionaryGenerationQueue\([\s\S]*retrieveDictionaryEvidence[\s\S]*generateDictionaryEntry/,
-  "the background queue automatically retrieves and generates each entry in order",
+  /new DictionaryGenerationQueue\([\s\S]*generateDictionaryEntry\(request, report\)/,
+  "the background queue runs the shared Dictionary investigation and synthesis",
 );
 assert.match(
-  academicIpc,
-  /needsInitialRetrieval = request\.mode === 'creation' && \(current\?\.coverage\.included \?\? 0\) === 0/,
-  "only a brand-new concept performs initial retrieval before its background generation",
+  ai,
+  /await investigateDictionaryEvidence\(resolved\)/,
+  "explicit generation investigates the authorized corpus before writing",
 );
 assert.match(
   academicIpc,

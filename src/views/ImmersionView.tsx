@@ -1,3 +1,6 @@
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import { useResearchEffort } from '../hooks/useResearchEffort';
+import type { ResearchEffort } from '@shared/researchReasoning';
 import { DocumentVisualScope, DocumentVisualActions, DocumentVisualFigures } from '../components/DocumentVisualScope';
 import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
 // Inmersión — the fully guided topic-mastery experience.
@@ -193,6 +196,8 @@ export function ImmersionView({
   // without a matching content language (French) defaults to English.
   const [language, setLanguage] = useState<'es' | 'en'>(settings.uiLanguage === 'es' ? 'es' : 'en');
   const [model, setModel] = useFeatureModel(settings, 'immersionModel');
+  // The thinking level for that model, shared with the Research chat's memory.
+  const [thinkingEffort, setThinkingEffort] = useResearchEffort(settings, model ?? null);
 
   const [scope, setScope] = useState<ImmersionScope | null>(null);
   const [scoping, setScoping] = useState(false);
@@ -311,6 +316,7 @@ export function ImmersionView({
         minutes,
         includeQuiz,
         model,
+        thinkingEffort,
         decorativeImage: { enabled: includeImage, style: imageStyle },
       },
     });
@@ -468,6 +474,8 @@ export function ImmersionView({
               imageStyle={imageStyle}
               language={language}
               model={model}
+              thinkingEffort={thinkingEffort}
+              onThinkingEffort={setThinkingEffort}
               hasModel={hasModel}
               scoping={scoping}
               error={error}
@@ -949,6 +957,8 @@ export function ImmersionComposerModal({
   imageStyle,
   language,
   model,
+  thinkingEffort,
+  onThinkingEffort,
   hasModel,
   scoping,
   error,
@@ -971,6 +981,8 @@ export function ImmersionComposerModal({
   imageStyle: DecorativeImageStyle;
   language: 'es' | 'en';
   model: AppSettings['immersionModel'];
+  thinkingEffort: ResearchEffort;
+  onThinkingEffort: (effort: ResearchEffort) => void;
   hasModel: boolean;
   scoping: boolean;
   error: string | null;
@@ -1080,7 +1092,10 @@ export function ImmersionComposerModal({
               <option value="es">Español</option>
               <option value="en">English</option>
             </select>
-            <ModelPicker settings={settings} value={model} onChange={onModel} compact menu />
+            <div className="flex w-full min-w-0 items-center gap-2">
+              <div className="min-w-0 flex-1"><ModelPicker settings={settings} value={model} onChange={onModel} compact menu /></div>
+              <ResearchEffortControl variant="field" className="shrink-0 !py-1.5 text-xs" testId="immersion-thinking" model={model ?? null} value={thinkingEffort} onChange={onThinkingEffort} disabled={!model || scoping} />
+            </div>
           </div>
 
           <DocumentSkillsControl value={documentSkills.policy} onChange={documentSkills.setPolicy} onValidityChange={documentSkills.setValid} />

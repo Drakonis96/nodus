@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppSettings, ModelRef } from '@shared/types';
-import { researchEffortFor, researchEffortMemoryKey, withResearchEffort, type ResearchEffort } from '@shared/researchReasoning';
+import { researchEffortFor, withResearchEffort, type ResearchEffort } from '@shared/researchReasoning';
+import { useResearchModelInfo } from './useResearchModelInfo';
 
 /**
- * The Research composer's thinking level for the selected model, remembered per
- * provider+model so reopening a model starts where the user left it instead of at
- * Standard. A level belongs to the model, not to the vault that was open when it was
- * picked, so the memory lives in the app-wide preference store.
+ * The thinking level for the selected model, remembered per provider+model so reopening a
+ * model starts where the user left it. A model the user never set starts on the middle of
+ * the levels it publishes (medium, or the level nearest to it). A level belongs to the
+ * model, not to the vault or the surface that was open when it was picked, so the memory
+ * lives in the app-wide preference store and the Research chat, Deep Research and
+ * Immersion share it.
  *
  * The level is saved as soon as it is picked: the slider has at most eight stops, so
  * there is nothing to debounce, and a level chosen right before the app closes is
@@ -17,16 +20,15 @@ export function useResearchEffort(
   settings: AppSettings,
   model: ModelRef | null
 ): [ResearchEffort, (effort: ResearchEffort) => void] {
-  const key = researchEffortMemoryKey(model);
-  const [chosen, setChosen] = useState<{ key: string | null; effort: ResearchEffort }>(
-    () => ({ key, effort: researchEffortFor(settings.researchEffortByModel, model) })
-  );
   // The map as this session knows it, and the picks that produced it.
-  const memory = useRef<Record<string, ResearchEffort>>(settings.researchEffortByModel ?? {});
+  const [memory, setMemory] = useState<Record<string, ResearchEffort>>(() => settings.researchEffortByModel ?? {});
+  const memoryRef = useRef(memory);
   const session = useRef<Array<{ model: ModelRef | null; effort: ResearchEffort }>>([]);
   const writes = useRef<Promise<unknown>>(Promise.resolve());
   const latest = useRef(model);
   latest.current = model;
+  // The live ladder of a catalogue-driven model: until it arrives, its middle is unknown.
+  const info = useResearchModelInfo(model);
 
   // Read fresh on mount and take the remembered levels from the user's own file: the
   // settings prop is App state and can be older than the last session. The disk snapshot is
@@ -38,16 +40,11 @@ export function useResearchEffort(
       .getSettings()
       .then((fresh) => {
         if (!active) return;
-        memory.current = session.current.reduce(
+        memoryRef.current = session.current.reduce(
           (map, pick) => withResearchEffort(map, pick.model, pick.effort),
           fresh.researchEffortByModel ?? {}
         );
-        const keyNow = researchEffortMemoryKey(latest.current);
-        setChosen((chosen) => chosen.key === keyNow && session.current.length > 0
-          // A level the user already picked for this model stands. The fresh map still
-          // reaches every other model, through `memory`.
-          ? chosen
-          : { key: keyNow, effort: researchEffortFor(memory.current, latest.current) });
+        setMemory(memoryRef.current);
       })
       .catch(() => undefined);
     return () => {
@@ -56,15 +53,16 @@ export function useResearchEffort(
   }, []);
 
   const choose = useCallback((effort: ResearchEffort) => {
-    setChosen({ key: researchEffortMemoryKey(latest.current), effort });
     session.current = [...session.current, { model: latest.current, effort }];
-    memory.current = withResearchEffort(memory.current, latest.current, effort);
+    memoryRef.current = withResearchEffort(memoryRef.current, latest.current, effort);
+    setMemory(memoryRef.current);
+    const next = memoryRef.current;
     writes.current = writes.current
       .catch(() => undefined)
-      .then(() => window.nodus.updateSettings({ researchEffortByModel: memory.current }));
+      .then(() => window.nodus.updateSettings({ researchEffortByModel: next }));
   }, []);
 
   // Derived rather than stored: switching model shows the level remembered for the new one,
-  // while the current pick keeps applying to the model it was picked for.
-  return [chosen.key === key ? chosen.effort : researchEffortFor(memory.current, model), choose];
+  // or its middle level, while the current pick keeps applying to the model it was picked for.
+  return [researchEffortFor(memory, model, info), choose];
 }

@@ -698,9 +698,9 @@ export function registerDatabasesIpc({ h, getWindow, chatAborters }: IpcContext)
   h('db:chatStream:cancel', async (_e, requestId: string) => {
     chatAborters.get(requestId)?.abort();
   });
-  h('db:chatHistory:list', async () => databaseChatHistory.listDatabaseChatConversations());
+  h('db:chatHistory:list', async (_e, includeArchived?: boolean) => databaseChatHistory.listDatabaseChatConversations(Boolean(includeArchived)));
   h('db:chatHistory:get', async (_e, id: string) => databaseChatHistory.getDatabaseChatConversation(id));
-  h('db:chatHistory:create', async (_e, input: { title: string; databaseIds: string[] }) => databaseChatHistory.createDatabaseChatConversation(input));
+  h('db:chatHistory:create', async (_e, input: Parameters<typeof databaseChatHistory.createDatabaseChatConversation>[0]) => databaseChatHistory.createDatabaseChatConversation(input));
   h('db:chatHistory:save', async (_e, id: string, messages: import('@shared/types').DbChatTurn[], databaseIds: string[]) => databaseChatHistory.saveDatabaseChatConversation(id, messages, databaseIds));
   h('db:chatHistory:delete', async (_e, id: string) => databaseChatHistory.deleteDatabaseChatConversation(id));
   h('db:listViews', async (_e, databaseId: string) => dbMode.listViews(databaseId));

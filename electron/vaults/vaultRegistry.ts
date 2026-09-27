@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { randomUUID } from 'node:crypto';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { VaultOrigin, VaultRemote, VaultSummary, VaultType } from '@shared/types';
@@ -269,7 +270,22 @@ export function listVaults(): VaultSummary[] {
   return registry.vaults.map((vault) => toSummary(vault, registry.activeVaultId));
 }
 
+const owningVaultContext = new AsyncLocalStorage<string>();
+
+/** Explicit background owner; never changes the UI's active-vault registry. */
+export function withOwningVault<T>(vaultId: string, work: () => T): T {
+  if (!getVault(vaultId)) throw new Error('research_vault_unavailable');
+  return owningVaultContext.run(vaultId, work);
+}
+export function withoutOwningVault<T>(work: () => T): T { return owningVaultContext.exit(work); }
+
 export function getActiveVault(): VaultSummary {
+  const owner = owningVaultContext.getStore();
+  if (owner) {
+    const vault = getVault(owner);
+    if (!vault) throw new Error('research_vault_unavailable');
+    return vault;
+  }
   const registry = ensureVaultRegistry();
   const vault = registry.vaults.find((candidate) => candidate.id === registry.activeVaultId) ?? registry.vaults[0];
   return toSummary(vault, registry.activeVaultId);

@@ -30,6 +30,19 @@ await build({
         buildApi.onResolve({ filter: pattern }, () => ({ path: name, namespace: 'stub' }));
         buildApi.onLoad({ filter: new RegExp(`^${name}$`), namespace: 'stub' }, () => ({ contents, loader: 'js' }));
       };
+      // The shared documentary service has separate real-SQLite integration
+      // coverage. This suite isolates profile generation and provider failures.
+      stub(/\.\/documentaryLegacyPreparation$/, 'shared-passages', `
+        import { createHash } from 'node:crypto';
+        import { planRetrievalChunks } from '../extraction/textExtractor';
+        import { embedMany } from './aiClient';
+        export async function prepareLegacyDocumentaryPassages(id,text,sourceMap,coverage,signal){
+          const chunks=planRetrievalChunks(text,{sourceMap});
+          const vectors=await embedMany(chunks.map(chunk=>chunk.text),signal);
+          signal?.throwIfAborted();
+          return {contentHash:createHash('sha1').update(text).digest('hex'),rows:chunks.map((chunk,index)=>({...chunk,embedding:vectors[index]})),embeddingProvider:'openrouter',embeddingModel:'baai/bge-m3'};
+        }
+      `);
       stub(/\.\.\/db\/database$/, 'database', `export function getDb(){return {prepare(sql){return {
         get(){if(sql.includes('COUNT(*) count'))return {count:0,hash:null};if(sql.includes('document_index_jobs'))return {nodus_id:'w1'};return null},
         all(){if(sql.includes('FROM passages'))return globalThis.__documentPipeline.passages;if(sql.includes('FROM ideas'))return [];return []}

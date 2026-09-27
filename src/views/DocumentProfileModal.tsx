@@ -112,12 +112,12 @@ export function DocumentProfileModal({ work, vaultId, onClose }: { work: WorkVie
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Índice documental')} onClick={() => !busy && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 sm:p-8" role="dialog" aria-modal="true" aria-label={t('Ficha documental')} onClick={() => !busy && onClose()}>
       <div className="card flex max-h-full w-full max-w-5xl flex-col overflow-hidden border border-neutral-700 bg-neutral-950 shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <header className="flex items-start gap-3 border-b border-neutral-800 px-5 py-4">
           <Icon name="book" size={19} className="mt-0.5 text-cyan-300" />
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-semibold">{t('Índice documental')}</h2>
+            <h2 className="truncate text-base font-semibold">{t('Ficha documental')}</h2>
             <p className="truncate text-xs text-neutral-500">{work.title}</p>
           </div>
           <span className={`rounded-md border px-2 py-1 text-xs ${STATUS_TONE[status]}`}>{t(STATUS_LABEL[status])}</span>

@@ -40,6 +40,10 @@ import type {
 import { PROMPT_LANGUAGES } from "@shared/types";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Markdown, type MarkdownCitation } from "../components/Markdown";
+import { ResearchEffortControl } from '../components/ResearchEffortControl';
+import { useResearchEffort } from '../hooks/useResearchEffort';
+import type { ResearchEffort } from '@shared/researchReasoning';
+import type { ResearchWebSearchMode } from '@shared/types';
 import { ModelPicker } from "../components/ModelPicker";
 import {
   SourceCitationModal,
@@ -464,10 +468,32 @@ function ChoiceGrid({
   );
 }
 
+interface DictionaryResearchOptions {
+  thinkingEffort: ResearchEffort;
+  onThinkingEffort: (effort: ResearchEffort) => void;
+  webSearch: ResearchWebSearchMode;
+  onWebSearch: (mode: ResearchWebSearchMode) => void;
+}
+
+function DictionaryResearchControls({ model, research, disabled = false }: {
+  model: ModelRef | null; research: DictionaryResearchOptions; disabled?: boolean;
+}) {
+  return <div className="flex flex-wrap items-center gap-2" data-testid="dictionary-research-controls">
+    <ResearchEffortControl model={model} value={research.thinkingEffort} onChange={research.onThinkingEffort}
+      disabled={disabled} variant="field" testId="dictionary-thinking" />
+    <button type="button" className="btn btn-ghost h-8 gap-1.5 text-xs" aria-pressed={research.webSearch !== 'off'}
+      disabled={disabled} data-testid="dictionary-web" title={t('Consultar la web cuando sea necesario')}
+      onClick={() => research.onWebSearch(research.webSearch === 'off' ? 'auto' : 'off')}>
+      <Icon name="globe" size={14} /> {t('Web')} · {t(research.webSearch === 'off' ? 'Desactivada' : 'Automática')}
+    </button>
+  </div>;
+}
+
 function CreationDialog({
   catalog,
   settings,
   model,
+  research,
   onModel,
   onClose,
   onOpenExisting,
@@ -476,6 +502,7 @@ function CreationDialog({
   catalog: CatalogData;
   settings: AppSettings;
   model: ModelRef | null;
+  research: DictionaryResearchOptions;
   onModel: (model: ModelRef | null) => void;
   onClose: () => void;
   onOpenExisting: (entry: DictionaryEntrySummary) => void;
@@ -581,6 +608,8 @@ function CreationDialog({
               entryId: entry.id,
               mode: "creation",
               model,
+              thinkingEffort: research.thinkingEffort,
+              webSearch: research.webSearch,
             });
             setQueuedDrafts((current) => new Set(current).add(draft.key));
           }
@@ -952,6 +981,7 @@ function CreationDialog({
                   allowEmpty={false}
                   menu
                 />
+                <DictionaryResearchControls model={model} research={research} disabled={!!phase} />
               </Field>
             </div>
             {error && <ErrorNotice>{error}</ErrorNotice>}
@@ -1025,6 +1055,9 @@ export function DictionaryView({
   onOpenLibraryWork: OpenCitationLibraryWork;
 }) {
   const [model, setModel] = useFeatureModel(settings, "dictionaryModel");
+  const [thinkingEffort, onThinkingEffort] = useResearchEffort(settings, model);
+  const [webSearch, onWebSearch] = useState<ResearchWebSearchMode>('auto');
+  const research = { thinkingEffort, onThinkingEffort, webSearch, onWebSearch };
   const [entries, setEntries] = useState<DictionaryEntrySummary[]>([]);
   const [total, setTotal] = useState(0);
   const [facets, setFacets] = useState<DictionaryFacets>({
@@ -1310,7 +1343,7 @@ export function DictionaryView({
             <h1 className="text-base font-semibold">{t("Diccionario")}</h1>
             <p className="text-[11px] text-neutral-500">
               {t(
-                "Conceptos sintetizados exclusivamente desde la evidencia de la bóveda.",
+                "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.",
               )}
             </p>
           </div>
@@ -1319,6 +1352,7 @@ export function DictionaryView({
             {t("Modelo de síntesis")}
           </span>
           <ModelPicker
+            className="!w-auto max-w-full"
             settings={settings}
             value={model}
             onChange={setModel}
@@ -1326,6 +1360,7 @@ export function DictionaryView({
             allowEmpty={false}
             menu
           />
+          <DictionaryResearchControls model={model} research={research} />
           {selected.size > 0 && (
             <button
               className="btn btn-ghost border border-red-200 text-red-600 dark:border-red-900/70 dark:text-red-400"
@@ -1388,6 +1423,7 @@ export function DictionaryView({
           }
           settings={settings}
           model={model}
+          research={research}
           catalog={catalog}
           onRename={(title) =>
             setOpenEntries((current) =>
@@ -1586,6 +1622,7 @@ export function DictionaryView({
           catalog={catalog}
           settings={settings}
           model={model}
+          research={research}
           onModel={setModel}
           onClose={() => setCreating(false)}
           onOpenExisting={(entry) => {
@@ -1812,6 +1849,7 @@ function DictionaryEntryView({
   onGenerationStarted,
   settings,
   model,
+  research,
   catalog,
   onRename,
   onOpenIdea,
@@ -1825,6 +1863,7 @@ function DictionaryEntryView({
   onGenerationStarted: (progress: DictionaryProgress) => void;
   settings: AppSettings;
   model: ModelRef | null;
+  research: DictionaryResearchOptions;
   catalog: CatalogData;
   onRename: (name: string) => void;
   onOpenIdea: (id: string) => void;
@@ -1889,15 +1928,6 @@ function DictionaryEntryView({
       : null;
   const mode = entry.currentVersionId ? "regeneration" : "creation";
   const generate = (generation: "creation" | "regeneration" | "update") => {
-    if (!hasEvidence) {
-      setError(
-        t(
-          "No hay evidencia incluida. Revisa la pestaña Evidencia, incluye al menos un elemento y vuelve a intentarlo.",
-        ),
-      );
-      setTab("evidence");
-      return;
-    }
     setHideBackgroundFailure(true);
     setBusy(generation);
     setError(null);
@@ -1906,6 +1936,8 @@ function DictionaryEntryView({
           entryId,
           mode: generation,
           model,
+          thinkingEffort: research.thinkingEffort,
+          webSearch: research.webSearch,
       })
       .then((nextProgress) => {
         onGenerationStarted(nextProgress);
@@ -1993,14 +2025,15 @@ function DictionaryEntryView({
                 )}
               </div>
             </div>
-            <div className="ml-auto grid w-full gap-2 sm:w-[620px]">
-              <div className="flex min-h-9 items-center justify-end gap-3">
+            <div className="ml-auto grid w-full max-w-full gap-2 xl:w-[620px]">
+              <div className="flex min-h-9 flex-wrap items-center justify-end gap-3">
                 {progress && (
                   <div className="min-w-0 flex-1" aria-live="polite">
                     <DictionaryGenerationState progress={progress} status={entry.status} />
                   </div>
                 )}
                 <ModelPicker
+                  className="!w-auto max-w-full"
                   settings={settings}
                   value={model}
                   onChange={() => undefined}
@@ -2009,6 +2042,7 @@ function DictionaryEntryView({
                   ariaLabel={t("Modelo del Diccionario")}
                   menu
                 />
+                <DictionaryResearchControls model={model} research={research} disabled={!!busy || backgroundBusy} />
               </div>
               <div className="grid grid-cols-[minmax(0,1fr)_minmax(118px,0.58fr)_minmax(118px,0.58fr)] gap-2">
                 <button
@@ -2017,7 +2051,7 @@ function DictionaryEntryView({
                   onClick={() =>
                     void run(
                       "scan",
-                      () => window.nodus.scanDictionaryNewEvidence(entryId),
+                      () => window.nodus.scanDictionaryNewEvidence(entryId, { model, thinkingEffort: research.thinkingEffort, webSearch: research.webSearch }),
                       "evidence",
                     )
                   }
@@ -2031,7 +2065,7 @@ function DictionaryEntryView({
                 </button>
                 <button
                   className="btn btn-primary h-9 min-w-0 justify-center whitespace-nowrap text-xs !text-white disabled:!text-white"
-                  disabled={!!busy || backgroundBusy || !hasEvidence}
+                  disabled={!!busy || backgroundBusy}
                   onClick={() => generate(mode)}
                 >
                   {regenerationBusy ? (
@@ -2049,8 +2083,7 @@ function DictionaryEntryView({
                     !!busy ||
                     backgroundBusy ||
                     !entry.currentVersionId ||
-                    entry.newEvidenceCount === 0 ||
-                    !hasEvidence
+                    entry.newEvidenceCount === 0
                   }
                   onClick={() => generate("update")}
                 >
@@ -2073,7 +2106,7 @@ function DictionaryEntryView({
           >
             <Icon name="info" />{" "}
             {t(
-              "No se encontró evidencia suficiente para generar automáticamente. Puedes inspeccionar la búsqueda en Evidencia.",
+              "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.",
             )}
             <Icon name="chevronRight" className="ml-auto" />
           </button>
@@ -2524,10 +2557,10 @@ function EvidenceTab({
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 150);
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [load, detail.entry.updatedAt]);
   useEffect(() => {
     void loadAll();
-  }, [loadAll]);
+  }, [loadAll, detail.entry.updatedAt]);
   const authors = useMemo(
     () =>
       [
@@ -2733,7 +2766,7 @@ function EvidenceCard({
         <span
           className={`rounded px-2 py-1 text-[10px] uppercase ${item.kind === "idea" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"}`}
         >
-          {t(item.kind === "idea" ? "IDEA" : "PASSAGE")}
+          {t(item.kind === "idea" ? "IDEA" : item.id.startsWith("web:") ? "Web" : "PASSAGE")}
         </span>
         <div className="min-w-0 flex-1">
           <button

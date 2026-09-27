@@ -18,6 +18,7 @@ export interface OpenLibraryDocumentDetail {
   itemId: string;
   scope: LibraryScope;
   page: number | null;
+  attachmentId?: string | null;
 }
 
 /** Ask the app shell to open a library document in the reader, at `page` when given. */

@@ -385,8 +385,12 @@ test('Biblioteca keeps a cut per scope, and only what nothing else already persi
   assert.match(wrapper, /snapshot=\{snapshot\?\.vault\}/);
   assert.match(wrapper, /snapshot=\{snapshot\?\.global\}/);
   assert.match(vaultLibrary, /useState<WorkFilter>\(\(\) => snapshot\?\.filter \?\? \{\}\)/);
-  for (const facet of ['source', 'extraction', 'itemType', 'yearFrom', 'yearTo', 'facetTag', 'facetVault', 'attachmentFilter']) {
-    assert.match(wrapper, new RegExp(`snapshot\\?\\.filters\\.${facet}`), `${facet} survives leaving the section`);
+  // Each facet holds several values; a snapshot written when it held one still restores.
+  for (const facet of ['sources', 'extractions', 'itemTypes', 'yearFrom', 'yearTo', 'tags', 'vaults', 'attachments']) {
+    assert.match(wrapper, new RegExp(`restored\\?\\.${facet}`), `${facet} survives leaving the section`);
+  }
+  for (const legacy of ['source', 'extraction', 'itemType', 'facetTag', 'facetVault', 'attachmentFilter']) {
+    assert.match(wrapper, new RegExp(`restored\\?\\.${legacy}\\)`), `a single ${legacy} from an older snapshot is still read`);
   }
   // Sorting and columns are already written to disk, and the scope lives in settings.
   assert.doesNotMatch(types, /visibleColumns|columnWidths/, 'the snapshot does not duplicate what the Library persists itself');

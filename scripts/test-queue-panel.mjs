@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'].filter(Boolean).find(existsSync);
@@ -31,8 +32,7 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
   let page;
   try {
     const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/queue-panel/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
-    const css = path.join(dir, 'style.css');
-    execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', css, '--minify'], { cwd: root, stdio: 'pipe' });
+    const css = componentStyles();
     const errors = [];
     async function mount(initial = {}, hold = []) {
       await page.addStyleTag({ content: await readFile(css, 'utf8') });
@@ -65,6 +65,41 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
       await page.waitForTimeout(350); await page.mouse.up();
     }
+    await t.test('documentary preparation is one Queue entry with one set of controls', async () => {
+      const campaign = { id: 'prepare-one', vaultId: 'owner', vaultName: 'Research vault', state: 'active', createdAt: Date.now(), updatedAt: Date.now(), embedding: { provider: 'openrouter', model: 'baai/bge-m3', external: true }, jobs: [
+        { id: 'job-one', documentId: 'source-one', title: 'Full document', state: 'running', stage: 'embeddings', completedPassages: 32, totalPassages: 70, unknownRequests: 1, error: null },
+        { id: 'job-two', documentId: 'source-two', title: 'Second document', state: 'queued', stage: 'extraction', completedPassages: 0, totalPassages: 0, unknownRequests: 0, error: null },
+      ] };
+      // A second campaign that also holds source-one: the document is still listed once.
+      const overlap = { ...campaign, id: 'prepare-two', jobs: [{ ...campaign.jobs[0], id: 'job-three', state: 'queued' }] };
+      await fresh({ getResearchPreparationProgress: { paused: false, campaigns: [campaign, overlap] } });
+      await open();
+      const bar = page.getByTestId('preparation-queue-bar');
+      assert.equal(await page.locator('[data-testid="preparation-queue-bar"]').count(), 1, 'one entry for every campaign');
+      assert.equal(await page.locator('[data-testid^="preparation-campaign-"], [data-testid^="preparation-job-"]').count(), 0, 'no per-campaign or per-job controls');
+      await bar.getByTestId('preparation-queue-status').getByText('Full document').waitFor();
+      await bar.getByText(/Embeddings · 32\/70/).waitFor();
+      await bar.getByText(/openrouter · baai\/bge-m3/).waitFor();
+      assert.equal(await bar.getByRole('progressbar').getAttribute('aria-valuenow'), String(Math.round(32 / 70 / 2 * 100)));
+      await bar.getByRole('button', { name: 'Pausar la indexación', exact: true }).click();
+      await action('setResearchPreparationPaused', true);
+      await bar.getByRole('button', { name: /Indexación/ }).click();
+      assert.equal(await bar.locator('[data-testid^="preparation-item-"]').count(), 2, 'each document listed once');
+      const row = bar.getByTestId('preparation-item-source-one');
+      await row.getByRole('button', { name: 'Quitar de la indexación: Full document', exact: true }).click();
+      await action('controlResearchPreparationCampaign', { campaignId: campaign.id, action: 'cancel', documentId: 'source-one' });
+      await action('controlResearchPreparationCampaign', { campaignId: overlap.id, action: 'cancel', documentId: 'source-one' });
+      await bar.getByRole('button', { name: 'Detener la indexación', exact: true }).click();
+      await page.getByRole('dialog', { name: 'Detener la indexación' }).getByRole('button', { name: 'Detener', exact: true }).click();
+      await action('controlAllResearchPreparation', 'cancel');
+      await close();
+      const done = (value) => ({ ...value, state: 'complete', jobs: value.jobs.map(job => ({ ...job, state: 'complete', stage: 'complete', completedPassages: 70, totalPassages: 70 })) });
+      await emit('onResearchPreparationProgress', { paused: false, campaigns: [done(campaign), done(overlap)] });
+      await count(0); await open();
+      await bar.getByText('2 completados').waitFor();
+      await bar.getByTestId('preparation-queue-dismiss').click();
+      await bar.waitFor({ state: 'detached' });
+    });
     await t.test('global clear confirms dismissal across lanes and preserves running, pending and paused tasks', async () => {
       const mixedScan = queue();
       mixedScan.items.push(

@@ -46,14 +46,14 @@ const backupRoot = path.join(isolatedRoot, 'library-root');
 const isolatedKeyPath = path.join(userData, 'secrets', path.basename(sourceKeyPath));
 
 const translations = [
-  { language: 'es', heading: 'Índice documental', action: 'Escanear obra completa' },
-  { language: 'en', heading: 'Documentary index', action: 'Scan complete work' },
-  { language: 'fr', heading: 'Index documentaire', action: 'Analyser l’œuvre complète' },
-  { language: 'de', heading: 'Dokumentenindex', action: 'Vollständiges Werk scannen' },
-  { language: 'pt', heading: 'Índice documental', action: 'Analisar obra completa' },
-  { language: 'pt-BR', heading: 'Índice documental', action: 'Escanear obra completa' },
-  { language: 'it', heading: 'Indice documentario', action: 'Analizza l’opera completa' },
-  { language: 'tr', heading: 'Belgesel dizin', action: 'Eserin tamamını tara' },
+  { language: 'es', heading: 'Ficha documental', action: 'Escanear obra completa' },
+  { language: 'en', heading: 'Document record', action: 'Scan complete work' },
+  { language: 'fr', heading: 'Fiche documentaire', action: 'Analyser l’œuvre complète' },
+  { language: 'de', heading: 'Dokumentdatensatz', action: 'Vollständiges Werk scannen' },
+  { language: 'pt', heading: 'Ficha documental', action: 'Analisar obra completa' },
+  { language: 'pt-BR', heading: 'Ficha documental', action: 'Escanear obra completa' },
+  { language: 'it', heading: 'Scheda documentale', action: 'Analizza l’opera completa' },
+  { language: 'tr', heading: 'Belge kaydı', action: 'Eserin tamamını tara' },
 ];
 
 const report = {
@@ -439,7 +439,7 @@ try {
   assert.equal(readinessAfter, readinessBefore, 'Documentary Index changed the work overall status.');
   assert.equal((await page.getByTestId('work-status-documentary-action').innerText()).trim(), 'Abrir la ficha documental completa');
   await page.getByTestId('work-status-documentary-action').click();
-  const documentDialog = page.getByRole('dialog', { name: 'Índice documental' });
+  const documentDialog = page.getByRole('dialog', { name: 'Ficha documental' });
   await documentDialog.waitFor({ state: 'visible' });
   await documentDialog.getByText('Visión de conjunto', { exact: true }).waitFor({ state: 'visible' });
   assert.match((await documentDialog.innerText()).toLocaleLowerCase('es'), /valdemora/);

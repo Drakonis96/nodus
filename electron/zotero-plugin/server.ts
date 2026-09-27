@@ -1,3 +1,4 @@
+import { listenLoopback } from '../listenLoopback';
 // Opt-in localhost HTTP server for the "Nodus for Zotero" plugin. The plugin
 // (running inside Zotero's privileged JS) calls this JSON/NDJSON API to chat
 // about the open item with Nodus's library as context: featured models,
@@ -1257,7 +1258,7 @@ async function start(): Promise<void> {
     status = { running: false, port: null, url: null, error: null };
     return;
   }
-  const port = settings.zoteroPluginPort;
+  let port = settings.zoteroPluginPort;
   if (!validPort(port)) {
     status = { running: false, port: null, url: null, error: `Puerto no válido: ${port}` };
     return;
@@ -1277,19 +1278,7 @@ async function start(): Promise<void> {
         }
       });
     });
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error) => {
-        candidate.off('listening', onListening);
-        reject(error);
-      };
-      const onListening = () => {
-        candidate.off('error', onError);
-        resolve();
-      };
-      candidate.once('error', onError);
-      candidate.once('listening', onListening);
-      candidate.listen(port, '127.0.0.1');
-    });
+    port = await listenLoopback(candidate, port);
     httpServer = candidate;
     status = { running: true, port, url: `http://127.0.0.1:${port}`, error: null };
     console.log(`[zotero-plugin] listening on http://127.0.0.1:${port}`);

@@ -11,6 +11,11 @@ import type {
   WorldChatSelection,
 } from '@shared/types';
 import { getDb } from './database';
+import { createChatOrganizer } from './chatOrganizerRepo';
+import { WORLD_CHAT_TABLES } from './chatHistoryTables';
+
+/** Projects, folders, pins and notebooks of the world chat history: the shared rules. */
+export const worldChatOrganizer = createChatOrganizer(WORLD_CHAT_TABLES);
 
 interface Row {
   id: string;
@@ -21,7 +26,16 @@ interface Row {
   model_json: string | null;
   created_at: string;
   updated_at: string;
+  archived?: number;
+  project_id?: string | null;
+  folder_id?: string | null;
+  pinned_at?: string | null;
+  notebook_id?: string | null;
 }
+
+/** The history's columns: the conversation joined with where it sits. */
+const WITH_PLACEMENT = `SELECT c.*, p.project_id, p.folder_id, p.pinned_at, p.notebook_id FROM world_chat_conversations c
+  LEFT JOIN world_chat_placements p ON p.conversation_id = c.id`;
 
 const DEFAULT_SELECTION: WorldChatSelection = { scope: 'auto', entryKeys: [], keepFocus: false };
 
@@ -56,13 +70,19 @@ function toConversation(row: Row): WorldChatConversation {
     messageCount: messages.length,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    archived: row.archived === 1,
+    projectId: row.project_id ?? null,
+    folderId: row.folder_id ?? null,
+    pinnedAt: row.pinned_at ?? null,
+    notebookId: row.notebook_id ?? null,
   };
 }
 
-export function listWorldChatConversations(): WorldChatConversationSummary[] {
+/** The history, newest first; archived chats only when asked for, after the others. */
+export function listWorldChatConversations(includeArchived = false): WorldChatConversationSummary[] {
   return (
     getDb()
-      .prepare('SELECT * FROM world_chat_conversations ORDER BY updated_at DESC')
+      .prepare(`${WITH_PLACEMENT} ${includeArchived ? '' : 'WHERE c.archived = 0'} ORDER BY c.archived ASC, c.updated_at DESC`)
       .all() as Row[]
   ).map((row) => {
     const { messages: _messages, ...summary } = toConversation(row);
@@ -71,14 +91,18 @@ export function listWorldChatConversations(): WorldChatConversationSummary[] {
 }
 
 export function getWorldChatConversation(id: string): WorldChatConversation | null {
-  const row = getDb().prepare('SELECT * FROM world_chat_conversations WHERE id = ?').get(id) as Row | undefined;
+  const row = getDb().prepare(`${WITH_PLACEMENT} WHERE c.id = ?`).get(id) as Row | undefined;
   return row ? toConversation(row) : null;
 }
 
+/** A chat can start inside a project (and one of its folders) or inside a notebook. */
 export function createWorldChatConversation(input: {
   title: string;
   selection: WorldChatSelection;
   model: ModelRef | null;
+  projectId?: string | null;
+  folderId?: string | null;
+  notebookId?: string | null;
 }): WorldChatConversation {
   const now = new Date().toISOString();
   const id = uuid();
@@ -96,7 +120,20 @@ export function createWorldChatConversation(input: {
       now,
       now
     );
+  if (input.notebookId) worldChatOrganizer.setConversationNotebook(id, input.notebookId);
+  else if (input.projectId) {
+    worldChatOrganizer.setConversationProject(id, input.projectId);
+    if (input.folderId) worldChatOrganizer.setConversationFolder(id, input.folderId);
+  }
   return getWorldChatConversation(id)!;
+}
+
+export function renameWorldChatConversation(id: string, title: string): void {
+  getDb().prepare('UPDATE world_chat_conversations SET title = ?, updated_at = ? WHERE id = ?').run(title.trim().slice(0, 120) || 'Chat del mundo', new Date().toISOString(), id);
+}
+
+export function setWorldChatConversationArchived(id: string, archived: boolean): void {
+  worldChatOrganizer.setConversationArchived(id, archived);
 }
 
 export function saveWorldChatConversation(
@@ -127,5 +164,10 @@ export function saveWorldChatConversation(
 export function deleteWorldChatConversation(id: string): void {
   deleteResearchAttachments({ surface: 'world', conversationId: id });
   deleteChatAssets(chatAssetOwner('world-assistant', id, getActiveVault().id));
-  getDb().prepare('DELETE FROM world_chat_conversations WHERE id = ?').run(id);
+  const db = getDb();
+  db.transaction(() => {
+    // A deleted chat leaves no place behind: no project, folder, pin or notebook.
+    worldChatOrganizer.deleteConversationPlacement(id);
+    db.prepare('DELETE FROM world_chat_conversations WHERE id = ?').run(id);
+  })();
 }

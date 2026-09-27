@@ -7,7 +7,12 @@ import type { CitationPreview, CitationRef } from '@shared/types';
 import { getIdeaDetail, getEdgeDetail } from '../db/ideasRepo';
 import { getWork } from '../db/worksRepo';
 import { getGapDetail } from '../db/gapsRepo';
-import { getPassageDetail } from '../db/passagesRepo';
+import { getPassageDetail as getLegacyPassageDetail } from '../db/passagesRepo';
+import { getScopedLegacyPassageDetail } from './scopedLegacyCitations';
+import { getDocumentaryPassageDetail } from './documentaryCitations';
+import { getWebPassageDetail } from '../db/researchWebRepo';
+import { webPassageLink } from '@shared/webResearchRanking';
+const getPassageDetail = (id: string) => id.startsWith('documentary:') ? getDocumentaryPassageDetail(id) : id.startsWith('scoped:') ? getScopedLegacyPassageDetail(id) : id.startsWith('web:') ? getWebPassageDetail(id) : getLegacyPassageDetail(id);
 import { buildCitationPreview } from './citationPreview';
 
 function exists(ref: CitationRef): boolean {
@@ -83,6 +88,11 @@ export function previewCitation(ref: CitationRef): CitationPreview | null {
       case 'passage': {
         const detail = getPassageDetail(ref.id);
         if (!detail) return null;
+        if (detail.web) {
+          const subtitle = [detail.web.siteName ?? detail.web.domain, detail.work.year ? String(detail.work.year) : '', detail.page_label ? `p. ${detail.page_label}` : ''].filter(Boolean).join(' · ');
+          return { ...buildCitationPreview('passage', { title: detail.work.title, subtitle, snippet: detail.text }), url: detail.web.url,
+            openUrl: webPassageLink(detail.web.finalUrl, detail.text, detail.page_number) };
+        }
         const subtitle = [detail.work.authors.slice(0, 2).join('; '), detail.page_label ?? '']
           .filter(Boolean)
           .join(' · ');

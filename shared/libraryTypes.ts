@@ -523,6 +523,8 @@ export interface ZoteroSyncSession {
 }
 
 export interface LibraryExtractionOptions {
+  /** Documentary preparation may only reuse installed language resources. */
+  localOcrOnly?: boolean;
   ocrMode: 'off' | 'local' | 'remote';
   ocrLanguages: string;
   maxOcrPages: number;
@@ -622,6 +624,12 @@ export interface LibraryCatalogQuery {
   yearFrom?: number | null;
   yearTo?: number | null;
   hasAttachments?: boolean | null;
+  /** Multi-value facets: an item matches when it matches any listed value. */
+  sources?: LibraryItemSource[];
+  itemTypes?: LibraryItemType[];
+  extractionStatuses?: NonNullable<LibraryItemRecord['extraction']>['status'][];
+  tags?: string[];
+  vaultIds?: string[];
   sort?: LibrarySortRule[];
   includeFacets?: boolean;
 }
@@ -751,6 +759,15 @@ export interface LibraryLocalImportReport {
   skipped: number;
   itemIds: string[];
   warnings: string[];
+  /** Items already in the library holding a skipped file's exact bytes. */
+  existingItemIds?: string[];
+}
+
+/** Files dropped on a vault's Library: imported to the Global Library, then used in the vault. */
+export interface LibraryVaultFileImportReport extends LibraryLocalImportReport {
+  vaultId: string;
+  linked: number;
+  alreadyInVault: number;
 }
 
 export type LibraryMetadataIdentifierKind = 'doi' | 'isbn' | 'issn' | 'pmid' | 'pmcid' | 'arxiv';

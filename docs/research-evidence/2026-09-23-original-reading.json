@@ -1,0 +1,161 @@
+{
+  "root": "/private/tmp/nodus-research-XWlgUu",
+  "proof": {
+    "writeInsideAllowed": true,
+    "writeOutsideDenied": true,
+    "descendantWriteDenied": true,
+    "externalNetworkDenied": true,
+    "forbiddenLoopbackPortDenied": true
+  },
+  "completed": true,
+  "modelCalls": 0,
+  "productionFixtures": false,
+  "notebooks": {
+    "passed": true,
+    "collections": 3,
+    "sources": 3,
+    "preparedPassages": 1,
+    "layouts": [
+      {
+        "theme": "dark",
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "box": {
+          "x": 260,
+          "y": 48,
+          "width": 760,
+          "height": 704
+        },
+        "keyboardFocusContained": true
+      },
+      {
+        "theme": "dark",
+        "viewport": {
+          "width": 800,
+          "height": 640
+        },
+        "box": {
+          "x": 24,
+          "y": 38.3984375,
+          "width": 752,
+          "height": 563.1953125
+        },
+        "keyboardFocusContained": true
+      },
+      {
+        "theme": "light",
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "box": {
+          "x": 260,
+          "y": 48,
+          "width": 760,
+          "height": 704
+        },
+        "keyboardFocusContained": true
+      },
+      {
+        "theme": "light",
+        "viewport": {
+          "width": 800,
+          "height": 640
+        },
+        "box": {
+          "x": 24,
+          "y": 38.3984375,
+          "width": 752,
+          "height": 563.1953125
+        },
+        "keyboardFocusContained": true
+      }
+    ]
+  },
+  "activity": {
+    "passed": true,
+    "mode": "deterministic IPC/UI fixture, no live model or Zotero calls",
+    "turns": 3,
+    "layouts": [
+      {
+        "theme": "light",
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "box": {
+          "x": 904,
+          "y": 268.5546875,
+          "width": 356,
+          "height": 402.9453125
+        }
+      },
+      {
+        "theme": "light",
+        "viewport": {
+          "width": 800,
+          "height": 640
+        },
+        "box": {
+          "x": 424,
+          "y": 218,
+          "width": 356,
+          "height": 293.5
+        }
+      },
+      {
+        "theme": "dark",
+        "viewport": {
+          "width": 1280,
+          "height": 800
+        },
+        "box": {
+          "x": 904,
+          "y": 268.5546875,
+          "width": 356,
+          "height": 402.9453125
+        }
+      },
+      {
+        "theme": "dark",
+        "viewport": {
+          "width": 800,
+          "height": 640
+        },
+        "box": {
+          "x": 424,
+          "y": 218,
+          "width": 356,
+          "height": 293.5
+        }
+      }
+    ],
+    "requestFiltering": true,
+    "simultaneousOperations": true,
+    "keyboard": true,
+    "minimizeExpand": true,
+    "failure": true,
+    "cancellation": true
+  },
+  "pdf": {
+    "passed": true,
+    "notebookId": "f605e593-070f-4078-97f3-1d871a0d7e7a",
+    "physicalPage": 1,
+    "originalRead": {
+      "passed": true,
+      "noCampaignCreated": true,
+      "physicalPage": 1
+    },
+    "marker": "PACKAGED73"
+  },
+  "paths": {
+    "userData": "/private/tmp/nodus-research-XWlgUu/profile",
+    "sessionData": "/private/tmp/nodus-research-XWlgUu/sessions",
+    "temp": "/private/tmp/nodus-research-XWlgUu/tmp",
+    "appData": "/private/tmp/nodus-research-XWlgUu/app-data",
+    "downloads": "/private/tmp/nodus-research-XWlgUu/downloads"
+  },
+  "databaseOpens": 6
+}

@@ -1,0 +1,23 @@
+{
+ "description": "Chemistry Studio 2.5.6 release and the offline bootstrap pin that the cross-repo check compares.",
+ "problem": "The marketplace merged 2.5.6 (NodusResearch/nodus-research-skill-marketplace#40) and its catalog advertised chemistry-studio-v2.5.6 before any release existed; the bootstrap pinned 2.5.1; the catalog size (19,450,683) was 2.5.1's. All three cross-repo jobs failed on main and on this PR.",
+ "compatibility": {
+  "finding": "2.5.6's SKILL.md forbade the reactants>agents>products reaction lines that Nodus 5.6.0 appends to a route request (shared/synthesisPrompt.ts at v5.6.0), while declaring minNodusVersion 5.3.2. The worker's tool inputs are unchanged since 2.5.1.",
+  "decision": "Make the synthesis section follow whichever contract the application appends and keep minNodusVersion 5.3.2. Raising it to 5.7.0 would make every 5.6.0 checkout refuse the package (cross-repo, capability migration, the 5.6.1-research installer candidate) until package.json moves.",
+  "marketplacePullRequest": "NodusResearch/nodus-research-skill-marketplace#41, merged 5367d684 after validate.yml and package tests passed; new contract test fails on the previous SKILL.md"
+ },
+ "release": {
+  "tag": "chemistry-studio-v2.5.6",
+  "workflowRun": 36015802038,
+  "environmentApproval": "not required (sign ran without waiting)",
+  "manifest": { "keyId": "nr02", "asset": "chemistry-studio-2.5.6-any.nodus-plugin", "bytes": 19454481, "sha256": "06251c4b7b2e356536c772ed37c344b940dcb0c66e969b5578032b22f1d2fafb", "createdAt": "2026-09-24T14:53:02.372Z" },
+  "verified": "signature with packages/capability-api verifyReleaseManifest against electron/capabilities/trustedKeys.json; downloaded asset size and SHA-256 equal to the manifest; packaged plugin.json minNodusVersion 5.3.2; packaged SKILL.md carries the corrected synthesis section"
+ },
+ "catalog": { "pullRequest": "NodusResearch/nodus-research-skill-marketplace#42", "mergeCommit": "24bef77f", "bytes": 19454481 },
+ "pin": {
+  "mainPullRequest": "Drakonis96/nodus#942 (not merged)",
+  "branchCommit": "7831f7f8",
+  "verification": ["NODUS_REQUIRE_BOOTSTRAP=1 npm run capabilities:bootstrap: 3 packages bundled", "npm run verify:cross-repo against marketplace main 24bef77: CROSS-REPO PASS", "npm run verify:capability-migration: CAPABILITY MIGRATION PASS", "#942 CI: cross-repo passed on macos-14, ubuntu-latest and windows-latest"]
+ },
+ "version5_6_2": "No 5.6.2 reference exists in either repository, the PR or the issue; package.json stays 5.6.0. The research installer candidate stays 5.6.1-research.N. compareSemver treats a pre-release patch as NaN, so a future 5.7.0-research.N candidate would reject any package whose minNodusVersion is 5.7.0."
+}

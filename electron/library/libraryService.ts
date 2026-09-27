@@ -25,6 +25,7 @@ import type {
   LibraryItemCollectionPatch,
   LibraryItemRecord,
   LibraryLocalImportReport,
+  LibraryVaultFileImportReport,
   LibraryBibliographyImportReport,
   LibraryDuplicateGroup,
   LibraryItemMetadata,
@@ -940,6 +941,19 @@ export async function importGlobalLibraryFiles(files: string[], collectionId?: s
   if (report.itemIds.length && current.operations.getSettings().autoPrepareAttachments) current.extraction.enqueue(report.itemIds);
   broadcast(current.catalog.status(current.root, current.deviceId));
   return report;
+}
+
+/** Files dropped on a vault's Library land in the Global Library and are used in that
+ * vault in one step. A file whose exact bytes are already in the Global Library is not
+ * copied again; its existing item is used in the vault instead. Linking creates the
+ * vault work, so the vault's automatic preparation picks it up like any other addition. */
+export async function importGlobalLibraryFilesIntoVault(files: string[], vaultId: string): Promise<LibraryVaultFileImportReport> {
+  if (!getVault(vaultId)) throw new Error('El vault seleccionado ya no existe.');
+  const report = await importGlobalLibraryFiles(files, null);
+  const itemIds = [...new Set([...report.itemIds, ...(report.existingItemIds ?? [])])];
+  if (!itemIds.length) return { ...report, vaultId, linked: 0, alreadyInVault: 0 };
+  const link = await linkGlobalLibraryItemsToVault(itemIds, vaultId);
+  return { ...report, vaultId, linked: link.linked, alreadyInVault: link.existing };
 }
 
 export async function importGlobalBibliographyFiles(files: string[], collectionId?: string | null): Promise<LibraryBibliographyImportReport> {

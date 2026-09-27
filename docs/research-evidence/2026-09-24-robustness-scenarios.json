@@ -1,0 +1,569 @@
+{
+  "description": "Real-Electron robustness scenarios on application build 2c7f1c4a. Every app run first proved inside-write, outside-write, descendant-write, external-network and forbidden-loopback denials. Where marked simulatedUpstream, the provider answer is produced locally behind the real cost-reserving proxy (same wire format; nothing leaves the machine); the application, queue, database and proxy are real. No paid calls.",
+  "commit": "2c7f1c4a",
+  "scenarios": {
+    "vaultSwitch": {
+      "root": "/private/tmp/nodus-research-YNGOuO",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          63974
+        ]
+      },
+      "simulatedUpstream": true,
+      "researchChat": {
+        "switchAccepted": true,
+        "result": {
+          "ok": false,
+          "error": "page.evaluate: Error: Error invoking remote method 'research:chat': Error: research_scope_changed"
+        },
+        "vaultBView": [
+          {
+            "id": "nodus:8b9c88ad-e9e9-457e-b774-f9071b3bb489",
+            "workId": null
+          },
+          {
+            "id": "nodus:8f256d40-87d3-4493-b423-d75e40968070",
+            "workId": null
+          }
+        ]
+      },
+      "deepResearch": {
+        "switchAccepted": false,
+        "message": "No se puede cambiar de bóveda mientras se genera un informe de Deep Research. Espera a que termine; en Deep Research puedes quitar de la cola los que aún no han empezado."
+      },
+      "preparation": {
+        "before": [
+          "missing/missing",
+          "ready/missing",
+          "missing/missing"
+        ],
+        "switch": {
+          "ok": true,
+          "message": "Bóveda cargada.",
+          "copiedProviders": []
+        },
+        "vaultBView": [
+          {
+            "workId": null,
+            "preparation": "missing/missing"
+          },
+          {
+            "workId": null,
+            "preparation": "ready/missing"
+          },
+          {
+            "workId": null,
+            "preparation": "missing/missing"
+          }
+        ],
+        "after": [
+          "ready/ready/",
+          "ready/ready/",
+          "ready/ready/"
+        ],
+        "vaultBLinkedDocumentsAtEnd": 0
+      }
+    },
+    "providerFaults": {
+      "root": "/private/tmp/nodus-research-WtSL46",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          63982
+        ]
+      },
+      "simulatedUpstream": true,
+      "faults": [
+        "429",
+        "500",
+        "200 malformed body",
+        "connection error"
+      ],
+      "embeddingOutage": {
+        "observedStates": [
+          "missing/",
+          "queued/provider_failed",
+          "running/provider_failed",
+          "failed/provider_failed"
+        ],
+        "state": [
+          {
+            "lexical": "ready",
+            "embeddings": "failed",
+            "reason": "provider_failed",
+            "status": "ready"
+          },
+          {
+            "lexical": "ready",
+            "embeddings": "failed",
+            "reason": "provider_failed",
+            "status": "ready"
+          }
+        ],
+        "callsAtTerminalState": 72,
+        "totalCallsAfterQuiescence": 74,
+        "otherProviderCalls": 0,
+        "retryPolicy": "three request attempts; each with up to two server retries and rate-limit waits; malformed bodies bisect the batch",
+        "lexicalHit": true,
+        "recoveredByExplicitRetry": true
+      },
+      "chatOutage": [
+        {
+          "fault": "429",
+          "ok": true,
+          "error": null,
+          "answer": "The requested marker appears in the supplied evidence ([source](nodus://passage/documentary%3Aacfad83333903e4afa7f765d7ecf8ffee139dc5697728ad8e80cc4ac38ef92d8%3A533ff2b7a6c90bf67a5c396ad7e25ee96fdd0d6",
+          "modelCalls": 2,
+          "seconds": 4
+        },
+        {
+          "fault": "500",
+          "ok": true,
+          "error": null,
+          "answer": "The requested marker appears in the supplied evidence ([source](nodus://passage/documentary%3Aacfad83333903e4afa7f765d7ecf8ffee139dc5697728ad8e80cc4ac38ef92d8%3A533ff2b7a6c90bf67a5c396ad7e25ee96fdd0d6",
+          "modelCalls": 2,
+          "seconds": 0
+        },
+        {
+          "fault": "malformed",
+          "ok": true,
+          "error": null,
+          "answer": "The requested marker appears in the supplied evidence ([source](nodus://passage/documentary%3Aacfad83333903e4afa7f765d7ecf8ffee139dc5697728ad8e80cc4ac38ef92d8%3A533ff2b7a6c90bf67a5c396ad7e25ee96fdd0d6",
+          "modelCalls": 2,
+          "seconds": 0
+        },
+        {
+          "fault": "connection",
+          "ok": true,
+          "error": null,
+          "answer": "The requested marker appears in the supplied evidence ([source](nodus://passage/documentary%3Aacfad83333903e4afa7f765d7ecf8ffee139dc5697728ad8e80cc4ac38ef92d8%3A533ff2b7a6c90bf67a5c396ad7e25ee96fdd0d6",
+          "modelCalls": 2,
+          "seconds": 0
+        }
+      ],
+      "chatPersistentOutage": {
+        "ok": false,
+        "error": "page.evaluate: Error: Error invoking remote method 'research:chat': Error: Error del proveedor (500)",
+        "modelCalls": 4
+      },
+      "deepResearchOutage": {
+        "completed": true,
+        "title": "Summarize the markers per page.",
+        "markdown": "The available evidence cannot support a sufficient answer. Review the selected sources, accessible text and pending documents. Claims that could not be verified have been omitted.",
+        "factualAudit": {
+          "checked": 3,
+          "supported": 0,
+          "removed": 0,
+          "unverified": 3
+        },
+        "truncated": true
+      }
+    },
+    "attachmentReplacementGlobalLibrary": {
+      "root": "/private/tmp/nodus-research-OXOaLy",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": []
+      },
+      "modelCalls": 0,
+      "completed": true,
+      "replacedWhile": "running",
+      "attachment": {
+        "before": [
+          "b7e820441397b1cb50456eff6ab3887e454cdae74fa8f9e519e5c3f4ebaac852"
+        ],
+        "after": [
+          "5404b4f972dd79e8d2a2b4bd4432fb90b734ecffc387372d4b038abcb266b217"
+        ]
+      },
+      "afterReplacement": {
+        "lexical": "missing",
+        "status": "catalogued",
+        "reason": null,
+        "oldMarkerHits": 0,
+        "newMarkerHits": 0
+      },
+      "afterRepreparation": {
+        "ready": true,
+        "oldMarkerHits": 0,
+        "newMarkerHits": 1,
+        "newRevisions": [
+          "a075232c9527e07ab9a69d180be346f8c029e8bfe656d11ab269fd4be9f3fd99"
+        ],
+        "currentRevision": "a075232c9527e07ab9a69d180be346f8c029e8bfe656d11ab269fd4be9f3fd99"
+      }
+    },
+    "attachmentReplacementZotero": {
+      "root": "/private/tmp/nodus-research-Ap4OtG",
+      "realZotero": "10.0.3",
+      "documentPreparationBefore": "missing",
+      "zoteroFile": "zotero/data/storage/H7RZ4KWM/source-3.pdf",
+      "knownSha256": "86de27be8f128476e520d187efe61fa58cf39fc0780920687d7e8d02910a98ef",
+      "automaticReadAfterReplacement": {
+        "ok": false,
+        "error": "page.evaluate: Error: Error invoking remote method 'research:corpus:read': Error: research_source_revision_changed"
+      },
+      "manualConnectAfterReplacement": {
+        "ok": false,
+        "error": "page.evaluate: Error: Error invoking remote method 'research:zotero:connect': Error: research_source_revision_changed"
+      },
+      "readAfterRestore": {
+        "hasOriginalMarker": true,
+        "evidenceIds": [
+          "scoped"
+        ]
+      }
+    },
+    "sharedIndexTwoVaults": {
+      "root": "/private/tmp/nodus-research-b1yw3b",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          64046
+        ]
+      },
+      "simulatedUpstream": true,
+      "completed": true,
+      "campaignsVisibleInB": 2,
+      "afterCancelInA": {
+        "documentId": "nodus:3628a345-145b-40cc-9885-5385551bce8b",
+        "revision": "2bbefbbc095301c842205ee173f8c41b4643169409b74b1a91d18306f8525c88",
+        "text": "available",
+        "lexical": "ready",
+        "embeddings": "missing",
+        "status": "ready",
+        "reason": null,
+        "error": null,
+        "passages": 75,
+        "embedded": 0,
+        "unpreparedAttachmentIds": []
+      },
+      "readyInB": {
+        "ready": true,
+        "lexical": "ready",
+        "embeddings": "ready",
+        "passages": 75
+      },
+      "searchInB": 2,
+      "searchEvidence": [
+        {
+          "id": "87fe24c0167a378757cc87090a526376a6e1152a34661066c3891c662c88d3d0:8",
+          "revision": "2bbefbbc095301c842205ee173f8c41b4643169409b74b1a91d18306f8525c88",
+          "locator": {
+            "pageLabel": "pp. 7–8",
+            "sourceRef": "library:nodus:3628a345-145b-40cc-9885-5385551bce8b:local:4eef7dbe-4196-4910-b1ce-d6647d422aaa",
+            "pageNumber": 7,
+            "pageEnd": 8
+          },
+          "provenance": "source"
+        },
+        {
+          "id": "87fe24c0167a378757cc87090a526376a6e1152a34661066c3891c662c88d3d0:7",
+          "revision": "2bbefbbc095301c842205ee173f8c41b4643169409b74b1a91d18306f8525c88",
+          "locator": {
+            "pageLabel": "pp. 6–7",
+            "sourceRef": "library:nodus:3628a345-145b-40cc-9885-5385551bce8b:local:4eef7dbe-4196-4910-b1ce-d6647d422aaa",
+            "pageNumber": 6,
+            "pageEnd": 7
+          },
+          "provenance": "source"
+        }
+      ],
+      "viewInA": {
+        "lexical": "ready",
+        "embeddings": "ready"
+      },
+      "store": {
+        "textOnlyIdentities": 1,
+        "vectorIdentities": 1,
+        "embeddedInputs": 76,
+        "uniqueEmbeddedInputs": 76,
+        "passages": 75
+      }
+    },
+    "killDuringEmbeddings": {
+      "root": "/private/tmp/nodus-research-Tx5lMW",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": [
+          64053
+        ]
+      },
+      "simulatedUpstream": true,
+      "completed": true,
+      "killPoint": {
+        "documents": [
+          {
+            "embedded": 0,
+            "passages": 100,
+            "embeddings": "missing"
+          },
+          {
+            "embedded": 0,
+            "passages": 0,
+            "embeddings": "missing"
+          },
+          {
+            "embedded": 100,
+            "passages": 100,
+            "embeddings": "ready"
+          }
+        ],
+        "attempts": [
+          {
+            "state": "complete",
+            "n": 4
+          },
+          {
+            "state": "requested",
+            "n": 1
+          }
+        ],
+        "inputsSentBeforeKill": 132
+      },
+      "orphansAfterKill": [],
+      "afterRestart": [
+        {
+          "embedded": 100,
+          "passages": 100,
+          "embeddings": "ready"
+        },
+        {
+          "embedded": 100,
+          "passages": 100,
+          "embeddings": "ready"
+        },
+        {
+          "embedded": 100,
+          "passages": 100,
+          "embeddings": "ready"
+        }
+      ],
+      "searchAfterRestart": true,
+      "store": {
+        "passages": 300,
+        "inputsBeforeKill": 132,
+        "inputsTotal": 332,
+        "reembeddedInputs": 32,
+        "attempts": [
+          {
+            "state": "complete",
+            "n": 12
+          },
+          {
+            "state": "unknown",
+            "n": 1
+          }
+        ],
+        "vectorsMissing": 0,
+        "outstandingBatchesAtKill": 1
+      }
+    },
+    "killDuringTextPreparation": {
+      "root": "/private/tmp/nodus-research-brmeio",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "killPoint": {
+        "published": 0,
+        "requests": [
+          "running:1",
+          "queued:0",
+          "queued:0",
+          "queued:0"
+        ]
+      },
+      "orphansAfterKill": [],
+      "afterRestart": [
+        {
+          "id": "nodus:0136c211-0229-44fb-8ea2-dc128c76269e",
+          "lexical": "ready",
+          "status": "blocked",
+          "passages": 313,
+          "reason": "no_model"
+        },
+        {
+          "id": "nodus:105f96c4-32a0-4bdf-8378-66cc88475ce9",
+          "lexical": "ready",
+          "status": "blocked",
+          "passages": 313,
+          "reason": "no_model"
+        },
+        {
+          "id": "nodus:68c2b7cd-4b53-434d-a06b-91426cb20e9c",
+          "lexical": "ready",
+          "status": "blocked",
+          "passages": 313,
+          "reason": "no_model"
+        },
+        {
+          "id": "nodus:b8bccea2-41f9-4092-9c9c-ba0db2fcffba",
+          "lexical": "ready",
+          "status": "blocked",
+          "passages": 313,
+          "reason": "no_model"
+        }
+      ],
+      "lastPages": [
+        {
+          "marker": "RECOVERY1P250",
+          "pageNumber": 249,
+          "pageEnd": 250,
+          "pageLabel": "pp. 249–250"
+        },
+        {
+          "marker": "RECOVERY2P250",
+          "pageNumber": 249,
+          "pageEnd": 250,
+          "pageLabel": "pp. 249–250"
+        },
+        {
+          "marker": "RECOVERY3P250",
+          "pageNumber": 249,
+          "pageEnd": 250,
+          "pageLabel": "pp. 249–250"
+        },
+        {
+          "marker": "RECOVERY4P250",
+          "pageNumber": 249,
+          "pageEnd": 250,
+          "pageLabel": "pp. 249–250"
+        }
+      ],
+      "store": {
+        "publishedPerDocument": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "duplicatePassageOrdinals": 0
+      }
+    },
+    "accessibility": {
+      "root": "/private/tmp/nodus-research-CrcBCn",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true,
+        "allowedLoopbackPorts": []
+      },
+      "axe": "4.13.0",
+      "note": "Automated WCAG 2.0/2.1 A/AA audit, not a screen-reader test with a person.",
+      "surfaces": [
+        {
+          "surface": "research-chat",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "notebook-editor",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "research-activity",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "queue-panel",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "preparation-welcome",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "preparation-decline-confirmation",
+          "theme": "light",
+          "violations": 0
+        },
+        {
+          "surface": "research-chat",
+          "theme": "dark",
+          "violations": 0
+        },
+        {
+          "surface": "notebook-editor",
+          "theme": "dark",
+          "violations": 0
+        },
+        {
+          "surface": "research-activity",
+          "theme": "dark",
+          "violations": 0
+        },
+        {
+          "surface": "queue-panel",
+          "theme": "dark",
+          "violations": 0
+        },
+        {
+          "surface": "preparation-welcome",
+          "theme": "dark",
+          "violations": 0
+        },
+        {
+          "surface": "preparation-decline-confirmation",
+          "theme": "dark",
+          "violations": 0
+        }
+      ],
+      "fixedBefore": [
+        "research effort trigger light 3.39:1",
+        "composer hint dark 2.53:1",
+        "Queue empty message dark 4.17:1"
+      ]
+    }
+  },
+  "defectsFoundAndFixed": [
+    {
+      "commit": "1d35b7a0",
+      "defect": "Embedding retries shown as failed; provider failures reported as extraction_failed"
+    },
+    {
+      "commit": "ab322ae4",
+      "defect": "Attachment replaced during preparation: request blocked as research_source_not_authorized, campaign owner blocked, new file shown as extraction failure"
+    },
+    {
+      "commit": "b5dc96a7",
+      "defect": "Three WCAG AA contrast failures in Research composer and Queue"
+    }
+  ],
+  "harnessCorrections": [
+    "OpenAI SDK requests base64 embeddings; the simulator now matches the wire format",
+    "The proxy turned simulated connection errors into 403 (read as invalid key); a test-only real socket reset was added",
+    "Global Library items appear in every academic vault by design; assertions check links, not visibility",
+    "Overlapping chunks legitimately return two passages for one marker; assertions check identity and uniqueness"
+  ]
+}

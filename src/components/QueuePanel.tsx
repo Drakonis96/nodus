@@ -205,7 +205,7 @@ export function QueuePanel({
             <PassageProgressBar progress={activity.passages} />
             <AdditionalQueueTasks activity={activity} />
             {visible === 0 && (
-              <p data-testid="header-queue-empty" className="px-3 py-6 text-center text-xs text-neutral-500">
+              <p data-testid="header-queue-empty" className="px-3 py-6 text-center text-xs text-neutral-400">
                 {t('Sin tareas ni colas en curso.')}
               </p>
             )}

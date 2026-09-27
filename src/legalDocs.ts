@@ -47,7 +47,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Cuándo salen datos del dispositivo',
         bullets: [
-          'Solo las funciones opcionales que actives de forma expresa contactan con terceros: un proveedor de IA en la nube que elijas, Zotero, Unpaywall, GitHub (comprobar actualizaciones) o Hugging Face (descargar modelos).',
+          'Solo las funciones opcionales que actives de forma expresa contactan con terceros: un proveedor de IA en la nube que elijas, Zotero, Unpaywall, GitHub (comprobar actualizaciones) o Hugging Face (descargar modelos), o la búsqueda web del Research Chat, que envía a motores públicos los términos de búsqueda derivados de tu pregunta y lee las páginas que encuentra.',
           'Si conectas ChatGPT mediante OpenAI Secure MCP Tunnel, OpenAI recibe las solicitudes y resultados de herramientas; el servidor de Nodus continúa limitado a este equipo.',
           'Si conectas el Nodus Server opcional y autohospedado, se publica por HTTPS una copia filtrada del vault; no incluye PDF, credenciales, rutas, embeddings, listas de alumnos ni calificaciones.',
           'Cada servicio externo queda identificado antes de usarse.',
@@ -77,7 +77,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'When data leaves the device',
         bullets: [
-          'Only optional features you explicitly enable contact third parties: a cloud AI provider you choose, Zotero, Unpaywall, GitHub (update checks) or Hugging Face (model downloads).',
+          'Only optional features you explicitly enable contact third parties: a cloud AI provider you choose, Zotero, Unpaywall, GitHub (update checks) or Hugging Face (model downloads), or the Research Chat web search, which sends the search terms derived from your question to public search engines and reads the pages it finds.',
           'If you connect ChatGPT through OpenAI Secure MCP Tunnel, OpenAI receives tool requests and results; the Nodus server remains restricted to this device.',
           'If you connect the optional self-hosted Nodus Server, a filtered vault copy is published over HTTPS; it excludes PDFs, credentials, paths, embeddings, student rosters and grades.',
           'Each external service is identified before it is used.',
@@ -107,7 +107,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: "Quand les données quittent l'appareil",
         bullets: [
-          "Seules les fonctions optionnelles que vous activez expressément contactent des tiers : un fournisseur d'IA cloud de votre choix, Zotero, Unpaywall, GitHub (vérification des mises à jour) ou Hugging Face (téléchargement de modèles).",
+          "Seules les fonctions optionnelles que vous activez expressément contactent des tiers : un fournisseur d'IA cloud de votre choix, Zotero, Unpaywall, GitHub (vérification des mises à jour) ou Hugging Face (téléchargement de modèles), ou la recherche web du Research Chat, qui envoie aux moteurs publics les termes de recherche dérivés de votre question et lit les pages qu’il trouve.",
           'Si vous connectez ChatGPT via OpenAI Secure MCP Tunnel, OpenAI reçoit les requêtes et résultats des outils ; le serveur Nodus reste limité à cet appareil.',
           "Si vous connectez le Nodus Server optionnel et auto-hébergé, une copie filtrée du coffre est publiée via HTTPS, sans PDF, identifiants, chemins, embeddings, listes d'élèves ni notes.",
           'Chaque service externe est identifié avant utilisation.',
@@ -137,7 +137,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Wann Daten das Gerät verlassen',
         bullets: [
-          'Nur optionale Funktionen, die du ausdrücklich aktivierst, kontaktieren Dritte: einen von dir gewählten Cloud-KI-Anbieter, Zotero, Unpaywall, GitHub (Update-Prüfung) oder Hugging Face (Modell-Downloads).',
+          'Nur optionale Funktionen, die du ausdrücklich aktivierst, kontaktieren Dritte: einen von dir gewählten Cloud-KI-Anbieter, Zotero, Unpaywall, GitHub (Update-Prüfung) oder Hugging Face (Modell-Downloads), oder die Websuche des Research Chat, die die aus deiner Frage abgeleiteten Suchbegriffe an öffentliche Suchmaschinen sendet und die gefundenen Seiten liest.',
           'Wenn du ChatGPT über OpenAI Secure MCP Tunnel verbindest, erhält OpenAI Werkzeuganfragen und Ergebnisse; der Nodus-Server bleibt auf dieses Gerät beschränkt.',
           'Wenn du den optionalen selbst gehosteten Nodus Server verbindest, wird eine gefilterte Tresorkopie über HTTPS veröffentlicht – ohne PDFs, Zugangsdaten, Pfade, Embeddings, Schülerlisten oder Noten.',
           'Jeder externe Dienst wird vor der Nutzung benannt.',
@@ -167,7 +167,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Quando os dados saem do dispositivo',
         bullets: [
-          'Apenas as funções opcionais que ativas expressamente contactam terceiros: um fornecedor de IA na nuvem à tua escolha, Zotero, Unpaywall, GitHub (verificar atualizações) ou Hugging Face (transferir modelos).',
+          'Apenas as funções opcionais que ativas expressamente contactam terceiros: um fornecedor de IA na nuvem à tua escolha, Zotero, Unpaywall, GitHub (verificar atualizações) ou Hugging Face (transferir modelos), ou a pesquisa web do Research Chat, que envia aos motores públicos os termos de pesquisa derivados da tua pergunta e lê as páginas que encontra.',
           'Se ligares o ChatGPT através do OpenAI Secure MCP Tunnel, a OpenAI recebe pedidos e resultados das ferramentas; o servidor do Nodus permanece limitado a este dispositivo.',
           'Se ligares o Nodus Server opcional e autoalojado, é publicada por HTTPS uma cópia filtrada do cofre, sem PDF, credenciais, caminhos, embeddings, listas de alunos ou classificações.',
           'Cada serviço externo é identificado antes de ser usado.',
@@ -197,7 +197,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Quando os dados saem do dispositivo',
         bullets: [
-          'Apenas os recursos opcionais que você ativa expressamente contatam terceiros: um provedor de IA na nuvem de sua escolha, Zotero, Unpaywall, GitHub (verificar atualizações) ou Hugging Face (baixar modelos).',
+          'Apenas os recursos opcionais que você ativa expressamente contatam terceiros: um provedor de IA na nuvem de sua escolha, Zotero, Unpaywall, GitHub (verificar atualizações) ou Hugging Face (baixar modelos), ou a pesquisa web do Research Chat, que envia aos buscadores públicos os termos de pesquisa derivados da sua pergunta e lê as páginas que encontra.',
           'Se você conectar o ChatGPT pelo OpenAI Secure MCP Tunnel, a OpenAI receberá solicitações e resultados de ferramentas; o servidor do Nodus continuará restrito a este dispositivo.',
           'Se você conectar o Nodus Server opcional e auto-hospedado, uma cópia filtrada do cofre será publicada por HTTPS, sem PDFs, credenciais, caminhos, embeddings, listas de alunos ou notas.',
           'Cada serviço externo é identificado antes de ser usado.',
@@ -227,7 +227,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Quando i dati lasciano il dispositivo',
         bullets: [
-          "Solo le funzioni opzionali che attivi espressamente contattano terze parti: un fornitore di IA nel cloud a tua scelta, Zotero, Unpaywall, GitHub (verifica aggiornamenti) o Hugging Face (download dei modelli).",
+          "Solo le funzioni opzionali che attivi espressamente contattano terze parti: un fornitore di IA nel cloud a tua scelta, Zotero, Unpaywall, GitHub (verifica aggiornamenti) o Hugging Face (download dei modelli), o la ricerca web del Research Chat, che invia ai motori pubblici i termini di ricerca derivati dalla tua domanda e legge le pagine che trova.",
           'Se connetti ChatGPT tramite OpenAI Secure MCP Tunnel, OpenAI riceve richieste e risultati degli strumenti; il server Nodus resta limitato a questo dispositivo.',
           'Se connetti il Nodus Server opzionale e auto-ospitato, una copia filtrata del vault viene pubblicata via HTTPS, senza PDF, credenziali, percorsi, embedding, elenchi di studenti o voti.',
           'Ogni servizio esterno è identificato prima di essere usato.',
@@ -257,7 +257,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: 'Veriler cihazdan ne zaman ayrılır',
         bullets: [
-          'Yalnızca açıkça etkinleştirdiğiniz isteğe bağlı özellikler üçüncü taraflarla iletişim kurar: seçtiğiniz bir bulut yapay zeka sağlayıcısı, Zotero, Unpaywall, GitHub (güncelleme kontrolleri) veya Hugging Face (model indirmeleri).',
+          'Yalnızca açıkça etkinleştirdiğiniz isteğe bağlı özellikler üçüncü taraflarla iletişim kurar: seçtiğiniz bir bulut yapay zeka sağlayıcısı, Zotero, Unpaywall, GitHub (güncelleme kontrolleri) veya Hugging Face (model indirmeleri), ya da Research Chat web araması: sorunuzdan türetilen arama terimlerini herkese açık arama motorlarına gönderir ve bulduğu sayfaları okur.',
           'OpenAI Secure MCP Tunnel aracılığıyla ChatGPT bağlarsanız, OpenAI araç isteklerini ve sonuçlarını alır; Nodus sunucusu bu cihazla sınırlı kalır.',
           'İsteğe bağlı kendi sunucunuzda barındırılan Nodus Sunucusunu bağlarsanız, kasanın filtrelenmiş bir kopyası HTTPS üzerinden yayınlanır; PDF’leri, kimlik bilgilerini, yolları, gömmeleri, öğrenci listelerini ve notları hariç tutar.',
           'Her harici hizmet kullanılmadan önce tanımlanır.',
@@ -287,7 +287,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: '数据何时离开设备',
         bullets: [
-          '只有你明确启用的可选功能才会联系第三方：你选择的云端AI提供商、Zotero、Unpaywall、GitHub（检查更新）或Hugging Face（下载模型）。',
+          '只有你明确启用的可选功能才会联系第三方：你选择的云端AI提供商、Zotero、Unpaywall、GitHub（检查更新）或Hugging Face（下载模型），或 Research Chat 的联网检索：它会把由你的问题衍生出的检索词发送给公共搜索引擎，并读取找到的页面。',
           '如果你通过OpenAI Secure MCP Tunnel连接ChatGPT，OpenAI会接收工具请求和结果；Nodus服务器仍限于此设备。',
           '如果你连接可选的自托管Nodus Server，会通过HTTPS发布一份过滤后的资料库副本；其中不包含PDF、凭证、路径、嵌入、学生名单或成绩。',
           '每项外部服务在使用前都会被标识。',
@@ -317,7 +317,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
       {
         heading: '資料何時離開裝置',
         bullets: [
-          '只有你明確啟用的可選功能才會聯絡第三方：你選擇的雲端AI提供商、Zotero、Unpaywall、GitHub（檢查更新）或Hugging Face（下載模型）。',
+          '只有你明確啟用的可選功能才會聯絡第三方：你選擇的雲端AI提供商、Zotero、Unpaywall、GitHub（檢查更新）或Hugging Face（下載模型），或 Research Chat 的聯網檢索：它會把由你的問題衍生出的檢索詞傳送給公開搜尋引擎，並讀取找到的頁面。',
           '如果你通過OpenAI Secure MCP Tunnel連線ChatGPT，OpenAI會接收工具請求和結果；Nodus伺服器仍限於此裝置。',
           '如果你連線可選的自託管Nodus Server，會通過HTTPS釋出一份過濾後的資料庫副本；其中不包含PDF、憑證、路徑、嵌入、學生名單或成績。',
           '每項外部服務在使用前都會被標識。',
@@ -346,7 +346,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     {
     heading: "데이터가 장치를 떠날 때",
     bullets: [
-    "귀하가 명시적으로 활성화한 선택적 기능만 제3자에게 연락할 수 있습니다: 귀하가 선택한 클라우드 AI 공급자, Zotero, Unpaywall, GitHub(업데이트 확인) 또는 Hugging Face(모델 다운로드).",
+    "귀하가 명시적으로 활성화한 선택적 기능만 제3자에게 연락할 수 있습니다: 귀하가 선택한 클라우드 AI 공급자, Zotero, Unpaywall, GitHub(업데이트 확인) 또는 Hugging Face(모델 다운로드), 또는 Research Chat의 웹 검색: 질문에서 도출된 검색어를 공개 검색 엔진으로 보내고 찾은 페이지를 읽습니다.",
     "OpenAI Secure MCP Tunnel을 통해 ChatGPT를 연결하면 OpenAI는 도구 요청 및 결과를 받습니다. Nodus 서버는 이 장치로 제한되어 있습니다.",
     "선택 사항인 자체 호스팅 Nodus Server를 연결하면 필터링된 볼트 복사본이 HTTPS를 통해 게시됩니다. PDF, 자격 증명, 경로, 포함, 학생 명단 및 성적은 제외됩니다.",
     "각 외부 서비스는 사용되기 전에 식별됩니다.",
@@ -375,7 +375,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     {
     heading: "データがデバイスから流出するとき",
     bullets: [
-    "明示的に有効にしたオプション機能のみがサードパーティ (選択したクラウド AI プロバイダー、Zotero、Unpaywall、GitHub (更新チェック)、または Hugging Face (モデルのダウンロード)) に連絡します。",
+    "明示的に有効にしたオプション機能のみがサードパーティ (選択したクラウド AI プロバイダー、Zotero、Unpaywall、GitHub (更新チェック)、または Hugging Face (モデルのダウンロード)) に連絡します、または Research Chat のウェブ検索: 質問から導かれた検索語を公開検索エンジンに送信し、見つかったページを読み取ります。",
     "OpenAI Secure MCP トンネル経由で ChatGPT に接続すると、OpenAI はツールのリクエストと結果を受け取ります。 Nodus サーバーはこのデバイスに制限されたままになります。",
     "オプションのセルフホスト型 Nodus Server に接続すると、フィルタリングされたボールトのコピーが HTTPS 経由で公開されます。 PDF、資格情報、パス、埋め込み、生徒名簿、成績は除外されます。",
     "各外部サービスは使用前に識別されます。",

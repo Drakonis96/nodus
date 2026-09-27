@@ -1,0 +1,106 @@
+// Real Electron, synthetic folders and chats, no provider calls or real credentials.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { createResearchApp, repoRoot } from './lib/research-app-harness.mjs';
+const out = path.join(repoRoot, 'artifacts/folder-expansion');
+fs.mkdirSync(out, { recursive: true });
+const h = await createResearchApp();
+const report = { profile: h.root, isolation: h.proof, paidCalls: 0, checks: [] };
+try {
+  const { page, app } = await h.launch();
+  await h.prepareProfile(page);
+  await h.simulatedKeys(page);
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setContentSize(1280, 1000); });
+  const seed = await page.evaluate(async () => {
+    const n = window.nodus;
+    const project = await n.createChatProject({ name: 'Orden de carpetas' });
+    const parent = await n.createChatProjectFolder({ projectId: project.id, name: 'Investigación' });
+    const zeta = await n.createChatProjectFolder({ projectId: project.id, parentId: parent.id, name: 'Zeta' });
+    const alpha = await n.createChatProjectFolder({ projectId: project.id, parentId: parent.id, name: 'Álpha' });
+    const deep = await n.createChatProjectFolder({ projectId: project.id, parentId: alpha.id, name: 'Anidada' });
+    const leaf = await n.createChatProjectFolder({ projectId: project.id, name: 'Solo chats' });
+    const make = (title, folderId) => n.createConversation({ title, projectId: project.id, folderId, model: { provider: 'deepseek', model: 'deepseek-flash' } });
+    const own = await make('Conversación de Investigación', parent.id);
+    const child = await make('Conversación de Álpha', alpha.id);
+    const grandchild = await make('Conversación anidada', deep.id);
+    const leafChat = await make('Conversación sin subcarpetas', leaf.id);
+    const unfiled = await make('Conversación sin carpeta', null);
+    return { project, parent, zeta, alpha, deep, leaf, own, child, grandchild, leafChat, unfiled };
+  });
+  await page.evaluate(version => {
+    localStorage.setItem('nodus.lastSeenVersion', version);
+    for (const key of ['nodus.mobileTeaserSeen.3.2.4','nodus.platformHighlightsSeen.2026-07','nodus.tutorialVideosAnnouncementSeen.2026-07','nodus.pdfPresenterTutorialSeen.e2js_u-05OA','nodus.toolkitBetaGuideSeen.2.4.0']) localStorage.setItem(key, '1');
+  }, JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'))).version);
+  await page.reload();
+  await page.getByRole('button', { name: 'Research chat', exact: true }).first().click();
+  await page.locator('.research-assistant-header').waitFor();
+  const history = page.getByTestId('research-history-sidebar');
+  if (!await history.isVisible()) await page.getByTestId('research-history-toggle').click();
+  const folder = item => history.getByTestId(`research-folder-${item.id}`);
+  const chat = item => history.getByTestId(`research-conversation-${item.id}`);
+  const open = item => folder(item).getByRole('button', { name: item.name, exact: true }).click();
+  const absent = async item => assert.equal(await chat(item).count(), 0, `${item.title} hidden`);
+  const visible = async item => { await chat(item).waitFor(); assert.equal(await chat(item).count(), 1); };
+  const before = async (a, b) => assert.ok((await a.boundingBox()).y < (await b.boundingBox()).y, 'display order');
+  await history.getByTestId(`research-project-${seed.project.id}`).getByRole('button', { name: seed.project.name, exact: true }).click();
+  await visible(seed.unfiled); await absent(seed.own); await absent(seed.child); await absent(seed.leafChat);
+  await open(seed.parent);
+  await visible(seed.own); await absent(seed.child); await absent(seed.grandchild);
+  await before(folder(seed.alpha), folder(seed.zeta));
+  await before(folder(seed.zeta), chat(seed.own));
+  assert.deepEqual(await history.locator('.research-history-heading').allTextContents(), ['Proyectos'], 'no section headings inside expanded folders');
+  report.checks.push('folder label opens alphabetic subfolders above direct conversations without section headings');
+  await open(seed.alpha); await visible(seed.child); await absent(seed.grandchild);
+  await before(folder(seed.deep), chat(seed.child)); await before(chat(seed.child), folder(seed.zeta));
+  await open(seed.deep); await visible(seed.grandchild);
+  await page.screenshot({ path: path.join(out, 'expanded-1280.png') });
+  report.checks.push('nested contents belong only to their own folder, with no duplicated conversations');
+  await open(seed.parent); await absent(seed.own); await absent(seed.child); await absent(seed.grandchild);
+  await open(seed.parent); await visible(seed.grandchild);
+  report.checks.push('collapse hides the entire subtree; reopening preserves child expansion');
+  await open(seed.leaf); await visible(seed.leafChat);
+  const toggle = folder(seed.leaf).getByRole('button', { name: `Contraer ${seed.leaf.name}`, exact: true });
+  await toggle.focus(); await page.keyboard.press('Enter'); await absent(seed.leafChat);
+  await folder(seed.leaf).getByRole('button', { name: seed.leaf.name, exact: true }).focus();
+  await page.keyboard.press('Enter'); await visible(seed.leafChat);
+  await chat(seed.leafChat).getByRole('button', { name: seed.leafChat.title, exact: true }).click();
+  assert.equal(await chat(seed.leafChat).getByRole('button', { name: seed.leafChat.title, exact: true }).getAttribute('aria-current'), 'page');
+  report.checks.push('leaf folders expand and collapse by mouse and keyboard; conversations open');
+  await open(seed.parent);
+  await history.getByTestId('research-chat-search').fill(seed.grandchild.title);
+  await visible(seed.grandchild);
+  await history.getByTestId('research-chat-search').fill(''); await absent(seed.grandchild);
+  report.checks.push('search still finds conversations inside collapsed folders');
+  // A selected empty folder must never filter its project's home page.
+  await open(seed.parent);
+  await open(seed.zeta);
+  const projectRow = history.getByTestId(`research-project-${seed.project.id}`);
+  await projectRow.getByRole('button', { name: `Abrir ${seed.project.name}`, exact: true }).click();
+  const home = page.getByTestId('research-project-home');
+  await home.waitFor();
+  assert.equal(await home.getByTestId('research-project-tree').count(), 0);
+  assert.equal(await home.getByTestId('research-project-chat-' + seed.own.id).count(), 1);
+  for (const item of [seed.child, seed.grandchild, seed.leafChat, seed.unfiled]) await home.getByTestId(`research-project-chat-${item.id}`).waitFor();
+  assert.equal(await home.locator('.research-project-chats li').count(), 5);
+  await page.screenshot({ path: path.join(out, 'project-home-all-chats.png') });
+  await home.getByTestId(`research-project-chat-${seed.grandchild.id}`).getByRole('button').click();
+  await projectRow.getByRole('button', { name: `Abrir ${seed.project.name}`, exact: true }).click();
+  assert.equal(await home.locator('.research-project-chats li').count(), 5);
+  report.checks.push('project home lists all five chats across nested folders, independent of sidebar selection, without a folder panel');
+
+  await app.evaluate(({ BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0]; w.setMinimumSize(800, 600); w.setContentSize(800, 1000); });
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'light', uiLanguage: 'en' }));
+  await history.locator('.research-history-heading').getByText('Projects', { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(out, 'expanded-800-light-en.png') });
+  report.checks.push('800px light theme and English labels');
+  report.passed = true;
+  console.log(JSON.stringify(report, null, 2));
+} catch (error) {
+  report.error = String(error.stack);
+  if (h.page) await h.page.screenshot({ path: path.join(out, 'failure.png') }).catch(() => {});
+  throw error;
+} finally {
+  fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify(report, null, 2));
+  await h.close();
+}

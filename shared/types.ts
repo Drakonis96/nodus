@@ -619,7 +619,7 @@ export interface DatabaseChatRequest {
   history?: DbChatTurn[];
 }
 
-export interface DatabaseChatConversationSummary {
+export interface DatabaseChatConversationSummary extends ChatHistoryPlacementFields {
   id: string;
   title: string;
   databaseIds: string[];
@@ -782,6 +782,7 @@ export interface LibraryReaderReference {
   preferredSource?: 'clean' | 'original';
   /** Physical 1-based page to land on once open; absent means the reader's own last position. */
   page?: number | null;
+  attachmentId?: string | null;
 }
 
 export type LibraryReaderAttachmentViewer = 'pdf' | 'epub' | 'image' | 'html' | 'text' | 'external';
@@ -1650,7 +1651,7 @@ export interface ModelRef {
 /** One model as returned by a provider's model-list endpoint. */
 export interface ModelInfo {
   id: string;
-  /** Native LM Studio reasoning choices, discovered from /api/v1/models. */
+  /** Exact native reasoning choices advertised by the provider, in display order. */
   researchReasoningLevels?: import('./researchReasoning').NativeResearchEffort[];
   name?: string;
   /** For OpenRouter: the upstream provider segment of the id (e.g. "anthropic"). */
@@ -2123,11 +2124,14 @@ export interface AppSettings {
   codexReasoningEfforts: Record<string, CodexReasoningEffort>;
   /**
    * The thinking level the Research composer last used, keyed by `provider:model`, so
-   * reopening a model starts where the user left it. Missing (or Standard, which is
-   * stored as an absence) means the composer opens on Standard. App-wide like the other
-   * model preferences: the level belongs to the model, not to the vault asking.
+   * reopening a model starts where the user left it. Missing means the model opens on the
+   * middle of its levels (`researchDefaultEffort`); Standard, once picked, is stored like any
+   * other level. Shared by the Research chat, Deep Research and Immersion. App-wide like the
+   * other model preferences: the level belongs to the model, not to the vault asking.
    */
   researchEffortByModel: Record<string, ResearchEffort>;
+  /** Research Chat's web step: automatic (the agent decides) or off. App-wide. */
+  researchWebSearch: ResearchWebSearchMode;
   // When using OpenRouter, bias routing toward the fastest upstream provider.
   openRouterThroughput: boolean;
   /**
@@ -3802,7 +3806,7 @@ export interface WorldChatSelection {
   keepFocus: boolean;
 }
 
-export interface WorldChatConversationSummary {
+export interface WorldChatConversationSummary extends ChatHistoryPlacementFields {
   id: string;
   title: string;
   selection: WorldChatSelection;
@@ -5835,7 +5839,24 @@ export interface ResearchGraphPartsSelection {
   authorGraph: boolean;
 }
 
+/**
+ * What a Research Chat turn may consult, as the context balloon offers it: the ideas
+ * layer (ideas, themes, contradictions, gaps, reading paths, authors and the graph) and
+ * the documents layer (the works' text, read from the Nodus library or Zotero, and their
+ * profiles). The web step has its own setting. All off: the answer comes from general
+ * knowledge and says so.
+ */
+export interface ResearchContextLayers {
+  ideas: boolean;
+  documents: boolean;
+}
+
 export interface ResearchContextSelection {
+  notebookId?: string | null;
+  /** The layers chosen in the context balloon. Absent in selections saved before it
+   * existed, which keep reading the sections below as they always did. */
+  layers?: ResearchContextLayers;
+  retrieval?: import('./researchCorpus').RetrievalSettings;
   sourceFilter?: import('./researchContextFilters').ResearchSourceFilter;
   ideas: boolean;
   themes: boolean;
@@ -5867,9 +5888,40 @@ export interface ResearchChatRequest {
   messages: ResearchChatMessage[];
   selection: ResearchContextSelection;
   model?: ModelRef | null;
+  /** Skills invoked with @ for this turn only; applied even when switched off for the chat. */
+  skillIds?: string[];
+  /** Research Chat's web step. Absent means automatic; 'off' never leaves the machine. */
+  webSearch?: ResearchWebSearchMode;
+}
+
+export type ResearchWebSearchMode = 'auto' | 'off';
+/** What the web step did in one turn, persisted with the answer. */
+export interface ResearchWebSearchStats {
+  mode: ResearchWebSearchMode;
+  searched: boolean;
+  trigger?: 'supervisor' | 'explicit' | 'fallback';
+  queries: Array<{ query: string; category: 'general' | 'science'; round: number; results: number; failed?: boolean }>;
+  rounds: number;
+  found: number;
+  consulted: Array<{ url: string; title: string; domain: string; outcome: import('./researchActivity').ResearchWebPageOutcome; passages: number }>;
+  limitations: string[];
+  durationMs: number;
+}
+/** A web page whose passages reached the model, with the citations that point at it. */
+export interface ResearchWebSource {
+  url: string;
+  title: string;
+  siteName: string | null;
+  domain: string;
+  retrievedAt: string;
+  publishedAt: string | null;
+  passageIds: string[];
 }
 
 export interface ResearchContextStats {
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
+  webSearch?: ResearchWebSearchStats;
+  webSources?: ResearchWebSource[];
   sections: string[];
   works: number;
   documents: number;
@@ -5888,6 +5940,7 @@ export interface ResearchChatResponse {
 }
 
 export interface ResearchChatStreamHandlers {
+  onActivity?(activity: import('./researchActivity').ResearchActivity): void;
   onConcilium?(result: import('./researchConcilium').ConciliumResult): void;
   onDelta(delta: string): void;
   /** The whole answer so far, replacing what has streamed: the application's interim repaints
@@ -6069,10 +6122,19 @@ export interface ChatMessageRecord {
   selectionKey?: string | null;
   stats?: ResearchContextStats | null;
   error?: boolean;
+  /** Skills the user invoked with @ for this message (name kept for display). */
+  skills?: { id: string; name: string }[];
 }
 
 /** Conversation list entry (no messages) for the history sidebar. */
 export interface ChatConversationSummary {
+  notebookId?: string | null;
+  /** Research chat project holding this conversation, if any. */
+  projectId?: string | null;
+  /** Folder inside that project; always one of the project's own folders, or null. */
+  folderId?: string | null;
+  /** Set while the conversation is one of the (at most five) pinned chats. */
+  pinnedAt?: string | null;
   id: string;
   title: string;
   created_at: string;
@@ -6080,6 +6142,65 @@ export interface ChatConversationSummary {
   archived: boolean;
   model: ModelRef | null;
   messageCount: number;
+}
+
+/** A research chat project: a named, iconed group of conversations. */
+export interface ResearchChatProject {
+  /** Shared preferences inherited by every conversation currently in this project. */
+  instructions?: string;
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A folder inside a research chat project. Folders nest; projects do not. */
+export interface ResearchChatProjectFolder {
+  id: string;
+  projectId: string;
+  /** Null at the project's root. */
+  parentId: string | null;
+  name: string;
+  /** Order among its siblings. */
+  position: number;
+  createdAt: string;
+}
+
+/** How many conversations may be pinned at once. */
+export const RESEARCH_CHAT_PIN_LIMIT = 5;
+
+/**
+ * A notebook a chat history keeps of its own (Databases, Worldbuilding): a named, iconed
+ * set of sources its chats read. `selection` is what the surface's context picker stores —
+ * database ids, or a Worldbuilding selection. Research Chat's notebooks live in the
+ * research corpus instead, and Study reuses its courses.
+ */
+export interface ChatHistoryNotebook {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  selection: unknown;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** The chat histories organized through the shared chat-history channels (Research Chat
+ * keeps its own). Study also serves the Teaching vault: same store, that vault's file. */
+export type ChatHistorySurface = 'database' | 'world' | 'study';
+/** The surfaces whose history keeps notebooks of its own. */
+export type ChatHistoryNotebookSurface = 'database' | 'world';
+
+/** Where a conversation of a chat history sits, beside its own fields. */
+export interface ChatHistoryPlacementFields {
+  archived?: boolean;
+  projectId?: string | null;
+  /** Always a folder of `projectId`, or null. */
+  folderId?: string | null;
+  pinnedAt?: string | null;
+  notebookId?: string | null;
 }
 
 /** A full conversation with its messages and the context selection it was using. */
@@ -6360,6 +6481,21 @@ export interface CitationPreview {
   title: string;
   subtitle?: string;
   snippet?: string;
+  /** Set for web evidence: the page the passage was read from. */
+  url?: string;
+  /** Link that lands on the quoted passage (text fragment or PDF page). */
+  openUrl?: string;
+}
+
+export interface WebPassageSource {
+  url: string;
+  finalUrl: string;
+  siteName: string | null;
+  domain: string;
+  retrievedAt: string;
+  publishedAt: string | null;
+  doi: string | null;
+  kind: 'html' | 'pdf';
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7106,6 +7242,8 @@ export interface SupportAuditEntry {
 }
 
 export interface WritingWorkshopDraft {
+  claimLedger?: import('./researchClaimAudit').ResearchClaimRecord[];
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
   documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   documentVisualHints?: string[];
   generatedAt: string;
@@ -7317,6 +7455,8 @@ export interface DeepResearchOutlineSection {
 }
 
 export interface DeepResearchRequest {
+  notebookId?: string | null;
+  retrieval?: import('./researchCorpus').RetrievalSettings;
   documentSkills?: import('./documentSkills').DocumentSkillPolicy;
   /** The research idea/question the whole report must develop. */
   objective: string;
@@ -7346,6 +7486,9 @@ export interface DeepResearchRequest {
    */
   sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   model?: ModelRef | null;
+  /** The thinking level chosen in the form for `model`. Absent (older builds, MCP, the
+   *  Server) runs every call with the model's usual reasoning, as before. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   decorativeImage?: DecorativeImageOption;
   /** Study vaults: use the indexed learning corpus and the pedagogical report prompts. */
   studyMode?: boolean;
@@ -7425,6 +7568,10 @@ export interface DeepResearchJobRecord {
 
 /** Coverage + evidence accounting attached to a finished report. */
 export interface DeepResearchMeta {
+  factualAudit?: { checked: number; supported: number; removed: number; unverified: number;
+    /** Whole-report reconciliation; pairs are kept so removals can be reviewed. */
+    consistency?: { checked: boolean; conflicts: number; removed: number; pruned: number; pairs: Array<{ a: string; b: string; reason: string }> } };
+  researchTraversal?: import('./researchCorpus').ResearchTraversal;
   /** Engine generation that produced the report. */
   deepResearchVersion: import('./deepResearchVersions').DeepResearchVersion;
   /** Visible report structure; internal evidence planning may still use movements. */
@@ -7466,7 +7613,7 @@ export interface DeepResearchMeta {
   coverage?: { questions: string[]; ratio: number } | null;
   /** Retrieval order used for this report. New academic reports lock the idea-graph
    * argument before whole-document evidence can enter. */
-  retrievalStrategy?: 'idea_first_document_enrichment' | 'legacy' | null;
+  retrievalStrategy?: 'idea_first_document_enrichment' | 'scoped_documentary' | 'legacy' | null;
   /** Outcome of the bounded, post-plan document-profile preparation pass. */
   documentPreparation?: {
     considered: number;
@@ -7966,6 +8113,9 @@ export interface ImmersionRequest {
   /** Whether stations and the final exam carry retrieval questions (always skippable). */
   includeQuiz: boolean;
   model?: ModelRef | null;
+  /** The thinking level chosen in the form for `model`. Absent (older builds, MCP, the
+   *  Server) runs every call with the model's usual reasoning, as before. */
+  thinkingEffort?: import('./researchReasoning').ResearchEffort;
   decorativeImage?: DecorativeImageOption;
 }
 
@@ -9365,6 +9515,16 @@ export interface WorkPassageStatus {
 }
 
 export interface PassageDetail {
+  attachmentRevision?: string;
+  conversationAttachment?: { conversationId: string; attachmentId: string };
+  noteId?: string;
+  revision?: string;
+  historical?: boolean;
+  libraryItemId?: string | null;
+  attachmentId?: string | null;
+  provenance?: 'source' | 'abstract' | 'user-note' | 'generated-report' | 'web';
+  /** Research Chat web evidence: where and when Nodus read this passage. */
+  web?: WebPassageSource;
   passage_id: string;
   nodus_id: string;
   text: string;

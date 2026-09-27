@@ -1,0 +1,7 @@
+# bibtexparser 1.4 publishes only an sdist. Build it with these locked tools.
+setuptools==80.9.0
+wheel==0.45.1
+# cryptography no longer publishes Intel macOS wheels. Keep the current release
+# and compile against a pinned private OpenSSL instead of downgrading it.
+maturin==1.14.1; sys_platform == 'darwin' and platform_machine == 'x86_64'
+cffi==2.1.0; sys_platform == 'darwin' and platform_machine == 'x86_64'

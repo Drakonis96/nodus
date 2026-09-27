@@ -29,6 +29,9 @@ import type {
 } from '@shared/dictionary';
 import type { ModelRef, PromptLanguage } from '@shared/types';
 import { getDb } from './database';
+import { getDocumentaryPassageDetail } from '../citations/documentaryCitations';
+import { getScopedLegacyPassageDetail } from '../citations/scopedLegacyCitations';
+import { getWebPassageDetail } from './researchWebRepo';
 
 type EntryRow = {
   id: string; name: string; normalized_name: string; aliases_json: string; focus_prompt: string;
@@ -394,6 +397,13 @@ function versionEvidenceSets(entryId: string): { used: Set<string>; cited: Set<s
 function evidenceUnavailable(row: EvidenceRow): boolean {
   if (row.kind === 'idea') {
     return !getDb().prepare('SELECT 1 FROM ideas WHERE global_id=?').get(row.ref_id);
+  }
+  if (/^(documentary|scoped|web):/.test(row.ref_id)) {
+    const current = row.ref_id.startsWith('documentary:') ? getDocumentaryPassageDetail(row.ref_id)
+      : row.ref_id.startsWith('scoped:') ? getScopedLegacyPassageDetail(row.ref_id)
+        : getWebPassageDetail(row.ref_id);
+    return !current || !row.source_revision
+      || createHash('sha256').update(current.text).digest('hex') !== row.source_revision;
   }
   // Passage ids are stable (`work#chunk`) and are deliberately reused by a
   // reindex. Existence alone therefore cannot prove that the copied Dictionary

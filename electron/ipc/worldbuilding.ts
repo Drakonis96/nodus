@@ -396,7 +396,7 @@ export function registerWorldbuildingIpc({ h, getWindow, chatAborters }: IpcCont
   h('worldChat:cancel', async (_e, requestId: string) => {
     chatAborters.get(requestId)?.abort();
   });
-  h('worldChat:history:list', async () => worldChatHistory.listWorldChatConversations());
+  h('worldChat:history:list', async (_e, includeArchived?: boolean) => worldChatHistory.listWorldChatConversations(Boolean(includeArchived)));
   h('worldChat:history:get', async (_e, id: string) => worldChatHistory.getWorldChatConversation(id));
   h('worldChat:history:create', async (_e, input: Parameters<typeof worldChatHistory.createWorldChatConversation>[0]) =>
     worldChatHistory.createWorldChatConversation(input)

@@ -10,7 +10,7 @@ const ResearchAssistantModal = lazy(() => import('../../views/ResearchAssistantM
 const Settings = lazy(() => import('../../views/Settings').then((module) => ({ default: module.Settings })));
 
 export const shellViews = {
-  researchChat: ({ settings, assistantTarget, researchConversationTarget, openNoteFromSearch, isAcademic, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded initialTarget={assistantTarget} initialConversationTarget={researchConversationTarget} notesDestinationLabel={isAcademic ? 'Espacio de trabajo' : 'Notas'} onOpenSavedNote={openNoteFromSearch} isGenealogy={isGenealogy} />,
+  researchChat: ({ settings, assistantTarget, researchConversationTarget, openNoteFromSearch, isAcademic, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded isAcademic={isAcademic} initialTarget={assistantTarget} initialConversationTarget={researchConversationTarget} notesDestinationLabel={isAcademic ? 'Espacio de trabajo' : 'Notas'} onOpenSavedNote={openNoteFromSearch} isGenealogy={isGenealogy} />,
   browser: () => <NodusBrowserView />,
   radar: ({ radarTarget }) => <RadarView target={radarTarget} />,
   compass: ({ snapshots }) => <CompassView snapshot={snapshots.read('compass')} onSnapshotChange={(patch) => snapshots.patch('compass', patch)} />,

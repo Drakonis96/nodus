@@ -23,7 +23,7 @@ test('the Auto Library guide is seen once; Manual keeps its own guidance', async
   assert.match(shell, /if \(autoPresented\.current\) markLibraryTutorialSeen\(\);/);
   assert.match(shell, /<LibraryTutorialModal/);
 
-  // The «?» lives beside Colecciones and Índice documental, and ignores the flag.
+  // The «?» lives beside Colecciones and Ficha documental, and ignores the flag.
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?onClick=\{academicMode === 'manual' \? \(\) => toast\([\s\S]*?: onOpenTutorial\}/);
   assert.match(library, /data-testid="library-open-tutorial"[\s\S]*?<Icon name="help"/);
   // Glyph-only among labelled buttons, so it wears the vault's accent to be findable.
@@ -61,10 +61,10 @@ test('the first tab walks the collections → monitor → process route', async 
     'En Zotero, pulsa «Monitorizar» en cada colección que quieras traer.',
     'Analizar las seleccionadas',
     'Procesar biblioteca',
-    'Para qué sirve el «Índice documental»',
+    'Para qué sirve la «Ficha documental»',
   ]) assert.ok(modal.includes(key), `missing guide copy: ${key}`);
   // Whole-document understanding is beta wherever it is named.
-  assert.match(modal, /title=\{t\('Para qué sirve el «Índice documental»'\)\} badge="BETA"/);
+  assert.match(modal, /title=\{t\('Para qué sirve la «Ficha documental»'\)\} badge="BETA"/);
   assert.ok(modal.includes('Está en beta: en documentos muy largos puede tardar bastante'));
   // Nodus Library is beta on both sides of the fork.
   assert.match(modal, /badge="BETA" badgeTone="beta"/);
@@ -106,8 +106,11 @@ test('every guide string is translated into every interface language', async () 
   assert.ok(asked.length > 25, `the guide looked wrong (${asked.length} keys parsed)`);
   const declared = new Set([...table.matchAll(/^ {2}'((?:[^'\\]|\\.)*)':/gm)].map((match) => match[1]));
   const borrowed = new Set(['Colecciones de Nodus', 'Colecciones de Zotero', 'Recomendado', 'Colecciones', 'Monitorizar', 'Procesar biblioteca', 'Importar desde Zotero', 'Cerrar', 'Empezar', 'Este vault', 'Global']);
+  const researchFile = await read('src/i18n.researchNotebooks.ts');
+  const research = JSON.parse(researchFile.slice(researchFile.indexOf('{'), researchFile.lastIndexOf('}') + 1));
   for (const key of asked) {
-    assert.ok(declared.has(key) || borrowed.has(key), `untranslated guide string: ${key}`);
+    if (declared.has(key) || borrowed.has(key)) continue;
+    for (const [language, translations] of Object.entries(research)) assert.ok(translations[key], `untranslated guide string (${language}): ${key}`);
   }
   for (const lang of ['en', 'fr', 'de', 'pt', "'pt-BR'", 'it', 'tr', "'zh-CN'", "'zh-TW'"]) {
     assert.ok(table.includes(`${lang}: `) || table.includes(`const ${lang} =`), `missing language: ${lang}`);

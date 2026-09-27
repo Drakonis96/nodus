@@ -10,9 +10,10 @@
  * event loop and producing an operating-system "application not responding"
  * state while the Library is open.
  */
-import { parentPort } from 'node:worker_threads';
+import { parentPort } from './backgroundParentPort';
 import type { LibraryExtractionOptions, LibraryItemRecord } from '@shared/libraryTypes';
 import { extractLibraryItem } from '../library/libraryExtractionEngine';
+import { readOriginalPages, inspectOriginalPdf, type OriginalPageRead } from '../extraction/researchOriginal';
 import { LibraryDiskStore } from '../library/libraryStorage';
 
 interface RunRequest {
@@ -31,7 +32,9 @@ interface RemoteOcrResult {
   error?: string;
 }
 
-type WorkerRequest = RunRequest | CancelRequest | RemoteOcrResult;
+interface OriginalReadRequest { kind: 'read-original'; input: OriginalPageRead }
+interface OriginalInspectRequest { kind: 'inspect-original'; input: { file: string; sha256?: string } }
+type WorkerRequest = RunRequest | OriginalReadRequest | OriginalInspectRequest | CancelRequest | RemoteOcrResult;
 
 let controller: AbortController | null = null;
 let nextRemoteRequestId = 1;
@@ -51,10 +54,19 @@ function remoteOcr(page: number, image: Buffer, mimeType: 'image/png'): Promise<
   });
 }
 
-async function run(request: RunRequest): Promise<void> {
+async function run(request: RunRequest | OriginalReadRequest | OriginalInspectRequest): Promise<void> {
   if (controller) throw new Error('The extraction worker is already busy.');
   controller = new AbortController();
   try {
+    if (request.kind === 'inspect-original') {
+      parentPort!.postMessage({ kind: 'done', result: await inspectOriginalPdf(request.input, controller.signal) });
+      return;
+    }
+    if (request.kind === 'read-original') {
+      const result = await readOriginalPages(request.input, controller.signal);
+      parentPort!.postMessage({ kind: 'done', result });
+      return;
+    }
     const store = new LibraryDiskStore(request.root, request.deviceId);
     const result = await extractLibraryItem({
       item: request.item,

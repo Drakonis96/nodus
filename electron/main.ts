@@ -1,4 +1,5 @@
 import { initializeChatSkillDefaults } from './chatSkills';
+import { claimIsolatedProfile } from './qa/isolatedProfile';
 import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
 import { rebuildCapabilityRegistry } from './capabilities/registry';
@@ -61,6 +62,7 @@ import { TUTORIAL_VIDEO_EMBED_ORIGIN } from '@shared/tutorialVideos';
 import { killChatGptSubscriptionServer } from './ai/codexSubscription';
 import { killGitHubCopilotSubscriptionServer } from './ai/githubCopilotSubscription';
 import { killNodusLocalServerSync } from './ai/nodusLocalAi';
+import { killSearxngSync } from './websearch/searxngService';
 import { ensureDatabaseDeepResearchLane } from './ai/databaseDeepResearchLane';
 import { installProcessSafetyNet } from './util/processSafety';
 import { restoreAppWindows } from './windowLifecycle';
@@ -103,7 +105,7 @@ registerNodusClientVersion(app.getVersion());
 // Google blocks OAuth in embedded webviews; the correct pattern is
 // system browser -> your-site.com/authorize -> nodus://authorize?code=... .
 // Register the scheme so the OS launches Nodus for nodus:// URLs.
-if (!app.isDefaultProtocolClient('nodus')) {
+if (!process.env.NODUS_USERDATA && !app.isDefaultProtocolClient('nodus')) {
   try { app.setAsDefaultProtocolClient('nodus'); } catch {}
 }
 registerImageSchemePrivileges();
@@ -144,7 +146,9 @@ if (process.env.NODUS_USERDATA) {
  * process to exit (`while kill -0 "$PID"`) before it replaces the bundle and
  * runs `open -n`, so the lock is already released by then.
  */
-const hasSingleInstanceLock = app.requestSingleInstanceLock();
+const isolatedUnlock = process.env.NODUS_ISOLATED_ROOT ? claimIsolatedProfile(process.env.NODUS_ISOLATED_ROOT) : null;
+const hasSingleInstanceLock = process.env.NODUS_ISOLATED_ROOT ? Boolean(isolatedUnlock) : app.requestSingleInstanceLock();
+if (isolatedUnlock) app.on('will-quit', isolatedUnlock);
 if (!hasSingleInstanceLock) {
   // Hand over to the copy that already owns this profile and leave. Nothing
   // below has run yet, so no database or window has been touched.
@@ -173,6 +177,8 @@ let databaseAutomationFirstTimer: NodeJS.Timeout | null = null;
 let announcementsFirstTimer: NodeJS.Timeout | null = null;
 /** Set once shutdown starts, so timers that fire mid-quit do not reopen the DB. */
 let quitting = false;
+let stopDocumentaryPreparation = () => {};
+let stopResearchZotero = async () => {};
 
 let pendingDeepLink: string | null = process.argv.find((arg) => arg.startsWith('nodus://')) ?? null;
 
@@ -283,7 +289,7 @@ function unsignedMacUpdateHelperScript(): string {
     // but never installed — which is exactly what a user reaching for Force Quit
     // does every single time the quit below fails to land.
     "trap '' TERM HUP INT",
-    'STAGING="$(/usr/bin/mktemp -d /private/tmp/nodus-update.XXXXXX)"',
+    'STAGING="$(/usr/bin/mktemp -d "${TMPDIR:-/private/tmp}/nodus-update.XXXXXX")"',
     'BACKUP="${TARGET}.previous"',
     'finish() { /bin/rm -rf "$STAGING"; /bin/rm -f "$0"; }',
     "fail() { /usr/bin/printf '%s\\n' '{\"status\":\"failed\"}' > \"$STATE\"; finish; exit 1; }",
@@ -352,7 +358,7 @@ function unsignedMacUpdateHelperScript(): string {
  * a window.
  */
 function removeDisplacedMacBundle(): void {
-  if (process.platform !== 'darwin' || !app.isPackaged) return;
+  if (process.env.NODUS_ISOLATED_ROOT || process.platform !== 'darwin' || !app.isPackaged) return;
   const appPath = macAppBundlePath();
   if (!appPath) return;
   const displaced = `${appPath}.previous`;
@@ -1005,7 +1011,7 @@ app.whenReady().then(async () => {
   // its handshake and is torn down in the same millisecond — reported either way as a
   // capability that would not start, for a worker that comes up in about 100 ms on a free
   // loop. Nothing here is urgent, and 5.4.0 shipped this in the contended window.
-  void afterFirstPaint(() => {
+  if (!process.env.NODUS_ISOLATED_ROOT) void afterFirstPaint(() => {
     void settleInstalledPluginMigrations()
       .then(settled => { if (settled.length) rebuildCapabilityRegistry(); })
       .catch(error => console.warn('[capabilities] outstanding data migrations could not be settled:', error));
@@ -1054,7 +1060,7 @@ app.whenReady().then(async () => {
   // Do this before creating either the main window or a browser tab: Chromium
   // then exposes the same effective preference to pages from their first frame.
   setBrowserTheme(getSettings().theme);
-  if (process.env.NODUS_STELLAR_PREVIEW !== '1') await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
+  if (!process.env.NODUS_ISOLATED_ROOT && process.env.NODUS_STELLAR_PREVIEW !== '1') await startDatabaseFormServer(Number.parseInt(process.env.NODUS_DATABASE_FORM_PORT ?? '0', 10) || 0);
   upgradeWorldbuildingDemoDynasties();
   upgradeWorldbuildingDemoImageQuality();
   upgradeWorldbuildingDemoNarrativeDepth();
@@ -1080,7 +1086,11 @@ app.whenReady().then(async () => {
   );
   createWindow();
   // The isolated graph review copy never resumes background jobs or connects integrations.
-  if (process.env.NODUS_STELLAR_PREVIEW === '1') return;
+  const { initializeDocumentaryPreparation, closeDocumentaryPreparation } = await import('./ai/documentaryPreparation');
+  stopDocumentaryPreparation = closeDocumentaryPreparation;
+  stopResearchZotero = (await import('./mcp/researchZotero')).closeResearchZotero;
+  await initializeDocumentaryPreparation();
+  if (process.env.NODUS_ISOLATED_ROOT || process.env.NODUS_STELLAR_PREVIEW === '1') return;
   // Existing installs may have one full database copy per historical schema update.
   // Queue every registered vault after the window exists; the utility worker applies
   // retention without delaying startup or opening any vault on the main thread.
@@ -1255,6 +1265,8 @@ app.on('window-all-closed', () => {
     destroyBrowserSubsystem();
     closeGlobalLibraryRuntime();
     killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
     documentIndexQueue.stop();
     closeDb();
     app.quit();
@@ -1263,6 +1275,8 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   quitting = true;
+  stopDocumentaryPreparation();
+  void stopResearchZotero();
   stopStudyCalendarReminders();
   stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
@@ -1299,6 +1313,8 @@ app.on('before-quit', () => {
   killChatGptSubscriptionServer();
   killGitHubCopilotSubscriptionServer();
   killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
   destroyBrowserSubsystem();
   closeGlobalLibraryRuntime();
   documentIndexQueue.stop();
@@ -1319,6 +1335,8 @@ const updateAwareApp = app as typeof app & { on(event: 'before-quit-for-update',
 updateAwareApp.on('before-quit-for-update', () => {
   quitting = true;
   killNodusLocalServerSync();
+  // Research Chat's search server: stdin closes too, so it would also exit on its own.
+  killSearxngSync();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (announcementsFirstTimer) clearTimeout(announcementsFirstTimer);
   if (autoBackupTimer) clearInterval(autoBackupTimer);

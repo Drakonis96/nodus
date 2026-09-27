@@ -110,12 +110,7 @@
 
 /* Tool-backed capabilities retain their own identity even while switched off. */
 .chat-skills-panel,.chat-skills-panel * { box-sizing: border-box; }
-.chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 25.9%, transparent); background: color-mix(in srgb, var(--vault-accent, #6366f1) 2.4%, transparent); }
-.chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45.9%, transparent); background: linear-gradient(135deg,color-mix(in srgb, var(--vault-accent, #6366f1) 7.5%, transparent),color-mix(in srgb, var(--vault-accent, #6366f1) 2.0%, transparent)); }
 .chat-skill-tool-badge { display: table; margin-top: 5px; padding: 1px 6px; border-radius: 5px; font-size: 9px; line-height: 1.6; font-weight: 600; color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 9.4%, transparent); border: 1px solid color-mix(in srgb, var(--vault-accent, #6366f1) 18.8%, transparent); }
-.tool-skill .chat-skill-switch[aria-checked='true'] { background: var(--vault-accent, #6366f1); }
-:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
-:is(.light, .nodi-theme-light) .chat-skill-item.tool-skill.enabled { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 45%, white); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 :is(.light, .nodi-theme-light) .chat-skill-tool-badge { color: var(--vault-accent, #6366f1); background: color-mix(in srgb, var(--vault-accent, #6366f1) 8%, white); }
 
 .skill-marketplace-tabs { display: flex; gap: 6px; margin: 16px 0; padding: 4px; border-radius: 10px; background: color-mix(in srgb, var(--vault-accent, #6366f1) 6.3%, transparent); }
@@ -225,3 +220,36 @@
   .skill-modal { padding: 18px; }
   .skill-modal-mark { width: 36px; height: 36px; }
 }
+
+/* The catalogue inside the Skills balloon only picks the repository to browse. */
+.skill-marketplace-source-pick { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 10px; font-size: 11.5px; color: var(--theme-text-dark-muted, #a1a1aa); }
+.skill-marketplace-source-pick select { max-width: 55%; height: 30px; border-radius: 9px; border: 1px solid #3f3f46; background: transparent; color: inherit; font-size: 12px; padding: 0 8px; }
+.light .skill-marketplace-source-pick select { border-color: #d4d4d8; }
+
+/* The Skills header balloon: the shared balloon, with this panel's resets inside it. */
+.chat-skills-panel.skills-balloon { padding: 0; overflow: hidden; display: flex; flex-direction: column; }
+.header-balloon-body.skills-balloon-body { padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.skills-balloon-mark { width: 22px; height: 22px; }
+.skills-hub { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.skills-hub-panel { min-height: 0; flex: 1; overflow-y: auto; padding: 14px 16px 16px; }
+.skills-hub-tab-title { font-size: 12.5px; }
+.skills-hub-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.skills-hub-actions > button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 9px; border: 1px solid #3f3f46; font-size: 11.5px; color: inherit; }
+.skills-hub-actions > button:hover:not(:disabled) { border-color: color-mix(in srgb, var(--vault-accent, #6366f1) 55%, transparent); color: var(--vault-accent, #6366f1); }
+.skills-hub-notice { margin-top: 10px; font-size: 11.5px; color: var(--vault-accent, #6366f1); }
+.skills-hub-repo { align-items: center; }
+.skills-hub-repo-edit { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.skills-hub-repo-edit input, .skills-hub-field input { min-width: 0; flex: 1; height: 32px; border-radius: 9px; border: 1px solid #3f3f46; background: transparent; color: inherit; padding: 0 10px; font-size: 12px; }
+.skills-hub-repo-add { margin-top: 14px; }
+.skills-hub-field { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; font-weight: 600; }
+.skills-hub-field > span { display: flex; gap: 6px; }
+.skills-hub-editor { gap: 12px; }
+.skills-hub-more > summary { cursor: pointer; font-size: 12px; font-weight: 600; margin-bottom: 8px; }
+.skills-hub-more[open] > summary { margin-bottom: 12px; }
+:is(.light, .nodi-theme-light) .skills-hub-actions > button, :is(.light, .nodi-theme-light) .skills-hub-repo-edit input, :is(.light, .nodi-theme-light) .skills-hub-field input { border-color: #d4d4d8; }
+.skill-modal .skills-hub { margin-top: 14px; }
+.skill-modal .skills-hub-tabs { padding-left: 0; }
+.skill-modal .skills-hub-panel { padding: 16px 2px 0; }
+
+/* Its label on the tinted trigger meets text contrast in the light theme. */
+:is(.light, .nodi-theme-light) .chat-skills-trigger > span:not(.chat-skills-count) { color: color-mix(in srgb, var(--vault-accent, #6366f1) 72%, black); }

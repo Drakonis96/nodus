@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const shotsDir = process.env.NODUS_STUDY_MARKDOWN_QA_DIR || path.join(root, 'artifacts/markdown-latex');
@@ -29,8 +30,7 @@ test('questions and flashcards typeset Markdown and LaTeX in both themes', { tim
       loader: { '.ttf': 'empty', '.woff': 'empty', '.woff2': 'empty', '.css': 'empty' },
       logLevel: 'error',
     });
-    const cssFile = path.join(dir, 'style.css');
-    execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', cssFile, '--minify'], { cwd: root, stdio: 'pipe' });
+    const cssFile = componentStyles();
     const css = [
       await readFile(cssFile, 'utf8'),
       await readFile(path.join(root, 'node_modules/katex/dist/katex.min.css'), 'utf8'),

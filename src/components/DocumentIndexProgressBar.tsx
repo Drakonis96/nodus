@@ -126,7 +126,7 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
       )}
       <div className="flex flex-wrap items-center gap-3">
         <button className="btn btn-ghost shrink-0" onClick={() => setExpanded((value) => !value)} aria-expanded={expanded}>
-          {expanded ? '▾' : '▸'} {t('Índice documental')}
+          {expanded ? '▾' : '▸'} {t('Ficha documental')}
         </button>
         <div className="order-last min-w-0 basis-full">
           <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-neutral-500 dark:text-neutral-400">
@@ -140,7 +140,7 @@ export function DocumentIndexProgressBar({ progress }: { progress: DocumentIndex
           <div
             className="h-1.5 overflow-hidden rounded-full bg-neutral-300 dark:bg-neutral-800"
             role="progressbar"
-            aria-label={t('Índice documental')}
+            aria-label={t('Ficha documental')}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={pctValue}

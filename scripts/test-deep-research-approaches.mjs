@@ -116,14 +116,14 @@ test('specialized Genealogy repairs only malformed citations to allowed sources'
   );
 });
 
-test('Academic Deep Research freezes an idea-first argument before document enrichment', async () => {
+test('Academic Deep Research binds both engines to a scoped cancellable corpus', async () => {
   const [source, workshop] = await Promise.all([
     readFile(path.join(repoRoot, 'electron/ai/deepResearch.ts'), 'utf8'),
     readFile(path.join(repoRoot, 'electron/ai/writingWorkshop.ts'), 'utf8'),
   ]);
   assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v1-general'[\s\S]*legacyAcademicDeps\(model(?:, signal)?\)/, 'v1 retains the historical dependency route');
   assert.match(source, /deepResearchEnginePath\(deepResearchVersion, approach\) === 'v2-general'[\s\S]*realDeps\(model(?:, signal)?\)/, 'v2 retains the idea-first document-enrichment route');
-  assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, deps, onProgress, signal\)/, 'both routes share the versioned cancellable orchestration boundary');
+  assert.match(source, /orchestrateDeepResearch\(\{ \.\.\.versionedRequest, model \}, bindAcademicCorpusRun\(baseDeps, versionedRequest, signal\), onProgress, signal\)/, 'both routes share the scoped versioned cancellable orchestration boundary');
   assert.match(source, /buildIdeaFirstWritingWorkshopSnapshot\(brief, academicObjectiveProbes\(brief\.objective\)\)/, 'General planning uses clause probes over the graph-only snapshot');
   assert.match(source, /function academicObjectiveProbes[\s\S]*split\(\/\[.;\]/, 'graph recall probes are deterministic clauses from the user objective');
   assert.match(source, /planReport: \(input\) => aiPlanReport\(\{ \.\.\.input, relationships \}, model\)/, 'General planning receives explicit graph relationships');

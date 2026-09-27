@@ -17,6 +17,15 @@ const source = readFileSync(path.join(root, 'electron/ai/deepResearch.ts'), 'utf
 const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
 const stages = ['sectionEditor', 'evidencePlan', 'sectionWriter', 'paragraphWriter', 'finalizer', 'finalAudit'];
 
+test('documentary safeguards reach every writing stage in all fifteen languages', () => {
+  for (const language of [...languages, 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
+    const base = module.deepResearchWritingPromptPack(language);
+    const documentary = module.deepResearchWritingPromptPack(language, { documentaryEvidence: true });
+    for (const stage of stages) assert.ok(documentary[stage].length > base[stage].length + 100, `${language}.${stage}`);
+  }
+  assert.match(module.deepResearchWritingPromptPack('es', { documentaryEvidence: true }).sectionWriter, /Distingue dato ausente, valor cero/);
+});
+
 test('all eight writing languages expose all requested stages', () => {
   for (const language of languages) {
     const pack = module.deepResearchWritingPromptPack(language, { approachRules: ['APPROACH_SENTINEL: exact.'], narrativeRules: ['NARRATIVE_SENTINEL: exact.'], isConclusion: true });

@@ -1,3 +1,4 @@
+import { listenLoopback } from '../listenLoopback';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { app } from 'electron';
@@ -271,19 +272,7 @@ async function start(): Promise<void> {
     void handleMcpRequest(req, res, port);
   });
   try {
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error) => {
-        candidate.off('listening', onListening);
-        reject(error);
-      };
-      const onListening = () => {
-        candidate.off('error', onError);
-        resolve();
-      };
-      candidate.once('error', onError);
-      candidate.once('listening', onListening);
-      candidate.listen(port, '127.0.0.1');
-    });
+    port = await listenLoopback(candidate, port);
     httpServer = candidate;
     sweepTimer = setInterval(() => sweepIdleSessions(), SESSION_SWEEP_INTERVAL_MS);
     sweepTimer.unref?.();

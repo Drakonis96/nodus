@@ -35,7 +35,7 @@ if (!requireElectronRuntime(path.join(repoRoot, 'scripts/test-connected-vault-re
 const externalQaProfile = Boolean(process.env.NODUS_USERDATA);
 let userData;
 if (externalQaProfile) {
-  const qaRoot = path.resolve(String(process.env.NODUS_QA_ROOT || ''));
+  const qaRoot = path.resolve(String(process.env.NODUS_QA_ROOT || process.env.NODUS_ISOLATED_ROOT || ''));
   const requested = path.resolve(process.env.NODUS_USERDATA);
   if (!qaRoot || (requested !== qaRoot && !requested.startsWith(`${qaRoot}${path.sep}`))) {
     throw new Error('NODUS_USERDATA for the replica suite must remain under NODUS_QA_ROOT.');

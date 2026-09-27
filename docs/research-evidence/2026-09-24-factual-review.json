@@ -1,0 +1,76 @@
+{
+  "reviewed": "2026-09-24",
+  "reviewer": "manual reading of every retained sentence, abstract, limitation and next step against the three source PDFs",
+  "sourceFacts": [
+    "North field measured 23 units. NORTH23 is the exact evidence marker.",
+    "South field measured 41 units. SOUTH41 contradicts a uniform 23-unit result.",
+    "The comparison reports missing controls. No measurement of the east field exists.",
+    "Shared body of all three PDFs: an isolated research fixture; the observation belongs to the named field only; the measurement was recorded after a controlled inspection; no evidence about other fields beyond explicit claims; invented records for software validation."
+  ],
+  "finalRun": {
+    "root": "/private/tmp/nodus-research-g3vRMS",
+    "applicationBuild": "2a407f0e",
+    "note": "45665d23 later changed chunk page labels only; the one-page synthetic PDFs produce no page-crossing chunks, so audit behaviour for this corpus is unchanged. Claim-audit code is identical between 2a407f0e and 91a82aa0.",
+    "decision": "No retained factual claim lacked support in the sources in this run. Residual wording and coherence defects are listed. One run per route on a three-document synthetic corpus: this is not a guarantee against unsupported statements, and run-to-run variance was high (see earlierRuns).",
+    "routes": [
+      {
+        "route": "v1-general",
+        "retainedFactualClaims": 12,
+        "unsupportedClaimsFound": 0,
+        "findings": [
+          { "kind": "paraphrase_intensified", "sentence": "… formula esa cifra como refutación explícita de un resultado uniforme de 23 unidades.", "source": "SOUTH41 contradicts a uniform 23-unit result.", "assessment": "'refutación' is stronger than 'contradicts'; the judge accepted it as attribution." },
+          { "kind": "dangling_reference", "sentence": "Cada una declara que documenta «an isolated research fixture», …", "assessment": "plural subject after a sentence about one source; the quotations are literal and cited." }
+        ],
+        "retainedSentencesIncludingNonfactual": 16,
+        "coverage": "north 23, south 41, east absent, isolation of each observation, explicit limited inference"
+      },
+      {
+        "route": "v2-general",
+        "retainedFactualClaims": 9,
+        "unsupportedClaimsFound": 0,
+        "findings": [
+          { "kind": "paraphrase_intensified", "sentence": "Sin controles registrados, cualquier explicación causal sería una inferencia sin respaldo en las fuentes disponibles.", "source": "The comparison reports missing controls.", "assessment": "'no recorded controls' generalizes 'missing controls'; the conclusion itself is a valid limitation." },
+          { "kind": "elliptical_sentence", "sentence": "La comparabilidad encuentra además un límite en la pertenencia de cada observación.", "assessment": "announces a limit without stating it in the same paragraph; not a factual error." }
+        ],
+        "correctedFromPreviousReview": [
+          "No 'independent' reports and no 'same declared protocol'. 'Las tres fuentes comparten una misma cláusula de alcance.' is literal: the clause appears verbatim in all three.",
+          "A limitation now separates absence of evidence from evidence of absence: 'el silencio documental no debe leerse como confirmación independiente' (run 28c2743a) and 'El corpus no aporta un protocolo común …' (absence of a documented protocol, not a claim that protocols differ)."
+        ],
+        "coverage": "all three sources, 23/41, east absent, invented records, causal limitation"
+      },
+      {
+        "route": "v1-comparative",
+        "retainedFactualClaims": 7,
+        "unsupportedClaimsFound": 0,
+        "findings": [ { "kind": "redundancy", "assessment": "east absence and missing controls are restated three times in different words; restatement pruning only removes identical sentences." } ],
+        "coverage": "north 23, south 41, east absent, missing controls; comparability limits are thin"
+      },
+      {
+        "route": "v2-comparative",
+        "retainedFactualClaims": 9,
+        "unsupportedClaimsFound": 0,
+        "findings": [
+          { "kind": "redundancy", "assessment": "the summary paragraph is repeated almost verbatim in the body." },
+          { "kind": "dangling_reference", "sentence": "La fuente sintética 3 lo enuncia de forma directa al afirmar que «No measurement of the east field exists».", "assessment": "'lo' refers to a removed sentence; the quotation is literal." }
+        ],
+        "correctedFromPreviousReview": [ "No longer asserts absence of temporal series while another statement says it cannot be established; no temporal-series claim survives." ],
+        "coverage": "north 23, south 41 and its stated contradiction, east absent, missing controls, isolation clause"
+      }
+    ]
+  },
+  "earlierRuns": [
+    { "build": "07f0e8bb (23 September)", "root": "/private/tmp/nodus-research-QVEGmv", "errors": [
+      "V2 general kept 'El segundo informe, independiente del primero, …' with supported=true while its reason said independence was unsupported.",
+      "'… bajo el mismo protocolo declarado …' presupposed a shared declared protocol no source states.",
+      "V2 comparative asserted absence of temporal series and later said that absence could not be established." ] },
+    { "build": "b2d8174c", "root": "/private/tmp/nodus-research-Ia0opa", "corrected": "Independence premises now fail individually: 'La segunda observación, registrada de manera independiente, …' removed (premise 'fue registrada de manera independiente' not entailed).", "newError": "Explicit, valid inferences were removed because the judge required sources to state conclusions (51 of 63 V1 general sentences removed, 46 for non-entailed premises); a whole batch of eight failed validation for one malformed item; the consistency judge removed compatible statements." },
+    { "build": "d289bcc0", "root": "/private/tmp/nodus-research-NOguMC", "newError": "Main process froze at 100% CPU for 25 minutes in V2 general: exponential backtracking in the sentence-boundary lookbehind over citation masks. Fixed in 3f9265c0 with a linear scan and a pathological regression input." },
+    { "build": "28c2743a", "root": "/private/tmp/nodus-research-AgEtMO", "newError": "A consistency pair was listed while its own reason said 'No hay contradicción literal'; an anaphoric sentence survived its removed antecedent; writer output '([label](link)])' left '(])'. Fixed by requiring an explicit incompatible verdict with quotes, and bracket-only wrapper cleanup." },
+    { "build": "73c21c3a", "root": "/private/tmp/nodus-research-ZRFQnB", "newError": "An orphaned-reference rule cascaded and removed literally supported, cited facts ('La primera registra que el campo norte midió 23 unidades … [S1]'); V2 comparative kept no claim. Rule withdrawn in 2a407f0e." }
+  ],
+  "limits": [
+    "Automatic grades, citation existence and literal quotes were not used as acceptance.",
+    "deepseek-flash acts as writer and judge; its verdicts vary between runs, so removals vary (e.g. V2 comparative kept 7, 0 and 9 factual claims in the last three runs).",
+    "Wording intensifications of an otherwise supported attribution are not reliably caught."
+  ]
+}

@@ -34,7 +34,7 @@ try {
   const ai = load('electron/ai/aiClient.ts');
   const plugins = load('electron/skillPlugins.ts');
 
-  settings.updateSettings({ chatModel: { provider: 'google', model: 'test-text-model' }, synthesisModel: { provider: 'google', model: 'test-text-model' }, nodiModel: { provider: 'google', model: 'test-text-model' }, imageProvider: 'google', imageModel: 'test-image-model', promptLanguage: 'en' });
+  settings.updateSettings({ chatModel: { provider: 'google', model: 'test-text-model' }, synthesisModel: { provider: 'google', model: 'test-text-model' }, nodiModel: { provider: 'google', model: 'test-text-model' }, imageProvider: 'google', imageModel: 'test-image-model', promptLanguage: 'en', researchWebSearch: 'off' });
 
   // ---- simulated boundaries -------------------------------------------------
   load('electron/ai/chatSvgQuality.ts').refineChatSvg = async answer => answer;
@@ -154,7 +154,7 @@ try {
   const researchSelection = { ideas: false, themes: false, contradictions: false, gaps: false, readingPath: false, authors: false, documents: false, passages: false, graph: false, graphParts: {} };
   const owner = (surface, id) => assets.chatAssetOwner(surface, id, vaults.getActiveVault().id);
   const surfaces = [
-    { name: 'research assistant', owner: owner('assistant', researchConversation.id), run: () => research.streamResearchChat({ conversationId: researchConversation.id, messages: [turn], selection: researchSelection }, () => {}).then(r => r.answer) },
+    { name: 'research assistant', scopedCorpus: true, owner: owner('assistant', researchConversation.id), run: () => research.streamResearchChat({ conversationId: researchConversation.id, messages: [turn], selection: researchSelection }, () => {}).then(r => r.answer) },
     { name: 'nodi', owner: owner('nodi', nodiConversation.id), run: () => nodi.streamNodiChat({ conversationId: nodiConversation.id, messages: [turn], contexts: [] }, () => {}) },
     { name: 'world chat', owner: owner('world-assistant', worldConversation.id), run: () => world.streamWorldChat({ conversationId: worldConversation.id, question: worldQuestion }, () => {}).then(r => r.text) },
     { name: 'database chat', owner: owner('database', dbConversation.id), run: () => dbChat.streamDatabaseChat({ conversationId: dbConversation.id, databaseIds: [database.id], question }, () => {}).then(r => r.text) },
@@ -174,7 +174,12 @@ try {
       const text = await surface.run();
       const after = capability.counter();
       check(`${surface.name} · ${capability.name} · executed exactly once`, after - before <= 1);
-      try { capability.expect(text); } catch (error) { console.error(`${surface.name} · ${capability.name} produced:\n${JSON.stringify(text)}`); throw error; }
+      if (surface.scopedCorpus) {
+        check(`${surface.name} · ${capability.name} · no unscoped capability dispatch`, after === before);
+        check(`${surface.name} · ${capability.name} · no forged capability result`, !shared.splitChatVisuals(text).some(part => part.kind === 'capability-result'));
+      } else {
+        try { capability.expect(text); } catch (error) { console.error(`${surface.name} · ${capability.name} produced:\n${JSON.stringify(text)}`); throw error; }
+      }
       check(`${surface.name} · ${capability.name} · the protocol request is consumed`, !shared.splitChatVisuals(text).some(p => p.kind.endsWith('-plan') || p.kind === 'capability-request' || p.kind === 'image-request'));
       checks++;
     }

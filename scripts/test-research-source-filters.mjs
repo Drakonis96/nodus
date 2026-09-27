@@ -74,7 +74,8 @@ try {
     const result = await buildResearchContext({ ...selection, sourceFilter: filter(['a'], ['a1']) }, 'topic', 250000, 'es');
     const json = JSON.stringify(result.context);
     assert.doesNotMatch(json, /OUTSIDE_ONLY|OUTSIDE_AUTHOR|edge-out/);
-    assert.ok(json.includes('Selected idea shared'));
+    assert.ok(json.includes('Selected idea inside'));
+    assert.doesNotMatch(json, /Selected idea shared/, 'an inseparable cross-source Idea is excluded from the academic scope');
     assert.deepEqual([...new Set(textReads)], ['a1']);
     assert.equal(result.stats.works, 1);
     assert.equal(result.context.huecos_de_investigacion[0].evidence, null);
@@ -94,6 +95,10 @@ try {
     checks++;
   }
   // Prove filtering happens before top-K, even when excluded vectors rank higher.
+  assert.deepEqual(passages.lexicalPassageSearch('topic', 10, { nodusIds: [] }), []);
+  assert.deepEqual(passages.findSimilarPassages([1, 0], -1, 10, { nodusIds: [] }), []);
+  assert.deepEqual(await passages.findSimilarPassagesPaged([1, 0], -1, 10, { nodusIds: [] }), []);
+  assert.deepEqual(await ideas.findSimilarIdeasPaged([1, 0], -1, 10, { nodusIds: [] }), []);
   const { retrieveHierarchical } = load('electron/ai/hierarchicalRetrieval.ts');
   const hit = await retrieveHierarchical('topic', { embedding: [1, 0], nodusIds: ['a1'], ideaLimit: 1, passageLimit: 1, documentLimit: 1 });
   assert.ok(hit.ideas.length && hit.documents.length && hit.passages.length);

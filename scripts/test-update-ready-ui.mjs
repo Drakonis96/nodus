@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
 import ts from 'typescript';
+import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-update-ready-'));
@@ -55,8 +56,8 @@ test('real update UI: work, postpone, revisit, retry and install in all language
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const buildFixture = (mode) => build({ outfile: path.join(dir, 'fixture.js'), entryPoints: [path.join(root, 'scripts/fixtures/manual-update/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': JSON.stringify(mode), __APP_VERSION__: '"5.1.7"' } });
   const [bundle, strictBundle] = await Promise.all([buildFixture('production'), buildFixture('development')]);
-  execFileSync(path.join(root, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', path.join(dir, 'style.css'), '--minify'], { cwd: root, stdio: 'pipe' });
-  const css = await readFile(path.join(dir, 'style.css'), 'utf8');
+  const stylesheet = componentStyles();
+  const css = await readFile(stylesheet, 'utf8');
   const browser = await chromium.launch({ executablePath: chrome, headless: true });
   const errors = [];
   let page;

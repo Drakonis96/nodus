@@ -15,9 +15,10 @@ device unless it expressly activates a remote function.
 
 Selecting a file or starting a recording **does not publish it or upload it to Nodus**. Some
 optional features can contact third-party services: for example, a user-chosen cloud AI provider,
-Zotero, Unpaywall, GitHub to check updates, Hugging Face to download models or OpenAI secure MCP
-tunnel to use Nodus from ChatGPT. These services receive the necessary data for the requested
-operation and apply their own conditions and policies.
+Zotero, Unpaywall, GitHub to check updates, Hugging Face to download models, OpenAI secure MCP
+tunnel to use Nodus from ChatGPT, or the web search of Research Chat, which sends the search terms
+derived from your question to public search engines and reads the pages it finds. These services
+receive the necessary data for the requested operation and apply their own conditions and policies.
 
 **Cross-vault Library.** When a backup folder is configured, Nodus stores the global document
 library in its nested `nodus-library` folder. That folder can contain originals, clean Markdown,
@@ -201,6 +202,18 @@ specified operation:
   sends only the DOI, ISBN, ISSN, PMID, PMCID or arXiv identifier selected for that lookup. Bulk
   requests are rate-limited and cancelable. Candidates are shown for review and are not applied
   automatically.
+- **Web search in Research Chat:** when the web step is on (the globe toggle in the chat composer, on
+  by default and remembered per user) and the agent decides the library is not enough, or the user asks
+  for an internet search, Nodus starts a local SearXNG instance packaged with the application and sends
+  the search terms — derived from the question being asked — to the search engines it is configured
+  with: DuckDuckGo, Bing, Brave, Yahoo and Seznam, plus the scholarly services arXiv, OpenAlex,
+  EuropePMC, PubMed, Semantic Scholar and Google Scholar. The pages it then reads are fetched directly
+  from their own servers. No Nodus server takes part and none of this reaches the project: the queries
+  leave from the user's own address, each engine or site can see what any web request exposes, such as
+  the IP address, and the retrieved text is stored only in the local database of that vault. The step
+  never solves, evades or retries around a CAPTCHA or an access block: a page that refuses is recorded
+  as blocked and the answer says so. Turning the toggle off keeps the whole turn in the library, and no
+  search request is made at all.
 - **Clean-reader chat and remote OCR:** these actions use the AI model explicitly configured by the
   user. A remote chat provider receives the clean document text, relevant annotations and recent
   conversation needed to answer; remote OCR receives the selected page image. A local model keeps

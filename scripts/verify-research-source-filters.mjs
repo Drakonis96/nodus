@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
+const base = process.env.NODUS_VISUAL_URL ?? 'http://127.0.0.1:5198';
 await mkdir('artifacts/research-assistant', { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
@@ -8,13 +9,18 @@ const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
 try {
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html`);
   const input = page.locator('.research-composer-input');
   await input.fill('Pregunta sin filtro'); await input.press('Enter');
   await page.waitForFunction(() => window.requests.length === 1 && window.saved.length > 0);
-  const trigger = page.getByTestId('research-source-filter-trigger');
-  await trigger.click();
-  const dialog = page.getByRole('dialog', { name: 'Filtrar contexto', exact: true });
+  // Sources are the Library tab of the one Context balloon.
+  const trigger = page.getByTestId('research-context-trigger');
+  const openLibrary = async () => { await trigger.click(); await page.getByTestId('research-context-tab-library').click(); };
+  await openLibrary();
+  const dialog = page.getByTestId('research-context-panel');
+  assert.equal(await page.getByTestId('research-context-tab-library').innerText(), 'Biblioteca', 'the chosen tab shows its title');
+  assert.equal(await page.getByTestId('research-context-tab-focus').innerText(), '', 'the other one shows its icon only');
+  assert.equal(await page.getByTestId('research-source-filter-trigger').count(), 0, 'no separate Sources button');
   const enable = dialog.getByRole('checkbox', { name: 'Limitar el contexto a las fuentes seleccionadas' });
   assert.equal(await enable.isChecked(), false);
   await enable.check();
@@ -28,7 +34,7 @@ try {
   await page.screenshot({ path: 'artifacts/research-assistant/source-filter-light.png' });
   await dialog.getByRole('button', { name: 'Aplicar', exact: true }).click();
   assert.equal(await dialog.count(), 0);
-  assert.ok((await trigger.getAttribute('class')).includes('is-active'));
+  assert.ok((await trigger.getAttribute('class')).includes('is-filtered'));
   assert.deepEqual(await page.evaluate(() => window.saved.at(-1).meta.selection.sourceFilter), { enabled: true, authorIds: ['arendt'], workIds: ['human'] });
   await input.fill('Pregunta solo sobre las fuentes seleccionadas'); await input.press('Enter');
   await page.waitForFunction(() => window.requests.length === 2);
@@ -36,15 +42,15 @@ try {
   assert.equal(request.messages.length, 1, 'earlier unfiltered history must not leak');
   assert.deepEqual(request.selection.sourceFilter, { enabled: true, authorIds: ['arendt'], workIds: ['human'] });
   // Cancel and Escape preserve the committed selection and return focus.
-  await trigger.click(); await enable.uncheck(); await page.keyboard.press('Escape');
-  assert.ok((await trigger.getAttribute('class')).includes('is-active'));
-  await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'research-source-filter-trigger');
+  await openLibrary(); await enable.uncheck(); await page.keyboard.press('Escape');
+  assert.ok((await trigger.getAttribute('class')).includes('is-filtered'));
+  await page.waitForFunction(() => document.activeElement?.getAttribute('data-testid') === 'research-context-trigger');
   await page.getByRole('button', { name: 'Nueva conversación', exact: true }).click();
-  assert.equal((await trigger.getAttribute('class')).includes('is-active'), false);
+  assert.equal((await trigger.getAttribute('class')).includes('is-filtered'), false);
   await page.getByText('Conversación de prueba 1', { exact: true }).click();
-  assert.ok((await trigger.getAttribute('class')).includes('is-active'), 'loading restores persisted filters');
-  await page.goto('http://127.0.0.1:5198/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981');
-  await trigger.click(); await enable.check();
+  assert.ok((await trigger.getAttribute('class')).includes('is-filtered'), 'loading restores persisted filters');
+  await page.goto(`${base}/visual-tests/research-assistant-harness.html?theme=dark&accent=%2310b981`);
+  await openLibrary(); await enable.check();
   await dialog.getByRole('checkbox', { name: 'Hannah Arendt 2 obras' }).check();
   await dialog.getByRole('checkbox', { name: /Vigilar y castigar/ }).check();
   assert.ok(await dialog.getByText('Ninguna obra coincide. No se recuperará contexto de otras fuentes.', { exact: true }).isVisible());

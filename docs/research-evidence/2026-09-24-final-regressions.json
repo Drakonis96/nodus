@@ -1,0 +1,259 @@
+{
+  "description": "Focused isolated regressions on the application code of 91a82aa0 (37 scripts from the 23 September set plus both Deep Research suites); the standalone OS-isolation suite ran first outside the inherited profile (6/6).",
+  "commit": "91a82aa0",
+  "root": "/private/tmp/nodus-research-HtaIX8",
+  "proof": {
+    "writeInsideAllowed": true,
+    "writeOutsideDenied": true,
+    "descendantWriteDenied": true,
+    "externalNetworkDenied": true,
+    "forbiddenLoopbackPortDenied": true
+  },
+  "workers": 2,
+  "standaloneIsolationSuite": {
+    "tests": 6,
+    "pass": 6,
+    "fail": 0
+  },
+  "results": [
+    {
+      "file": "test-deep-research-approaches.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 151
+    },
+    {
+      "file": "test-deep-research.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 337
+    },
+    {
+      "file": "test-documentary-campaigns.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 4490
+    },
+    {
+      "file": "test-documentary-ocr-deferred.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2205
+    },
+    {
+      "file": "test-documentary-requests.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 424
+    },
+    {
+      "file": "test-documentary-store.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 403
+    },
+    {
+      "file": "test-documentary-automatic-lifecycle.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 9780
+    },
+    {
+      "file": "test-documentary-vault-ownership.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 4602
+    },
+    {
+      "file": "test-documentary-writers.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 3194
+    },
+    {
+      "file": "test-library-tutorial.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 81
+    },
+    {
+      "file": "test-ipc-contract.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 790
+    },
+    {
+      "file": "test-research-actions.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2392
+    },
+    {
+      "file": "test-research-activity.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 148
+    },
+    {
+      "file": "test-research-assistant-i18n.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 107
+    },
+    {
+      "file": "test-research-attachment-transport.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 1992
+    },
+    {
+      "file": "test-mcp.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 4996
+    },
+    {
+      "file": "test-research-background-process.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 154
+    },
+    {
+      "file": "test-research-canonical-inventory.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2243
+    },
+    {
+      "file": "test-research-claim-audit.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 493
+    },
+    {
+      "file": "test-research-attachments.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 5869
+    },
+    {
+      "file": "test-research-context-popover.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 119
+    },
+    {
+      "file": "test-research-concilium.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 3461
+    },
+    {
+      "file": "test-research-cost-ledger.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 82
+    },
+    {
+      "file": "test-research-listener.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 290
+    },
+    {
+      "file": "test-research-corpus-run.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2806
+    },
+    {
+      "file": "test-research-native-effort.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2934
+    },
+    {
+      "file": "test-research-notebooks.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 1577
+    },
+    {
+      "file": "test-research-original-read.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 527
+    },
+    {
+      "file": "test-research-preflight.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 1995
+    },
+    {
+      "file": "test-research-prompt-packs.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 152
+    },
+    {
+      "file": "test-research-provider-proxy.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 323
+    },
+    {
+      "file": "test-research-reasoning-transport.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 3970
+    },
+    {
+      "file": "test-research-reasoning.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 264
+    },
+    {
+      "file": "test-research-request-budget.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2438
+    },
+    {
+      "file": "test-research-save-to-notes.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 443
+    },
+    {
+      "file": "test-research-preparation-ui.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 12100
+    },
+    {
+      "file": "test-research-source-filters.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 4373
+    },
+    {
+      "file": "test-research-zotero-sessions.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 2717
+    },
+    {
+      "file": "test-research-system-prompts.mjs",
+      "exitCode": 0,
+      "timedOut": false,
+      "durationMs": 4687
+    }
+  ],
+  "passed": 39,
+  "total": 39,
+  "notes": [
+    "test-research-preparation-ui.mjs used an isolated headless Chromium via CHROME_BIN; since 7628f15c it also runs on the CI macOS runner instead of being skipped."
+  ]
+}

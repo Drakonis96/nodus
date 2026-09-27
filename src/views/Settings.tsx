@@ -1,3 +1,4 @@
+import { openResearchPreparation } from '../components/ResearchPreparationWelcome';
 // SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
@@ -1068,6 +1069,12 @@ export function Settings({
           </Section>
       )}
 
+      {activeVault?.type === 'academic' && visibleSettingsSection('library', 'Preparar fuentes', 'documentos embeddings biblioteca consentimiento') && (
+        <Section title={t('Preparar fuentes')}>
+          <button className="btn" onClick={() => openResearchPreparation(undefined, true)}>{t('Preparar fuentes')}</button>
+        </Section>
+      )}
+
       {settings.academicMode !== 'manual' && visibleSettingsSection('library', 'Automatización de análisis', 'analizar temas profundo resumen cola relaciones reanudar') && (
           <Section title={t('Automatización de análisis')}>
             <Row label={t('Analizar temas al sincronizar')}>
@@ -1099,7 +1106,7 @@ export function Settings({
             </Row>
             {activeVault?.type === 'academic' && <>
               <div className="mt-4 border-t border-neutral-800 pt-4">
-                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Índice documental')}</h3>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-500">{t('Ficha documental')}</h3>
                 <p className="mb-3 text-xs leading-5 text-neutral-500">{t('Crea una ficha jerárquica auditada de cada obra completa para orientar chat, Nodi, Deep Research e Immersion. Las citas siguen apuntando al texto original.')}</p>
               </div>
               {DOCUMENT_INDEX_CONTINUOUS_AVAILABLE && <>

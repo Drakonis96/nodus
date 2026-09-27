@@ -19,7 +19,7 @@ try {
   const { validateConcilium } = load('shared/researchConcilium.ts');
   for (const config of [{ models: models.slice(0, 1), chairman: 0 }, { models: [...models, ...models], chairman: 0 }, { models, chairman: 3 }, { models: [models[0], models[0]], chairman: 0 }, { models: [null, models[1]], chairman: 0 }]) assert.throws(() => validateConcilium(config));
   assert.equal(validateConcilium({ models: [...models, { provider: 'deepseek', model: 'mock-four' }, { provider: 'gemini', model: 'mock-five' }], chairman: 4 }).models.length, 5);
-  load('electron/db/settingsRepo.ts').updateSettings({ synthesisModel: models[0], chatModel: models[0], promptLanguage: 'en' });
+  load('electron/db/settingsRepo.ts').updateSettings({ synthesisModel: models[0], chatModel: models[0], promptLanguage: 'en', researchWebSearch: 'off' });
   const skills = load('electron/chatSkills.ts');
   for (const skill of skills.restoreChatSkills()) skills.saveChatSkill({ ...skill, enabled: { assistant: skill.builtin === 'svg', nodi: false } });
   const ai = load('electron/ai/aiClient.ts');
@@ -40,21 +40,27 @@ try {
   };
   const research = load('electron/ai/researchAssistant.ts');
   const request = { messages: [{ role: 'user', content: 'Compare the evidence.' }], selection, model: models[0], concilium: { models, chairman: 1 } };
-  const snapshots = [], chat = [];
-  const response = await research.streamResearchChat(request, delta => chat.push(delta), undefined, update => snapshots.push(update));
+  const snapshots = [], chat = [], activity = [];
+  const response = await research.streamResearchChat(request, delta => chat.push(delta), undefined, update => snapshots.push(update), event => activity.push(event));
   assert.equal(response.concilium.status, 'complete');
   assert.equal(response.concilium.members.length, 3);
   assert.equal(calls.length, 4);
+  const writes = activity.filter(event => event.layer === 'response' && event.operation === 'write');
+  assert.equal(writes.filter(event => event.status === 'active').length, 4);
+  assert.equal(writes.filter(event => event.status === 'completed').length, 4);
+  assert.ok(models.every(model => writes.some(event => event.subject === model.model)), 'concurrent model operations identify the participating model');
+  assert.equal(activity.filter(event => event.status === 'active').length, activity.filter(event => event.status !== 'active').length);
+  const activityCount = activity.length;
   assert.deepEqual(chat, ['Verified consensus.'], 'member answers and reasoning never enter the main chat');
   assert.equal(executions.length, 1, 'only the chairman executes skills');
   assert.deepEqual(executions[0].model, models[1]);
-  assert.ok(executions[0].skills.length > 0);
+  assert.equal(executions[0].skills.length, 0, 'academic corpus scope disables external skill tools, including the chairman');
   for (const call of calls.slice(0, 3)) {
     assert.match(call.options.system, /No skills or tools are available/);
     assert.equal(JSON.parse(call.options.user).application_output_contract, undefined);
     assert.doesNotMatch(call.options.system, /nodus-svg/);
   }
-  assert.match(calls[3].options.system, /svg/i);
+  assert.doesNotMatch(calls[3].options.system, /nodus-svg/);
   assert.ok(snapshots.some(s => s.members[1].status === 'complete' && s.members[0].status === 'thinking'), 'out-of-order completion is delivered live');
   const { SCHEMA_VERSION } = load('electron/db/migrations.ts');
   assert.equal(load('electron/db/database.ts').getDb().pragma('user_version', { simple: true }), SCHEMA_VERSION, 'Concilium migration matches the advertised schema version');
@@ -78,6 +84,7 @@ try {
   assert.equal(failedUpdates.at(-1).status, 'error');
   calls.length = 0; executions.length = 0;
   await research.streamResearchChat({ ...request, concilium: undefined }, () => {});
+  assert.equal(activity.length, activityCount, 'a subsequent request without an observer cannot reach the previous observer');
   assert.equal(calls.length, 1, 'ordinary chat still makes one model call');
   assert.equal(executions.length, 1);
   const { academicApi } = load('electron/preload/academic.ts');

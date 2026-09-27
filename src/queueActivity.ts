@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { clearBackgroundJob, subscribeBackgroundJobs, type AnyJob } from './backgroundJobs';
+import type { ResearchPreparationProgress, ResearchPreparationCampaign } from '@shared/researchCorpus';
 import type { OcrDocProgress } from '@shared/aiOcrTypes';
 import type { DeepResearchJobRecord, DocumentIndexProgress, EmbeddingPipelineProgress, PassageEmbeddingProgress, QueueProgress } from '@shared/types';
 import type { DictionaryProgress } from '@shared/dictionary';
@@ -13,6 +14,7 @@ export const embeddingVisible = (p: EmbeddingPipelineProgress | null) => Boolean
 export const passageVisible = (p: PassageEmbeddingProgress | null) => Boolean(p && (p.running || p.paused || p.cancelled || p.totalPassages > 0 || p.error));
 
 interface QueueSnapshot {
+  preparation: ResearchPreparationProgress;
   queue: QueueProgress | null;
   zotero: ZoteroImportProgress | null;
   documents: DocumentIndexProgress | null;
@@ -37,8 +39,10 @@ export function backgroundFailure(job: AnyJob): string | number | null {
   return null;
 }
 const activeFirst = (a: boolean, b: boolean) => Number(b) - Number(a);
-const EMPTY: QueueSnapshot = { queue: null, zotero: null, documents: null, embeddings: null, passages: null, extraction: [], research: [], dictionary: [], background: [], ocr: [] };
+const EMPTY: QueueSnapshot = { preparation: { paused: false, campaigns: [] }, queue: null, zotero: null, documents: null, embeddings: null, passages: null, extraction: [], research: [], dictionary: [], background: [], ocr: [] };
 const DISMISSED_STORAGE_KEY = 'nodus.queue.dismissed.v1';
+export const preparationLive = (campaign: ResearchPreparationCampaign) => campaign.jobs.some(job => ['queued', 'running', 'paused'].includes(job.state));
+export const preparationVersion = (campaign: ResearchPreparationCampaign) => JSON.stringify([campaign.state, campaign.updatedAt, campaign.jobs.map(job => [job.state, job.stage, job.completedPassages, job.error])]);
 export const researchVersion = (job: DeepResearchJobRecord) => `${job.status}:${job.finishedAt ?? ''}:${job.saveError ?? ''}`;
 export const ocrVersion = (job: QueueSnapshot['ocr'][number]) => `${job.status}:${job.doneCount}:${job.errorCount}:${job.error ?? ''}`;
 const scanVersion = (job: QueueProgress['items'][number]) => `${job.state}:${job.enqueued_at}:${job.finished_at}:${job.error ?? ''}`;
@@ -57,6 +61,7 @@ function readDismissed(): Record<string, string> {
 /** Persisted result lists are history, not fresh notifications. Failures remain actionable. */
 function taskStates(snapshot: Partial<QueueSnapshot>) {
   return [
+    ...(snapshot.preparation?.campaigns ?? []).map(job => ({ key: `preparation:${job.id}`, version: preparationVersion(job), active: preparationLive(job), settled: job.jobs.every(document => ['complete', 'cancelled'].includes(document.state)), updatedAt: job.updatedAt })),
     ...(snapshot.extraction ?? []).map((job) => ({ key: `extraction:${job.id}`, version: `${job.status}:${job.updatedAt}`, active: job.status === 'queued' || job.status === 'processing', settled: job.status === 'canceled' || (job.status === 'done' && !job.error), updatedAt: job.updatedAt })),
     ...(snapshot.documents?.campaigns ?? []).map((job) => ({ key: `documents:${job.campaignId}`, version: `${job.status}:${job.updatedAt}`, active: DOCUMENT_LIVE.has(job.status), settled: job.status === 'cancelled' || (job.status === 'completed' && !job.failedJobs && !job.error), updatedAt: job.updatedAt })),
     // A standalone job (a per-work scan, or Deep Research preparation) has no campaign row
@@ -131,6 +136,7 @@ export function useQueueActivity() {
       const sessions = await api.listZoteroSyncSessions();
       return sessions.find((s) => s.status === 'running' && Date.now() - Date.parse(s.updatedAt) < 60_000)?.progress ?? null;
     }, (cb) => api.onZoteroImportProgress(cb));
+    watch('preparation', () => api.getResearchPreparationProgress(), cb => api.onResearchPreparationProgress(cb));
     watch('research', () => api.listDeepResearchJobs(), (cb) => api.onDeepResearchQueue(cb));
 
     // These channels publish individual jobs, rather than whole snapshots.
@@ -172,25 +178,26 @@ export function useQueueActivity() {
     // Campaign jobs are never filtered here: their history is dismissed by campaign id.
     jobs: snapshot.documents.jobs.filter((job) => job.campaignId || dismissed[`document-job:${job.jobId}`] !== `${job.status}:${job.updatedAt}`),
   };
+  const preparation = { ...snapshot.preparation, campaigns: snapshot.preparation.campaigns.filter(campaign => dismissed[`preparation:${campaign.id}`] !== preparationVersion(campaign)) };
   const queueActive = Boolean(queue && (queue.maintenanceRunning || queue.items.some((item) => DOCUMENT_LIVE.has(item.state))));
   const documentLane = documentLaneActivity(documents ?? null);
-  const visible = Number(Boolean(queue && (queue.total > 0 || queue.maintenanceRunning || queue.maintenanceError)))
+  const visible = Number(preparation.campaigns.length > 0) + Number(Boolean(queue && (queue.total > 0 || queue.maintenanceRunning || queue.maintenanceError)))
     + Number(Boolean(zotero)) + Number(documentLane.visible) + Number(embeddingVisible(embeddings)) + Number(passageVisible(passages))
     + Number(extraction.length > 0) + Number(research.length > 0) + Number(dictionary.length > 0) + Number(ocr.length > 0) + Number(background.length > 0);
-  const live = Number(queueActive) + Number(Boolean(zotero && !ZOTERO_FINISHED.has(zotero.phase)))
+  const live = Number(preparation.campaigns.some(preparationLive)) + Number(queueActive) + Number(Boolean(zotero && !ZOTERO_FINISHED.has(zotero.phase)))
     + Number(documentLane.active) + Number(Boolean(embeddings && (embeddings.running || embeddings.paused)))
     + Number(Boolean(passages && (passages.running || passages.paused)))
     + Number(extraction.some((job) => job.status === 'queued' || job.status === 'processing'))
     + Number(research.some((job) => job.status === 'queued' || job.status === 'running'))
     + Number(dictionary.some((job) => !DICTIONARY_FINISHED.has(job.phase)))
     + Number(ocr.some((job) => job.status === 'pending' || job.status === 'processing')) + Number(background.some((job) => job.status === 'running'));
-  const attention = Boolean(queue?.maintenanceError || queue?.failed || queue?.pausedReason || embeddings?.error || passages?.error
+  const attention = Boolean(preparation.campaigns.some(campaign => campaign.jobs.some(job => ['failed', 'blocked'].includes(job.state))) || queue?.maintenanceError || queue?.failed || queue?.pausedReason || embeddings?.error || passages?.error
     || zotero?.phase === 'failed' || documentLane.attention
     || extraction.some((job) => job.status === 'failed') || research.some((job) => job.status === 'failed' || job.saveError)
     || dictionary.some((job) => job.phase === 'failed' || job.phase === 'degraded') || ocr.some((job) => job.status !== 'cancelled' && (job.status === 'error' || job.errorCount > 0 || job.error)) || background.some((job) => job.status === 'failed' || backgroundFailure(job)));
   const finished = taskStates(snapshot).filter((task) => !task.active && dismissed[task.key] !== task.version);
   const finishedBackground = background.filter((job) => job.status !== 'running');
-  return { ...snapshot, queue, embeddings, passages, documents, zotero, extraction, research, dictionary, ocr, background, visible, live, attention,
+  return { ...snapshot, preparation, queue, embeddings, passages, documents, zotero, extraction, research, dictionary, ocr, background, visible, live, attention,
     canClearFinished: finished.length > 0 || finishedBackground.length > 0,
     clearFinished: () => {
       setDismissed((current) => ({ ...current, ...Object.fromEntries(finished.map((task) => [task.key, task.version])) }));

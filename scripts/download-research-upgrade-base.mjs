@@ -1,0 +1,30 @@
+/** Fetch immutable release bytes only on a disposable installer runner. */
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
+import { Readable, Transform } from 'node:stream';
+if (process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 'github-hosted') throw new Error('Disposable runner required');
+const directory = path.resolve('release-base');
+fs.mkdirSync(directory, { recursive: true });
+const name = process.platform === 'darwin' ? `Nodus-mac-${process.arch}.dmg` : process.platform === 'win32' ? 'Nodus-win-x64.exe' : 'Nodus-linux-amd64.deb';
+const response = await fetch('https://api.github.com/repos/Drakonis96/nodus/releases/tags/v5.6.0', { headers: { Accept: 'application/vnd.github+json', ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}) }, signal: AbortSignal.timeout(30000) });
+if (!response.ok) throw new Error(`Release metadata HTTP ${response.status}`);
+const release = await response.json();
+const asset = release.assets.find(item => item.name === name);
+if (!asset || !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? '') || !asset.browser_download_url.startsWith('https://github.com/Drakonis96/nodus/releases/download/v5.6.0/')) throw new Error('Missing hash-verified v5.6.0 artifact');
+const download = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(600000) });
+if (!download.ok || !download.body) throw new Error(`Artifact HTTP ${download.status}`);
+const hash = createHash('sha256');
+let bytes = 0;
+const meter = new Transform({ transform(chunk, _encoding, callback) {
+  bytes += chunk.length;
+  if (bytes > 1500 * 1024 * 1024) return callback(new Error('Artifact size limit'));
+  hash.update(chunk); callback(null, chunk);
+} });
+const file = path.join(directory, name);
+await pipeline(Readable.fromWeb(download.body), meter, fs.createWriteStream(file, { flags: 'wx' }));
+const sha256 = hash.digest('hex');
+if (`sha256:${sha256}` !== asset.digest || bytes !== asset.size) throw new Error('Release artifact integrity mismatch');
+fs.writeFileSync(path.join(directory, 'upgrade-base.json'), JSON.stringify({ version: '5.6.0', assetId: asset.id, name, sha256, bytes, releaseId: release.id }, null, 2));
+console.log(JSON.stringify({ version: '5.6.0', name, sha256, bytes }));

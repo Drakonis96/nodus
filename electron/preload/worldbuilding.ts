@@ -143,7 +143,7 @@ export const worldbuildingApi: WorldbuildingApi = {
       ipcRenderer.removeListener('worldChat:delta', onDelta);
     }
   },
-  listWorldChatConversations: () => ipcRenderer.invoke('worldChat:history:list'),
+  listWorldChatConversations: (includeArchived) => ipcRenderer.invoke('worldChat:history:list', includeArchived),
   getWorldChatConversation: (id) => ipcRenderer.invoke('worldChat:history:get', id),
   createWorldChatConversation: (input) => ipcRenderer.invoke('worldChat:history:create', input),
   saveWorldChatConversation: (id, messages, selection, focus, model) =>

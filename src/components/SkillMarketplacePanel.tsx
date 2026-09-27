@@ -105,7 +105,9 @@ function MarketplaceCard({ cardKey, name, description, author, category, install
   </article>;
 }
 
-export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[]; accent: string }) {
+/** `manageSources` false leaves repository management to the Repositories tab: the catalogue
+ * only chooses which repository to browse. */
+export function SkillMarketplacePanel({ skills, accent, manageSources = true }: { skills: ChatSkill[]; accent: string; manageSources?: boolean }) {
   const [state, setState] = useState<SkillMarketplace>({ version: 1, sources: [] });
   const [sourceId, setSourceId] = useState('');
   const [url, setUrl] = useState('');
@@ -252,7 +254,11 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
     {/* Where the skills come from, folded away. It is answered once and then rarely asked
         again, and open by default it put five controls between the reader and the first
         skill. The line stays visible, so which repository this is never becomes a mystery. */}
-    <details className="skill-marketplace-sources">
+    {!manageSources && <div className="skill-marketplace-source-pick">
+      <span>{official ? t('Repositorio oficial de Nodus') : t('Fuente comunitaria · no revisada por Nodus')}</span>
+      {state.sources.length > 1 && <select aria-label={t('Repositorio de skills')} value={source?.id ?? ''} disabled={busy} onChange={e => setSourceId(e.target.value)}>{state.sources.map(s => <option key={s.id} value={s.id}>{s.id}</option>)}</select>}
+    </div>}
+    {manageSources && <details className="skill-marketplace-sources">
       <summary>
         <span>{official ? t('Repositorio oficial de Nodus') : t('Fuente comunitaria · no revisada por Nodus')}{source?.updatedAt ? tx(' · Actualizado el {date}', { date: new Date(source.updatedAt).toLocaleDateString() }) : source ? t(' · Actualiza para descubrir skills') : ''}</span>
         <span className="skill-marketplace-sources-hint">{t('Repositorios')}</span>
@@ -265,7 +271,7 @@ export function SkillMarketplacePanel({ skills, accent }: { skills: ChatSkill[];
         setNotice(waiting.length ? t('Hay una actualización esperando a que apruebes sus permisos.') : t('Todo está al día.'));
       })}><Icon name="download" size={14} />{t('Buscar actualizaciones')}</button></div>}
       <form onSubmit={e => { e.preventDefault(); void run(async () => { const value = await window.nodus.addSkillSource(url); setState(value); setSourceId(value.sources[value.sources.length - 1].id); setUrl(''); }); }} className="skill-marketplace-source"><label>{t('Añadir un repositorio')}<input aria-label={t('URL del repositorio')} type="url" required placeholder="https://github.com/owner/repository" value={url} onChange={e => setUrl(e.target.value)} /></label><button type="submit" disabled={busy || !url.trim()}>{t('Añadir fuente')}</button></form>
-    </details>
+    </details>}
     {pluginReview && <PluginPermissionReview prompt={pluginReview} busy={busy}
       onClose={() => setPluginReview(null)}
       onAllow={() => void run(async () => {

@@ -1,7 +1,11 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
+import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -78,11 +82,15 @@ export const JA: Record<string, string> = {
   "Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.": "Nodus を離れずに情報源を探し、最新情報を追跡し、ファイルを操作できます。",
   "Buscar herramientas": "ツールを検索",
 
+  ...RESEARCH_ACTIVITY_TRANSLATIONS.ja,
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS.ja,
   ...RESEARCH_ATTACHMENT_TRANSLATIONS.ja,
+  ...VAULT_FILE_DROP_TRANSLATIONS['ja'],
   ...DOCUMENT_SKILLS_TRANSLATIONS.ja,
   ...RESEARCH_PROMPT_TRANSLATIONS.ja,
   ...RESEARCH_SOURCE_TRANSLATIONS.ja,
   ...RESEARCH_REASONING_TRANSLATIONS.ja,
+  ...RESEARCH_NOTEBOOK_TRANSLATIONS["ja"],
   ...CHAT_SKILLS_TRANSLATIONS.ja,
   ...CAPABILITIES_TRANSLATIONS.ja,
   ...STELLAR_GRAPH_TRANSLATIONS.ja,

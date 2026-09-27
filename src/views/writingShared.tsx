@@ -8,6 +8,7 @@ import type { CitationTarget } from '../components/SourceCitationModal';
 import { useDismissableLayer } from '../hooks';
 import { t, tx, getActiveLang } from '../i18n';
 import { DecorativeImageCard } from '../components/DecorativeImageCard';
+import { ResearchCoverage } from '../components/ResearchCoverage';
 
 /** Human labels for every workshop/report kind (deep reports use `deep_research`). */
 export const KIND_LABELS: Record<WritingWorkshopBrief['kind'], string> = {
@@ -159,7 +160,9 @@ export function DraftResultMain({
       <div className="space-y-3">
         <div className="min-w-0">
           <h2 className="text-xl font-semibold break-words">{draft.title}</h2>
-          {draft.abstract && <p className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>{draft.abstract}</p>}
+          {draft.abstract && <div data-testid="draft-abstract" className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>
+            <Markdown content={draft.abstract} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
+          </div>}
         </div>
         {!hideActions && (
           <DraftActionBar
@@ -285,6 +288,7 @@ export function SupportMatrix({
             </div>
           ))}
           <SupportAudit entries={draft.supportAudit ?? []} />
+          {draft.researchTraversal && <ResearchCoverage value={draft.researchTraversal} />}
           {draft.qualityAssessment && <DeepResearchQualityPanel assessment={draft.qualityAssessment} />}
           <PanelList title={t('Siguientes pasos')} items={draft.nextSteps} />
           <PanelList title={t('Limitaciones')} items={draft.limitations} />

@@ -113,7 +113,8 @@ try {
   assert.equal(fs.existsSync(path.join(scratch, 'chat-assets', reader.libraryReaderChatAssetOwner('SKILLDOC'))), false); checks++;
   beforeImage = () => {};
   // Disabled tool skills never call the image provider, even if the text model emits a tool block.
-  registry.saveChatSkill({ ...defaults.find(s => s.builtin === 'image'), enabled: { assistant: false, nodi: true } });
+  // A skill is on or off for every chat at once, so disabling it means both switches off.
+  registry.saveChatSkill({ ...defaults.find(s => s.builtin === 'image'), enabled: { assistant: false, nodi: false } });
   ai.completeTextStream = async () => `\`\`\`nodus-image\n${JSON.stringify(brief)}\n\`\`\``;
   const previousImageCalls = imageCalls;
   const disabled = await readerChat.streamLibraryReaderChat({ documentId: 'SKILLDOC', messages: [turn] }, () => {});

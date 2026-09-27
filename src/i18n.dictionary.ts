@@ -1,6 +1,11 @@
 /** Dictionary surface translations. Spanish is the source key language. */
 export const DICTIONARY_TRANSLATIONS = {
   en: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "Concepts grounded in your library and, when needed, the web.",
+    "Consultar la web cuando sea necesario": "Consult the web when needed",
+    "Automática": "Automatic",
+    "Actividad del Diccionario": "Dictionary activity",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "Generation searches the works, ideas and documents in the selected scope. You can review the sources under Evidence.",
     Diccionario: "Dictionary",
     "Nueva entrada del Diccionario": "New Dictionary entry",
     "Cambiar dirección de orden": "Change sort direction",
@@ -214,6 +219,11 @@ export const DICTIONARY_TRANSLATIONS = {
     Italiano: "Italian",
   },
   fr: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "Concepts fondés sur votre bibliothèque et, si nécessaire, sur le Web.",
+    "Consultar la web cuando sea necesario": "Consulter le Web si nécessaire",
+    "Automática": "Automatique",
+    "Actividad del Diccionario": "Activité du Dictionnaire",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "La génération consulte les œuvres, idées et documents du périmètre choisi. Vous pouvez examiner les sources dans Preuves.",
     Diccionario: "Dictionnaire",
     "Nueva entrada del Diccionario": "Nouvelle entrée de dictionnaire",
     "Nodus buscará la evidencia más relevante y generará la definición automáticamente.":
@@ -437,6 +447,10 @@ export const DICTIONARY_TRANSLATIONS = {
   "zh-CN": {},
   'zh-TW': {},
   ko: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "라이브러리와, 필요할 때는 웹의 증거에 근거한 개념.",
+    "Consultar la web cuando sea necesario": "필요할 때 웹 참조",
+    "Actividad del Diccionario": "사전 활동",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "생성할 때 선택한 범위의 저작, 아이디어 및 문서를 참조합니다. 출처는 증거에서 검토할 수 있습니다.",
     "Diccionario": "사전",
     "Nueva entrada del Diccionario": "새 사전 항목",
     "Cambiar dirección de orden": "정렬 방향 변경",
@@ -637,6 +651,10 @@ export const DICTIONARY_TRANSLATIONS = {
     "Realiza una lectura crítica del concepto: supuestos, tensiones internas, ambigüedades, críticas, límites y cuestiones abiertas señaladas por los autores o visibles en la evidencia.": "가정, 내부 긴장, 모호함, 비판, 한계, 저자가 식별했거나 증거에서 볼 수 있는 공개 질문 등 개념에 대한 비판적 읽기를 제공합니다.",
   },
   ja: {
+    "Conceptos con evidencia de tu biblioteca y, cuando sea necesario, de la web.": "ライブラリと、必要に応じてウェブの証拠に基づく概念。",
+    "Consultar la web cuando sea necesario": "必要に応じてウェブを参照",
+    "Actividad del Diccionario": "辞書のアクティビティ",
+    "Al generar, se consultarán las obras, ideas y documentos del ámbito elegido. Puedes revisar las fuentes en Evidencia.": "生成時には、選択した範囲の著作、アイデア、文書を参照します。出典は証拠で確認できます。",
     "Diccionario": "辞書",
     "Nueva entrada del Diccionario": "新しい辞書エントリ",
     "Cambiar dirección de orden": "並べ替え方向を変更する",

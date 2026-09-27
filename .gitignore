@@ -122,3 +122,4 @@ work/stellar-preview/
 !legal/generated/LEGALIZE_*
 capability-signing-key-*.pem
 build/capability-bootstrap/
+build/zotero-mcp/

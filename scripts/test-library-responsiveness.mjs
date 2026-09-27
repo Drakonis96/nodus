@@ -40,12 +40,12 @@ async function assertEventLoopResponsive(promise, label, minimumTicks = 12) {
 try {
   await mkdir(root, { recursive: true });
   await writeFile(extractionWorker, `
-    const { parentPort } = require('node:worker_threads');
+    const parentPort = { once: (...args) => process.once(...args), postMessage: value => process.send(value) };
     parentPort.once('message', (request) => {
       parentPort.postMessage({ kind: 'progress', progress: { phase: 'ocr', progress: 0.5, message: 'fixture' } });
       const until = Date.now() + 500;
       while (Date.now() < until) Math.sqrt(Math.random());
-      parentPort.postMessage({ kind: 'done', result: { item: request.item, report: { worker: true } } });
+      parentPort.postMessage({ kind: 'done', result: { item: request.item, report: { worker: true, pid: process.pid } } });
     });
   `);
   await writeFile(operationWorker, `
@@ -94,6 +94,7 @@ try {
     item, store, onProgress: (value) => progress.push(value),
   }), 'CPU-heavy extraction');
   assert.equal(extractionResult.report.worker, true);
+  assert.notEqual(extractionResult.report.pid, process.pid, 'extraction owns a separate OS process');
   assert.equal(progress[0]?.phase, 'ocr');
 
   const operationResult = await assertEventLoopResponsive(operationHost.runLibraryOperationInWorker(

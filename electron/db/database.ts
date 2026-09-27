@@ -7,6 +7,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { isMainThread, workerData } from 'node:worker_threads';
 import { runMigrations, SCHEMA_VERSION } from './migrations';
 import { ensureTombstoneTriggers, pruneTombstones } from './tombstones';
+import { repairAllChatPlacements } from './chatHistoryTables';
 import { ensureOutboxTriggers } from '../serverSync/outboxTriggers';
 import { activeVaultDbPath, getVault, getVaultByPath } from '../vaults/vaultRegistry';
 import { auditQaDatabaseOpen } from '../qa/databaseAudit';
@@ -136,6 +137,15 @@ function openDatabase(file: string): Database.Database {
   // server_outbox no matter what the rest of the app believes.
   ensureOutboxTriggers(next, mayQueueMutations(file));
   ensureBackupRevisionTriggers(next);
+  // A chat history's folders and projects are checked on every open: a placement that
+  // names a folder or project that is gone (or a folder of another project) is cleared
+  // here, so no chat can hide behind a reference that does not resolve. Opening the vault
+  // never depends on it.
+  try {
+    repairAllChatPlacements(next);
+  } catch (error) {
+    console.warn('[db] chat history repair skipped:', error instanceof Error ? error.message : error);
+  }
   next.pragma('busy_timeout = 5000');
   next.pragma('synchronous = NORMAL');
   next.pragma('temp_store = MEMORY');

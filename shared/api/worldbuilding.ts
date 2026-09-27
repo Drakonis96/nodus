@@ -303,12 +303,17 @@ export interface WorldbuildingApi {
     handlers: { onDelta: (delta: string) => void }
   ): Promise<WorldChatResult>;
   cancelWorldChat(): Promise<void>;
-  listWorldChatConversations(): Promise<WorldChatConversationSummary[]>;
+  /** Archived chats only when asked for. */
+  listWorldChatConversations(includeArchived?: boolean): Promise<WorldChatConversationSummary[]>;
   getWorldChatConversation(id: string): Promise<WorldChatConversation | null>;
+  /** A chat may start in a project (and a folder of it) or in a notebook. */
   createWorldChatConversation(input: {
     title: string;
     selection: WorldChatSelection;
     model: ModelRef | null;
+    projectId?: string | null;
+    folderId?: string | null;
+    notebookId?: string | null;
   }): Promise<WorldChatConversation>;
   saveWorldChatConversation(
     id: string,

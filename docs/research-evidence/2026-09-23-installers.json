@@ -1,0 +1,157 @@
+{
+  "commit": "736823e0",
+  "workflow": "https://github.com/Drakonis96/nodus/actions/runs/35862266301",
+  "scope": "native install, same-version reinstall and removal on disposable hosted runners; not a different-version upgrade",
+  "reports": [
+    {
+      "root": "/private/tmp/nodus-research-cLqdSA",
+      "platform": "darwin",
+      "arch": "x64",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "passed": true,
+      "updateKind": "same-version-native-reinstallation",
+      "futureVersionUpgradeTest": false,
+      "launches": [
+        {
+          "packaged": true,
+          "userData": "/private/tmp/nodus-research-cLqdSA/profile",
+          "resources": "/private/tmp/nodus-research-cLqdSA/installation/Nodus.app/Contents/Resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 16118,
+          "retainedNotebook": true
+        },
+        {
+          "packaged": true,
+          "userData": "/private/tmp/nodus-research-cLqdSA/profile",
+          "resources": "/private/tmp/nodus-research-cLqdSA/installation/Nodus.app/Contents/Resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 17387,
+          "retainedNotebook": true
+        }
+      ],
+      "artifact": {
+        "name": "Nodus-mac-x64.dmg",
+        "sha256": "4334d04b09f0964211c1f7df9e9925f63e656ffc3bbfa4716c0036da1d986cf5"
+      },
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true
+    },
+    {
+      "root": "/private/tmp/nodus-research-rxcgQ2",
+      "platform": "darwin",
+      "arch": "arm64",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "passed": true,
+      "updateKind": "same-version-native-reinstallation",
+      "futureVersionUpgradeTest": false,
+      "launches": [
+        {
+          "packaged": true,
+          "userData": "/private/tmp/nodus-research-rxcgQ2/profile",
+          "resources": "/private/tmp/nodus-research-rxcgQ2/installation/Nodus.app/Contents/Resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 69067,
+          "retainedNotebook": true
+        },
+        {
+          "packaged": true,
+          "userData": "/private/tmp/nodus-research-rxcgQ2/profile",
+          "resources": "/private/tmp/nodus-research-rxcgQ2/installation/Nodus.app/Contents/Resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 70748,
+          "retainedNotebook": true
+        }
+      ],
+      "artifact": {
+        "name": "Nodus-mac-arm64.dmg",
+        "sha256": "d1512d9c063c537d59451f971789b7a6ddb21af8cca03465708413194f4acbec"
+      },
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true
+    },
+    {
+      "root": "/tmp/nodus-research-YOUzUO",
+      "platform": "linux",
+      "arch": "x64",
+      "proof": {
+        "environment": "disposable-hosted-ci",
+        "osWriteBoundaryVerified": false
+      },
+      "passed": true,
+      "updateKind": "same-version-native-reinstallation",
+      "futureVersionUpgradeTest": false,
+      "launches": [
+        {
+          "packaged": true,
+          "userData": "/tmp/nodus-research-YOUzUO/profile",
+          "resources": "/opt/Nodus/resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 3361,
+          "retainedNotebook": true
+        },
+        {
+          "packaged": true,
+          "userData": "/tmp/nodus-research-YOUzUO/profile",
+          "resources": "/opt/Nodus/resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 3570,
+          "retainedNotebook": true
+        }
+      ],
+      "artifact": {
+        "name": "Nodus-linux-amd64.deb",
+        "sha256": "31c114309b90750f6462bad44061c680f5574726abb4ebd6c94ac88643d6f0be"
+      },
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true
+    },
+    {
+      "root": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\nodus-research-WZ4crR",
+      "platform": "win32",
+      "arch": "x64",
+      "proof": {
+        "environment": "disposable-hosted-ci",
+        "osWriteBoundaryVerified": false
+      },
+      "passed": true,
+      "updateKind": "same-version-native-reinstallation",
+      "futureVersionUpgradeTest": false,
+      "launches": [
+        {
+          "packaged": true,
+          "userData": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\nodus-research-WZ4crR\\profile",
+          "resources": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\nodus-research-WZ4crR\\installation\\resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 7876,
+          "retainedNotebook": true
+        },
+        {
+          "packaged": true,
+          "userData": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\nodus-research-WZ4crR\\profile",
+          "resources": "C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\nodus-research-WZ4crR\\installation\\resources",
+          "title": "Nodus Research \u00b7 Desarrollo",
+          "pid": 3884,
+          "retainedNotebook": true
+        }
+      ],
+      "artifact": {
+        "name": "Nodus-win-x64.exe",
+        "sha256": "cef92007b3602f956257ed80b3de9ef5f7a8906e1ef264a1a9b83729c56e407e"
+      },
+      "profilePreserved": true,
+      "foreignResourcesPreserved": true
+    }
+  ]
+}

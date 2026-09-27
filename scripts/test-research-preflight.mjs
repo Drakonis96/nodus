@@ -1,0 +1,36 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { installRuntimeHooks, requireElectronRuntime, repoRoot } from './lib/tsRuntimeHooks.mjs';
+if (!requireElectronRuntime(fileURLToPath(import.meta.url), '--research-preflight')) process.exit(0);
+const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-preflight-'));
+installRuntimeHooks(root);
+const require = createRequire(import.meta.url);
+const load = file => require(path.join(repoRoot, file));
+try {
+  const { buildTextPdf, buildScannedPdf } = await import('./toolkit-fixtures.mjs');
+  const files = { digital: await buildTextPdf(root), scanned: await buildScannedPdf(root, 'scan.pdf', [['Scanned source']]), missing: path.join(root, 'absent.pdf') };
+  const library = load('electron/library/libraryService.ts');
+  library.getGlobalLibraryItem = id => ({ id, metadata: {}, attachments: id === 'abstract' ? [] : [{ id: 'pdf', mimeType: 'application/pdf', sha256: files[id] && fs.existsSync(files[id]) ? createHash('sha256').update(fs.readFileSync(files[id])).digest('hex') : 'missing' }] });
+  library.globalLibraryAttachmentPath = id => files[id];
+  const reader = load('electron/extraction/researchOriginal.ts');
+  const host = load('electron/library/libraryExtractionWorkerHost.ts');
+  host.inspectResearchOriginalInWorker = reader.inspectOriginalPdf;
+  let modelCalls = 0;
+  const ai = load('electron/ai/aiClient.ts');
+  for (const method of ['complete', 'completeJson', 'embedMany']) ai[method] = async () => { modelCalls++; throw new Error('unexpected model call'); };
+  const { preparationPreflight } = load('electron/ai/researchPreparationPreflight.ts');
+  const documents = ['digital', 'scanned', 'missing', 'abstract'].map(id => ({ id, libraryItemId: id, coverage: id === 'abstract' ? 'abstract' : 'metadata', preparation: { lexical: 'missing', text: 'missing' } }));
+  const result = await preparationPreflight(documents);
+  assert.deepEqual(result.map(item => item.status), ['available', 'ocr_pending', 'inaccessible', 'abstract']);
+  assert.equal(result[0].pages, 3);
+  assert.deepEqual(await preparationPreflight([]), []);
+  host.inspectResearchOriginalInWorker = async () => { throw new Error('documentary_extraction_worker_unavailable'); };
+  assert.equal((await preparationPreflight([documents[0]]))[0].status, 'unknown');
+  assert.equal(modelCalls, 0);
+  console.log('Read-only preflight distinguishes real digital/scanned/missing/abstract sources and unavailable inspection.');
+} finally { fs.rmSync(root, { recursive: true, force: true }); }

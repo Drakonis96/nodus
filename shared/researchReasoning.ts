@@ -2,7 +2,7 @@ import type { ModelInfo, ModelRef } from './types';
 
 /** Every level the Research composer can ask for, off through the largest budget. A runtime
  *  list as well as a type so a stored choice can be validated when it is read back. */
-export const RESEARCH_EFFORTS = ['standard', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'] as const;
+export const RESEARCH_EFFORTS = ['standard', 'none', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'] as const;
 
 /** Research Assistant only. Never persisted into chatReasoning or ModelRef; the level the
  *  composer last used for a model lives in its own settings key (`researchEffortByModel`). */
@@ -14,16 +14,17 @@ export function isResearchEffort(value: unknown): value is ResearchEffort {
 }
 export interface ResearchReasoningProfile {
   levels: NativeResearchEffort[];
-  mode: 'none' | 'effort' | 'gemini-budget' | 'gemini-level' | 'anthropic-adaptive' | 'anthropic-budget' | 'toggle' | 'local';
+  /** Compatibility for old requests and bounded internal validation, never a UI choice. */
+  legacyStandard?: NativeResearchEffort;
+  mode: 'none' | 'effort' | 'gemini-budget' | 'gemini-level' | 'anthropic-adaptive' | 'anthropic-budget' | 'anthropic-effort' | 'toggle' | 'local';
 }
 const ordered: NativeResearchEffort[] = ['none', 'off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'on'];
 const profile = (mode: ResearchReasoningProfile['mode'], ...levels: NativeResearchEffort[]): ResearchReasoningProfile => ({ mode, levels });
 const unknown = () => profile('none');
 
 /**
- * Providers whose ladder arrives with the live model catalogue instead of the profile
- * tables below. Until that catalogue is fetched their profile advertises no levels at all,
- * so nothing may read «no levels» as «this model offers none».
+ * Legacy transport routes that require runtime catalogue lookup. Picker availability is
+ * always determined by researchAdvertisedEfforts, for every provider.
  */
 export function researchReasoningNeedsCatalog(ref: ModelRef | null | undefined): boolean {
   return ['codex', 'github-copilot', 'lmstudio', 'openrouter'].includes(ref?.provider ?? '');
@@ -31,7 +32,7 @@ export function researchReasoningNeedsCatalog(ref: ModelRef | null | undefined):
 
 /** Explicit, documented families only. Runtime catalogues take precedence for
  * subscriptions and LM Studio. See docs/research-assistant-reasoning.md. */
-export function researchReasoningProfile(ref: ModelRef | null | undefined, info?: ModelInfo): ResearchReasoningProfile {
+function legacyResearchReasoningProfile(ref: ModelRef | null | undefined, info?: ModelInfo): ResearchReasoningProfile {
   if (!ref) return unknown();
   const id = ref.model.toLowerCase();
   if (ref.provider === 'codex' || ref.provider === 'github-copilot') {
@@ -114,13 +115,32 @@ export function researchReasoningProfile(ref: ModelRef | null | undefined, info?
   return unknown();
 }
 
-export function researchEffortChoices(p: ResearchReasoningProfile): ResearchEffort[] {
-  return ['standard', ...p.levels.slice(1).filter((x): x is Exclude<ResearchEffort, 'standard'> => x !== 'none' && x !== 'off')];
+/** Exact, recognised choices from the provider, preserving its display order. A capability
+ * flag or a familiar model name does not advertise an effort ladder. */
+export function researchAdvertisedEfforts(info?: ModelInfo): NativeResearchEffort[] {
+  const levels = info?.researchReasoningLevels ?? info?.supportedReasoningEfforts?.map(entry => entry.reasoningEffort) ?? [];
+  if (!Array.isArray(levels)) return [];
+  return [...new Set(levels.filter((level): level is NativeResearchEffort => isResearchEffort(level) && level !== 'standard'))];
+}
+
+/** Native metadata takes precedence in requests too. Keep the old minimum only for
+ * legacy Standard requests and internal JSON validators, which never use the picker. */
+export function researchReasoningProfile(ref: ModelRef | null | undefined, info?: ModelInfo): ResearchReasoningProfile {
+  const legacy = legacyResearchReasoningProfile(ref, info);
+  const levels = researchAdvertisedEfforts(info);
+  if (!levels.length) return legacy;
+  const mode = legacy.mode !== 'none' ? legacy.mode
+    : ref?.provider === 'deepseek' ? 'toggle' : ref?.provider === 'anthropic' ? 'anthropic-effort' : 'effort';
+  return { mode, levels, legacyStandard: legacy.levels[0] ?? levels[0] };
+}
+
+export function researchEffortChoices(p: ResearchReasoningProfile): NativeResearchEffort[] {
+  return p.levels;
 }
 
 export function resolveResearchEffort(p: ResearchReasoningProfile, requested: unknown): NativeResearchEffort | undefined {
-  return researchEffortChoices(p).includes(requested as ResearchEffort) && requested !== 'standard'
-    ? requested as NativeResearchEffort : p.levels[0];
+  if (requested === 'standard') return p.legacyStandard ?? p.levels[0];
+  return p.levels.includes(requested as NativeResearchEffort) ? requested as NativeResearchEffort : p.legacyStandard ?? p.levels[0];
 }
 
 /**
@@ -132,12 +152,28 @@ export function researchEffortMemoryKey(ref: ModelRef | null | undefined): strin
   return ref?.provider && ref.model ? `${ref.provider}:${ref.model}` : null;
 }
 
+/** How deep each level reasons, for finding the one nearest the middle. `on` is a switch,
+ *  not a depth, so it has no rank and is never a default. */
+const depth: Partial<Record<NativeResearchEffort, number>> = { none: 0, off: 0, minimal: 1, low: 2, medium: 3, high: 4, xhigh: 5, max: 6, ultra: 7 };
+
+/** Medium when advertised; otherwise the nearest depth, preferring the lighter level on
+ * a tie. The legacy sentinel is used only when there is no published choice. */
+export function researchDefaultEffort(p: ResearchReasoningProfile): ResearchEffort {
+  const choices = researchEffortChoices(p);
+  if (choices.includes('medium')) return 'medium';
+  const rank = (choice: NativeResearchEffort) => depth[choice];
+  let best: ResearchEffort = choices[0] ?? 'standard';
+  let distance = Infinity;
+  for (const choice of choices) {
+    const value = rank(choice);
+    if (value === undefined) continue;
+    if (Math.abs(value - depth.medium!) < distance || (Math.abs(value - depth.medium!) === distance && value < (depth[best as NativeResearchEffort] ?? Infinity))) { best = choice; distance = Math.abs(value - depth.medium!); }
+  }
+  return best;
+}
+
 /**
- * The writer for the per provider+model memory the Research composer owns.
- *
- * «Standard» removes the entry instead of storing it: with no choice remembered the
- * picker already opens on Standard, so the map only ever holds levels the user went out
- * of their way to pick, and no model is pinned to a value that used to be the default.
+ * Store native choices per provider+model. Legacy Standard entries remain readable.
  */
 export function withResearchEffort(
   current: Record<string, ResearchEffort> | undefined,
@@ -146,28 +182,34 @@ export function withResearchEffort(
 ): Record<string, ResearchEffort> {
   const key = researchEffortMemoryKey(ref);
   const next = { ...(current ?? {}) };
-  if (!key) return next;
-  if (effort === 'standard') delete next[key];
-  else next[key] = effort;
+  if (key) next[key] = effort;
   return next;
 }
 
-/**
- * The level the composer opens on for one selection: the last level chosen for that same
- * provider+model, or Standard when nothing was remembered for it.
- *
- * A value that is not a level at all (a hand-edited preferences file) is ignored here.
- * A level the model no longer publishes is left alone on purpose — only the picker holds
- * the live catalogue, so it is the place that normalises it, and the request path
- * (`resolveResearchEffort`) already floors anything the model rejects.
- */
-export function researchEffortFor(
+/** The level remembered for one selection, if the user ever picked one. A value that is
+ *  not a level at all (a hand-edited preferences file) counts as no choice. */
+export function rememberedResearchEffort(
   remembered: Record<string, ResearchEffort> | undefined,
   ref: ModelRef | null | undefined
-): ResearchEffort {
+): ResearchEffort | undefined {
   const key = researchEffortMemoryKey(ref);
   const stored = key ? remembered?.[key] : undefined;
-  return isResearchEffort(stored) ? stored : 'standard';
+  return isResearchEffort(stored) ? stored : undefined;
+}
+
+/** The same native value is shown and submitted. Old Standard preferences map to their
+ * former native minimum when advertised, otherwise to the usual initial choice. */
+export function researchEffortFor(
+  remembered: Record<string, ResearchEffort> | undefined,
+  ref: ModelRef | null | undefined,
+  info?: ModelInfo
+): ResearchEffort {
+  const stored = rememberedResearchEffort(remembered, ref);
+  if (!info) return stored ?? 'standard';
+  const levels = researchAdvertisedEfforts(info);
+  const native = stored === 'standard' ? legacyResearchReasoningProfile(ref, info).levels[0] : stored;
+  if (native && levels.includes(native as NativeResearchEffort)) return native;
+  return researchDefaultEffort({ mode: 'none', levels });
 }
 
 /** Additional allowance for reasoning, preserving room for the visible answer.
@@ -187,8 +229,9 @@ export function researchReasoningBody(ref: ModelRef, requested: ResearchEffort, 
       ? { thinking_level: effort }
       : { thinking_budget: off ? 0 : Math.min(researchThinkingAllowance(effort), Math.max(128, maxTokens - 1024)) } } },
   };
+  if (p.mode === 'anthropic-effort') return { output_config: { effort } };
   if (p.mode === 'anthropic-adaptive') return { thinking: { type: off ? 'disabled' : 'adaptive' }, output_config: { effort: off ? 'low' : effort } };
-  if (p.mode === 'anthropic-budget') return { thinking: off ? { type: 'disabled' } : { type: 'enabled', budget_tokens: Math.min(researchThinkingAllowance(effort), Math.max(1024, maxTokens - 1024)) } };
+  if (p.mode === 'anthropic-budget') return { thinking: off ? { type: 'disabled' } : { type: 'enabled', budget_tokens: Math.min(researchThinkingAllowance(effort), Math.max(1024, maxTokens - 1024)) }, ...(researchAdvertisedEfforts(info).includes(effort) ? { output_config: { effort } } : {}) };
   if (p.mode === 'toggle') {
     if (ref.provider === 'groq') return { reasoning_effort: off ? 'none' : 'default' };
     return { thinking: { type: off ? 'disabled' : 'enabled' }, ...(ref.provider === 'deepseek' && !off ? { reasoning_effort: effort } : {}) };

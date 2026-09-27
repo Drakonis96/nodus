@@ -1,4 +1,4 @@
-// The assistant's context picker ("Síntesis" and friends) used to open as a
+// The assistant's context picker (its layers and its Library tab) used to open as a
 // centered modal that covered the conversation. It now behaves like the Skills
 // menu: a balloon anchored to its header trigger. This guards the regression.
 import assert from 'node:assert/strict';
@@ -11,15 +11,18 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
 test('the assistant context picker opens as an anchored balloon, not a modal', async () => {
-  const [assistant, styles] = await Promise.all([
+  const [assistant, balloon, styles] = await Promise.all([
     read('src/views/ResearchAssistantModal.tsx'),
+    read('src/components/HeaderBalloon.tsx'),
     read('src/views/researchAssistant.css'),
   ]);
 
-  assert.match(assistant, /import \{ createPortal \} from 'react-dom'/, 'the balloon renders through a portal');
-  assert.match(assistant, /className="research-context-panel"/, 'the panel carries the balloon class');
-  assert.match(assistant, /contextPanelRef/, 'the panel is tracked for outside-click dismissal');
-  assert.match(assistant, /setShowContext\(\(value\) => !value\)/, 'both triggers toggle the picker');
+  // Since the header's balloons were unified, the picker is the shared HeaderBalloon.
+  assert.match(assistant, /<HeaderBalloon[\s\S]*?anchor=\{contextTriggerRef\}[\s\S]*?testId="research-context-panel"[\s\S]*?className="research-context-panel"/, 'the picker is a balloon anchored to its trigger');
+  assert.match(assistant, /setShowContext\(\(value\) => !value\)/, 'the trigger toggles the picker');
+  assert.match(balloon, /import \{ createPortal \} from 'react-dom'/, 'the balloon renders through a portal');
+  assert.match(balloon, /addEventListener\('mousedown', pointer\)/, 'a click outside dismisses it');
+  assert.doesNotMatch(balloon, /aria-modal/, 'the balloon is not a modal');
 
   // The old centered dialog is gone: no full-screen backdrop. Only the outer
   // research-assistant window remains a modal; the picker is not one.

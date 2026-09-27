@@ -1,0 +1,469 @@
+{
+  "description": "Focused regression runs; later reruns replace earlier failures only for the same script. Separate standalone isolation suite also passed.",
+  "runs": [
+    {
+      "root": "/private/tmp/nodus-research-lUliXn",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "results": [
+        {
+          "file": "test-documentary-campaigns.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 75758,
+          "durationMs": 6997,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-campaigns.mjs.log"
+        },
+        {
+          "file": "test-documentary-ocr-deferred.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 76550,
+          "durationMs": 4105,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-ocr-deferred.mjs.log"
+        },
+        {
+          "file": "test-documentary-automatic-lifecycle.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 75757,
+          "durationMs": 11425,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-automatic-lifecycle.mjs.log"
+        },
+        {
+          "file": "test-documentary-requests.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77003,
+          "durationMs": 358,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-requests.mjs.log"
+        },
+        {
+          "file": "test-documentary-store.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77042,
+          "durationMs": 369,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-store.mjs.log"
+        },
+        {
+          "file": "test-documentary-writers.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77090,
+          "durationMs": 3120,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-writers.mjs.log"
+        },
+        {
+          "file": "test-documentary-vault-ownership.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77051,
+          "durationMs": 4153,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-documentary-vault-ownership.mjs.log"
+        },
+        {
+          "file": "test-research-activity.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77575,
+          "durationMs": 504,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-activity.mjs.log"
+        },
+        {
+          "file": "test-research-claim-audit.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77636,
+          "durationMs": 478,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-claim-audit.mjs.log"
+        },
+        {
+          "file": "test-research-actions.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77496,
+          "durationMs": 2512,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-actions.mjs.log"
+        },
+        {
+          "file": "test-research-notebooks.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77777,
+          "durationMs": 1735,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-notebooks.mjs.log"
+        },
+        {
+          "file": "test-research-corpus-run.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77686,
+          "durationMs": 3083,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-corpus-run.mjs.log"
+        },
+        {
+          "file": "test-research-original-read.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 77970,
+          "durationMs": 730,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-original-read.mjs.log"
+        },
+        {
+          "file": "test-research-preflight.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78035,
+          "durationMs": 2780,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-preflight.mjs.log"
+        },
+        {
+          "file": "test-research-request-budget.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78301,
+          "durationMs": 3375,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-request-budget.mjs.log"
+        },
+        {
+          "file": "test-research-source-filters.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78597,
+          "durationMs": 13459,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-source-filters.mjs.log"
+        },
+        {
+          "file": "test-research-preparation-ui.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78062,
+          "durationMs": 29011,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-preparation-ui.mjs.log"
+        },
+        {
+          "file": "test-research-zotero-sessions.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78870,
+          "durationMs": 11729,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-research-zotero-sessions.mjs.log"
+        },
+        {
+          "file": "test-mcp.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 78981,
+          "durationMs": 15691,
+          "output": "/private/tmp/nodus-research-lUliXn/artifacts/test-mcp.mjs.log"
+        }
+      ]
+    },
+    {
+      "root": "/private/tmp/nodus-research-gblZ6E",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "results": [
+        {
+          "file": "test-research-claim-audit.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 81168,
+          "durationMs": 1183,
+          "output": "/private/tmp/nodus-research-gblZ6E/artifacts/test-research-claim-audit.mjs.log"
+        },
+        {
+          "file": "test-documentary-vault-ownership.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 81167,
+          "durationMs": 13054,
+          "output": "/private/tmp/nodus-research-gblZ6E/artifacts/test-documentary-vault-ownership.mjs.log"
+        },
+        {
+          "file": "test-mcp.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 81270,
+          "durationMs": 15043,
+          "output": "/private/tmp/nodus-research-gblZ6E/artifacts/test-mcp.mjs.log"
+        }
+      ]
+    },
+    {
+      "root": "/private/tmp/nodus-research-wUgWFW",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "results": [
+        {
+          "file": "test-documentary-vault-ownership.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 83335,
+          "durationMs": 11080,
+          "output": "/private/tmp/nodus-research-wUgWFW/artifacts/test-documentary-vault-ownership.mjs.log"
+        }
+      ]
+    },
+    {
+      "root": "/private/tmp/nodus-research-ovW4ct",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "results": [
+        {
+          "file": "test-research-assistant-i18n.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 87840,
+          "durationMs": 350,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-assistant-i18n.mjs.log"
+        },
+        {
+          "file": "test-research-attachment-transport.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 87841,
+          "durationMs": 6174,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-attachment-transport.mjs.log"
+        },
+        {
+          "file": "test-research-background-process.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88047,
+          "durationMs": 480,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-background-process.mjs.log"
+        },
+        {
+          "file": "test-research-canonical-inventory.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88073,
+          "durationMs": 6914,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-canonical-inventory.mjs.log"
+        },
+        {
+          "file": "test-research-attachments.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 87857,
+          "durationMs": 17902,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-attachments.mjs.log"
+        },
+        {
+          "file": "test-research-context-popover.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88402,
+          "durationMs": 235,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-context-popover.mjs.log"
+        },
+        {
+          "file": "test-research-cost-ledger.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88411,
+          "durationMs": 260,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-cost-ledger.mjs.log"
+        },
+        {
+          "file": "test-research-listener.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88423,
+          "durationMs": 919,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-listener.mjs.log"
+        },
+        {
+          "file": "test-research-concilium.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88247,
+          "durationMs": 9151,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-concilium.mjs.log"
+        },
+        {
+          "file": "test-research-prompt-packs.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88538,
+          "durationMs": 274,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-prompt-packs.mjs.log"
+        },
+        {
+          "file": "test-research-provider-proxy.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88552,
+          "durationMs": 307,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-provider-proxy.mjs.log"
+        },
+        {
+          "file": "test-research-native-effort.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88454,
+          "durationMs": 7508,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-native-effort.mjs.log"
+        },
+        {
+          "file": "test-research-reasoning.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88747,
+          "durationMs": 384,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-reasoning.mjs.log"
+        },
+        {
+          "file": "test-research-save-to-notes.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88760,
+          "durationMs": 490,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-save-to-notes.mjs.log"
+        },
+        {
+          "file": "test-research-reasoning-transport.mjs",
+          "exitCode": 1,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88584,
+          "durationMs": 4830,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-reasoning-transport.mjs.log"
+        },
+        {
+          "file": "test-ipc-contract.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88784,
+          "durationMs": 1879,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-ipc-contract.mjs.log"
+        },
+        {
+          "file": "test-library-tutorial.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88879,
+          "durationMs": 287,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-library-tutorial.mjs.log"
+        },
+        {
+          "file": "test-research-system-prompts.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 88781,
+          "durationMs": 10662,
+          "output": "/private/tmp/nodus-research-ovW4ct/artifacts/test-research-system-prompts.mjs.log"
+        }
+      ]
+    },
+    {
+      "root": "/private/tmp/nodus-research-MJcC3j",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "results": [
+        {
+          "file": "test-research-provider-proxy.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 96395,
+          "durationMs": 394,
+          "output": "/private/tmp/nodus-research-MJcC3j/artifacts/test-research-provider-proxy.mjs.log"
+        },
+        {
+          "file": "test-research-attachment-transport.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 96460,
+          "durationMs": 4221,
+          "output": "/private/tmp/nodus-research-MJcC3j/artifacts/test-research-attachment-transport.mjs.log"
+        },
+        {
+          "file": "test-research-reasoning-transport.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 96425,
+          "durationMs": 7155,
+          "output": "/private/tmp/nodus-research-MJcC3j/artifacts/test-research-reasoning-transport.mjs.log"
+        }
+      ]
+    }
+  ],
+  "latestPassed": 37,
+  "latestTotal": 37,
+  "unresolved": []
+}

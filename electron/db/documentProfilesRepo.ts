@@ -17,6 +17,7 @@ import type {
   ModelRef,
 } from '@shared/types';
 import { getDb } from './database';
+import { assertPassagePublication, type PassagePublication } from './passagePublications';
 import { currentEmbeddingConfig, embeddingTextHash, encodeEmbedding } from './ideasRepo';
 import type { PassageInsert, SimilarPassage } from './passagesRepo';
 import { scanSimilar } from './vectorScan';
@@ -92,6 +93,7 @@ export interface PublishDocumentProfileInput {
   };
   /** Passage replacement staged in memory and committed with the profile. */
   passages?: {
+    publication?: PassagePublication;
     contentHash: string;
     rows: PassageInsert[];
     embeddingProvider?: string;
@@ -497,6 +499,7 @@ export function publishDocumentProfile(input: PublishDocumentProfileInput): stri
       section.charEnd, section.contentHash, now
     );
     if (input.passages) {
+      if (input.passages.publication) assertPassagePublication(input.nodusId, input.passages.publication);
       const passageConfig = currentEmbeddingConfig();
       const insertPassage = db.prepare(
         `INSERT INTO passages(

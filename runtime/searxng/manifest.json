@@ -1,0 +1,8 @@
+{
+  "format": "nodus.searxng-runtime/1",
+  "upstreamCommit": "12f8b6515ca77c3c3bc1498584950ef5daca1433",
+  "upstreamDate": "2026-09-25",
+  "upstreamUrl": "https://api.github.com/repos/searxng/searxng/tarball/12f8b6515ca77c3c3bc1498584950ef5daca1433",
+  "upstreamSha256": "cb5bd0318fc36346502fee804a8ffb43b1688ce526348ca9a1c36d39fc4bc1a9",
+  "adapterVersion": "1"
+}

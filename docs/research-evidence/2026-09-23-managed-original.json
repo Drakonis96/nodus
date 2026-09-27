@@ -1,0 +1,61 @@
+{
+  "root": "/private/tmp/nodus-research-A8WH1k",
+  "isolation": {
+    "writeInsideAllowed": true,
+    "writeOutsideDenied": true,
+    "descendantWriteDenied": true,
+    "externalNetworkDenied": true,
+    "forbiddenLoopbackPortDenied": true
+  },
+  "endpointKind": "synthetic-http-fixture",
+  "transport": "stdio",
+  "passed": true,
+  "tools": [
+    "zotero_get_item_children",
+    "zotero_get_item_fulltext",
+    "zotero_get_item_metadata",
+    "zotero_read_pdf_pages"
+  ],
+  "calls": [
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/SOURCE01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01/fulltext"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/SOURCE01"
+    },
+    {
+      "method": "GET",
+      "url": "/api/users/0/items/ATTACH01"
+    }
+  ],
+  "version": {
+    "name": "nodus-zotero-mcp",
+    "version": "0.13.0+nodus.1"
+  }
+}

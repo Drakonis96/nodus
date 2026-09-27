@@ -13,6 +13,7 @@ import type {
 import { getDb } from './database';
 import { currentEmbeddingConfig, encodeEmbedding, embeddingTextHash } from './ideasRepo';
 import { synchronizeNotePage } from './pagesRepo';
+import { notifyAuthoredResearchSourceChanged } from '../ai/researchCorpusEvents';
 
 interface NoteFolderRow {
   id: string;
@@ -261,6 +262,7 @@ export function createNote(input: CreateNoteInput): Note {
       now
     );
   synchronizeNotePage(id, title, input.content ?? '');
+  notifyAuthoredResearchSourceChanged();
   return getNote(id)!;
 }
 
@@ -282,6 +284,7 @@ export function updateNote(input: UpdateNoteInput): Note | null {
     )
     .run(title, content, JSON.stringify(tags), folderId, orderIdx, new Date().toISOString(), input.id);
   if (input.title !== undefined || input.content !== undefined) synchronizeNotePage(input.id, title, content);
+  if (input.title !== undefined || input.content !== undefined) notifyAuthoredResearchSourceChanged();
   return getNote(input.id);
 }
 

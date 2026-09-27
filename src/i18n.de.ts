@@ -1,7 +1,11 @@
+import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
+import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
+import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
+import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
 import { RESEARCH_PROMPT_TRANSLATIONS } from './i18n.researchPrompts';
 import { RESEARCH_SOURCE_TRANSLATIONS } from './i18n.researchSources';
@@ -79,12 +83,16 @@ export const DE: Record<string, string> = {
   "Buscar herramientas": "Werkzeuge suchen",
 
   'Elige entre modo claro, oscuro o seguir el sistema operativo.': 'Wähle den hellen oder dunklen Modus oder folge dem Betriebssystem.',
+  ...RESEARCH_ACTIVITY_TRANSLATIONS["de"],
+  ...RESEARCH_CHAT_HISTORY_TRANSLATIONS["de"],
   ...RESEARCH_ATTACHMENT_TRANSLATIONS['de'],
+  ...VAULT_FILE_DROP_TRANSLATIONS['de'],
   "Research chat": "Research chat",
   "Elige al menos una base de datos.": "Wählen Sie mindestens eine Datenbank aus.",
   ...RESEARCH_PROMPT_TRANSLATIONS["de"],
   ...RESEARCH_SOURCE_TRANSLATIONS["de"],
   ...RESEARCH_REASONING_TRANSLATIONS["de"],
+  ...RESEARCH_NOTEBOOK_TRANSLATIONS["de"],
   ...CHAT_SKILLS_TRANSLATIONS['de'],
   ...CAPABILITIES_TRANSLATIONS['de'],
   ...DOCUMENT_SKILLS_TRANSLATIONS['de'],

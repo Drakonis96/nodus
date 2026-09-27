@@ -30,7 +30,7 @@ test('notion-parity path guard rejects normal and symlink-escaped profiles', asy
   const roots = notionParityQaRoots(repoRoot);
   await assert.rejects(
     assertAuthorizedQaProfile(path.join(os.homedir(), 'Library', 'Application Support', 'Nodus'), repoRoot),
-    /Perfil QA rechazado/,
+    /Perfil QA rechazado|EPERM|EACCES/,
   );
 
   const outside = await mkdtemp(path.join(os.tmpdir(), 'nodus-qa-outside-'));

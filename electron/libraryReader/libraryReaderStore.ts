@@ -473,6 +473,8 @@ export function getLibraryReaderRawContent(documentId: string): {
   document: LibraryReaderDocument;
   markdown: string;
   folder: string;
+  /** Relative path of the extraction's source map, when the extraction wrote one. */
+  sourceMapFile: string | undefined;
 } | null {
   const resolved = resolvedDocument(documentId);
   const document = getLibraryReaderDocument(documentId);
@@ -480,7 +482,7 @@ export function getLibraryReaderRawContent(documentId: string): {
   const markdownPath = optionalDocumentFile(resolved.folder, resolved.metadata.files?.reader, 'reader.md');
   if (!markdownPath || !fs.existsSync(markdownPath)) return null;
   const markdown = fs.readFileSync(markdownPath, 'utf8');
-  return { document: { ...document, markdown }, markdown, folder: resolved.folder };
+  return { document: { ...document, markdown }, markdown, folder: resolved.folder, sourceMapFile: resolved.metadata.files?.sourceMap };
 }
 
 function mimeForOriginal(filePath: string): string {

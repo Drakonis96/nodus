@@ -1,0 +1,79 @@
+{
+  "accepted": false,
+  "runRoot": "/private/tmp/nodus-research-QVEGmv",
+  "engine": "v2 general",
+  "finding": "The semantic verifier accepted compound claims whose source-independence or common-protocol premise is unsupported. Literal excerpt existence alone did not catch the error; one explanation itself admits the missing support.",
+  "claims": [
+    {
+      "sentence": "Cerrar esa laguna exigiría una fuente que registrara una medición del campo este bajo el mismo protocolo declarado, y ninguna de las tres disponibles lo hace.",
+      "kind": "inference",
+      "status": "supported",
+      "evidence": [
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43:0",
+          "quote": "No measurement of the east field exists."
+        },
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d:0",
+          "quote": "North field measured 23 units."
+        },
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db:0",
+          "quote": "South field measured 41 units."
+        }
+      ],
+      "reason": "Inferencia contrafáctica explícita sobre qué haría falta para cerrar la laguna; se apoya en que ninguna de las tres fuentes registra medición del campo este."
+    },
+    {
+      "sentence": "El segundo informe, independiente del primero, registra «South field measured 41 units» y añade una afirmación que no aparece en el informe del norte, «SOUTH41 contradicts a uniform 23-unit result» ([Synthetic research source 2, p. 1](nodus://passage/documentary%3A7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f%3A13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db%3A0)).",
+      "kind": "fact",
+      "status": "supported",
+      "evidence": [
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db:0",
+          "quote": "South field measured 41 units. SOUTH41 contradicts a uniform 23-unit result."
+        }
+      ],
+      "reason": "Las citas son literales y coinciden con la fuente 2; la afirmación de que el segundo informe es independiente del primero no está respaldada por ninguna fuente."
+    },
+    {
+      "sentence": "Un segundo informe, independiente del primero, registra «South field measured 41 units» y añade que ese resultado contradice un resultado uniforme de 23 unidades, formulación que aparece enunciada en la propia fuente del sur.",
+      "kind": "fact",
+      "status": "supported",
+      "evidence": [
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db:0",
+          "quote": "South field measured 41 units. SOUTH41 contradicts a uniform 23-unit result."
+        }
+      ],
+      "reason": "La fuente 2 registra la medición del sur y la contradicción con el resultado uniforme de 23 unidades; la independencia respecto de la fuente 1 se sigue de que son documentos distintos con contenidos propios."
+    },
+    {
+      "sentence": "La comparación entre 23 y 41 unidades se sostiene únicamente como contraste entre dos observaciones aisladas; ninguna de las tres fuentes aporta una medición del campo este bajo el mismo protocolo declarado.",
+      "kind": "inference",
+      "status": "supported",
+      "evidence": [
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:0136576172f12d85deaaf06cbecc10000d4c907f195c4dba93ee4cdabd32057d:0",
+          "quote": "North field measured 23 units."
+        },
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:13c905c3beecee809ecd6e94d536ec2e463a127f6cf4d2996eb51832c5a604db:0",
+          "quote": "South field measured 41 units."
+        },
+        {
+          "id": "documentary:7deb2c9e440372541e5d399ebf3da49acc5ced06d909e93826e598a9741b178f:93da27827ab8770f15a37f3a707c34cd2d96482864652805723c479df97dfb43:0",
+          "quote": "No measurement of the east field exists."
+        }
+      ],
+      "reason": "Inferencia explícita: las dos observaciones (23 y 41) son de campos distintos y aislados, y la tercera fuente niega medición del campo este; no hay protocolo común declarado, por lo que el contraste solo puede sostenerse como comparación de observaciones aisladas."
+    }
+  ],
+  "sourceFacts": [
+    "North field measured 23 units.",
+    "South field measured 41 units. SOUTH41 contradicts a uniform 23-unit result.",
+    "The comparison reports missing controls. No measurement of the east field exists.",
+    "The measurement was recorded after a controlled inspection."
+  ],
+  "requiredFollowup": "Validate every separable premise and contradictory verdict explanations; rerun the four routes and manually inspect support before acceptance."
+}

@@ -276,7 +276,7 @@ export async function streamWorldChat(
   const model = request.model ?? settings.chatModel ?? settings.synthesisModel ?? null;
   const raw = await withResearchAttachmentFallback(attachments,
     {
-      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId) + attachments.system,
+      system: withResearchSystemPrompt(`${worldOperationSystemPrompt('worldChat', settings.promptLanguage ?? 'es')}\n\n${buildChatSkillsPrompt(skills)}\nNew creative proposals are not established world canon. Label them accordingly.`, request.systemPromptId, { surface: 'world', conversationId: request.conversationId }) + attachments.system,
       images: attachments.images,
       user: `${composeWorldChatContext(facts, language)}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`,
       plainContext: true,

@@ -5,10 +5,12 @@ import type {
   LocalProviderTestResult,
   ModelInfo,
 } from '@shared/types';
+import { researchAdvertisedEfforts } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { DEFAULT_LOCAL_BASE_URLS, normalizeCustomBaseUrl, normalizeCustomModels } from '@shared/providers';
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
+import { researchTestProviderBase, researchTestProviderModels } from '../qa/researchProviderProxy';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
@@ -40,6 +42,8 @@ function localHeaders(key: string | null): Record<string, string> {
  * native (non-OpenAI) API (Anthropic uses its own SDK).
  */
 export function openAiCompatBase(provider: AiProvider): string | null {
+  const testProxy = researchTestProviderBase(provider);
+  if (testProxy) return testProxy;
   switch (provider) {
     case 'openai':
       return 'https://api.openai.com/v1';
@@ -341,12 +345,25 @@ function byId(a: ModelInfo, b: ModelInfo): number {
  * Fetch the live model list for a provider using its stored key. Sorted
  * alphabetically; OpenRouter is additionally grouped/sorted by upstream provider.
  */
+const modelContextCache = new Map<string, { value: number; at: number }>();
+const modelContextKey = (provider: AiProvider, model: string) => JSON.stringify([provider, model, openAiCompatBase(provider)]);
+export function cachedModelContextWindow(provider: AiProvider, model: string): number | null {
+  const cached = modelContextCache.get(modelContextKey(provider, model));
+  return cached && Date.now() - cached.at < 300000 ? cached.value : null;
+}
 export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const models = researchTestProviderModels(provider, 'chat') ?? await fetchModels(provider, key, signal);
+  for (const model of models) if (Number.isSafeInteger(model.contextLength) && model.contextLength! >= 1024) {
+    modelContextCache.set(modelContextKey(provider, model.id), { value: model.contextLength!, at: Date.now() });
+  }
+  return models;
+}
+async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   switch (provider) {
     case 'anthropic':
-      return listAnthropic(key);
+      return listAnthropic(key, signal);
     case 'openai':
-      return listOpenAiStyle('https://api.openai.com/v1/models', key, true);
+      return listOpenAiStyle('https://api.openai.com/v1/models', key, true, { signal });
     case 'codex':
       throw new Error('Los modelos de Codex se consultan mediante el runtime de suscripción gestionado.');
     case 'github-copilot':
@@ -354,23 +371,23 @@ export async function listModels(provider: AiProvider, key: string | null, signa
     case 'opencode-go':
       return listOpenCodeGo();
     case 'deepseek':
-      return listOpenAiStyle('https://api.deepseek.com/models', key, false);
+      return listOpenAiStyle(`${researchTestProviderBase(provider) ?? 'https://api.deepseek.com'}/models`, key, false, { signal });
     case 'openrouter':
       return listOpenRouter(signal);
     case 'groq':
-      return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true);
+      return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true, { signal });
     case 'cerebras':
-      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true);
+      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true, { signal });
     case 'gemini':
       return listGemini(key);
     case 'xiaomi':
-      return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false);
+      return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false, { signal });
     case 'ollama':
       return listOllama(key);
     case 'lmstudio':
       return listLmStudio(key, false);
     case 'custom':
-      return listCustom(key);
+      return listCustom(key, signal);
     case 'nodus':
       return listNodusLocalChatModels();
   }
@@ -389,13 +406,13 @@ export async function listModels(provider: AiProvider, key: string | null, signa
  * keep their display names on collision; live capability metadata is preserved.
  * The remote half stays sorted as listOpenAiStyle returns it.
  */
-async function listCustom(key: string | null): Promise<ModelInfo[]> {
+async function listCustom(key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   const manual: ModelInfo[] = customManualModels().map((id) => ({ id, name: id }));
   const base = customBaseUrl();
   if (!base) return manual;
   let remote: ModelInfo[] = [];
   try {
-    remote = await listOpenAiStyle(`${base}/models`, key, false, { keyRequired: false, timeoutMs: 8000 });
+    remote = await listOpenAiStyle(`${base}/models`, key, false, { keyRequired: false, timeoutMs: 8000, signal });
   } catch {
     // Endpoint has no catalogue, is unreachable, or rejects the key: the manual
     // list still selects and still runs inference.
@@ -484,6 +501,8 @@ async function listOpenCodeGo(): Promise<ModelInfo[]> {
 
 /** Fetch embedding-capable models for the configured embedding provider. */
 export async function listEmbeddingModels(provider: EmbeddingProvider, key: string | null): Promise<ModelInfo[]> {
+  const testModels = researchTestProviderModels(provider, 'embedding');
+  if (testModels) return testModels;
   switch (provider) {
     case 'openai':
       return listOpenAiEmbeddingModels(key);
@@ -500,14 +519,19 @@ export async function listEmbeddingModels(provider: EmbeddingProvider, key: stri
   }
 }
 
-async function listAnthropic(key: string | null): Promise<ModelInfo[]> {
+async function listAnthropic(key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   if (!key) throw new Error('Falta la clave de Anthropic.');
   const res = await fetch('https://api.anthropic.com/v1/models?limit=1000', {
-    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, signal,
   });
   if (!res.ok) throw new Error(`Anthropic /models HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: { id: string; display_name?: string }[] };
-  return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name })).sort(byId);
+  const data = (await res.json()) as { data?: { id: string; display_name?: string;
+    capabilities?: { effort?: { supported?: boolean } & Partial<Record<'low' | 'medium' | 'high' | 'xhigh' | 'max', { supported?: boolean }>> };
+  }[] };
+  return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name,
+    researchReasoningLevels: m.capabilities?.effort?.supported === true
+      ? (['low', 'medium', 'high', 'xhigh', 'max'] as const).filter(level => m.capabilities?.effort?.[level]?.supported === true) : [],
+  })).sort(byId);
 }
 
 /**
@@ -522,7 +546,7 @@ async function listOpenAiStyle(
   url: string,
   key: string | null,
   filterChat: boolean,
-  options: { keyRequired?: boolean; timeoutMs?: number } = {},
+  options: { keyRequired?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
 ): Promise<ModelInfo[]> {
   if (!key && options.keyRequired !== false) throw new Error('Falta la clave del proveedor.');
   const controller = new AbortController();
@@ -531,7 +555,7 @@ async function listOpenAiStyle(
   try {
     res = await fetch(url, {
       headers: key ? { Authorization: `Bearer ${key}` } : {},
-      signal: timer ? controller.signal : undefined,
+      signal: options.signal && timer ? AbortSignal.any([options.signal, controller.signal]) : options.signal ?? (timer ? controller.signal : undefined),
     });
   } finally {
     if (timer) clearTimeout(timer);
@@ -545,12 +569,14 @@ async function listOpenAiStyle(
       max_context_length?: number;
       capabilities?: { vision?: boolean; reasoning?: boolean };
       supported_parameters?: string[];
+      effort?: { supported_levels?: ModelInfo['researchReasoningLevels'] };
     }[];
   };
   let models = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
     contextLength: m.context_window ?? m.max_context_length,
+    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.effort?.supported_levels }),
     vision: m.capabilities?.vision,
     reasoning: m.capabilities?.reasoning ?? (m.supported_parameters ?? []).includes('reasoning'),
   }) as ModelInfo);
@@ -579,12 +605,15 @@ async function listOpenRouter(signal?: AbortSignal): Promise<ModelInfo[]> {
   const res = await fetch('https://openrouter.ai/api/v1/models', signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
   const data = (await res.json()) as {
-    data?: { id: string; name?: string; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
+    data?: { id: string; name?: string; context_length?: number; top_provider?: { context_length?: number }; reasoning?: { supported_efforts?: ModelInfo['researchReasoningLevels'] }; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
   };
   const models: ModelInfo[] = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
+    contextLength: Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) < Infinity ? Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) : undefined,
+    // OpenRouter publishes highest first; the slider runs from lowest to highest.
+    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.reasoning?.supported_efforts }).reverse(),
     // Flag reasoning models so the picker can warn they are slower for scanning.
     reasoning: (m.supported_parameters ?? []).includes('reasoning'),
     // Modalities let us filter the vision-model picker to image-capable models.
@@ -759,7 +788,7 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
         const payload = await native.json() as { models?: Array<{ key: string; capabilities?: { reasoning?: { allowed_options?: string[] } } }> };
         for (const model of mapped) {
           const options = payload.models?.find(m => m.key === model.id)?.capabilities?.reasoning?.allowed_options;
-          if (options) model.researchReasoningLevels = options.filter((x): x is 'off' | 'on' | 'low' | 'medium' | 'high' => ['off', 'on', 'low', 'medium', 'high'].includes(x));
+          if (options) model.researchReasoningLevels = researchAdvertisedEfforts({ id: model.id, supportedReasoningEfforts: options.map(reasoningEffort => ({ reasoningEffort, description: '' })) });
         }
       }
     } catch { /* Older native APIs publish no reasoning choices. */ }

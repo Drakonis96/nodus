@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 // Local OCR for scanned PDFs without a text layer. Heavy deps (tesseract.js +
 // @napi-rs/canvas) are imported lazily so the app works without them — if they are
 // unavailable the caller catches the error and marks the work `skipped_no_text`.
@@ -31,10 +33,27 @@ async function getCanvas(): Promise<any> {
   return canvasModPromise;
 }
 
-async function createOcrWorker(languages: string): Promise<any> {
+export function installedOcrOptions(languages: string): { cachePath: string; langPath: string; gzip: false; cacheMethod: string } {
+  const configured = process.env.NODUS_TESSDATA_CACHE?.trim();
+  if (!configured || !/^[a-z][a-z0-9_]*(\+[a-z][a-z0-9_]*){0,7}$/i.test(languages)) throw new Error('documentary_ocr_resources_missing');
+  try {
+    const directory = fs.realpathSync(configured);
+    for (const language of languages.split('+')) {
+      const file = fs.realpathSync(path.join(directory, `${language}.traineddata`));
+      if (!file.startsWith(`${directory}${path.sep}`) || !fs.statSync(file).isFile() || fs.statSync(file).size === 0) throw new Error('missing');
+      fs.accessSync(file, fs.constants.R_OK);
+    }
+    // Even a removal between this check and worker startup can only fall back
+    // to this local directory; no CDN URL is available to the worker.
+    return { cachePath: directory, langPath: directory, gzip: false, cacheMethod: 'readOnly' };
+  } catch { throw new Error('documentary_ocr_resources_missing'); }
+}
+
+async function createOcrWorker(languages: string, localOnly = false): Promise<any> {
+  const installed = localOnly ? installedOcrOptions(languages) : null;
   const Tesseract: any = await import('tesseract.js');
   const cachePath = process.env.NODUS_TESSDATA_CACHE?.trim();
-  return Tesseract.createWorker(languages, undefined, cachePath ? { cachePath } : {});
+  return Tesseract.createWorker(languages, undefined, installed ?? (cachePath ? { cachePath } : {}));
 }
 
 /** Render one pdfjs page to a PNG buffer at a DPI suitable for OCR. */
@@ -217,17 +236,21 @@ export async function ocrPdfPages(
   pdf: any,
   pageNumbers: number[],
   languages: string,
-  onProgress?: (p: OcrProgress) => void
+  onProgress?: (p: OcrProgress) => void,
+  options: { localOnly?: boolean; signal?: AbortSignal } = {},
 ): Promise<Map<number, OcrPageResult>> {
-  const worker = await createOcrWorker(languages);
+  options.signal?.throwIfAborted();
+  const worker = await createOcrWorker(languages, options.localOnly);
   const out = new Map<number, OcrPageResult>();
   try {
     let done = 0;
     for (const n of pageNumbers) {
+      options.signal?.throwIfAborted();
       const page = await pdf.getPage(n);
       const rendered = await renderPageToPng(page);
       page.cleanup?.();
       const { data } = await worker.recognize(rendered.png, {}, { blocks: true, text: true });
+      options.signal?.throwIfAborted();
       out.set(n, structuredPage(data, rendered.width, rendered.height));
       done++;
       onProgress?.({ page: done, totalPages: pageNumbers.length });

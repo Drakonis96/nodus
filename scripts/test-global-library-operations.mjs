@@ -67,6 +67,15 @@ try {
   assert.equal(catalog.list({ collectionId: postwar.id }).total, 2);
   assert.equal(catalog.list({ hasAttachments: true }).total, 2);
   assert.equal(catalog.list({ source: 'nodus' }).total, 2);
+  // Multi-value facets: an item matches any listed value, and listing every value is no cut.
+  assert.equal(catalog.list({ sources: ['nodus'] }).total, 2);
+  assert.equal(catalog.list({ sources: ['zotero'] }).total, catalog.list({ source: 'zotero' }).total);
+  assert.equal(catalog.list({ sources: ['nodus', 'zotero'] }).total, catalog.list({ source: 'nodus' }).total + catalog.list({ source: 'zotero' }).total);
+  const types = [...new Set(store.scanMaterializedItems().records.filter((item) => !item.deletedAt && item.source === 'nodus').map((item) => item.metadata.itemType))];
+  assert.equal(catalog.list({ sources: ['nodus'], itemTypes: types }).total, 2);
+  assert.equal(catalog.list({ itemTypes: ['patent-that-no-item-has'] }).total, 0);
+  assert.equal(catalog.list({ vaultIds: ['no-such-vault'] }).total, 0);
+  assert.equal(catalog.list({ extractionStatuses: ['pending', 'ready', 'failed', 'processing', 'unsupported'] }).total, catalog.list().total);
   const first = store.scanMaterializedItems().records.find((item) => item.metadata.title === 'entre norma y deseo');
   const second = store.scanMaterializedItems().records.find((item) => item.metadata.title === 'datos');
   assert.ok(first);

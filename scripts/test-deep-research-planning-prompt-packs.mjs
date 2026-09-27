@@ -19,6 +19,34 @@ const packsModule = await import(pathToFileURL(bundle).href);
 const deepResearchSource = fs.readFileSync(path.join(root, 'electron/ai/deepResearch.ts'), 'utf8');
 const languages = ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr'];
 const stages = ['decomposeObjective', 'auditPlanCoverage', 'planReport', 'reviewPlan', 'adversarialReview'];
+test('plan reviews specify a root plan instead of echoing the input evidence envelope', () => {
+  for (const language of [...languages, 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
+    for (const documentaryEvidence of [false, true]) {
+      const pack = packsModule.deepResearchPlanningPromptPack(language, { documentaryEvidence });
+      for (const stage of ['auditPlanCoverage', 'reviewPlan', 'adversarialReview']) {
+        const shape = JSON.parse(pack[stage].slice(pack[stage].lastIndexOf('{"title":')));
+        assert.deepEqual(Object.keys(shape), ['title', 'abstract', 'sections']);
+        assert.ok(Array.isArray(shape.sections));
+        for (const key of ['ideaIds', 'workIds', 'gapIds', 'contradictionIds', 'passageIds', 'coverageQuestions', 'dependsOn']) {
+          assert.ok(Array.isArray(shape.sections[0][key]), `${language}.${stage}.${key}`);
+        }
+      }
+    }
+  }
+});
+test('documentary planning consumes existing passages without requiring Ideas or profiles', () => {
+  for (const language of [...languages, 'zh-Hans', 'zh-Hant', 'vi', 'ja', 'ru', 'uk', 'ko']) {
+    const pack = packsModule.deepResearchPlanningPromptPack(language, { documentaryEvidence: true });
+    for (const stage of ['planReport', 'reviewPlan', 'adversarialReview']) {
+      assert.match(pack[stage], /pasajes_documentales/);
+      assert.match(pack[stage], /passageIds/);
+    }
+  }
+  const spanish = packsModule.deepResearchPlanningPromptPack('es', { documentaryEvidence: true });
+  assert.doesNotMatch(spanish.planReport, /no recibes fichas documentales ni pasajes/);
+  assert.doesNotMatch(spanish.reviewPlan, /passageIds.*debe permanecer vacío/);
+  assert.match(deepResearchSource, /pasajes_documentales: input\.passages/);
+});
 const stableTokens = [
   '`coverageQuestions`', '`dependsOn`', '`passageIds`', 'ideaIds', 'workIds', 'gapIds',
   'contradictionIds', 'keyClaims', '"intro|body|synthesis"', '"s1"', '[]',

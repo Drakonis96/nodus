@@ -1,3 +1,5 @@
+import type { DocumentPreparationState } from '@shared/researchCorpus';
+import { openResearchPreparationQueue } from '../components/ResearchPreparationWelcome';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type {
@@ -7,8 +9,6 @@ import type {
   QueueItem,
   WorkEmbeddingStatus,
   WorkPassageStatus,
-  VaultAnalysisReuseKind,
-  VaultAnalysisReuseResult,
   VaultType,
   ZoteroTag,
   CollectionFacet,
@@ -17,6 +17,7 @@ import type {
   DocumentUnderstandingState,
 } from '@shared/types';
 import { Icon } from '../components/ui';
+import { CollectionSourceIcon } from '../components/CollectionSourceIcon';
 import { confirm, toast } from '../components/feedback';
 import { WorkGraphModal } from './WorkGraphModal';
 import { WorkIdeasModal } from './WorkIdeasModal';
@@ -24,6 +25,8 @@ import { WorkStatusModal } from './WorkStatusModal';
 import { DocumentProfileModal } from './DocumentProfileModal';
 import { DocumentIndexManager } from './DocumentIndexManager';
 import { VirtualList } from '../components/VirtualList';
+import { TriStateSwitch, type TriState } from '../components/TriStateSwitch';
+import { libraryIndexAction } from '../libraryIndexAction';
 import { anchorStyle, useAnchoredCoords } from '../components/dbGrid';
 import { notifyDataChanged, useDataRefresh, useDismissableLayer, useScanComplete } from '../hooks';
 import { deriveWorkStatus, queueItemsByWork, retryableSteps, type StepId, type WorkReadiness, type WorkStatus } from '../libraryStatus';
@@ -34,7 +37,7 @@ import {
   type PendingGraphNavigationTarget,
 } from '../navigation';
 import { t, tx } from '../i18n';
-import { getVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
+import { getVaultQueryCache, invalidateVaultQueryCache, setVaultQueryCache } from '../vaultQueryCache';
 import { vaultTypeColor } from '@shared/vaultTypes';
 
 import { DOCUMENT_INDEX_MANAGER_VISIBLE } from '@shared/documentIndexPolicy';
@@ -45,7 +48,7 @@ const LIBRARY_PAGE_SIZE = 200;
 // Title and authors get the room the five pipeline-status columns used to take:
 // checkbox, title, authors, year, theme(s), ideas, status, actions.
 const LIBRARY_GRID_TEMPLATE =
-  '2rem minmax(18rem,2fr) minmax(10rem,1fr) 4.5rem minmax(9rem,1fr) 5rem 11rem 8.5rem';
+  '2rem minmax(18rem,2fr) minmax(10rem,1fr) 4.5rem minmax(9rem,1fr) 5rem 11rem 10.5rem';
 
 type StatusFlag = 'deep' | 'summary' | 'ideas' | 'passages' | '!deep' | '!summary' | '!ideas' | '!passages';
 
@@ -172,119 +175,6 @@ function dimensionOf(f: StatusFlag): StatusDimension {
 function labelFor(f: StatusFlag): string {
   const meta = STATUS_FLAGS.find((s) => s.dim === dimensionOf(f));
   return meta ? (isNegated(f) ? meta.negLabel : meta.label) : f;
-}
-
-function StatusFlagsPicker({
-  value,
-  setDimension,
-  onClear,
-}: {
-  value: StatusFlag[];
-  setDimension: (dim: StatusDimension, state: 'off' | 'pos' | 'neg') => void;
-  onClear: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useDismissableLayer<HTMLDivElement>({
-    open,
-    onDismiss: () => setOpen(false),
-    group: 'library-filters',
-  });
-
-  const active = value.length > 0;
-
-  const currentFor = (dim: StatusDimension): 'off' | 'pos' | 'neg' => {
-    if (value.includes(dim)) return 'pos';
-    if (value.includes(`!${dim}` as StatusFlag)) return 'neg';
-    return 'off';
-  };
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        className={`library-filter-button tone-indigo btn border gap-1.5 ${active ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-      >
-        <Icon name="list" /> {t('Estado')}
-        {active && (
-          <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold">{value.length}</span>
-        )}
-        <Icon name="chevronDown" size={13} className="opacity-70" />
-      </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label={t('Filtrar por estado')}
-          className="library-filter-popover absolute left-0 z-30 mt-2 w-[27rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-2 shadow-2xl"
-        >
-          <div className="mb-1 flex items-center justify-between gap-3 px-1.5 py-1">
-            <div>
-              <div className="text-xs font-medium text-neutral-300">{t('Estado de análisis')}</div>
-              <div className="text-[11px] text-neutral-500">{t('Cada fila acepta sí, no o cualquiera.')}</div>
-            </div>
-            <button
-              type="button"
-              className="btn btn-ghost px-2 py-1 text-xs"
-              disabled={!active}
-              onClick={onClear}
-            >
-              {t('Limpiar')}
-            </button>
-          </div>
-          {STATUS_FLAGS.map((s) => {
-            const state = currentFor(s.dim);
-            const stateClass = state === 'pos' ? 'is-pos bg-indigo-600/15' : state === 'neg' ? 'is-neg bg-red-600/15' : 'hover:bg-neutral-900';
-            const borderClass = state === 'pos' ? 'is-pos border-indigo-400 bg-indigo-500' : state === 'neg' ? 'is-neg border-red-400 bg-red-500' : 'border-neutral-600';
-            const textClass = state === 'pos' ? 'text-indigo-200' : state === 'neg' ? 'text-red-200' : 'text-neutral-200';
-            return (
-              <div
-                key={s.dim}
-                className={`library-status-option mb-1.5 flex items-start justify-between gap-3 rounded-md border border-transparent px-2.5 py-2 transition-colors ${stateClass}`}
-              >
-                <div className="min-w-0">
-                  <span className="flex items-center gap-2">
-                    <span
-                      className={`library-status-indicator flex h-4 w-4 shrink-0 items-center justify-center rounded border text-white ${borderClass}`}
-                    >
-                      {state === 'pos' && <Icon name="check" size={12} />}
-                      {state === 'neg' && <Icon name="x" size={12} />}
-                    </span>
-                    <span className={`block text-sm font-medium ${textClass}`}>{t(s.title)}</span>
-                  </span>
-                  <span className="mt-0.5 block text-xs text-neutral-500">{state === 'neg' ? t(s.negDesc) : t(s.desc)}</span>
-                </div>
-                <div className="inline-flex shrink-0 rounded-md border border-neutral-700 bg-neutral-950/50 p-0.5">
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'pos' ? 'is-active is-pos bg-indigo-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'pos')}
-                  >
-                    {t('Sí')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'neg' ? 'is-active is-neg bg-red-600 text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'neg')}
-                  >
-                    {t('No')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`library-status-choice rounded px-2 py-1 text-xs ${state === 'off' ? 'is-active bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                    onClick={() => setDimension(s.dim, 'off')}
-                  >
-                    {t('Cualquiera')}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 }
 
 /**
@@ -466,6 +356,26 @@ export function Library({
   // for records; primary documents live in the Archive.
   const isRecordsVault = vaultType === 'genealogy' || vaultType === 'primary_sources';
   const [works, setWorks] = useState<WorkView[]>([]);
+  const [preparationByWork, setPreparationByWork] = useState<Map<string, DocumentPreparationState>>(new Map());
+  useEffect(() => {
+    if (vaultType !== 'academic') return;
+    let current = true;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let generation = 0;
+    const refresh = async () => {
+      const version = ++generation;
+      try {
+        const inventory = await window.nodus.getResearchPreparationInventory();
+        if (current && version === generation) setPreparationByWork(new Map(inventory.documents.filter(document => document.workId).map(document => [document.workId!, document.preparation])));
+      } catch { /* Keep the last readiness snapshot and existing analysis actions. */ }
+    };
+    void refresh();
+    const release = window.nodus.onResearchPreparationProgress(() => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; void refresh(); }, 300);
+    });
+    return () => { current = false; if (timer) clearTimeout(timer); release(); };
+  }, [vaultId, vaultType]);
   const [totalWorks, setTotalWorks] = useState(0);
   // The page and the row that was at the top are one restored value.
   const [pageOffset, setPageOffset] = useState(() => snapshot?.placement?.pageOffset ?? 0);
@@ -487,9 +397,8 @@ export function Library({
   const [embeddingStatuses, setEmbeddingStatuses] = useState<Map<string, WorkEmbeddingStatus>>(new Map());
   const [passageStatuses, setPassageStatuses] = useState<Map<string, WorkPassageStatus>>(new Map());
   const [documentStatuses, setDocumentStatuses] = useState<Map<string, DocumentUnderstandingState>>(new Map());
-  const [reuseAnalysisFromVaults, setReuseAnalysisFromVaults] = useState(false);
-  const [reuseNotice, setReuseNotice] = useState<string | null>(null);
-  const [filtersOpen, setFiltersOpenState] = useState(() => snapshot?.filtersOpen ?? false);
+  // A balloon: it never reopens by itself when the section is shown again.
+  const [filtersOpen, setFiltersOpenState] = useState(false);
   const [advancedFiltersOpen, setAdvancedFiltersOpenState] = useState(() => snapshot?.advancedFiltersOpen ?? false);
   const [collectionsMenuOpen, setCollectionsMenuOpen] = useState(false);
   const [graphWork, setGraphWork] = useState<{ nodus_id: string; title: string } | null>(null);
@@ -515,6 +424,13 @@ export function Library({
     onDismiss: () => setCollectionFilterOpen(false),
     group: 'library-filters',
   });
+  // The filters open as a balloon anchored to their button. A group of its own, so the
+  // tag and collection dropdowns inside it do not close it when they open.
+  const filterBalloonRef = useDismissableLayer<HTMLDivElement>({
+    open: filtersOpen,
+    onDismiss: () => { setFiltersOpenState(false); setTagFilterOpen(false); setCollectionFilterOpen(false); },
+    group: 'library-filter-balloon',
+  });
   const collectionsMenuRef = useDismissableLayer<HTMLDivElement>({
     open: collectionsMenuOpen,
     onDismiss: () => setCollectionsMenuOpen(false),
@@ -524,6 +440,7 @@ export function Library({
   // Only the works list depends on the active filter, so typing in the search
   // box must reload nothing else. Keeping this isolated is what stops each
   // keystroke from firing five IPC round-trips against SQLite.
+  const [fileDrop, setFileDrop] = useState(false);
   const load = useCallback(async (force = true) => {
     const requestId = ++loadRequestRef.current;
     const cacheKey = `library:${JSON.stringify({ filter, pageOffset, sort })}`;
@@ -732,22 +649,6 @@ export function Library({
     reportSnapshot.current?.(snapshotOf.current());
   }, [restoreAnchorId, works]);
 
-  const reuseSelectedAnalysis = async (ids: string[], skipKinds: VaultAnalysisReuseKind[]): Promise<string[]> => {
-    if (!reuseAnalysisFromVaults || ids.length === 0) return ids;
-    const result: VaultAnalysisReuseResult = await window.nodus.reuseVaultAnalysis(ids);
-    const importedWorks = result.works.filter((work) => work.imported.length > 0);
-    if (importedWorks.length > 0) {
-      setReuseNotice(tx('Análisis reutilizado desde otras bóvedas para {n} obra(s).', { n: importedWorks.length }));
-    } else {
-      setReuseNotice(t('No se encontró análisis reutilizable en otras bóvedas para la selección.'));
-    }
-    const skipped = new Set(
-      result.works
-        .filter((work) => skipKinds.some((kind) => work.imported.includes(kind)))
-        .map((work) => work.nodusId)
-    );
-    return ids.filter((id) => !skipped.has(id));
-  };
 
   const analyzeThemes = async (w: WorkView) => {
     await window.nodus.rescan(w.nodus_id, 'light');
@@ -820,34 +721,8 @@ export function Library({
     await load();
   };
 
-  const analyzeSelectedThemes = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['themes']);
-    for (const id of pending) {
-      await window.nodus.rescan(id, 'light');
-    }
-    setSelected(new Set());
-    await load();
-  };
 
-  const analyzeSelectedIdeas = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.setManualDeepBulk(pending, true);
-    setSelected(new Set());
-    await load();
-  };
 
-  const analyzeSelectedBoth = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideas']);
-    if (pending.length > 0) await window.nodus.analyzeBothBulk(pending);
-    setSelected(new Set());
-    await load();
-  };
 
   // Full chain: themes → ideas → summary → index (ideas + passages) → discover relationships.
   const processFullSelected = async () => {
@@ -864,11 +739,9 @@ export function Library({
       });
       if (!ok) return;
     }
-    // Keep cross-vault reuse for new works, but never let it suppress an explicit
-    // renewal of already processed ones. Mixed selections therefore use two modes.
+    // Already processed works are renewed; the rest run only what is stale.
     const processedSet = new Set(processedIds);
-    const newIds = ids.filter((id) => !processedSet.has(id));
-    const pendingNewIds = await reuseSelectedAnalysis(newIds, ['ideas']);
+    const pendingNewIds = ids.filter((id) => !processedSet.has(id));
     if (processedIds.length > 0) {
       await window.nodus.processFullBulk(processedIds, undefined, { mode: 'refresh' });
     }
@@ -903,34 +776,10 @@ export function Library({
     toast(tx('Procesado completo en cola para {n} obra(s). Verás el progreso en la cola.', { n: ids.length }));
   };
 
-  const summarizeSelected = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['summary']);
-    if (pending.length > 0) await window.nodus.summarizeBulk(pending);
-    setSelected(new Set());
-    await load();
-  };
 
-  const embedSelected = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['ideaEmbeddings']);
-    if (pending.length > 0) await window.nodus.startEmbedding(pending);
-    setSelected(new Set());
-  };
 
-  const indexSelectedPassages = async () => {
-    const ids = selectedVisibleIds;
-    if (ids.length === 0) return;
-    const pending = await reuseSelectedAnalysis(ids, ['passages']);
-    if (pending.length > 0) await window.nodus.startPassageEmbedding(pending);
-    setSelected(new Set());
-    await load();
-  };
 
   const toggleSelected = (id: string, checked: boolean) => {
-    setReuseNotice(null);
     setSelected((prev) => {
       const next = new Set(prev);
       if (checked) next.add(id);
@@ -1026,7 +875,6 @@ export function Library({
       else if (state === 'neg') set.add(`!${dim}` as StatusFlag);
       return { ...cur, statusFlags: [...set] };
     });
-  const clearStatusFlags = () => updateFilter((c) => ({ ...c, statusFlags: [] }));
   const clearAllFilters = () => {
     updateFilter({});
     setSearchDraft('');
@@ -1046,11 +894,6 @@ export function Library({
       filtersOpen: nextOpen,
       advancedFiltersOpen: nextOpen ? advancedFiltersOpen : false,
     });
-  };
-  const toggleAdvancedFilterPanel = () => {
-    const nextOpen = !advancedFiltersOpen;
-    setAdvancedFiltersOpenState(nextOpen);
-    reportSnapshot.current?.({ ...snapshotOf.current(), advancedFiltersOpen: nextOpen });
   };
 
   // A batch action must only operate on the current result set.  Otherwise a
@@ -1078,7 +921,6 @@ export function Library({
 
   const allVisibleSelected = works.length > 0 && selectedVisibleIds.length === works.length;
   const selectAllVisible = () => {
-    setReuseNotice(null);
     setSelected(new Set(works.map((work) => work.nodus_id)));
   };
   // Click a header: sort by it (default direction), flip direction on the second
@@ -1220,7 +1062,6 @@ export function Library({
         );
         return;
       }
-      setReuseNotice(null);
       setSelected(new Set());
       notifyDataChanged();
       await load();
@@ -1239,8 +1080,68 @@ export function Library({
   });
   const openVaultWorkAnalysis = (work: WorkView) => setIdeasWork({ nodus_id: work.nodus_id, title: work.title });
 
+  // Indexing is one click: documents that are not indexed yet are queued for text and
+  // embeddings at once. Only a request for more than 100 documents asks first.
+  const indexWorks = async (workIds?: string[]) => {
+    try {
+      let result = await window.nodus.indexResearchWorks({ workIds });
+      if (result.confirmationRequired) {
+        const accepted = await confirm({
+          title: t('Indexar documentos'),
+          message: tx('Se indexarán {n} documentos con el modelo de embeddings configurado. ¿Continuar?', { n: result.confirmationRequired }),
+          confirmLabel: t('Indexar'),
+        });
+        if (!accepted) return;
+        result = await window.nodus.indexResearchWorks({ workIds, confirmed: true });
+      }
+      if (!result.embeddingAvailable) toast(t('Configura un modelo de embeddings para indexar.'), { tone: 'error' });
+      else if (result.queued) toast(tx('{n} documento(s) en cola para indexar.', { n: result.queued }));
+      else if (result.alreadyIndexed) toast(t('Ya está todo indexado.'), { tone: 'info' });
+    } catch (error) { toast(error instanceof Error ? error.message : String(error), { tone: 'error' }); }
+  };
+
+  // Files dropped here go to the Global Library and are used in this vault in one step,
+  // so this vault's automatic preparation indexes them like any other addition.
+  const importDroppedIntoVault = async (fileList: FileList) => {
+    setFileDrop(false);
+    const filePaths = [...new Set(Array.from(fileList)
+      .map((file) => window.nodus.getPathForDroppedFile(file))
+      .filter((entry): entry is string => !!entry))];
+    if (!filePaths.length) return;
+    try {
+      const targetVaultId = vaultId ?? (await window.nodus.getActiveVault()).id;
+      const report = await window.nodus.importDroppedFilesIntoVault(filePaths, targetVaultId);
+      if (report.linked) {
+        const automatic = vaultType === 'academic' ? (await window.nodus.getResearchPreparationPolicy().catch(() => null))?.futureAdditions : false;
+        toast(automatic
+          ? tx('{n} documento(s) añadido(s) a este vault y a la Biblioteca global. Se indexarán automáticamente.', { n: report.linked })
+          : tx('{n} documento(s) añadido(s) a este vault y a la Biblioteca global. La indexación automática está desactivada.', { n: report.linked }));
+      } else if (report.alreadyInVault) toast(t('Esos documentos ya estaban en este vault.'), { tone: 'info' });
+      else if (report.warnings.length) toast(report.warnings[0], { tone: 'error' });
+      invalidateVaultQueryCache(targetVaultId);
+      notifyDataChanged();
+      await load(true);
+    } catch (error) { toast(error instanceof Error ? error.message : String(error), { tone: 'error' }); }
+  };
+
   return (
-    <div className="h-full flex flex-col p-6 min-h-0">
+    <div data-testid="library-vault-file-drop-surface" className="relative h-full flex flex-col p-6 min-h-0"
+      onDragEnter={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); setFileDrop(true); } }}
+      onDragOver={(event) => { if (event.dataTransfer.types.includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFileDrop(false); }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.files.length) return;
+        event.preventDefault();
+        void importDroppedIntoVault(event.dataTransfer.files);
+      }}
+    >
+      {fileDrop && <div data-testid="library-vault-file-drop-overlay" className="pointer-events-none absolute inset-3 z-50 grid place-items-center rounded-2xl border-2 border-dashed border-indigo-400 bg-indigo-500/10 backdrop-blur-sm">
+        <div className="rounded-2xl border border-indigo-400/35 bg-white/95 px-7 py-5 text-center shadow-2xl dark:bg-neutral-950/95">
+          <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl bg-indigo-500/15 text-indigo-500"><Icon name="upload" size={22} /></span>
+          <b className="mt-3 block text-sm">{t('Suelta para añadir')}</b>
+          <span className="mt-1 block max-w-xs text-xs text-neutral-500">{t('Se añadirá a la Biblioteca global y a este vault.')}</span>
+        </div>
+      </div>}
       <header data-testid="library-vault-header" className="library-header-bar -mx-6 -mt-6 mb-4 min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3">
         <div className="library-header-title min-w-0">
           <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="book" className="text-indigo-400" /> {t('Biblioteca')}</h1>
@@ -1248,6 +1149,10 @@ export function Library({
         </div>
         {scopeControls}
         <div className="library-header-actions">
+          {vaultType === 'academic' && <>
+            <button className="btn btn-ghost border border-neutral-700" data-testid="library-prepare-sources" data-scope={selectedVisibleIds.length > 0 ? 'selection' : 'library'} onClick={() => void indexWorks(selectedVisibleIds.length > 0 ? selectedVisibleIds : undefined)}>{t(selectedVisibleIds.length > 0 ? 'Indexar selección' : 'Indexar biblioteca')}</button>
+            <button className="btn btn-ghost" onClick={openResearchPreparationQueue}>{t('Ver en Queue')}</button>
+          </>}
           {academicMode !== 'manual' && DOCUMENT_INDEX_MANAGER_VISIBLE && vaultType === 'academic' && <button
             data-testid="document-index-manager-button"
             className="btn btn-ghost border border-neutral-700 gap-1.5"
@@ -1256,7 +1161,7 @@ export function Library({
           >
             {/* Whole-document understanding is still beta: slow on long texts, and
                 not always right about the structure. The badge says so up front. */}
-            <Icon name="layers" /> {t('Índice documental')}
+            <Icon name="layers" /> {t('Ficha documental')}
             <em data-testid="document-index-beta" className="library-action-menu-badge is-beta">BETA</em>
           </button>}
           <div className="relative z-40" ref={collectionsMenuRef}>
@@ -1334,21 +1239,267 @@ export function Library({
               onChange={(e) => setSearchDraft(e.target.value)}
             />
           </div>
-          <button
-            data-testid="library-vault-filters-toggle"
-            type="button"
-            className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-            onClick={toggleFilterPanel}
-            aria-expanded={filtersOpen}
-            aria-controls="library-vault-filters-panel"
-          >
-            <Icon name="filter" /> {t('Filtros')}
-            {activeFilterCount > 0 && (
-              <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                {activeFilterCount}
-              </span>
+          <div className="relative" ref={filterBalloonRef}>
+            <button
+              data-testid="library-vault-filters-toggle"
+              type="button"
+              className={`library-filter-button tone-indigo btn shrink-0 border gap-1.5 ${filtersOpen || activeFilterCount > 0 ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+              onClick={toggleFilterPanel}
+              aria-expanded={filtersOpen}
+              aria-controls="library-vault-filters-panel"
+            >
+              <Icon name="filter" /> {t('Filtros')}
+              {activeFilterCount > 0 && (
+                <span className="library-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            {filtersOpen && (
+              <div
+                id="library-vault-filters-panel"
+                data-testid="library-vault-filters-panel"
+                role="dialog"
+                aria-label={t('Filtros')}
+                className="library-filter-balloon absolute right-0 top-full z-40 mt-2 w-[30rem] max-w-[calc(100vw-3rem)] rounded-xl border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+              >
+                {academicMode !== 'manual' && <>
+                <div className="mb-2 text-xs font-medium text-neutral-300">{t('Estado de análisis')}</div>
+                <div className="space-y-1">
+                  {STATUS_FLAGS.map((flag) => {
+                    const state: TriState = selectedStatusFlags.includes(flag.dim) ? 'pos' : selectedStatusFlags.includes(`!${flag.dim}` as StatusFlag) ? 'neg' : 'off';
+                    return (
+                      <div key={flag.dim} data-testid={`library-status-filter-${flag.dim}`} className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-neutral-900/60">
+                        <div className="min-w-0">
+                          <div className="text-sm text-neutral-200">{t(flag.title)}</div>
+                          <div className="text-[11px] text-neutral-500">{state === 'pos' ? t(flag.label) : state === 'neg' ? t(flag.negLabel) : t('Indiferente')}</div>
+                        </div>
+                        <TriStateSwitch
+                          value={state}
+                          label={t(flag.title)}
+                          posLabel={t(flag.label)}
+                          negLabel={t(flag.negLabel)}
+                          testId={`library-status-switch-${flag.dim}`}
+                          onChange={(next) => setStatusDimension(flag.dim, next)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mb-2 mt-3 border-t border-neutral-800 pt-3 text-xs font-medium text-neutral-300">{t('Preparación')}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className={`library-preset btn border px-2.5 py-1 text-xs ${
+                      selectedReadiness === null ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'
+                    }`}
+                    onClick={() => setReadiness(null)}
+                  >
+                    {t('Todo')}
+                  </button>
+                  {STATUS_PRESETS.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`library-preset btn border gap-1.5 px-2.5 py-1 text-xs ${
+                        selectedReadiness === preset
+                          ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100'
+                          : 'btn-ghost border-neutral-700'
+                      }`}
+                      onClick={() => setReadiness(selectedReadiness === preset ? null : preset)}
+                    >
+                      <Icon name={READINESS_ICON[preset]} size={12} className="opacity-70" />
+                      {t(READINESS_LABEL[preset])}
+                    </button>
+                  ))}
+                </div>
+                </>}
+                <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
+                  <div className="relative" ref={tagFilterRef}>
+                    <button
+                      type="button"
+                      className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
+                      onClick={() => setTagFilterOpen((open) => !open)}
+                      aria-expanded={tagFilterOpen}
+                      aria-haspopup="dialog"
+                    >
+                      <Icon name="tag" /> {t('Etiquetas Zotero')}
+                      {selectedZoteroTags.length > 0 && (
+                        <span className="library-filter-count zotero-tag-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                          {selectedZoteroTags.length}
+                        </span>
+                      )}
+                    </button>
+                    {tagFilterOpen && (
+                      <div
+                        role="dialog"
+                        aria-label={t('Filtrar por etiquetas de Zotero')}
+                        className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            className="input min-w-0 flex-1"
+                            value={tagSearch}
+                            onChange={(e) => setTagSearch(e.target.value)}
+                            placeholder={t('Buscar etiqueta…')}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-xs"
+                            disabled={selectedZoteroTags.length === 0}
+                            onClick={clearZoteroTags}
+                          >
+                            {t('Limpiar')}
+                          </button>
+                        </div>
+                        {selectedZoteroTags.length > 1 && (
+                          <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                            {t('Combinar etiquetas')}
+                            <select
+                              className="input py-1 text-xs"
+                              value={filter.zoteroTagMode ?? 'any'}
+                              onChange={(e) => updateFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
+                            >
+                              <option value="any">{t('Cualquiera')}</option>
+                              <option value="all">{t('Todas')}</option>
+                            </select>
+                          </label>
+                        )}
+                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                          {visibleZoteroTags.map((tag) => {
+                            const checked = selectedZoteroTags.some((selected) => selected.toLocaleLowerCase() === tag.label.toLocaleLowerCase());
+                            return (
+                              <button
+                                key={tag.label}
+                                type="button"
+                                className={`zotero-tag-option flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                                  checked ? 'is-selected bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
+                                }`}
+                                onClick={() => toggleZoteroTag(tag.label)}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 items-center justify-center rounded border ${
+                                    checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
+                                  }`}
+                                >
+                                  {checked && <Icon name="check" size={12} />}
+                                </span>
+                                <span className="min-w-0 flex-1 truncate">{tag.label}</span>
+                                <span className="text-xs tabular-nums text-neutral-500">{tag.workCount}</span>
+                              </button>
+                            );
+                          })}
+                          {availableZoteroTags.length === 0 && (
+                            <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                              {t('Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.')}
+                            </p>
+                          )}
+                          {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
+                            <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay etiquetas que coincidan.')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="relative" ref={collectionFilterRef}>
+                    <button
+                      type="button"
+                      className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
+                      onClick={() => setCollectionFilterOpen((open) => !open)}
+                      aria-expanded={collectionFilterOpen}
+                      aria-haspopup="dialog"
+                      disabled={availableCollections.length === 0}
+                      title={availableCollections.length === 0 ? t('Sincroniza para poder filtrar por colección.') : t('Filtrar por colección')}
+                    >
+                      <Icon name="folder" /> {t('Colección')}
+                      {selectedCollections.length > 0 && (
+                        <span className="library-filter-count tone-cyan rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
+                          {selectedCollections.length}
+                        </span>
+                      )}
+                    </button>
+                    {collectionFilterOpen && (
+                      <div
+                        role="dialog"
+                        aria-label={t('Filtrar por colección')}
+                        className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
+                      >
+                        <div className="flex items-center gap-2">
+                          <input
+                            autoFocus
+                            className="input min-w-0 flex-1"
+                            value={collectionSearch}
+                            onChange={(e) => setCollectionSearch(e.target.value)}
+                            placeholder={t('Buscar colección…')}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-ghost text-xs"
+                            disabled={selectedCollections.length === 0}
+                            onClick={clearCollections}
+                          >
+                            {t('Limpiar')}
+                          </button>
+                        </div>
+                        {selectedCollections.length > 1 && (
+                          <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
+                            {t('Combinar colecciones')}
+                            <select
+                              className="input py-1 text-xs"
+                              value={filter.collectionMode ?? 'any'}
+                              onChange={(e) => updateFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
+                            >
+                              <option value="any">{t('Cualquiera')}</option>
+                              <option value="all">{t('Todas')}</option>
+                            </select>
+                          </label>
+                        )}
+                        <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
+                          {visibleCollections.map((collection) => {
+                            const checked = selectedCollections.includes(collection.key);
+                            return (
+                              <button
+                                key={collection.key}
+                                type="button"
+                                className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
+                                  checked ? 'bg-cyan-950/50 text-cyan-100' : 'text-neutral-300'
+                                }`}
+                                style={{ paddingLeft: `${0.5 + collection.depth * 0.85}rem` }}
+                                onClick={() => toggleCollection(collection.key)}
+                              >
+                                <span
+                                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                                    checked ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-neutral-600'
+                                  }`}
+                                >
+                                  {checked && <Icon name="check" size={12} />}
+                                </span>
+                                {/* The vault's collections are Zotero's: the folder carries its Z. */}
+                                <CollectionSourceIcon origin="zotero" size={16} />
+                                <span className="min-w-0 flex-1 truncate">{collection.name}</span>
+                                <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
+                              </button>
+                            );
+                          })}
+                          {availableCollections.length === 0 && (
+                            <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
+                              {t('Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.')}
+                            </p>
+                          )}
+                          {availableCollections.length > 0 && visibleCollections.length === 0 && (
+                            <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay colecciones que coincidan.')}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1" />
+                  {hasActiveFilters && <button type="button" className="btn btn-ghost px-2 py-1 text-xs" onClick={clearAllFilters}>{t('Limpiar filtros')}</button>}
+                </div>
+              </div>
             )}
-          </button>
+          </div>
           {hasActiveFilters && (
             <button
               type="button"
@@ -1361,249 +1512,6 @@ export function Library({
             </button>
           )}
         </div>
-        {filtersOpen && (
-          <div id="library-vault-filters-panel" data-testid="library-vault-filters-panel" className="library-vault-filter-panel mt-3 rounded-xl border border-neutral-800 bg-neutral-950/35 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-          <div className="relative" ref={tagFilterRef}>
-            <button
-              type="button"
-              className={`library-filter-button zotero-tag-filter tone-indigo btn border gap-1.5 ${selectedZoteroTags.length ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'}`}
-              onClick={() => setTagFilterOpen((open) => !open)}
-              aria-expanded={tagFilterOpen}
-              aria-haspopup="dialog"
-            >
-              <Icon name="tag" /> {t('Etiquetas Zotero')}
-              {selectedZoteroTags.length > 0 && (
-                <span className="library-filter-count zotero-tag-filter-count tone-indigo rounded bg-indigo-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                  {selectedZoteroTags.length}
-                </span>
-              )}
-            </button>
-            {tagFilterOpen && (
-              <div
-                role="dialog"
-                aria-label={t('Filtrar por etiquetas de Zotero')}
-                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    className="input min-w-0 flex-1"
-                    value={tagSearch}
-                    onChange={(e) => setTagSearch(e.target.value)}
-                    placeholder={t('Buscar etiqueta…')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    disabled={selectedZoteroTags.length === 0}
-                    onClick={clearZoteroTags}
-                  >
-                    {t('Limpiar')}
-                  </button>
-                </div>
-                {selectedZoteroTags.length > 1 && (
-                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    {t('Combinar etiquetas')}
-                    <select
-                      className="input py-1 text-xs"
-                      value={filter.zoteroTagMode ?? 'any'}
-                      onChange={(e) => updateFilter((current) => ({ ...current, zoteroTagMode: e.target.value as 'any' | 'all' }))}
-                    >
-                      <option value="any">{t('Cualquiera')}</option>
-                      <option value="all">{t('Todas')}</option>
-                    </select>
-                  </label>
-                )}
-                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {visibleZoteroTags.map((tag) => {
-                    const checked = selectedZoteroTags.some((selected) => selected.toLocaleLowerCase() === tag.label.toLocaleLowerCase());
-                    return (
-                      <button
-                        key={tag.label}
-                        type="button"
-                        className={`zotero-tag-option flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
-                          checked ? 'is-selected bg-indigo-950/50 text-indigo-100' : 'text-neutral-300'
-                        }`}
-                        onClick={() => toggleZoteroTag(tag.label)}
-                      >
-                        <span
-                          className={`flex h-4 w-4 items-center justify-center rounded border ${
-                            checked ? 'border-indigo-400 bg-indigo-500 text-white' : 'border-neutral-600'
-                          }`}
-                        >
-                          {checked && <Icon name="check" size={12} />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{tag.label}</span>
-                        <span className="text-xs tabular-nums text-neutral-500">{tag.workCount}</span>
-                      </button>
-                    );
-                  })}
-                  {availableZoteroTags.length === 0 && (
-                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
-                      {t('Aún no hay etiquetas guardadas. Pulsa “Actualizar” para leer las etiquetas de las colecciones monitorizadas en Zotero.')}
-                    </p>
-                  )}
-                  {availableZoteroTags.length > 0 && visibleZoteroTags.length === 0 && (
-                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay etiquetas que coincidan.')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="relative" ref={collectionFilterRef}>
-            <button
-              type="button"
-              className={`library-filter-button collection-filter tone-cyan btn border gap-1.5 ${selectedCollections.length ? 'is-active border-cyan-700 bg-cyan-950/40 text-cyan-100' : 'btn-ghost border-neutral-700'}`}
-              onClick={() => setCollectionFilterOpen((open) => !open)}
-              aria-expanded={collectionFilterOpen}
-              aria-haspopup="dialog"
-              disabled={availableCollections.length === 0}
-              title={availableCollections.length === 0 ? t('Sincroniza para poder filtrar por colección.') : t('Filtrar por colección')}
-            >
-              <Icon name="folder" /> {t('Colección')}
-              {selectedCollections.length > 0 && (
-                <span className="library-filter-count tone-cyan rounded bg-cyan-800/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums">
-                  {selectedCollections.length}
-                </span>
-              )}
-            </button>
-            {collectionFilterOpen && (
-              <div
-                role="dialog"
-                aria-label={t('Filtrar por colección')}
-                className="library-filter-popover absolute left-0 z-30 mt-2 w-[23rem] max-w-[calc(100vw-3rem)] rounded-lg border border-neutral-700 bg-neutral-950 p-3 shadow-2xl"
-              >
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    className="input min-w-0 flex-1"
-                    value={collectionSearch}
-                    onChange={(e) => setCollectionSearch(e.target.value)}
-                    placeholder={t('Buscar colección…')}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost text-xs"
-                    disabled={selectedCollections.length === 0}
-                    onClick={clearCollections}
-                  >
-                    {t('Limpiar')}
-                  </button>
-                </div>
-                {selectedCollections.length > 1 && (
-                  <label className="mt-3 flex items-center justify-between gap-3 text-xs text-neutral-400">
-                    {t('Combinar colecciones')}
-                    <select
-                      className="input py-1 text-xs"
-                      value={filter.collectionMode ?? 'any'}
-                      onChange={(e) => updateFilter((current) => ({ ...current, collectionMode: e.target.value as 'any' | 'all' }))}
-                    >
-                      <option value="any">{t('Cualquiera')}</option>
-                      <option value="all">{t('Todas')}</option>
-                    </select>
-                  </label>
-                )}
-                <div className="mt-3 max-h-64 space-y-1 overflow-y-auto pr-1">
-                  {visibleCollections.map((collection) => {
-                    const checked = selectedCollections.includes(collection.key);
-                    return (
-                      <button
-                        key={collection.key}
-                        type="button"
-                        className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-neutral-800 ${
-                          checked ? 'bg-cyan-950/50 text-cyan-100' : 'text-neutral-300'
-                        }`}
-                        style={{ paddingLeft: `${0.5 + collection.depth * 0.85}rem` }}
-                        onClick={() => toggleCollection(collection.key)}
-                      >
-                        <span
-                          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
-                            checked ? 'border-cyan-400 bg-cyan-500 text-white' : 'border-neutral-600'
-                          }`}
-                        >
-                          {checked && <Icon name="check" size={12} />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{collection.name}</span>
-                        <span className="text-xs tabular-nums text-neutral-500">{collection.workCount}</span>
-                      </button>
-                    );
-                  })}
-                  {availableCollections.length === 0 && (
-                    <p className="px-2 py-3 text-xs leading-relaxed text-neutral-500">
-                      {t('Aún no hay colecciones. Pulsa “Sincronizar” para leer la estructura de colecciones de Zotero.')}
-                    </p>
-                  )}
-                  {availableCollections.length > 0 && visibleCollections.length === 0 && (
-                    <p className="px-2 py-3 text-xs text-neutral-500">{t('No hay colecciones que coincidan.')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="flex-1" />
-            </div>
-        {/* One-click status filters. These replaced a row of counters that showed
-            the same information but could not be clicked, sitting next to a
-            separate control that filtered by it. */}
-        {academicMode !== 'manual' && <>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className={`library-preset btn border px-2.5 py-1 text-xs ${
-              selectedReadiness === null ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100' : 'btn-ghost border-neutral-700'
-            }`}
-            onClick={() => setReadiness(null)}
-          >
-            {t('Todo')}
-          </button>
-          {STATUS_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className={`library-preset btn border gap-1.5 px-2.5 py-1 text-xs ${
-                selectedReadiness === preset
-                  ? 'is-active border-indigo-700 bg-indigo-950/40 text-indigo-100'
-                  : 'btn-ghost border-neutral-700'
-              }`}
-              onClick={() => setReadiness(selectedReadiness === preset ? null : preset)}
-            >
-              <Icon name={READINESS_ICON[preset]} size={12} className="opacity-70" />
-              {t(READINESS_LABEL[preset])}
-            </button>
-          ))}
-          <div className="flex-1" />
-          <button
-            type="button"
-            className={`btn border px-2.5 py-1 text-xs ${
-              advancedFiltersOpen || selectedStatusFlags.length > 0
-                ? 'is-active border-neutral-600 bg-neutral-800 text-neutral-100'
-                : 'btn-ghost border-neutral-700'
-            }`}
-            onClick={toggleAdvancedFilterPanel}
-            aria-expanded={advancedFiltersOpen}
-          >
-            {t('Filtros avanzados')}
-            {selectedStatusFlags.length > 0 && (
-              <span className="ml-1.5 tabular-nums opacity-80">{selectedStatusFlags.length}</span>
-            )}
-          </button>
-        </div>
-        {advancedFiltersOpen && (
-          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-800 pt-3">
-            <StatusFlagsPicker
-              value={selectedStatusFlags}
-              setDimension={setStatusDimension}
-              onClear={clearStatusFlags}
-            />
-            <span className="text-xs text-neutral-500">
-              {t('Combina condiciones sueltas de la tubería de análisis. Los presets de arriba cubren los casos habituales.')}
-            </span>
-          </div>
-        )}
-        </>}
-          </div>
-        )}
         {selectedZoteroTags.length > 0 && (
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-neutral-500">
             <span>{t('Etiquetas:')}</span>
@@ -1691,7 +1599,6 @@ export function Library({
           <button
             className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
             onClick={() => {
-              setReuseNotice(null);
               if (allVisibleSelected) setSelected(new Set());
               else selectAllVisible();
             }}
@@ -1699,13 +1606,57 @@ export function Library({
             <Icon name={allVisibleSelected ? 'x' : 'check'} size={13} />
             {allVisibleSelected ? t('Quitar selección') : tx('Seleccionar los {n} de esta página', { n: works.length })}
           </button>
+          {/* One verb whose scope is the selection when there is one, the filtered
+              library otherwise. */}
           <button
             className="btn btn-primary px-2 py-1 text-xs"
-            onClick={processFullLibrary}
-            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
+            data-testid="library-extract-ideas"
+            data-scope={selectedVisibleIds.length > 0 ? 'selection' : 'library'}
+            onClick={() => void (selectedVisibleIds.length > 0 ? processFullSelected() : processFullLibrary())}
+            title={selectedVisibleIds.length > 0
+              ? t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')
+              : t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones para toda la biblioteca filtrada.')}
           >
-            <Icon name="compass" size={13} /> {t('Procesar biblioteca')}
+            <Icon name="compass" size={13} /> {t(vaultType === 'academic' ? 'Extraer ideas' : 'Procesar biblioteca')}
+            {selectedVisibleIds.length > 0 && <span className="tabular-nums opacity-80">· {selectedVisibleIds.length}</span>}
           </button>
+          {selectedVisibleIds.length > 0 && <>
+            {/* Offered only while some selected work has something left to finish. */}
+            {academicMode !== 'manual' && retryPlan.works > 0 && (
+              <button
+                className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
+                onClick={() => void retryMissingSelected()}
+                title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
+                data-testid="library-retry-missing-selected"
+              >
+                <Icon name="refresh" size={13} /> {t('Reintentar')}
+              </button>
+            )}
+            {isRecordsVault && (
+              <button
+                className="btn btn-ghost border border-amber-700/70 px-2 py-1 text-xs text-amber-300"
+                onClick={() => void scanSelectedRecords()}
+                title={t('Extraer personas, lugares y eventos de estas obras hacia el árbol')}
+              >
+                <Icon name="users" size={13} /> {t('Extraer personas y eventos')}
+              </button>
+            )}
+            <button
+              className="btn bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-500"
+              onClick={() => void deleteSelected()}
+              title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
+              data-testid="library-delete-selected"
+            >
+              <Icon name="trash" size={13} /> {t('Eliminar')}
+            </button>
+            <button
+              className="btn btn-ghost px-2 py-1 text-xs"
+              data-testid="library-clear-selection"
+              onClick={() => { setSelected(new Set()); }}
+            >
+              {t('Limpiar selección')}
+            </button>
+          </>}
         </div>
       )}
 
@@ -1720,104 +1671,6 @@ export function Library({
         </div>
       )}
 
-      {selectedVisibleIds.length > 0 && (
-        <div className="mb-3 rounded-lg border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-indigo-200">{tx('{n} seleccionadas', { n: selectedVisibleIds.length })}</span>
-          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
-          {academicMode !== 'manual' && <>
-          <label
-            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-indigo-800/70 bg-indigo-950/30 px-2.5 py-1.5 text-xs text-indigo-100"
-            title={t('Busca coincidencias en otras bóvedas y, si encuentra ideas, embeddings, resúmenes o pasajes ya generados, los importa antes de usar IA.')}
-          >
-            <input
-              type="checkbox"
-              checked={reuseAnalysisFromVaults}
-              onChange={(e) => {
-                setReuseNotice(null);
-                setReuseAnalysisFromVaults(e.target.checked);
-              }}
-            />
-            <span className="min-w-0 leading-4">{t('Reutilizar análisis de otras bóvedas')}</span>
-          </label>
-          {reuseNotice && <span className="min-w-0 max-w-full text-xs text-indigo-200/80">{reuseNotice}</span>}
-          <span className="hidden sm:block h-5 w-px bg-indigo-800/70" />
-          {/* One verb, with the scope spelled out. The partial verbs live in the
-              menu: offering seven equally-weighted buttons was what made this bar
-              read as seven unrelated decisions instead of one. */}
-          <button
-            className="btn btn-primary"
-            onClick={processFullSelected}
-            title={t('Encadena temas, ideas, resumen, indexado (ideas y pasajes) y descubrimiento de relaciones.')}
-          >
-            <Icon name="compass" /> {tx('Analizar las {n} seleccionadas', { n: selectedVisibleIds.length })}
-          </button>
-          {/* The repair counterpart of the verb above: it never re-runs a step that is
-              already done, so it is offered only while some selected work has something
-              left to finish. */}
-          {retryPlan.works > 0 && (
-            <button
-              className="btn btn-ghost border border-neutral-700"
-              onClick={() => void retryMissingSelected()}
-              title={t('Encola solo los pasos incompletos, pendientes o fallidos de cada obra seleccionada. No vuelve a analizar lo que ya está hecho.')}
-              data-testid="library-retry-missing-selected"
-            >
-              <Icon name="refresh" /> {t('Reintentar lo que falta')}
-              {/* The count is works, not steps, so it says so: the button sits next to
-                  a selection count and a bare number would read as the same thing. */}
-              <span className="tabular-nums opacity-80">· {tx('{n} obra(s)', { n: retryPlan.works })}</span>
-            </button>
-          )}
-          {/* Not a pipeline step in records vaults — it is what the view is for. */}
-          {isRecordsVault && (
-            <button
-              className="btn btn-ghost border border-amber-700/70 text-amber-300"
-              onClick={() => void scanSelectedRecords()}
-              title={t('Extraer personas, lugares y eventos de estas obras hacia el árbol')}
-            >
-              <Icon name="users" /> {t('Extraer personas y eventos')}
-            </button>
-          )}
-          <RowMenu
-            label={t('Analizar solo un paso')}
-            items={[
-              { label: t('Analizar solo temas'), icon: 'tag', onClick: () => void analyzeSelectedThemes() },
-              { label: t('Analizar solo ideas'), icon: 'bulb', onClick: () => void analyzeSelectedIdeas() },
-              { label: t('Analizar temas e ideas'), icon: 'layers', onClick: () => void analyzeSelectedBoth() },
-              { label: t('Generar resumen'), icon: 'wand', onClick: () => void summarizeSelected() },
-              { label: t('Preparar búsqueda semántica'), icon: 'search', onClick: () => void embedSelected() },
-              { label: t('Indexar texto citable'), icon: 'book', onClick: () => void indexSelectedPassages() },
-              { label: t('Comprender documentos completos'), icon: 'layers', onClick: () => void window.nodus.startDocumentIndexCampaign({ nodusIds: selectedVisibleIds }) },
-            ]}
-          />
-          </>}
-          {/* Destructive and irreversible, so it sits apart from the verbs above: past
-              the overflow menu, away from the primary action, and red in both themes. */}
-          <button
-            className="btn bg-red-600 text-white hover:bg-red-500"
-            onClick={() => void deleteSelected()}
-            title={t('Elimina estas obras del vault actual con sus ideas, pasajes, embeddings y demás datos derivados. Lo que otras obras comparten no se toca.')}
-            data-testid="library-delete-selected"
-          >
-            <Icon name="trash" /> {t('Eliminar selección')}
-          </button>
-          <div className="flex-1" />
-          <button
-            className="btn btn-ghost"
-            onClick={() => {
-              setReuseNotice(null);
-              setSelected(new Set());
-            }}
-          >
-            {t('Limpiar selección')}
-          </button>
-        </div>
-      )}
-
-      {reuseNotice && selectedVisibleIds.length === 0 && (
-        <div className="mb-3 rounded-md border border-indigo-800/70 bg-indigo-950/20 px-3 py-2 text-xs text-indigo-200">
-          {reuseNotice}
-        </div>
-      )}
 
       <div className="card flex-1 flex flex-col min-h-0 overflow-hidden text-sm">
         <div
@@ -1831,7 +1684,6 @@ export function Library({
                 title={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 aria-label={tx('Seleccionar los {n} resultados filtrados', { n: works.length })}
                 onChange={(e) => {
-                  setReuseNotice(null);
                   if (e.target.checked) selectAllVisible();
                   else setSelected(new Set());
                 }}
@@ -1925,13 +1777,18 @@ export function Library({
                 </div>
                 <div className="p-1 whitespace-nowrap">
                   <div className="flex items-center gap-1">
-                    {academicMode !== 'manual' && <button
-                      className="btn btn-ghost border border-neutral-700 px-2 py-1 text-xs"
-                      title={t('Analizar: temas, ideas, resumen, indexado y relaciones')}
+                    {academicMode !== 'manual' && <RowIconButton
+                      title={t(vaultType === 'academic' ? 'Extraer ideas' : 'Analizar')}
+                      icon="bulb"
+                      tone="violet"
                       onClick={() => processFullWork(w)}
-                    >
-                      {t('Analizar')}
-                    </button>}
+                    />}
+                    {vaultType === 'academic' && (() => {
+                      // The colour is this document's index state; the label is what a click does.
+                      const index = libraryIndexAction(preparationByWork.get(w.nodus_id));
+                      return <RowIconButton title={t(index.label)} icon="layers" tone={index.tone} spinning={index.busy}
+                        testId={`vault-library-index-${w.nodus_id}`} onClick={() => void indexWorks([w.nodus_id])} />;
+                    })()}
                     <RowIconButton
                       title={t('Abrir lector limpio')}
                       icon="book"
@@ -1951,6 +1808,10 @@ export function Library({
                     <RowMenu
                       label={t('Más acciones')}
                       items={[
+                        ...(vaultType === 'academic' ? [
+                          { label: t('Indexar documento'), icon: 'layers', onClick: () => void indexWorks([w.nodus_id]) },
+                          { label: t('Ver en Queue'), icon: 'list', onClick: openResearchPreparationQueue },
+                        ] : []),
                         {
                           label: t('Abrir lector limpio'),
                           icon: 'book',
@@ -1975,7 +1836,7 @@ export function Library({
                           onClick: () => void summarizeWork(w),
                         },
                         {
-                          label: t('Índice documental'),
+                          label: t('Ficha documental'),
                           icon: 'layers',
                           onClick: () => setDocumentWork(w),
                         },
@@ -2085,12 +1946,16 @@ function RowIconButton({
   icon,
   tone = 'neutral',
   disabled = false,
+  spinning = false,
+  testId,
   onClick,
 }: {
   title: string;
   icon: string;
-  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet' | 'amber';
+  tone?: 'neutral' | 'indigo' | 'cyan' | 'violet' | 'amber' | 'green' | 'orange' | 'red';
   disabled?: boolean;
+  spinning?: boolean;
+  testId?: string;
   onClick: () => void;
 }) {
   const toneClass =
@@ -2102,16 +1967,25 @@ function RowIconButton({
           ? 'text-violet-400 hover:text-violet-300'
           : tone === 'amber'
             ? 'text-amber-400 hover:text-amber-300'
-            : 'text-neutral-400 hover:text-neutral-100';
+            : tone === 'green'
+              ? 'text-emerald-400 hover:text-emerald-300'
+              : tone === 'orange'
+                ? 'text-orange-400 hover:text-orange-300'
+                : tone === 'red'
+                  ? 'text-red-400 hover:text-red-300'
+                  : 'text-neutral-400 hover:text-neutral-100';
   return (
     <button
       className={`library-row-action ${tone === 'neutral' ? 'library-row-action-neutral' : ''} inline-flex h-7 w-7 items-center justify-center rounded-md hover:bg-neutral-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent ${toneClass}`}
       title={title}
       aria-label={title}
+      data-testid={testId}
+      data-tone={tone}
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={13} />
+      {/* Spin a wrapper, never the icon itself: Tailwind's transform utilities clash with a spin on one element. */}
+      {spinning ? <span className="library-row-action-spin inline-flex"><Icon name={icon} size={13} /></span> : <Icon name={icon} size={13} />}
     </button>
   );
 }

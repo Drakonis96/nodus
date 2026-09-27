@@ -26,6 +26,7 @@ await build({
       ]}`);
       stub(/\.\.\/db\/passagesRepo$/, 'passages', `export async function findSimilarPassagesPaged(vector,threshold,limit,opts={}){
         globalThis.__hierarchical.passageCalls.push(opts.nodusIds||[]);
+        if(opts.nodusIds?.length && globalThis.__hierarchical.routedGate) await globalThis.__hierarchical.routedGate;
         if(opts.nodusIds?.length)return [{passage_id:'p-routed',nodus_id:'work-doc',text:'Evidencia dentro de la obra orientada.',page_label:'8',similarity:.72,title:'Obra documental',authors_json:'["A"]',year:2020,zotero_key:'Z1'}];
         return [{passage_id:'p-global',nodus_id:'work-other',text:'Evidencia global independiente.',page_label:'3',similarity:.91,title:'Otra obra',authors_json:'["B"]',year:2021,zotero_key:'Z2'}];
       }
@@ -94,4 +95,17 @@ test('deep-research evidence selection spends its first slots on independent wor
   ], 4, { preferLexical: true, preferSourceDiversity: true });
   assert.equal(new Set(selected.slice(0, 3).map((item) => item.nodus_id)).size, 3, 'three evidence slots cover three works before repeating one');
   assert.ok(selected.some((item) => item.passage_id === 'g-a1' || item.passage_id === 'g-a2'), 'source diversity does not ban additional evidence from a relevant work');
+});
+
+
+test('routed retrieval remains pending while its asynchronous lane yields to the event loop', async () => {
+  let release;
+  globalThis.__hierarchical.routedGate = new Promise(resolve => { release = resolve; });
+  let settled = false;
+  const pending = retrieval.retrieveHierarchical('consulta', { passageLimit: 5, routedPassageLimit: 5 }).then(result => { settled = true; return result; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(settled, false, 'the hierarchy must await routed evidence while allowing another event-loop turn');
+  release();
+  try { assert.ok((await pending).passages.some(hit => hit.passage_id === 'p-routed')); }
+  finally { delete globalThis.__hierarchical.routedGate; }
 });

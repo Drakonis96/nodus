@@ -1,0 +1,329 @@
+{
+  "date": "2026-09-23",
+  "feature": "Request-scoped Research Chat activity",
+  "ui": {
+    "root": "/private/tmp/nodus-research-MOEVLi",
+    "proof": {
+      "writeInsideAllowed": true,
+      "writeOutsideDenied": true,
+      "descendantWriteDenied": true,
+      "externalNetworkDenied": true,
+      "forbiddenLoopbackPortDenied": true
+    },
+    "completed": true,
+    "modelCalls": 0,
+    "productionFixtures": false,
+    "notebooks": {
+      "passed": true,
+      "collections": 3,
+      "sources": 3,
+      "preparedPassages": 1,
+      "layouts": [
+        {
+          "theme": "dark",
+          "viewport": {
+            "width": 1280,
+            "height": 800
+          },
+          "box": {
+            "x": 260,
+            "y": 48,
+            "width": 760,
+            "height": 704
+          },
+          "keyboardFocusContained": true
+        },
+        {
+          "theme": "dark",
+          "viewport": {
+            "width": 800,
+            "height": 640
+          },
+          "box": {
+            "x": 24,
+            "y": 38.3984375,
+            "width": 752,
+            "height": 563.1953125
+          },
+          "keyboardFocusContained": true
+        },
+        {
+          "theme": "light",
+          "viewport": {
+            "width": 1280,
+            "height": 800
+          },
+          "box": {
+            "x": 260,
+            "y": 48,
+            "width": 760,
+            "height": 704
+          },
+          "keyboardFocusContained": true
+        },
+        {
+          "theme": "light",
+          "viewport": {
+            "width": 800,
+            "height": 640
+          },
+          "box": {
+            "x": 24,
+            "y": 38.3984375,
+            "width": 752,
+            "height": 563.1953125
+          },
+          "keyboardFocusContained": true
+        }
+      ]
+    },
+    "activity": {
+      "passed": true,
+      "mode": "deterministic IPC/UI fixture, no live model or Zotero calls",
+      "turns": 3,
+      "layouts": [
+        {
+          "theme": "light",
+          "viewport": {
+            "width": 1280,
+            "height": 800
+          },
+          "box": {
+            "x": 904,
+            "y": 268.5546875,
+            "width": 356,
+            "height": 402.9453125
+          }
+        },
+        {
+          "theme": "light",
+          "viewport": {
+            "width": 800,
+            "height": 640
+          },
+          "box": {
+            "x": 424,
+            "y": 218,
+            "width": 356,
+            "height": 293.5
+          }
+        },
+        {
+          "theme": "dark",
+          "viewport": {
+            "width": 1280,
+            "height": 800
+          },
+          "box": {
+            "x": 904,
+            "y": 268.5546875,
+            "width": 356,
+            "height": 402.9453125
+          }
+        },
+        {
+          "theme": "dark",
+          "viewport": {
+            "width": 800,
+            "height": 640
+          },
+          "box": {
+            "x": 424,
+            "y": 218,
+            "width": 356,
+            "height": 293.5
+          }
+        }
+      ],
+      "requestFiltering": true,
+      "simultaneousOperations": true,
+      "keyboard": true,
+      "minimizeExpand": true,
+      "failure": true,
+      "cancellation": true
+    },
+    "paths": {
+      "userData": "/private/tmp/nodus-research-MOEVLi/profile",
+      "sessionData": "/private/tmp/nodus-research-MOEVLi/sessions",
+      "temp": "/private/tmp/nodus-research-MOEVLi/tmp",
+      "appData": "/private/tmp/nodus-research-MOEVLi/app-data",
+      "downloads": "/private/tmp/nodus-research-MOEVLi/downloads"
+    },
+    "databaseOpens": 6
+  },
+  "focusedRuns": [
+    {
+      "root": "/private/tmp/nodus-research-wAhoYZ",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "tests": [
+        "test-research-activity.mjs",
+        "test-research-corpus-run.mjs",
+        "test-documentary-writers.mjs",
+        "test-hierarchical-retrieval.mjs",
+        "test-research-assistant-i18n.mjs"
+      ],
+      "results": [
+        {
+          "file": "test-research-activity.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 11710,
+          "durationMs": 3453,
+          "output": "/private/tmp/nodus-research-wAhoYZ/artifacts/test-research-activity.mjs.log"
+        },
+        {
+          "file": "test-research-corpus-run.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 11711,
+          "durationMs": 8987,
+          "output": "/private/tmp/nodus-research-wAhoYZ/artifacts/test-research-corpus-run.mjs.log"
+        },
+        {
+          "file": "test-hierarchical-retrieval.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 12492,
+          "durationMs": 235,
+          "output": "/private/tmp/nodus-research-wAhoYZ/artifacts/test-hierarchical-retrieval.mjs.log"
+        },
+        {
+          "file": "test-research-assistant-i18n.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 12511,
+          "durationMs": 226,
+          "output": "/private/tmp/nodus-research-wAhoYZ/artifacts/test-research-assistant-i18n.mjs.log"
+        },
+        {
+          "file": "test-documentary-writers.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 12135,
+          "durationMs": 6628,
+          "output": "/private/tmp/nodus-research-wAhoYZ/artifacts/test-documentary-writers.mjs.log"
+        }
+      ],
+      "signals": [],
+      "exitCode": 0
+    },
+    {
+      "root": "/private/tmp/nodus-research-me570p",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "tests": [
+        "test-research-activity.mjs",
+        "test-documentary-writers.mjs"
+      ],
+      "results": [
+        {
+          "file": "test-research-activity.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 27227,
+          "durationMs": 3376,
+          "output": "/private/tmp/nodus-research-me570p/artifacts/test-research-activity.mjs.log"
+        },
+        {
+          "file": "test-documentary-writers.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 27228,
+          "durationMs": 7847,
+          "output": "/private/tmp/nodus-research-me570p/artifacts/test-documentary-writers.mjs.log"
+        }
+      ],
+      "signals": [],
+      "exitCode": 0
+    },
+    {
+      "root": "/private/tmp/nodus-research-XUWDEV",
+      "proof": {
+        "writeInsideAllowed": true,
+        "writeOutsideDenied": true,
+        "descendantWriteDenied": true,
+        "externalNetworkDenied": true,
+        "forbiddenLoopbackPortDenied": true
+      },
+      "workers": 2,
+      "tests": [
+        "test-research-concilium.mjs",
+        "test-chat-abort-partial.mjs",
+        "test-research-system-prompts.mjs",
+        "test-research-native-effort.mjs"
+      ],
+      "results": [
+        {
+          "file": "test-research-concilium.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 32064,
+          "durationMs": 12766,
+          "output": "/private/tmp/nodus-research-XUWDEV/artifacts/test-research-concilium.mjs.log"
+        },
+        {
+          "file": "test-chat-abort-partial.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 32065,
+          "durationMs": 13244,
+          "output": "/private/tmp/nodus-research-XUWDEV/artifacts/test-chat-abort-partial.mjs.log"
+        },
+        {
+          "file": "test-research-native-effort.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 33198,
+          "durationMs": 6047,
+          "output": "/private/tmp/nodus-research-XUWDEV/artifacts/test-research-native-effort.mjs.log"
+        },
+        {
+          "file": "test-research-system-prompts.mjs",
+          "exitCode": 0,
+          "signal": null,
+          "timedOut": false,
+          "pid": 33161,
+          "durationMs": 8901,
+          "output": "/private/tmp/nodus-research-XUWDEV/artifacts/test-research-system-prompts.mjs.log"
+        }
+      ],
+      "signals": [],
+      "exitCode": 0
+    }
+  ],
+  "validation": {
+    "build": true,
+    "typecheck": true,
+    "focusedLint": true,
+    "modelCalls": 0,
+    "liveZoteroCalls": 0
+  },
+  "limits": [
+    "UI/IPC evidence uses deterministic injected events; real backend retrieval and worker telemetry are exercised separately.",
+    "No new live provider or Zotero campaign was run for this UI addition.",
+    "Deep Research does not install the activity observer."
+  ]
+}

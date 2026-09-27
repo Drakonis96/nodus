@@ -344,7 +344,8 @@ test('bundled workflows wait for migrations, then survive updates and rollback w
   assert.equal(rolledBack.id, skill.id);
   assert.equal(rolledBack.version, '2.0.0');
   assert.equal(rolledBack.instructions, 'My edited workflow.');
-  assert.deepEqual(rolledBack.enabled, { assistant: true, nodi: false });
+  // A skill is on for every chat at once: saving it on for one chat turns both switches on.
+  assert.deepEqual(rolledBack.enabled, { assistant: true, nodi: true });
   const [restored] = lib.restorePluginSkillAuthorVersion(skill.id);
   assert.equal(restored.instructions, 'Ask for a country.');
   assert.equal(restored.id, skill.id);

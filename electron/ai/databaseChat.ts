@@ -148,7 +148,7 @@ export async function streamDatabaseChat(
     });
 
   const text = await withResearchAttachmentFallback(attachments,
-    { system: withResearchSystemPrompt(`${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId) + attachments.system, images: attachments.images, user: `${user}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
+    { system: withResearchSystemPrompt(`${databaseChatSystem(language)}\n\n${buildChatSkillsPrompt(skills)}`, request.systemPromptId, { surface: 'database', conversationId: request.conversationId }) + attachments.system, images: attachments.images, user: `${user}\n\n${chatSkillsOutputContract(skills)}${attachments.text}`, englishImagePrompts: skills.some(skill => skillHasCapability(skill, 'image')), plainContext: true, temperature: 0.3, maxTokens: skills.length ? 10_000 : 1500 },
     options => stream(options, onDelta, signal)
   );
   // A user-triggered stop keeps the partial answer: running the skill tools now would

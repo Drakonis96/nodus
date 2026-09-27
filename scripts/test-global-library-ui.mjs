@@ -13,6 +13,20 @@ test('the unified Library keeps the global catalogue independent and the vault c
   assert.match(vaultTypes, /'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library'/, 'prosopography allows the global Library route');
 });
 
+test('the Global Library selection bar is one row of icon actions; copy, move and tag open small dialogs', async () => {
+  const view = await readSource('src/views/GlobalLibraryView.tsx');
+  const start = view.indexOf('data-testid="global-library-bulk-actions"');
+  const bar = view.slice(start, view.indexOf('</div>}', start));
+  assert.match(bar, /flex-nowrap/, 'the actions share one row');
+  assert.doesNotMatch(bar, /<select|<input|<details/, 'no inline selects, tag field or overflow menu');
+  for (const action of ['bulk-copy-library-collection', 'bulk-move-library-collection', 'bulk-remove-library-collection', 'bulk-tag-library-items',
+    'bulk-resolve-library-metadata', 'bulk-library-citations', 'bulk-add-library-to-vault', 'bulk-rebuild-library-clean', 'bulk-trash-library-items',
+    'bulk-restore-library-trash', 'bulk-purge-library-trash', 'bulk-clear-library-selection']) assert.match(bar, new RegExp(`<BulkIconButton testId="${action}"`), action);
+  assert.match(view, /function BulkIconButton[\s\S]*?aria-label=\{label\} title=/, 'every icon names itself in its tooltip and accessible name');
+  for (const marker of ['library-bulk-collection-dialog', 'library-bulk-collection-target-', 'confirm-library-bulk-collection', 'library-bulk-tag-dialog', 'library-bulk-tag-input', 'confirm-library-bulk-tag'])
+    assert.match(view, new RegExp(`data-testid=(?:"|{\`)${marker}`), marker);
+});
+
 test('the Library UI exposes hierarchy, search, bulk operations, imports and background state', async () => {
   const workspaceTabs = await readSource('src/components/library/LibraryWorkspaceTabs.tsx');
   const zoteroProgress = await readSource('src/components/ZoteroImportProgressBar.tsx');
@@ -198,6 +212,14 @@ test('the Library accepts external files at the root or inside an editable colle
   assert.match(api, /importDroppedGlobalLibraryFiles\(filePaths: string\[\], collectionId\?: string \| null\)/);
   assert.match(preload, /library:importDroppedFiles/);
   assert.match(ipc, /library:importDroppedFiles/);
+  const vaultLibrary = await readSource('src/views/Library.tsx');
+  assert.match(vaultLibrary, /data-testid="library-vault-file-drop-surface"/, 'a vault Library also accepts dropped files');
+  assert.match(vaultLibrary, /data-testid="library-vault-file-drop-overlay"/);
+  assert.match(vaultLibrary, /getPathForDroppedFile[\s\S]*importDroppedFilesIntoVault/,
+    'files dropped on a vault go to the Global Library and are used in that vault in one step');
+  assert.match(api, /importDroppedFilesIntoVault\(filePaths: string\[\], vaultId: string\)/);
+  assert.match(preload, /library:importDroppedFilesToVault/);
+  assert.match(ipc, /library:importDroppedFilesToVault/);
   assert.match(operations, /inferredLocalFileMetadata[\s\S]*yearMatch[\s\S]*isbnMatch[\s\S]*doiMatch/,
     'filename inference supplies editable title, date, ISBN, and DOI candidates without network blocking');
 });
@@ -413,7 +435,7 @@ test('the typed bridge covers every global management operation', async () => {
   const methods = [
     'listGlobalLibraryCollections', 'getGlobalLibraryItem', 'createGlobalLibraryCollection',
     'updateGlobalLibraryCollection', 'deleteGlobalLibraryCollection', 'patchGlobalLibraryItemCollections',
-    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles',
+    'setGlobalLibraryItemsDeleted', 'importGlobalLibraryFiles', 'importDroppedGlobalLibraryFiles', 'importDroppedFilesIntoVault',
     'prepareGlobalLibraryReading',
     'importGlobalBibliographyFiles', 'updateGlobalLibraryItemMetadata', 'resolveGlobalLibraryMetadata',
     'createGlobalLibraryItem', 'importGlobalLibraryIdentifier', 'duplicateGlobalLibraryItem', 'convertGlobalLibraryItemToNodus',
@@ -438,7 +460,7 @@ test('the typed bridge covers every global management operation', async () => {
   assertApiMethods(assert, methods);
   assertChannelsWired(assert, [
     'library:collections', 'library:item', 'library:createCollection', 'library:updateCollection',
-    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles',
+    'library:deleteCollection', 'library:patchItemCollections', 'library:setItemsDeleted', 'library:importFiles', 'library:importDroppedFiles', 'library:importDroppedFilesToVault',
     'library:prepareReading',
     'library:createItem', 'library:duplicateItem', 'library:convertItemToNodus',
     'library:addAttachments', 'library:updateAttachment', 'library:replaceAttachment', 'library:removeAttachment',

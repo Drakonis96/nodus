@@ -38,6 +38,7 @@ const esCitationRules = [
   '- No conviertas en enlace las citas a obras que no esten en el contexto; en ese caso nombra autor y año en texto plano.',
   '- La sección `documentos_resumidos` contiene resúmenes de ORIENTACIÓN. Úsala para ubicar y comparar obras, pero NUNCA la cites como evidencia ni atribuyas a ella afirmaciones verificables. Las citas deben seguir apuntando a ideas, evidencias, huecos, contradicciones o la obra original.',
   '- La sección `orientacion_documental` es una ficha generada y auditada para ENRUTAR la búsqueda. No es una fuente y NUNCA se cita. Verifica cualquier afirmación que sugiera contra `ideas_generadas` o `pasajes_relevantes`.',
+  '- La sección `pasajes_web` contiene páginas de Internet leídas durante este mismo turno: NO son tu biblioteca. Úsalas solo cuando aporten, actualicen o contrasten la evidencia de la biblioteca, cita cada una con el campo `citation` exacto de su pasaje y nombra el sitio o la editorial cuando importe; si una fuente web discrepa de la biblioteca, dilo y cita ambas.'
 ];
 
 const esCitationRulesCompact = [
@@ -47,6 +48,7 @@ const esCitationRulesCompact = [
   'En consultas globales o comparativas, usa la orientación para cubrir las dimensiones centrales y respalda cada apartado con un pasaje pertinente cuando exista; nunca uses pasajes tangenciales para cumplir una cuota.',
   '`orientacion_documental` sirve solo para localizar obras: nunca la cites como evidencia.',
   'El texto visible del enlace debe ser «Autor, Año» (el apellido del primer autor y el año de la obra), NUNCA el id. Usa el id exacto solo dentro de los parentesis; nunca lo inventes.',
+  '- `pasajes_web` son páginas de Internet leídas ahora, no tu biblioteca: cita cada pasaje con su `citation` exacta, nombra el sitio y señala sus discrepancias con la biblioteca.'
 ];
 
 const makeChat = (language: PromptLanguage, citationRules: string[], compactRules: string[]) => {
@@ -302,6 +304,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Do not turn citations to works absent from the context into links; instead name author and year in plain text.',
     '- The `documentos_resumidos` section contains ORIENTATION summaries. Use it to locate and compare works, but NEVER cite it as evidence or attribute verifiable claims to it. Citations must continue to point to ideas, evidence, gaps, contradictions, or the original work.',
     '- The `orientacion_documental` section is a generated, audited card for ROUTING the search. It is not a source and is NEVER cited. Verify any claim it suggests against `ideas_generadas` or `pasajes_relevantes`.',
+    '- The `pasajes_web` section contains web pages read during this same turn: they are NOT your library. Use them only where they add to, update or contrast the library evidence, cite each with its passage’s exact `citation` field, and name the site or publisher when it matters; if a web source disagrees with the library, say so and cite both.'
   ], compact: [
     'CITATIONS: after mentioning an idea/claim from the context, add a Markdown link [Author, Year](nodus://idea/<id>) with the EXACT `id` from the "id" field.',
     'Documents: [Author, Year](nodus://work/<nodus_id>). Passages: [Author, Year, p. N](nodus://passage/<id>) using the exact `citation` field.',
@@ -309,6 +312,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'For global or comparative queries, use the orientation to cover the central dimensions and support each part with a relevant passage when available; never use tangential passages to meet a quota.',
     '`orientacion_documental` is only for locating works: never cite it as evidence.',
     'Visible link text must be «Author, Year» (the first author’s surname and work year), NEVER the id. Use the exact id only inside the parentheses; never invent it.',
+    '- `pasajes_web` are web pages read just now, not your library: cite each passage with its exact `citation`, name the site, and point out any disagreement with the library.'
   ] },
   fr: { full: [
     'CITATIONS DES SOURCES (obligatoires, style NotebookLM) :',
@@ -327,6 +331,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Ne transformez pas en liens les citations d’ouvrages absents du contexte ; nommez alors l’auteur et l’année en texte brut.',
     '- La section `documentos_resumidos` contient des résumés d’ORIENTATION. Utilisez-la pour localiser et comparer les ouvrages, mais ne la citez JAMAIS comme preuve et ne lui attribuez aucune affirmation vérifiable. Les citations doivent continuer à pointer vers les idées, les éléments de preuve, les lacunes, les contradictions ou l’ouvrage original.',
     '- La section `orientacion_documental` est une fiche générée et auditée pour le GUIDAGE de la recherche. Ce n’est pas une source et elle ne se cite JAMAIS. Vérifiez toute affirmation qu’elle suggère dans `ideas_generadas` ou `pasajes_relevantes`.',
+    '- La section `pasajes_web` contient des pages Internet lues pendant ce même tour : ce n’est PAS votre bibliothèque. Utilisez-les uniquement lorsqu’elles complètent, actualisent ou contredisent les preuves de la bibliothèque, citez chacune avec le champ `citation` exact de son passage et nommez le site ou l’éditeur lorsque c’est utile ; si une source web contredit la bibliothèque, dites-le et citez les deux.'
   ], compact: [
     'CITATIONS : après avoir mentionné une idée ou une affirmation du contexte, ajoutez un lien Markdown [Auteur, Année](nodus://idea/<id>) avec l’`id` EXACT du champ « id ».',
     'Documents : [Auteur, Année](nodus://work/<nodus_id>). Passages : [Auteur, Année, p. N](nodus://passage/<id>) avec le champ `citation` exact.',
@@ -334,6 +339,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Pour les questions globales ou comparatives, utilisez l’orientation pour couvrir les dimensions centrales et étayez chaque partie par un passage pertinent lorsqu’il existe ; n’utilisez jamais de passages tangents pour remplir un quota.',
     '`orientacion_documental` sert uniquement à localiser les ouvrages : ne la citez jamais comme preuve.',
     'Le texte visible du lien doit être « Auteur, Année » (nom du premier auteur et année de l’ouvrage), JAMAIS l’identifiant. Utilisez l’identifiant exact uniquement entre parenthèses ; n’en inventez jamais.',
+    '- `pasajes_web` sont des pages Internet lues à l’instant, pas votre bibliothèque : citez chaque passage avec sa `citation` exacte, nommez le site et signalez tout désaccord avec la bibliothèque.'
   ] },
   de: { full: [
     'QUELLENNACHWEISE (verpflichtend, NotebookLM-Stil):',
@@ -352,6 +358,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Mache Zitate zu Werken, die nicht im Kontext vorkommen, nicht zu Links; nenne Autor und Jahr stattdessen als Klartext.',
     '- `documentos_resumidos` enthält ORIENTIERUNGSzusammenfassungen. Nutze sie, um Werke zu finden und zu vergleichen, aber zitiere sie NIEMALS als Beleg und schreibe ihnen keine überprüfbaren Aussagen zu. Zitate müssen weiterhin auf Ideen, Belege, Lücken, Widersprüche oder das Originalwerk verweisen.',
     '- `orientacion_documental` ist eine generierte und geprüfte Karte zur SUCHSTEUERUNG. Sie ist keine Quelle und wird NIEMALS zitiert. Prüfe jede von ihr nahegelegte Aussage gegen `ideas_generadas` oder `pasajes_relevantes`.',
+    '- Der Abschnitt `pasajes_web` enthält Webseiten, die in diesem Durchgang gelesen wurden: Sie sind NICHT deine Bibliothek. Nutze sie nur, wenn sie die Bibliotheksbelege ergänzen, aktualisieren oder ihnen widersprechen, zitiere jede mit dem exakten `citation`-Feld ihrer Passage und nenne die Website oder den Verlag, wenn es darauf ankommt; wenn eine Webquelle der Bibliothek widerspricht, sage es und zitiere beide.'
   ], compact: [
     'ZITATE: Füge nach der Erwähnung einer Idee/Behauptung aus dem Kontext einen Markdown-Link [Autor, Jahr](nodus://idea/<id>) mit der EXAKTEN `id` aus dem Feld „id“ ein.',
     'Dokumente: [Autor, Jahr](nodus://work/<nodus_id>). Passagen: [Autor, Jahr, S. N](nodus://passage/<id>) mit dem exakten Feld `citation`.',
@@ -359,6 +366,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Nutze bei globalen oder vergleichenden Fragen die Orientierung für die zentralen Dimensionen und belege jeden Teil mit einer passenden Passage, sofern vorhanden; verwende niemals nebensächliche Passagen, um eine Quote zu erfüllen.',
     '`orientacion_documental` dient nur zum Auffinden von Werken: Zitiere sie niemals als Beleg.',
     'Der sichtbare Linktext muss «Autor, Jahr» (Nachname des ersten Autors und Erscheinungsjahr) sein, NIEMALS die ID. Verwende die exakte ID nur in den Klammern und erfinde sie nicht.',
+    '- `pasajes_web` sind gerade gelesene Webseiten, nicht deine Bibliothek: zitiere jede Passage mit ihrer exakten `citation`, nenne die Website und benenne Widersprüche zur Bibliothek.'
   ] },
   pt: { full: [
     'CITAÇÕES DE FONTES (obrigatórias, estilo NotebookLM):',
@@ -377,6 +385,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Não transformes em ligações as citações de obras que não estejam no contexto; nesse caso, indica o autor e o ano em texto simples.',
     '- A secção `documentos_resumidos` contém resumos de ORIENTAÇÃO. Usa-a para localizar e comparar obras, mas NUNCA a cites como evidência nem lhe atribuas afirmações verificáveis. As citações devem continuar a apontar para ideias, evidências, lacunas, contradições ou a obra original.',
     '- A secção `orientacion_documental` é uma ficha gerada e auditada para ORIENTAR a pesquisa. Não é uma fonte e NUNCA é citada. Verifica qualquer afirmação sugerida contra `ideas_generadas` ou `pasajes_relevantes`.',
+    '- A secção `pasajes_web` contém páginas da Internet lidas neste mesmo turno: NÃO são a tua biblioteca. Usa-as apenas quando acrescentem, atualizem ou contrastem a evidência da biblioteca, cita cada uma com o campo `citation` exato do seu passagem e nomeia o site ou a editora quando for relevante; se uma fonte web divergir da biblioteca, di-lo e cita ambas.'
   ], compact: [
     'CITAÇÕES: depois de mencionares uma ideia/afirmação do contexto, acrescenta uma ligação Markdown [Autor, Ano](nodus://idea/<id>) com o `id` EXATO do campo "id".',
     'Documentos: [Autor, Ano](nodus://work/<nodus_id>). Passagens: [Autor, Ano, p. N](nodus://passage/<id>) com o campo `citation` exato.',
@@ -384,6 +393,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Em consultas globais ou comparativas, usa a orientação para cobrir as dimensões centrais e fundamenta cada parte com uma passagem pertinente quando existir; nunca uses passagens tangenciais para cumprir uma quota.',
     '`orientacion_documental` serve apenas para localizar obras: nunca a cites como evidência.',
     'O texto visível da ligação deve ser «Autor, Ano» (o apelido do primeiro autor e o ano da obra), NUNCA o id. Usa o id exato apenas entre parênteses; nunca o inventes.',
+    '- `pasajes_web` são páginas da Internet lidas agora, não a tua biblioteca: cita cada passagem com a sua `citation` exata, nomeia o site e assinala divergências com a biblioteca.'
   ] },
   'pt-BR': { full: [
     'CITAÇÕES DE FONTES (obrigatórias, estilo NotebookLM):',
@@ -427,6 +437,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Non trasformare in link le citazioni di opere assenti dal contesto; indica invece autore e anno in testo semplice.',
     '- La sezione `documentos_resumidos` contiene riassunti di ORIENTAMENTO. Usala per localizzare e confrontare le opere, ma non citarla MAI come prova né attribuirle affermazioni verificabili. Le citazioni devono continuare a puntare a idee, prove, lacune, contraddizioni o all’opera originale.',
     '- La sezione `orientacion_documental` è una scheda generata e verificata per INDIRIZZARE la ricerca. Non è una fonte e non va MAI citata. Verifica ogni affermazione che suggerisce rispetto a `ideas_generadas` o `pasajes_relevantes`.',
+    '- La sezione `pasajes_web` contiene pagine Internet lette in questo stesso turno: NON sono la tua biblioteca. Usale solo quando aggiungono, aggiornano o contrastano l’evidenza della biblioteca, cita ciascuna con il campo `citation` esatto del suo passaggio e nomina il sito o l’editore quando conta; se una fonte web contraddice la biblioteca, dillo e cita entrambe.'
   ], compact: [
     'CITAZIONI: dopo aver menzionato un’idea/affermazione del contesto, aggiungi un link Markdown [Autore, Anno](nodus://idea/<id>) con l’`id` ESATTO del campo "id".',
     'Documenti: [Autore, Anno](nodus://work/<nodus_id>). Passaggi: [Autore, Anno, p. N](nodus://passage/<id>) con il campo `citation` esatto.',
@@ -434,6 +445,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Nelle domande globali o comparative, usa l’orientamento per coprire le dimensioni centrali e sostieni ogni parte con un passaggio pertinente quando disponibile; non usare mai passaggi tangenziali per completare una quota.',
     '`orientacion_documental` serve solo a localizzare le opere: non citarla mai come prova.',
     'Il testo visibile del link deve essere «Autore, Anno» (cognome del primo autore e anno dell’opera), MAI l’id. Usa l’id esatto solo tra parentesi; non inventarlo mai.',
+    '- `pasajes_web` sono pagine Internet lette ora, non la tua biblioteca: cita ogni passaggio con la sua `citation` esatta, nomina il sito e segnala i disaccordi con la biblioteca.'
   ] },
   tr: { full: [
     'KAYNAK ALINTILARI (zorunlu, NotebookLM tarzı):',
@@ -452,6 +464,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Bağlamda bulunmayan eserlere ait alıntıları bağlantıya dönüştürme; bunun yerine yazar ve yılı düz metin olarak yaz.',
     '- `documentos_resumidos` bölümü YÖNLENDİRME özetlerini içerir. Eserleri bulup karşılaştırmak için kullan, ancak bunu ASLA kanıt olarak alıntılama veya doğrulanabilir iddiaları buna atfetme. Alıntılar fikirlere, kanıtlara, boşluklara, çelişkilere veya özgün esere yönelmeye devam etmelidir.',
     '- `orientacion_documental` bölümü aramayı YÖNLENDİRMEK için oluşturulmuş ve denetlenmiş bir fiştir. Kaynak değildir ve ASLA alıntılanmaz. Önerdiği iddiaları `ideas_generadas` veya `pasajes_relevantes` ile doğrula.',
+    '- `pasajes_web` bölümü bu turda okunan Internet sayfalarını içerir: bunlar kütüphanen DEĞİLDİR. Yalnızca kütüphane kanıtını tamamladığında, güncellediğinde veya ona karşı çıktığında kullan, her birini pasajın tam `citation` alanıyla alıntıla ve önemli olduğunda siteyi veya yayıncıyı belirt; bir web kaynağı kütüphaneyle çelişiyorsa bunu söyle ve ikisini de alıntıla.'
   ], compact: [
     'ALINTILAR: Bağlamdaki bir fikirden söz ettikten sonra "id" alanındaki TAM `id` ile [Yazar, Yıl](nodus://idea/<id>) Markdown bağlantısı ekle.',
     'Belgeler: [Yazar, Yıl](nodus://work/<nodus_id>). Pasajlar: tam `citation` alanını kullanarak [Yazar, Yıl, s. N](nodus://passage/<id>).',
@@ -459,6 +472,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Küresel veya karşılaştırmalı sorularda merkezi boyutları kapsamak için yönlendirmeyi kullan ve her bölümü varsa ilgili bir pasajla destekle; kota doldurmak için ilgisiz pasajları kullanma.',
     '`orientacion_documental` yalnızca eserleri bulmaya yarar: onu asla kanıt olarak alıntılama.',
     'Görünen bağlantı metni «Yazar, Yıl» (ilk yazarın soyadı ve eserin yılı) olmalı, ASLA kimlik olmamalıdır. Tam kimliği yalnızca parantez içinde kullan; asla uydurma.',
+    '- `pasajes_web` şimdi okunan Internet sayfalarıdır, kütüphanen değil: her pasajı tam `citation` alanıyla alıntıla, siteyi belirt ve kütüphaneyle çelişkileri bildir.'
   ] },
   'zh-Hans': { full: [
     '来源引用（强制，NotebookLM 风格）：',
@@ -477,6 +491,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- 不要将上下文中不存在的著作引用变为链接；此时请以纯文本写出作者和年份。',
     '- `documentos_resumidos` 部分包含定位性摘要。用它来查找和比较著作，但绝不能将其作为证据引用，也不得把可验证的主张归因于它。引用必须继续指向观点、证据、空白、矛盾或原始著作。',
     '- `orientacion_documental` 部分是用于引导检索的生成并经审核的卡片。它不是来源，绝不能被引用。请对照 `ideas_generadas` 或 `pasajes_relevantes` 核实它提出的任何主张。',
+    '- `pasajes_web` 部分是本次对话中读取的互联网页面：它们不是你的文献库。只有当它们补充、更新或对照文献库证据时才使用，逐条用其摘录的准确 `citation` 字段引用，并在重要时说明网站或出版方；若网页来源与文献库不一致，请说明并同时引用两者。'
   ], compact: [
     '引用：在提及上下文中的观点/主张后，添加 Markdown 链接 [作者, 年份](nodus://idea/<id>)，其中使用 "id" 字段中确切的 `id`。',
     '文档：[作者, 年份](nodus://work/<nodus_id>)。段落：[作者, 年份, p. N](nodus://passage/<id>)，使用确切的 `citation` 字段。',
@@ -484,6 +499,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '对于全局性或比较性查询，请使用定位信息涵盖核心维度，并在可用时用相关段落支撑每一部分；绝不要用无关段落凑数。',
     '`orientacion_documental` 仅用于定位著作：绝不要将其作为证据引用。',
     '链接的可见文本必须是“作者, 年份”（第一作者姓氏和著作年份），绝不能是 id。仅可在括号内使用确切的 id；绝不编造。',
+    '- `pasajes_web` 是刚读取的互联网页面，不是你的文献库：用其准确的 `citation` 引用每条摘录，说明网站，并指出与文献库的分歧。'
   ] },
   'zh-Hant': { full: [
     '來源引用（強制，NotebookLM 風格）：',
@@ -502,6 +518,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- 不要將脈絡中不存在的著作引用變成連結；此時請以純文字寫出作者和年份。',
     '- `documentos_resumidos` 區段包含定位性摘要。用它來查找和比較著作，但絕不能將其作為證據引用，也不得把可驗證的主張歸因於它。引用必須繼續指向觀點、證據、缺口、矛盾或原始著作。',
     '- `orientacion_documental` 區段是用於引導檢索的生成並經審核的卡片。它不是來源，絕不能被引用。請對照 `ideas_generadas` 或 `pasajes_relevantes` 核實它提出的任何主張。',
+    '- `pasajes_web` 部分是本次對話中讀取的網際網路頁面：它們不是你的文獻庫。只有當它們補充、更新或對照文獻庫證據時才使用，逐條用其摘錄的準確 `citation` 欄位引用，並在重要時說明網站或出版方；若網頁來源與文獻庫不一致，請說明並同時引用兩者。'
   ], compact: [
     '引用：在提及脈絡中的觀點/主張後，加入 Markdown 連結 [作者, 年份](nodus://idea/<id>)，其中使用 "id" 欄位中確切的 `id`。',
     '文件：[作者, 年份](nodus://work/<nodus_id>)。段落：[作者, 年份, p. N](nodus://passage/<id>)，使用確切的 `citation` 欄位。',
@@ -509,6 +526,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '對於全域性或比較性查詢，請使用定位資訊涵蓋核心面向，並在可用時以相關段落支撐每一部分；絕不要用無關段落湊數。',
     '`orientacion_documental` 僅用於定位著作：絕不要將其作為證據引用。',
     '連結的可見文字必須是「作者, 年份」（第一作者姓氏和著作年份），絕不能是 id。僅可在括號內使用確切的 id；絕不捏造。',
+    '- `pasajes_web` 是剛讀取的網際網路頁面，不是你的文獻庫：用其準確的 `citation` 引用每條摘錄，說明網站，並指出與文獻庫的分歧。'
   ] },
   vi: { full: [
     'TRÍCH DẪN NGUỒN (bắt buộc, phong cách NotebookLM):',
@@ -527,6 +545,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Không biến các trích dẫn tới công trình không có trong ngữ cảnh thành liên kết; thay vào đó hãy nêu tên tác giả và năm bằng văn bản thuần.',
     '- Phần `documentos_resumidos` chứa các tóm tắt ĐỊNH HƯỚNG. Dùng nó để định vị và so sánh các công trình, nhưng KHÔNG BAO GIỜ trích dẫn nó làm bằng chứng hay gán các khẳng định có thể kiểm chứng cho nó. Các trích dẫn phải tiếp tục hướng tới ý tưởng, bằng chứng, khoảng trống, mâu thuẫn hoặc công trình gốc.',
     '- Phần `orientacion_documental` là một phiếu được tạo và kiểm toán để ĐỊNH TUYẾN tìm kiếm. Nó không phải là nguồn và KHÔNG BAO GIỜ được trích dẫn. Hãy kiểm chứng mọi khẳng định mà nó gợi ý dựa trên `ideas_generadas` hoặc `pasajes_relevantes`.',
+    '- Phần `pasajes_web` chứa các trang Internet được đọc trong chính lượt này: chúng KHÔNG phải thư viện của bạn. Chỉ dùng khi chúng bổ sung, cập nhật hoặc đối chiếu bằng chứng của thư viện, trích dẫn từng đoạn bằng đúng trường `citation` của nó và nêu tên trang hoặc nhà xuất bản khi cần; nếu một nguồn web mâu thuẫn với thư viện, hãy nói rõ và trích dẫn cả hai.'
   ], compact: [
     'TRÍCH DẪN: sau khi đề cập một ý tưởng/khẳng định từ ngữ cảnh, hãy thêm liên kết Markdown [Tác giả, Năm](nodus://idea/<id>) với `id` CHÍNH XÁC từ trường "id".',
     'Tài liệu: [Tác giả, Năm](nodus://work/<nodus_id>). Đoạn trích: [Tác giả, Năm, tr. N](nodus://passage/<id>) bằng trường `citation` chính xác.',
@@ -534,6 +553,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Với các truy vấn toàn cục hoặc so sánh, hãy dùng định hướng để bao quát các khía cạnh trọng tâm và hỗ trợ mỗi phần bằng một đoạn liên quan khi có; tuyệt đối không dùng các đoạn ngoài lề để đủ hạn mức.',
     '`orientacion_documental` chỉ dùng để định vị các công trình: không bao giờ trích dẫn nó làm bằng chứng.',
     'Văn bản hiển thị của liên kết phải là «Tác giả, Năm» (họ của tác giả đầu tiên và năm của công trình), KHÔNG BAO GIỜ là id. Chỉ dùng id chính xác bên trong dấu ngoặc đơn; không bao giờ bịa ra nó.',
+    '- `pasajes_web` là các trang Internet vừa đọc, không phải thư viện của bạn: trích dẫn từng đoạn bằng đúng `citation`, nêu tên trang và chỉ ra mâu thuẫn với thư viện.'
   ] },
   ja: { full: [
     '出典の引用（必須、NotebookLM 形式）：',
@@ -552,6 +572,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- コンテキストに存在しない著作への引用をリンクにしないでください。その場合は著者と年をプレーンテキストで示してください。',
     '- `documentos_resumidos` セクションには方向づけの要約が含まれます。著作の位置特定と比較に使用してください。ただし、証拠として引用したり、検証可能な主張をそれに帰属させたりしないでください。引用は引き続きアイデア、証拠、空白、矛盾、または原著を指し示す必要があります。',
     '- `orientacion_documental` セクションは検索を誘導するために生成・監査されたカードです。出典ではなく、決して引用されません。それが提案する主張は `ideas_generadas` または `pasajes_relevantes` に対して検証してください。',
+    '- `pasajes_web` セクションは、このターンで読み込んだインターネット上のページです。あなたのライブラリではありません。ライブラリの根拠を補う・更新する・対照する場合にのみ使い、各抜粋をその正確な `citation` フィールドで引用し、重要な場合はサイト名や出版社を示してください。ウェブ資料がライブラリと矛盾する場合は、その旨を述べて両方を引用してください。'
   ], compact: [
     '引用：コンテキストのアイデアや主張に言及した後、"id" フィールドの正確な `id` を使って Markdown リンク [著者, 年](nodus://idea/<id>) を追加してください。',
     '文書：[著者, 年](nodus://work/<nodus_id>)。一節：[著者, 年, p. N](nodus://passage/<id>)。正確な `citation` フィールドを使用してください。',
@@ -559,6 +580,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '全体または比較の問いでは、方向づけを使って中心的な次元を網羅し、利用可能な場合は関連する一節で各部分を裏付けてください。枠を満たすために的外れな一節を使用しないでください。',
     '`orientacion_documental` は著作の位置特定のみに使用します。証拠として決して引用しないでください。',
     'リンクの表示テキストは「著者, 年」（第一著者の姓と著作の年）でなければならず、id を決して表示しないでください。正確な id は括弧内でのみ使用し、決して捏造しないでください。',
+    '- `pasajes_web` は今読み込んだウェブページで、ライブラリではありません。各抜粋を正確な `citation` で引用し、サイト名を示し、ライブラリとの矛盾を指摘してください。'
   ] },
   ru: { full: [
     'ССЫЛКИ НА ИСТОЧНИКИ (обязательно, в стиле NotebookLM):',
@@ -577,6 +599,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Не превращайте в ссылки цитаты работ, отсутствующих в контексте; в этом случае назовите автора и год обычным текстом.',
     '- Раздел `documentos_resumidos` содержит ОРИЕНТИРУЮЩИЕ резюме. Используйте его для поиска и сравнения работ, но НИКОГДА не цитируйте его как доказательство и не приписывайте ему проверяемые утверждения. Ссылки должны по-прежнему указывать на идеи, доказательства, пробелы, противоречия или оригинальную работу.',
     '- Раздел `orientacion_documental` — это созданная и проверенная карточка для НАПРАВЛЕНИЯ поиска. Она не является источником и НИКОГДА не цитируется. Проверяйте любое предлагаемое ею утверждение по `ideas_generadas` или `pasajes_relevantes`.',
+    '- Раздел `pasajes_web` содержит страницы из Интернета, прочитанные в этом же ходе: это НЕ ваша библиотека. Используйте их только там, где они дополняют, обновляют или противоречат доказательствам библиотеки, цитируйте каждую с точным полем `citation` её фрагмента и указывайте сайт или издателя, когда это важно; если веб-источник расходится с библиотекой, скажите об этом и процитируйте оба.'
   ], compact: [
     'ССЫЛКИ: после упоминания идеи/утверждения из контекста добавьте ссылку Markdown [Автор, Год](nodus://idea/<id>) с ТОЧНЫМ `id` из поля "id".',
     'Документы: [Автор, Год](nodus://work/<nodus_id>). Фрагменты: [Автор, Год, с. N](nodus://passage/<id>) с точным полем `citation`.',
@@ -584,6 +607,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Для глобальных или сравнительных запросов используйте ориентир, чтобы охватить центральные измерения, и подкрепляйте каждую часть подходящим фрагментом, когда он есть; никогда не используйте периферийные фрагменты для выполнения квоты.',
     '`orientacion_documental` служит только для поиска работ: никогда не цитируйте её как доказательство.',
     'Видимый текст ссылки должен быть «Автор, Год» (фамилия первого автора и год работы), НИКОГДА не id. Используйте точный id только внутри скобок; никогда не выдумывайте его.',
+    '- `pasajes_web` — это прочитанные только что страницы Интернета, а не ваша библиотека: цитируйте каждый фрагмент с его точным `citation`, указывайте сайт и отмечайте расхождения с библиотекой.'
   ] },
   uk: { full: [
     'ПОСИЛАННЯ НА ДЖЕРЕЛА (обов’язково, у стилі NotebookLM):',
@@ -602,6 +626,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- Не перетворюйте на посилання цитати праць, відсутніх у контексті; у такому разі назвіть автора та рік звичайним текстом.',
     '- Розділ `documentos_resumidos` містить ОРІЄНТУВАЛЬНІ резюме. Використовуйте його для пошуку та порівняння праць, але НІКОЛИ не цитуйте його як доказ і не приписуйте йому перевірювані твердження. Посилання мають і надалі вказувати на ідеї, докази, прогалини, протиріччя або оригінальну працю.',
     '- Розділ `orientacion_documental` — це створена й перевірена картка для СПРЯМУВАННЯ пошуку. Вона не є джерелом і НІКОЛИ не цитується. Перевіряйте будь-яке запропоноване нею твердження за `ideas_generadas` або `pasajes_relevantes`.',
+    '- Розділ `pasajes_web` містить сторінки з Інтернету, прочитані в цьому ж ході: це НЕ ваша бібліотека. Використовуйте їх лише там, де вони доповнюють, оновлюють або суперечать доказам бібліотеки, цитуйте кожну з точним полем `citation` її фрагмента й називайте сайт або видавця, коли це важливо; якщо веб-джерело розходиться з бібліотекою, скажіть про це й процитуйте обидва.'
   ], compact: [
     'ПОСИЛАННЯ: після згадки ідеї/твердження з контексту додайте посилання Markdown [Автор, Рік](nodus://idea/<id>) з ТОЧНИМ `id` із поля "id".',
     'Документи: [Автор, Рік](nodus://work/<nodus_id>). Фрагменти: [Автор, Рік, с. N](nodus://passage/<id>) з точним полем `citation`.',
@@ -609,6 +634,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     'Для глобальних або порівняльних запитів використовуйте орієнтир, щоб охопити центральні виміри, і підкріплюйте кожну частину доречним фрагментом, коли він є; ніколи не використовуйте периферійні фрагменти для виконання квоти.',
     '`orientacion_documental` слугує лише для пошуку праць: ніколи не цитуйте її як доказ.',
     'Видимий текст посилання має бути «Автор, Рік» (прізвище першого автора та рік праці), НІКОЛИ не id. Використовуйте точний id лише всередині дужок; ніколи не вигадуйте його.',
+    '- `pasajes_web` — це щойно прочитані сторінки Інтернету, а не ваша бібліотека: цитуйте кожен фрагмент з його точним `citation`, називайте сайт і зазначайте розбіжності з бібліотекою.'
   ] },
   ko: { full: [
     '출처 인용(필수, NotebookLM 스타일):',
@@ -627,6 +653,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '- 컨텍스트에 없는 저작에 대한 인용을 링크로 만들지 마십시오. 그 대신 저자와 연도를 일반 텍스트로 명시하십시오.',
     '- `documentos_resumidos` 섹션에는 방향 제시용 요약이 들어 있습니다. 저작을 찾고 비교하는 데 사용하되, 증거로 절대 인용하거나 검증 가능한 주장을 그것에 귀속시키지 마십시오. 인용은 계속 아이디어, 증거, 공백, 모순 또는 원저작을 가리켜야 합니다.',
     '- `orientacion_documental` 섹션은 검색을 안내하기 위해 생성되고 감사된 카드입니다. 그것은 출처가 아니며 절대 인용되지 않습니다. 그것이 제안하는 주장은 `ideas_generadas` 또는 `pasajes_relevantes`와 대조하여 검증하십시오.',
+    '- `pasajes_web` 섹션은 이번 턴에 읽은 인터넷 페이지입니다. 사용자의 라이브러리가 아닙니다. 라이브러리 근거를 보완·갱신·대조할 때만 사용하고, 각 발췌를 정확한 `citation` 필드로 인용하며, 중요한 경우 사이트나 출판사를 밝히세요. 웹 출처가 라이브러리와 어긋나면 그 점을 말하고 둘 다 인용하세요.'
   ], compact: [
     '인용: 컨텍스트의 아이디어/주장을 언급한 뒤 "id" 필드의 정확한 `id`와 함께 Markdown 링크 [저자, 연도](nodus://idea/<id>)를 추가하십시오.',
     '문서: [저자, 연도](nodus://work/<nodus_id>). 구절: [저자, 연도, p. N](nodus://passage/<id>). 정확한 `citation` 필드를 사용하십시오.',
@@ -634,6 +661,7 @@ const localizedCitationRules: Record<PromptLanguage, { full: string[]; compact: 
     '전체 또는 비교 질의에서는 방향 정보를 사용하여 중심 차원을 다루고, 사용 가능한 경우 관련 구절로 각 부분을 뒷받침하십시오. 할당량을 채우기 위해 주변부 구절을 절대 사용하지 마십시오.',
     '`orientacion_documental`은 저작 위치 확인 전용입니다. 증거로 절대 인용하지 마십시오.',
     '링크의 표시 텍스트는 «저자, 연도»(제1저자의 성과 저작 연도)여야 하며 id가 되어서는 절대 안 됩니다. 정확한 id는 괄호 안에서만 사용하고 절대 지어내지 마십시오.',
+    '- `pasajes_web`은 방금 읽은 인터넷 페이지이며 라이브러리가 아닙니다: 각 발췌를 정확한 `citation`으로 인용하고, 사이트를 밝히고, 라이브러리와의 불일치를 지적하세요.'
   ] },
 };
 
@@ -651,6 +679,14 @@ localizedCitationRules['pt-BR'] = {
     .replaceAll('acrescenta', 'adicione').replaceAll('Devolve', 'Retorne').replaceAll('usa', 'use')
     .replaceAll('uma link', 'um link').replaceAll('a link', 'o link')),
 };
+// The web clause is written straight in Brazilian Portuguese: the word-by-word
+// mapping above would leave European forms behind ("Usa-as", "di-lo").
+localizedCitationRules['pt-BR'].full = localizedCitationRules['pt-BR'].full.map(line => line.startsWith('- A secção `pasajes_web`')
+  ? '- A seção `pasajes_web` contém páginas da Internet lidas neste mesmo turno: NÃO são a sua biblioteca. Use-as apenas quando acrescentarem, atualizarem ou contrastarem a evidência da biblioteca, cite cada uma com o campo `citation` exato do seu trecho e nomeie o site ou a editora quando importar; se uma fonte web divergir da biblioteca, diga isso e cite ambas.'
+  : line);
+localizedCitationRules['pt-BR'].compact = localizedCitationRules['pt-BR'].compact.map(line => line.startsWith('- `pasajes_web` são páginas da Internet lidas agora')
+  ? '- `pasajes_web` são páginas da Internet lidas agora, não a sua biblioteca: cite cada trecho com sua `citation` exata, nomeie o site e aponte divergências com a biblioteca.'
+  : line);
 
 const genealogy = {
   es: {

@@ -143,7 +143,7 @@ test('newer Claude models replay with adaptive thinking when they reject thinkin
 
 test('a streamed answer cut at the output ceiling is reported, not stored', () => {
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
-  const options = readFileSync(path.join(repoRoot, 'electron/ai/researchGenerationOptions.ts'), 'utf8');
+  const options = readFileSync(path.join(repoRoot, 'electron/ai/thinkingEffort.ts'), 'utf8');
   // The Anthropic stream reads the only truncation signal it has — `stop_reason` on the final
   // `message_delta`, plus the thinking-token breakdown — and refuses to store the fragment.
   assert.match(source, /stopReason = event\.delta\.stop_reason/);

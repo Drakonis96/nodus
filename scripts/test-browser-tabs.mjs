@@ -129,7 +129,7 @@ test('shutdown is wired into every one of main.ts’s exit paths', () => {
     "mainWindow.on('closed'",
     "app.on('window-all-closed'",
     "app.on('before-quit'",
-    "app.on('will-quit'",
+    "app.on('will-quit', () =>",
     "updateAwareApp.on('before-quit-for-update'",
   ]) {
     const at = main.indexOf(marker);
