@@ -1,42 +1,29 @@
 #!/usr/bin/env node
-// Whole-library idea-graph consistency audit — Phase 1 of the stray-analysis plan.
+// Whole-library idea-graph consistency audit. Read-only (better-sqlite3 `readonly`),
+// so it is safe to run anytime, including while a scan is in progress.
 //
-// The first 9 checks mirror assertDeepDataIntegrity() (electron/db/ideasRepo.ts)
-// exactly, but that function runs SCOPED to one work, and only at the moment that
-// work is (re)scanned. Nothing ever re-validates a work that already finished — so a
-// LATER, unrelated purge can silently break an earlier, already-audited work's data
-// (the class of bug fixed in PR #962), and any drift that predates 2026-09-02 (when
-// assertDeepDataIntegrity was added) was never checked at all. This script runs the
-// identical checks with no work-scoping, against a vault's real database, read-only,
-// so it can be run anytime without risk — including while a scan is in progress.
+// assertDeepDataIntegrity() (electron/db/ideasRepo.ts) checks one work, inside the
+// transaction that rewrites it, right after that work's purge. This script checks the
+// whole vault as it sits on disk, so two of its rules differ on purpose:
 //
-// A further 4 checks (theme links→themes, theme links→works, work themes→themes,
-// work themes→works) cover ground assertDeepDataIntegrity never checked at all, at
-// any point — the write path has no equivalent guard for a theme reference the way
-// it does for an idea reference. See the comment on those checks in CHECKS below;
-// they surfaced real, live drift (1,005 dangling theme_id references on the first
-// vault this ran against), likely from the same "global cleanup with no awareness of
-// another write in flight" bug shape as #962, just in the themes subsystem — not yet
-// investigated or fixed the way #961/#962 were for ideas.
+// - An edge whose endpoint is DORMANT is expected, not a violation. When a work is
+//   rescanned and no longer contains an idea, the idea goes to sleep, and the edges other
+//   works hold into it stay in `edges`; the `visible_edges` view hides them until a scan
+//   re-attaches the idea. Those works' own rescans delete their edges first, so they
+//   never trip the write-time check. They are reported as information only. An edge
+//   whose endpoint is MISSING is a real violation.
+// - An ACTIVE idea with no occurrence (and no note owning it as a manual idea) is a
+//   violation: an idea is active exactly while some work holds it.
 //
-// Ideas, and bridges / other semantic-relationship edges, are both already covered:
-// ideas by 6 of the first 9 checks constraining against a missing/dormant idea;
-// bridges by the `edges→active ideas` check, which is agnostic to an edge's trace
-// method ('bridge', 'reprocess', 'deep', 'fusion') or a null source_work.
+// The theme checks cover references the write path never validates. Before 5.6.0 the
+// orphan-theme sweep ignored idea_theme_links and deleted themes only idea links used,
+// which left links pointing at nothing. The app repairs all of these once per vault
+// (electron/db/graphIntegrityRepair.ts); a clean report afterwards is the confirmation.
+// Theme links of manual ideas use the 'manual' pseudo-work, which is not a missing work.
 //
-// This is detection only. It never writes anything. A narrower, separate repair pass
-// for the one class it's currently possible to repair safely (reviving an idea that's
-// dormant but still referenced by a live edge — provably safe, matching the invariant
-// PR #962 now enforces going forward) is scripts/repair-graph-integrity.mjs, Phase 2.
-// The theme_id checks below have no equivalent repair yet: a theme row is hard-deleted
-// (not soft-dormant like an idea), so there's nothing to revive.
-//
-// Where these mirror assertDeepDataIntegrity, keep the two in sync if that function's
-// checks ever change — this duplication is intentional: the two run in very different
-// contexts (inside a write transaction vs. read-only over a whole vault) and don't
-// share a runtime, so keeping them as plain, dependency-free SQL here is simpler and
-// safer than threading Electron or vault-switching machinery through a diagnostic
-// script.
+// Keep the checks shared with assertDeepDataIntegrity in step if that function changes.
+// They are duplicated as plain SQL on purpose: this runs outside the app, read-only,
+// without Electron or vault-switching machinery.
 //
 // Usage:
 //   node scripts/audit-graph-integrity.mjs                   # every vault in vaults.json
@@ -111,12 +98,15 @@ function discoverVaults() {
   return fs.existsSync(fallback) ? [{ id: 'default', name: 'My vault', path: fallback }] : [];
 }
 
-// Each check's `count` is the exact WHERE-clause shape assertDeepDataIntegrity uses,
-// minus the nodus_id / source_work parameter. `detail` adds a `works` join so
-// violations can be reported by title, and a `reason` column distinguishing "the
-// target doesn't exist at all" (unrecoverable — the reference itself is stale) from
-// "the target exists but is dormant" (the class PR #961/#962 address; potentially
-// repairable by reviving it, which this script does not do).
+// Each check's `count` is the WHERE clause of the matching assertDeepDataIntegrity check
+// without its work filter. `detail` adds the work title and, where it helps, whether the
+// target is missing or dormant. `info` checks are reported but never count as violations.
+// Ideas a note owns as a manual idea (the same exclusion purgeDeepData's dormancy sweep
+// makes). Guarded with json_valid so one malformed note cannot abort the audit.
+const MANUAL_IDEA_REFS = `SELECT json_extract(doc, '$.ref') FROM (
+    SELECT CASE WHEN json_valid(source_json) THEN source_json END AS doc FROM notes
+  ) WHERE json_extract(doc, '$.note') = 'manual-idea' AND json_extract(doc, '$.ref') IS NOT NULL`;
+
 const CHECKS = [
   {
     label: 'occurrences→ideas',
@@ -135,36 +125,69 @@ const CHECKS = [
     label: 'evidence→ideas',
     count: `SELECT COUNT(*) AS n FROM evidence ev
       LEFT JOIN ideas i ON i.global_id = ev.global_id
-      WHERE ev.global_id IS NOT NULL AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`,
+      WHERE ev.global_id IS NOT NULL AND ev.global_id <> ''
+        AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`,
     detail: `SELECT ev.nodus_id, w.title, ev.id AS evidence_id, ev.global_id,
         CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
       FROM evidence ev
       LEFT JOIN ideas i ON i.global_id = ev.global_id
       LEFT JOIN works w ON w.nodus_id = ev.nodus_id
-      WHERE ev.global_id IS NOT NULL AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)
+      WHERE ev.global_id IS NOT NULL AND ev.global_id <> ''
+        AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)
       ORDER BY w.title LIMIT 200`,
   },
   {
-    label: 'edges→active ideas',
+    // Before 2026-09-02 a gap in a work with no ideas stored its evidence under the idea
+    // id ''. The gap still shows the quote, and the work's next rescan replaces it.
+    label: 'gap evidence w/o idea',
+    info: true,
+    count: `SELECT COUNT(*) AS n FROM evidence ev WHERE ev.global_id = ''`,
+    detail: `SELECT ev.nodus_id, w.title, ev.id AS evidence_id
+      FROM evidence ev LEFT JOIN works w ON w.nodus_id = ev.nodus_id
+      WHERE ev.global_id = '' ORDER BY w.title LIMIT 200`,
+  },
+  {
+    label: 'edges→ideas',
     count: `SELECT COUNT(*) AS n FROM edges e
       LEFT JOIN ideas src ON src.global_id = e.from_id
       LEFT JOIN ideas dst ON dst.global_id = e.to_id
-      WHERE src.global_id IS NULL OR dst.global_id IS NULL
-        OR src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL`,
+      WHERE src.global_id IS NULL OR dst.global_id IS NULL`,
     detail: `SELECT e.source_work AS nodus_id, w.title, e.id AS edge_id, e.from_id, e.to_id,
-        CASE
-          WHEN src.global_id IS NULL THEN 'from_id missing'
-          WHEN dst.global_id IS NULL THEN 'to_id missing'
-          WHEN src.orphaned_at IS NOT NULL THEN 'from_id dormant'
-          ELSE 'to_id dormant'
-        END AS reason
+        CASE WHEN src.global_id IS NULL THEN 'from_id missing' ELSE 'to_id missing' END AS reason
       FROM edges e
       LEFT JOIN ideas src ON src.global_id = e.from_id
       LEFT JOIN ideas dst ON dst.global_id = e.to_id
       LEFT JOIN works w ON w.nodus_id = e.source_work
       WHERE src.global_id IS NULL OR dst.global_id IS NULL
-        OR src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL
       ORDER BY w.title LIMIT 200`,
+  },
+  {
+    label: 'edges hidden (dormant end)',
+    info: true,
+    count: `SELECT COUNT(*) AS n FROM edges e
+      JOIN ideas src ON src.global_id = e.from_id
+      JOIN ideas dst ON dst.global_id = e.to_id
+      WHERE src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL`,
+    detail: `SELECT e.source_work AS nodus_id, w.title, e.id AS edge_id, e.from_id, e.to_id
+      FROM edges e
+      JOIN ideas src ON src.global_id = e.from_id
+      JOIN ideas dst ON dst.global_id = e.to_id
+      LEFT JOIN works w ON w.nodus_id = e.source_work
+      WHERE src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL
+      ORDER BY w.title LIMIT 200`,
+  },
+  {
+    label: 'active ideas w/o works',
+    count: `SELECT COUNT(*) AS n FROM ideas i
+      WHERE i.orphaned_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = i.global_id)
+        AND i.global_id NOT IN (${MANUAL_IDEA_REFS})`,
+    detail: `SELECT NULL AS nodus_id, '(no work holds it)' AS title, i.global_id, i.label
+      FROM ideas i
+      WHERE i.orphaned_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = i.global_id)
+        AND i.global_id NOT IN (${MANUAL_IDEA_REFS})
+      ORDER BY i.label LIMIT 200`,
   },
   {
     label: 'theme links→ideas',
@@ -238,18 +261,7 @@ const CHECKS = [
       LEFT JOIN edges e ON e.id = et.edge_id
       WHERE e.id IS NULL LIMIT 200`,
   },
-  // The four checks below are NOT part of assertDeepDataIntegrity — the write path
-  // never validates theme references at all, at any point. Added here because a live
-  // audit found real, sizable drift the write path has no equivalent check for: 1,005
-  // idea_theme_links rows pointing at a deleted theme, on the first vault this was run
-  // against. Likely cause: pruneOrphanThemes() (electron/db/themesRepo.ts, called from
-  // reprocessConnections.ts) deletes any theme currently unreferenced ACROSS THE WHOLE
-  // LIBRARY — the same "global cleanup with no awareness of another write in flight"
-  // shape as the bug #962 fixed for ideas, just for themes instead, and not yet fixed.
-  // Bridges and other semantic-relationship edges need no separate check here: they
-  // are plain rows in `edges` (trace method 'bridge' / 'reprocess', `source_work`
-  // often NULL) and are already covered by the `edges→active ideas` check above,
-  // which doesn't care about method or a null source_work.
+  // Theme references: assertDeepDataIntegrity never checks these.
   {
     label: 'theme links→themes',
     count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
@@ -266,11 +278,11 @@ const CHECKS = [
     label: 'theme links→works',
     count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
       LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE w.nodus_id IS NULL`,
+      WHERE w.nodus_id IS NULL AND itl.nodus_id <> 'manual'`,
     detail: `SELECT itl.nodus_id, itl.global_id, itl.theme_id
       FROM idea_theme_links itl
       LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE w.nodus_id IS NULL LIMIT 200`,
+      WHERE w.nodus_id IS NULL AND itl.nodus_id <> 'manual' LIMIT 200`,
   },
   {
     label: 'work themes→themes',
@@ -320,7 +332,7 @@ function auditVault(vault) {
     const results = CHECKS.map((check) => {
       const n = db.prepare(check.count).get().n;
       const rows = n > 0 ? db.prepare(check.detail).all() : [];
-      return { label: check.label, count: n, rows };
+      return { label: check.label, info: Boolean(check.info), count: n, rows };
     });
     const stuckJobs = db.prepare(STUCK_JOBS_SQL).all();
     return { vault, results, stuckJobs };
@@ -347,9 +359,13 @@ function printReport(audit) {
     return;
   }
   let anyViolations = false;
-  for (const { label, count, rows } of audit.results) {
+  for (const { label, info, count, rows } of audit.results) {
     if (count === 0) {
-      console.log(`  ${label.padEnd(26)} clean`);
+      console.log(`  ${label.padEnd(26)} ${info ? 'none' : 'clean'}`);
+      continue;
+    }
+    if (info) {
+      console.log(`  ${label.padEnd(26)} ${count} (expected, not a violation)`);
       continue;
     }
     anyViolations = true;
@@ -384,6 +400,8 @@ if (asJson) {
 }
 
 const anyViolations = audits.some(
-  (a) => a.error || (a.results && a.results.some((r) => r.count > 0)) || (a.stuckJobs && a.stuckJobs.length > 0)
+  (a) => a.error || (a.results && a.results.some((r) => !r.info && r.count > 0)) || (a.stuckJobs && a.stuckJobs.length > 0)
 );
-process.exit(anyViolations ? 1 : 0);
+// exitCode, not process.exit(): exiting at once truncates a large --json report that is
+// still being written to a pipe.
+process.exitCode = anyViolations ? 1 : 0;
