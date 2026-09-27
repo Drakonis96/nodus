@@ -136,7 +136,7 @@ try {
     return window.nodus.startDictionaryGeneration({ entryId: id, mode: 'creation', model, thinkingEffort: 'low', webSearch: 'auto' });
   }, { id: entry.id, model });
   await page.getByText('Rotational irrigation', { exact: true }).first().click();
-  await page.getByTestId('research-activity').waitFor();
+  assert.equal(await page.getByTestId('research-activity').count(), 0, 'queued Dictionary work does not show a chat activity balloon');
   await page.screenshot({ path: path.join(out, 'dictionary-active.png') });
   const result = await waitFor(async () => {
     const jobs = await page.evaluate(() => window.nodus.listDictionaryGenerationJobs());

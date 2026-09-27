@@ -40,8 +40,6 @@ import type {
 import { PROMPT_LANGUAGES } from "@shared/types";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { Markdown, type MarkdownCitation } from "../components/Markdown";
-import { ResearchActivityPanel } from '../components/ResearchActivityPanel';
-import { updateResearchActivities, type ResearchActivity } from '@shared/researchActivity';
 import { ResearchEffortControl } from '../components/ResearchEffortControl';
 import { useResearchEffort } from '../hooks/useResearchEffort';
 import type { ResearchEffort } from '@shared/researchReasoning';
@@ -1060,13 +1058,6 @@ export function DictionaryView({
   const [thinkingEffort, onThinkingEffort] = useResearchEffort(settings, model);
   const [webSearch, onWebSearch] = useState<ResearchWebSearchMode>('auto');
   const research = { thinkingEffort, onThinkingEffort, webSearch, onWebSearch };
-  const [activities, setActivities] = useState<Record<string, ResearchActivity[]>>({});
-  useEffect(() => window.nodus.onDictionaryProgress(event => {
-    if (event.phase === 'queued') setActivities(current => ({ ...current, [event.entryId]: [] }));
-    if (event.activity) setActivities(current => ({ ...current,
-      [event.entryId]: updateResearchActivities(current[event.entryId] ?? [], event.activity!),
-    }));
-  }), []);
   const [entries, setEntries] = useState<DictionaryEntrySummary[]>([]);
   const [total, setTotal] = useState(0);
   const [facets, setFacets] = useState<DictionaryFacets>({
@@ -1415,7 +1406,6 @@ export function DictionaryView({
                 : { ...current, [activeId]: tab },
             )
           }
-          activities={activities[activeId] ?? []}
           progress={generationJobs.get(activeId)}
           onGenerationStarted={(progress) =>
             setGenerationJobs((current) => {
@@ -1856,7 +1846,6 @@ function DictionaryEntryView({
   restoredTab,
   onTabChange,
   progress,
-  activities,
   onGenerationStarted,
   settings,
   model,
@@ -1871,7 +1860,6 @@ function DictionaryEntryView({
   restoredTab?: DictionaryDetailTab;
   onTabChange: (tab: DictionaryDetailTab) => void;
   progress?: DictionaryProgress;
-  activities: ResearchActivity[];
   onGenerationStarted: (progress: DictionaryProgress) => void;
   settings: AppSettings;
   model: ModelRef | null;
@@ -2109,9 +2097,6 @@ function DictionaryEntryView({
             </div>
           </div>
         </section>
-        <ResearchActivityPanel startMinimized activities={activities} label={t('Actividad del Diccionario')}
-          outcome={backgroundBusy ? 'active' : progress?.phase === 'failed' ? 'failed' : 'completed'}
-          webDisabled={research.webSearch === 'off'} />
         {backgroundFailure && <ErrorNotice>{backgroundFailure}</ErrorNotice>}
         {error && <ErrorNotice>{error}</ErrorNotice>}
         {!hasEvidence && (
