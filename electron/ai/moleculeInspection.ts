@@ -189,7 +189,14 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
   };
   const result = await runner.invoke({ provider, toolId: ROUTE_TOOL, input });
   const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'route-audit');
-  return artifact ? normalizeRouteAudit(artifact.data) : null;
+  const audit = artifact ? normalizeRouteAudit(artifact.data) : null;
+  // Older installed packages (including 2.5.6) drop empty steps. Updating the bootstrap
+  // does not upgrade a user's active plugin, so verify the returned positions before any
+  // labels, corrections or drawings are associated with them.
+  if (audit && (audit.steps.length !== steps.length || audit.steps.some((step, index) => step.index !== index))) {
+    throw new Error('The installed chemistry package omitted or renumbered route steps. Update Chemistry Studio before checking this route');
+  }
+  return audit;
 }
 
 async function verifyRouteSteps(steps: string[], options: InspectOptions, racemic?: boolean): Promise<RouteAudit | null> {

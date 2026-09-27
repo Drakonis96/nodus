@@ -833,7 +833,7 @@ export function routeReportsForHistory(prose: string, latest: boolean): string {
 // …", then "SMILES:". The name may wrap and may be a long systematic name, so the run before SMILES
 // crosses newlines (up to 400 characters); it stops at a "from/starting/using/with" clause so it
 // never wanders into the starting materials.
-const TARGET_PATTERN = /\b(?:synthes[a-z]*(?:\s+(?:of|for))?|preparation\s+of|route\s+(?:to|for))\b(?:(?!\b(?:from|starting|using|with)\b)[\s\S]){0,400}?\bSMILES\s*[:=]\s*`?([^\s`,;]+)/i;
+const TARGET_PATTERN = /\b(?:synthes[a-z]*(?:\s+(?:of|for))?|preparation\s+of|route\s+(?:to|for)|s[ií]ntesis\s+(?:de|del)|sintetiz[a-záéíóú]*|preparaci[oó]n\s+(?:de|del)|ruta\s+(?:de|para|hacia))\b(?:(?!\b(?:from|starting|using|with|desde|usando|con)\b|\ba\s+partir\s+de\b)[\s\S]){0,400}?\bSMILES\s*[:=]\s*`?([^\s`,;]+)/i;
 
 export function findRequestedTarget(text: string): string | null {
   const match = TARGET_PATTERN.exec(text);
@@ -878,7 +878,10 @@ export function isRouteFixPrompt(text: string): boolean {
  *  when it names no SMILES, so an earlier route's target never carries over into a new route. */
 // A request for a new route ("propose a synthesis of…", "synthesize…", "suggest a route to…"), as
 // opposed to a question about the current one ("why does the synthesis need step 2?").
-const NEW_ROUTE_REQUEST = /\b(?:propose|suggest|design|plan|give|outline|devise|provide)\b[^.?!\n]{0,60}\b(?:synthes[a-z]*|route)\b|\bsynthesi[sz]e\b/i;
+// A named request need not contain an imperative: "Now a synthesis of paracetamol" and
+// "Ahora una ruta de síntesis de paracetamol" both replace the earlier target. Do not
+// carry its structure into the new route merely because the new request gives only a name.
+const NEW_ROUTE_REQUEST = /\b(?:propose|suggest|design|plan|give|outline|devise|provide)\b[^.?!\n]{0,60}\b(?:synthes[a-z]*|route)\b|\bsynthesi[sz]e\b|\b(?:synthesis|preparation)\s+(?:of|for)\b|\broute\s+(?:to|for)\b|\b(?:s[ií]ntesis|preparaci[oó]n)\s+(?:de|del)\b|\bruta\s+(?:de|para|hacia)\b|\bsintetiz[a-záéíóú]*\b/i;
 
 export function requestedTargetFor(userMessages: string[]): string | null {
   for (let index = userMessages.length - 1; index >= 0; index--) {
@@ -944,7 +947,9 @@ const ROUTE_LINK_REASONS: RouteLinkAudit['reason'][] = ['carried', 'constitution
 function normalizeRouteStep(entry: unknown, index: number): RouteStepAudit | null {
   const value = asRecord(entry);
   const reaction = value && typeof value.reaction === 'string' ? value.reaction : '';
-  if (!value || !reaction) return null;
+  // 2.5.7 reports an unresolved step with an empty reaction and ok:false. It must
+  // survive normalization, otherwise even a correctly aligned plugin audit shifts here.
+  if (!value || typeof value.reaction !== 'string' || (!reaction && value.ok !== false)) return null;
   return {
     index: numberOr(value.index, index),
     reaction,

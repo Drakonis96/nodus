@@ -1014,3 +1014,29 @@ test('conditions and prose are read inside each step, not by position', () => {
   assert.match(prose[0], /^Step 1 — Oxidation of ethanol — Ethanol is oxidised to ethanal\./);
   assert.match(prose[1], /^Step 2 — Oxidation of ethanal/);
 });
+
+test('a named new route never inherits a different target, including Spanish requests', () => {
+  const aspirin = 'Propose a synthesis of aspirin (SMILES: CC(=O)Oc1ccccc1C(=O)O).';
+  const correction = `${ROUTE_FIX_PROMPT_LEAD}\nFix step 1.`;
+  for (const request of [
+    'Now a synthesis of paracetamol.', 'A preparation of paracetamol, please.',
+    'What about a route to paracetamol?', 'I need a synthesis of paracetamol.',
+    'Ahora quiero una ruta de síntesis de paracetamol.', 'Preparación de paracetamol.',
+    'Quiero sintetizar paracetamol.', 'Ahora una ruta para paracetamol.',
+  ]) {
+    assert.equal(requestedTargetFor([aspirin, request]), null, request);
+    assert.equal(requestedTargetFor([aspirin, request, correction]), null, `a correction must not cross the new request: ${request}`);
+  }
+  assert.equal(requestedTargetFor([aspirin, 'Propón una síntesis de etanol (SMILES: CCO).']), 'CCO');
+  assert.equal(findRequestedTarget('Síntesis de paracetamol a partir de fenol (SMILES: Oc1ccccc1).'), null);
+  for (const followup of ['Why does the synthesis need step 2?', '¿Por qué es necesario el paso 2?', 'What temperature should step 1 use?']) {
+    assert.equal(requestedTargetFor([aspirin, followup]), 'CC(=O)Oc1ccccc1C(=O)O');
+  }
+});
+
+test('correction drawing plans preserve backslashes in stereochemical SMILES', () => {
+  const target = 'C/C=C\\C';
+  const prompt = fixPayload(formatMissingSpeciesPrompt(target)).prompt;
+  const json = prompt.match(/chemistry-plan with (\{.*\}), copying/)[1];
+  assert.equal(JSON.parse(json).species[0].input.value, target);
+});

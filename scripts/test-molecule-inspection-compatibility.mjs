@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { build } from 'esbuild';
+
+const root = path.resolve(import.meta.dirname, '..');
+const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-route-compatibility-'));
+test.after(() => rm(tmp, { recursive: true, force: true }));
+const outfile = path.join(tmp, 'inspection.mjs');
+await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')], outfile,
+  bundle: true, platform: 'node', format: 'esm', logLevel: 'silent',
+  plugins: [{ name: 'no-external-services', setup(api) {
+    const mocks = {
+      '../capabilities/registry': `export const capabilityRegistry=()=>({providers:new Map([['nodus:chemistry',{id:'nodus:chemistry',tools:[{id:'verify-route',inputSchema:{properties:{labels:{}}}}]}]])}); export const pinCapabilitiesForTurn=()=>[];`,
+      '../capabilities/runner': `export function createTrustedCapabilityRunner(){throw Error('test must supply a runner')}`,
+      './aiClient': `export function completeText(){throw Error('test must not call a model')}`,
+    };
+    api.onResolve({ filter: /^(\.\/aiClient|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
+  } }],
+});
+const { appendRouteReportAndDrawings } = await import(pathToFileURL(outfile));
+const steps = ['CCO>>CC=O', '', 'CC=O>>CC(=O)O'];
+const labels = steps.map(() => [{ role: 'reactant', byproduct: false, name: 'ethanol', smiles: 'CCO' }]);
+const passing = (index, reaction) => ({ index, reaction, ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] });
+function runnerFor(auditSteps) {
+  return { async invoke({ toolId, input }) {
+    assert.equal(toolId, 'verify-route');
+    assert.deepEqual(input.steps, steps);
+    return { artifacts: [{ artifactType: 'route-audit', data: { steps: auditSteps, continuous: false, blocked: ['Step 2 is not built'], links: [] } }] };
+  } };
+}
+
+test('an installed 2.5.6-style checker cannot attach shifted labels or corrections', async () => {
+  const old = [passing(0, steps[0]), passing(1, steps[2])];
+  const answer = await appendRouteReportAndDrawings('Route prose', '', { runner: runnerFor(old) }, { steps, labels });
+  assert.match(answer, /Route check unavailable:.*omitted or renumbered/);
+  assert.match(answer, /Update Chemistry Studio/);
+  assert.doesNotMatch(answer, /Route verified|nodus-route-fix|### Route drawings/);
+});
+
+test('a checker that keeps the count but renumbers steps is also refused', async () => {
+  const reordered = [passing(0, steps[0]), passing(2, steps[2]), passing(1, '')];
+  const answer = await appendRouteReportAndDrawings('Route prose', '', { runner: runnerFor(reordered) }, { steps, labels });
+  assert.match(answer, /omitted or renumbered/);
+});
+
+test('a 2.5.7-style checker preserves the failed step and the following step number', async () => {
+  const current = [passing(0, steps[0]), { ...passing(1, ''), ok: false, error: 'Step could not be built' }, passing(2, steps[2])];
+  const answer = await appendRouteReportAndDrawings('Route prose', '', { runner: runnerFor(current) }, { steps, labels });
+  assert.doesNotMatch(answer, /Route check unavailable/);
+  assert.match(answer, /Step 2/);
+  assert.match(answer, /Step 3/);
+  assert.match(answer, /Step could not be built/);
+  assert.match(answer, /nodus-route-fix/);
+});

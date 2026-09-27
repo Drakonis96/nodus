@@ -34,8 +34,9 @@ export const ROUTE_SPECIES_RULES = [
 export function correctionTargetPlanRule(target: string | null | undefined): string {
   const never = 'Never emit a chemistry-plan for a step, and never a nodus-view, nodus-artifact or nodus-capability-result block: the application draws and checks every step itself.';
   if (!target) return `Do not emit a chemistry-plan block in this correction: the application keeps the target from the original request. ${never}`;
+  const plan = JSON.stringify({ version: 2, kind: 'structure', depiction: 'skeletal', species: [{ id: 'target', input: { kind: 'smiles', value: target } }] });
   return [
     `The requested target, exactly as the original request gave it: \`${target}\`.`,
-    `Draw only that target: emit exactly one fenced code block tagged chemistry-plan with {"version":2,"kind":"structure","depiction":"skeletal","species":[{"id":"target","input":{"kind":"smiles","value":"${target}"}}]}, copying the target exactly as quoted above. ${never}`,
+    `Draw only that target: emit exactly one fenced code block tagged chemistry-plan with ${plan}, copying the target exactly as quoted above. ${never}`,
   ].join('\n');
 }
