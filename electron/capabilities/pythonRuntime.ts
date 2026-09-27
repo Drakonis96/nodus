@@ -29,6 +29,21 @@ export interface RuntimeLock { schemaVersion: 1; python: string; platform: strin
 
 const READY = 'READY';
 const MAX_WHEEL_BYTES = 256 * 1024 * 1024;
+// The main process owns provisioning. Serialize by the full shared path (including the
+// profile), then recheck READY: another capability may have completed it while we waited.
+const runtimeBuilds = new Map<string, Promise<void>>();
+
+async function withRuntimeLock<T>(root: string, action: () => Promise<T>): Promise<T> {
+  const previous = runtimeBuilds.get(root) ?? Promise.resolve();
+  const result = previous.then(action);
+  const settled = result.then(() => {}, () => {});
+  runtimeBuilds.set(root, settled);
+  try {
+    return await result;
+  } finally {
+    if (runtimeBuilds.get(root) === settled) runtimeBuilds.delete(root);
+  }
+}
 
 /** Environments are shared by lock digest: two capabilities that pin the same dependencies build
  *  and reuse one environment instead of a private copy each. */
@@ -118,6 +133,18 @@ export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtime
   if (!lock) return { ready: false, detail: `This package publishes no pinned dependency set for Python ${minor} on ${process.platform}-${process.arch}.` };
   const lockDigest = createHash('sha256').update(JSON.stringify(lock)).digest('hex');
   const root = sharedRuntimeDir(lockDigest);
+  return withRuntimeLock(root, () => provisionPythonRuntime(pointer, root, lockDigest, lock, python, context));
+}
+
+async function provisionPythonRuntime(
+  pointer: string,
+  root: string,
+  lockDigest: string,
+  lock: RuntimeLock,
+  python: { path: string; version: string },
+  context: EnsureRuntimeContext,
+): Promise<{ ready: boolean; detail?: string }> {
+  context.signal.throwIfAborted();
   const marker = path.join(root, READY);
 
   // The marker records which lock produced the environment: a package that changes its
@@ -148,8 +175,9 @@ export async function ensurePythonRuntime(runtime: TrustedWorkerRuntime, runtime
     // working directory happens to be.
     fs.writeFileSync(requirements, lock.packages.map(entry => `${entry.requirement} --hash=sha256:${entry.sha256}`).join('\n'), { mode: 0o600 });
 
-    await run(python.path, ['-m', 'venv', path.join(staging, 'venv')], { timeout: 300_000 });
-    await run(interpreter(staging), ['-m', 'pip', 'install', '--no-index', '--require-hashes', '--find-links', wheels, '-r', requirements], { timeout: 900_000, maxBuffer: 16 * 1024 * 1024 });
+    await run(python.path, ['-m', 'venv', path.join(staging, 'venv')], { timeout: 300_000, signal: context.signal });
+    await run(interpreter(staging), ['-m', 'pip', 'install', '--no-index', '--require-hashes', '--find-links', wheels, '-r', requirements], { timeout: 900_000, maxBuffer: 16 * 1024 * 1024, signal: context.signal });
+    context.signal.throwIfAborted();
 
     fs.rmSync(wheels, { recursive: true, force: true });
     fs.rmSync(root, { recursive: true, force: true });
