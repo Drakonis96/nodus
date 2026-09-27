@@ -193,6 +193,11 @@
 .research-chat-history-tool:disabled { opacity: .4; cursor: not-allowed; }
 .light .research-chat-history-tools { border-bottom-color: #e5e5e5; }
 .light .research-chat-history-tool { color: #525252; }
+.research-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .research-message button.study-evidence-citation {
   color: color-mix(in srgb, var(--vault-accent) 55%, #171717);
   background: color-mix(in srgb, var(--vault-accent) 10%, white);

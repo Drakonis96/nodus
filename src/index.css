@@ -4698,12 +4698,9 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   color: #3730a3;
 }
 
-/* Live typing caret at the end of the streaming answer. While a message streams,
-   its markdown flows inline so the caret hugs the last character. */
-.stream-body .md,
-.stream-body .md > :last-child {
-  display: inline;
-}
+/* Keep Markdown's block layout while streaming: making the last block inline
+   removes list indentation and lets preformatted code escape the message.
+   The live caret follows the rendered content without changing its layout. */
 .stream-caret {
   display: inline-block;
   width: 0.5em;
