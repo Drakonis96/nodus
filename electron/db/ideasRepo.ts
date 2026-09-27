@@ -743,6 +743,19 @@ export function purgeDeepData(nodusId: string): void {
     // revived by upsertOccurrence the moment any scan re-attaches it. Manual
     // ideas are never flagged: they are owned by a note and may legitimately
     // have no works linked yet.
+    //
+    // This sweep is global — it runs for every purge, not just this work's own
+    // data — so it must also spare an idea that some OTHER work still has a
+    // live edge into. A fusion "link" (as opposed to a merge) attaches no
+    // occurrence for its target; applyFusionPlan's reviveIdea() call clears
+    // orphaned_at for that work's own scan, but without this exclusion the very
+    // next unrelated purge anywhere in the library re-flags the same idea
+    // dormant the moment it has zero occurrences, silently invalidating the
+    // linking work's edges (assertDeepDataIntegrity would then fail if that
+    // work were ever rescanned, with no error raised in the meantime). This
+    // scan's own edges into/out of this idea were already deleted above (the
+    // `DELETE FROM edges WHERE source_work = ?` two statements up), so this
+    // only protects references genuinely held by a *different* work.
     db.prepare(
       `UPDATE ideas SET orphaned_at = ?
         WHERE orphaned_at IS NULL
@@ -750,7 +763,9 @@ export function purgeDeepData(nodusId: string): void {
           AND global_id NOT IN (
             SELECT json_extract(source_json, '$.ref') FROM notes
              WHERE json_extract(source_json, '$.note') = 'manual-idea'
-          )`
+          )
+          AND global_id NOT IN (SELECT from_id FROM edges)
+          AND global_id NOT IN (SELECT to_id FROM edges)`
     ).run(new Date().toISOString());
     db.prepare(
       `DELETE FROM edges

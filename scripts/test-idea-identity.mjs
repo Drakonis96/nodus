@@ -145,6 +145,39 @@ try {
   db.prepare("DELETE FROM idea_occurrences WHERE global_id = ?").run(dormant.global_id);
   db.prepare("DELETE FROM ideas WHERE global_id = ?").run(dormant.global_id);
 
+  // ── 4c. A revival must survive an UNRELATED work's later purge ─────────────
+  // purgeDeepData's dormancy sweep is global — it runs on every rescan, for
+  // every idea in the library, not just the work being purged. Reproduces the
+  // real failure seen scanning actual books: book A links to a dormant idea
+  // and revives it (4b's mechanism), but book B's rescan minutes later — with
+  // no relation to book A — dormant-flags that same idea again the moment it
+  // finds zero occurrences, because the sweep never looked at edges. That
+  // silently invalidates book A's already-completed, already-audited data with
+  // no error raised anywhere, until book A happens to be rescanned itself.
+  const linked = repo.createIdea({ type: 'claim', label: 'Enlazada', statement: 'z', embedding: [1, 1, 0] });
+  repo.upsertOccurrence(linked.global_id, 'w4c-owner', 'principal', '', 0.8);
+  repo.purgeDeepData('w4c-owner'); // its only occurrence is gone; nothing keeps it alive yet
+  db.prepare("INSERT INTO edges VALUES ('e-cross', ?, ?, 'variant_of', 'inferred', 0.7, 'w4c-linker')").run(originalId, linked.global_id);
+  repo.reviveIdea(linked.global_id); // what applyFusionPlan does for a cross-work link
+  assert.equal(
+    db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(linked.global_id).orphaned_at,
+    null,
+    'revived by a link from a different work (book A)'
+  );
+  repo.purgeDeepData('w4c-some-unrelated-work'); // book B's rescan — no relation to the idea above
+  assert.equal(
+    db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(linked.global_id).orphaned_at,
+    null,
+    "an unrelated work's purge must not undo a revival a live edge still depends on"
+  );
+  assert.doesNotThrow(
+    () => repo.assertDeepDataIntegrity('w4c-linker'),
+    "the linking work (book A) stays valid after book B's unrelated purge"
+  );
+  db.prepare("DELETE FROM edges WHERE id = 'e-cross'").run();
+  db.prepare("DELETE FROM idea_occurrences WHERE global_id = ?").run(linked.global_id);
+  db.prepare("DELETE FROM ideas WHERE global_id = ?").run(linked.global_id);
+
   assert.throws(() => db.transaction(() => {
     db.prepare("INSERT INTO gaps (id, nodus_id, related_idea) VALUES ('broken-gap', 'w1', 'missing-idea')").run();
     repo.assertDeepDataIntegrity('w1');
