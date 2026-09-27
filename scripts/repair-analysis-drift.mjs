@@ -26,8 +26,12 @@
 // Electron app via Playwright (`_electron`), the same technique
 // scripts/audit-document-understanding-live.mjs uses, calling the same IPC methods the
 // UI's own actions call. The theme repair is a bounded, awaited call this script waits
-// out; the document re-enqueue is fire-and-forget — a full analysis can run for hours,
-// so this only queues it and moves on, same as any other queued job.
+// out — bounded by INACTIVITY (watchForStall: no new reproc_theme_batch checkpoint for
+// several minutes), not by a fixed wall-clock cap. A first version used a flat 15-minute
+// timeout and killed a real, still-progressing 60-work run at exactly 15 minutes — 339
+// checkpointed batches, all discarded, since the actual write only commits atomically
+// once at the very end. The document re-enqueue is fire-and-forget — a full analysis
+// can run for hours, so this only queues it and moves on, same as any other queued job.
 //
 // Modes:
 //   (default)      Dry run. Read-only: opens an online SQLite backup of the vault,
@@ -261,7 +265,45 @@ function isNodusRunning() {
   }
 }
 
-async function runReprocess(profileUserData, nodusIds, staleDocIds) {
+// Watches scan_checkpoints (kind='reproc_theme_batch') for activity, polling the SAME
+// database reprocessConnections is writing to (read-only; WAL mode makes this a safe
+// concurrent read). Rejects only on genuine SILENCE — no new checkpoint for idleMs —
+// not on total elapsed time: a real run over many works can legitimately take far
+// longer than any fixed guess, and capping wall-clock time is exactly what cut off a
+// healthy, still-progressing run early (339 batches saved, killed at a flat 15 minutes
+// regardless). An absolute backstop (overallMs) still exists in case a checkpoint
+// keeps landing forever without the call ever resolving — a different failure shape
+// than a stall, worth a very generous but non-infinite bound.
+function watchForStall(dbPath, { idleMs = 5 * 60_000, overallMs = 4 * 60 * 60_000, pollMs = 15_000 } = {}) {
+  const Database = require('better-sqlite3');
+  const start = Date.now();
+  let timer = null;
+  const promise = new Promise((_, reject) => {
+    const tick = () => {
+      if (Date.now() - start > overallMs) {
+        reject(new Error(`reprocessThemeConnections still running after ${(overallMs / 60_000).toFixed(0)} minutes total — stopping as a backstop, not a stall (checkpoints were still landing)`));
+        return;
+      }
+      try {
+        const db = new Database(dbPath, { readonly: true, fileMustExist: true });
+        const last = db.prepare("SELECT MAX(created_at) AS t FROM scan_checkpoints WHERE kind='reproc_theme_batch'").get().t;
+        db.close();
+        const idleFor = last ? Date.now() - Date.parse(last) : Date.now() - start;
+        if (idleFor > idleMs) {
+          reject(new Error(`no new reprocess checkpoint in ${(idleFor / 60_000).toFixed(1)} minutes — looks stalled, not just slow`));
+          return;
+        }
+      } catch {
+        // A transient read failure (e.g. mid-checkpoint-write) isn't itself a stall signal.
+      }
+      timer = setTimeout(tick, pollMs);
+    };
+    timer = setTimeout(tick, pollMs);
+  });
+  return { promise, cancel: () => clearTimeout(timer) };
+}
+
+async function runReprocess(profileUserData, nodusIds, staleDocIds, dbPathForWatchdog) {
   const { _electron: electron } = require(path.join(repoRoot, 'node_modules/playwright-core/index.js'));
   const env = { ...process.env, NODUS_USERDATA: profileUserData, NODUS_DISABLE_AUTO_UPDATE: '1' };
   delete env.ELECTRON_RUN_AS_NODE;
@@ -302,21 +344,23 @@ async function runReprocess(profileUserData, nodusIds, staleDocIds) {
     let result = null;
     if (nodusIds.length > 0) {
       console.log(`  reprocessing ${nodusIds.length} work(s), themes only (relations: false)...`);
-      // Bounded: fail loudly and quickly rather than sit silently — this exact call
-      // hung once already.
-      const REPROCESS_TIMEOUT_MS = 15 * 60_000;
-      result = await Promise.race([
-        page.evaluate(
-          ({ ids }) => window.nodus.reprocessThemeConnections({ relations: false, nodusIds: ids }, null),
-          { ids: nodusIds }
-        ),
-        new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error(`reprocessThemeConnections did not resolve within ${REPROCESS_TIMEOUT_MS / 60_000} minutes`)),
-            REPROCESS_TIMEOUT_MS
-          )
-        ),
-      ]);
+      // Bounded by INACTIVITY, not total time (see watchForStall): a fixed wall-clock
+      // cap here once killed a healthy, still-progressing run at exactly 15 minutes —
+      // 339 checkpointed batches, all discarded, because the single write only commits
+      // atomically at the very end. Only genuine silence (no new checkpoint) should
+      // fail this call now.
+      const watchdog = watchForStall(dbPathForWatchdog);
+      try {
+        result = await Promise.race([
+          page.evaluate(
+            ({ ids }) => window.nodus.reprocessThemeConnections({ relations: false, nodusIds: ids }, null),
+            { ids: nodusIds }
+          ),
+          watchdog.promise,
+        ]);
+      } finally {
+        watchdog.cancel();
+      }
       console.log('  result:', JSON.stringify(result));
     }
     if (staleDocIds.length > 0) {
@@ -422,7 +466,7 @@ async function main() {
     console.log('\n  cloning profile (db + encrypted keys) to a scratch directory — the real vault is never opened read-write...');
     const { profileRoot, targetDb } = await cloneProfile(vault, snapshotPath);
     try {
-      await runReprocess(profileRoot, nodusIds, staleDocIds);
+      await runReprocess(profileRoot, nodusIds, staleDocIds, targetDb);
       const remaining = danglingCount(targetDb);
       console.log(`\n  clone re-audit: ${remaining} dangling link(s) remain (was ${found.danglingLinks}).`);
       if (staleDocIds.length > 0) {
@@ -455,7 +499,7 @@ async function main() {
     process.exit(2);
   }
   console.log('\n  applying against the real vault...');
-  await runReprocess(vault.userData, nodusIds, staleDocIds);
+  await runReprocess(vault.userData, nodusIds, staleDocIds, vault.path);
   const remaining = danglingCount(vault.path);
   console.log(`\n  re-audit: ${remaining} dangling link(s) remain (was ${found.danglingLinks}).`);
   if (staleDocIds.length > 0) {
