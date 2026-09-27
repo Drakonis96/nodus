@@ -9,6 +9,7 @@ import {
   getIdea,
   embeddingTextForIdea,
   currentEmbeddingConfig,
+  reviveIdea,
 } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
@@ -392,6 +393,13 @@ export function applyFusionPlan(plan: FusionPlan, sourceWork: string): string {
         rationale: plan.edge.rationale,
       },
     });
+    // The candidate search includes dormant ideas on purpose (`findSimilarIdeas(...,
+    // { includeDormant: true })`), so a "variant_of"/"refines"/"contradicts" link can
+    // legitimately point at one. Unlike a merge, linking adds no occurrence for the
+    // target, so nothing else revives it — leaving a live edge into a dormant idea,
+    // which is exactly what the deep-analysis integrity check rejects. Revive it here:
+    // a fresh edge is as much a real reference as a fresh occurrence.
+    reviveIdea(plan.edge.to);
   }
   return created.global_id;
 }
