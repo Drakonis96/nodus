@@ -23,6 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { createHash, generateKeyPairSync, sign as signBytes } from 'node:crypto';
 import { build } from 'esbuild';
+import { verifyPublishedBootstrap } from './lib/published-bootstrap.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-cross-repo-'));
@@ -325,6 +326,13 @@ try {
         assert.ok(Number.isInteger(asset.bytes) && asset.bytes > 0);
       }
     });
+    const label = `${entry.id}: the pinned release is published and signed`;
+    try {
+      await verifyPublishedBootstrap(entry, { keys: applicationKeys, verifyReleaseManifest: sdk.verifyReleaseManifest });
+      check(label, () => {});
+    } catch (error) {
+      check(label, () => { throw error; });
+    }
   }
 
   console.log(failed ? '\nCROSS-REPO FAIL' : '\nCROSS-REPO PASS: shared contract, identical keys, catalog, reproducible build, signature, install, migration gate, rollback, bootstrap.');
