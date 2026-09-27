@@ -73,6 +73,18 @@ test('the shared component owns every control visible in the header', () => {
   assert.equal((headerScript.match(/return `<nav class="nav/g) ?? []).length, 1);
   assert.match(headerScript, /class="nav\$\{isWiki \? ' wiki-nav' : ''\}" id="site-header"/);
   assert.match(headerScript, /data-nodus-browser-bookmarks hidden/, 'Bookmarks is an inert prepared slot in ordinary browsers');
+  // The downloads chip counts what the releases page holds, but a click on it
+  // asks for the builds: the header hands the click to the dialog the Download
+  // button opens, and only while that dialog exists — the href stays the
+  // destination for the pages without one and for a modifier-click that asks
+  // for the releases page in a new tab. The chip only calls itself a dialog
+  // opener on the pages that can answer with one.
+  assert.match(headerScript, /const opensDialog = \(\) => typeof window\.openDl === 'function';/,
+    'the chip falls back to the releases link where the page has no dialog');
+  assert.match(headerScript, /downloads\.setAttribute\('aria-haspopup', 'dialog'\)/,
+    'and only calls itself a dialog opener where the page publishes one');
+  assert.match(headerScript, /if \(event\.metaKey \|\| event\.ctrlKey \|\| event\.shiftKey \|\| event\.altKey\) return;/,
+    'a modifier-click keeps its meaning: the releases page, in a new tab');
   // Destination order is part of the design, so it is asserted as a whole
   // rather than one label at a time. The browser-only Bookmarks slot sits
   // immediately ahead of Wiki, the way the Nodus Browser start page orders them.
@@ -139,4 +151,17 @@ test('both header stylesheets keep the same fixed dimensions and breakpoint', ()
   assert.match(read('site/demo/demo.css'), /body\.demo-page > \[data-nodus-site-header\] \{ display: block; height: 62px; \}/);
   // the wiki offsets its own shell by the shared header variable rather than a copy
   assert.match(read('site/wiki/wiki.css'), /padding-top: var\(--nav-h\)/);
+});
+
+test('the home page ships the download dialog the chip hands its click to', () => {
+  // The chip only takes the click over while the page has a dialog to answer it
+  // (`window.openDl`, defined by site.js around #dl-overlay), so the page that
+  // carries that dialog is what the chip's promise rests on. On the pages
+  // without one the chip stays the link to the releases page it has always been.
+  const home = read('site/index.html');
+  assert.match(home, /id="dl-overlay"/, 'the home page carries the download dialog');
+  assert.match(home, /assets\/js\/site\.js\?v=[^"]+/, 'and the script that opens it');
+  for (const [relative] of standalonePages) {
+    assert.doesNotMatch(read(relative), /id="dl-overlay"/, `${relative} has no dialog for the chip to open`);
+  }
 });
