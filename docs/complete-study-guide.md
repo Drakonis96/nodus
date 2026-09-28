@@ -131,7 +131,7 @@ evidence sidecar answers the reader's exact-quote popover.
 
 1. [x] Foundations: types, fail-closed routing guard, selection, snapshot, tree,
    estimate, catalog/preview IPC.
-2. [x] Infrastructure: run/cache/artifact tables (migration 194, local, not synced),
+2. [x] Infrastructure: run/cache/artifact tables (migration 197, local, not synced),
    usage meter, job-scoped output language (every Deep Research job now honours the
    language chosen in the form).
 3. [x] Passes 1–3: reconnaissance, chapters from the user's units, anchored extraction.
@@ -247,7 +247,7 @@ What the paid run found, and what was fixed because of it:
   line; they are in `shared/mainProcessErrors.ts` now (the count of unread parts as a
   pattern, so the numbers survive) and `test-main-error-i18n.mjs` passes.
 - **A pinned schema version.** `scripts/test-project-instructions.mjs` pins
-  `SCHEMA_VERSION` so a bump is deliberate; migration 194 is, and the pin moved.
+  `SCHEMA_VERSION` so a bump is deliberate; the guide's migration is, and the pin moved. Main took 194–196 while this branch was in flight, so the guide's tables are 197 and every pin of the number moved with them.
 
 Two things the paid run reports and did not change:
 
@@ -346,7 +346,7 @@ web section, checkpoints and fail-soft outages). `scripts/test-complete-guide-co
 covers anchoring edge cases, sanitizing, provenance, plans, locators, reference
 sections and the 15 label packs.
 
-`node --test scripts/test-complete-guide-infrastructure.mjs` runs migration 194 on
+`node --test scripts/test-complete-guide-infrastructure.mjs` runs migration 197 on
 `node:sqlite` and covers frozen snapshots, resumable checkpoints, stale-run pruning,
 the shared LRU reading cache, sidecar deletion, the job language scope and nested
 usage meters.
