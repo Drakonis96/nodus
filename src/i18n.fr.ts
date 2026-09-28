@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -151,6 +152,7 @@ export const FR: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.fr,
   ...GRAPH_HEALTH_TRANSLATIONS.fr,
   ...STUDY_SOURCE_TRANSLATIONS["fr"],
+  ...STUDY_FOCUS_TRANSLATIONS["fr"],
   ...STUDY_IMPROVE_TRANSLATIONS.fr,
   ...WORKSPACE_TRANSLATIONS.fr,
   "Lo que cuenta el mapa": "Ce que raconte la carte",
@@ -4584,7 +4586,7 @@ export const FR: Record<string, string> = {
   'Publicación': 'Publication',
   'Editor / marca': 'Éditeur / marque',
   'Ubicación': 'Emplacement',
-  'Material': 'Matériau',
+  'Material': 'Support',
   'Inscripción': 'Inscription',
   'Estado de conservación': 'État de conservation',
   'Figura de protección': 'Statut de protection',

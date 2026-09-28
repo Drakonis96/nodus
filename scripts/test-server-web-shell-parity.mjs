@@ -19,7 +19,12 @@ test('Server shell preserves Desktop sidebar state and compact threshold', () =>
 });
 
 test('Server shell keeps tools out of navigation and routes the account glyph to settings', () => {
-  assert.match(app, /const SERVER_TOOL_VIEWS = new Set<View>\(\[\s*'browser',\s*'radar',\s*'compass',\s*'toolkit',?\s*\]\)/);
+  // The set grows as desktop-only views appear (Study's focus timer is one), so it is read
+  // rather than pattern-matched: what must hold is that the tools never leave it.
+  const toolViews = app.match(/const SERVER_TOOL_VIEWS = new Set<View>\(\[([\s\S]*?)\]\)/)?.[1] ?? '';
+  for (const view of ['browser', 'radar', 'compass', 'toolkit']) {
+    assert.match(toolViews, new RegExp(`['"]${view}['"]`), `${view} must stay out of the Server navigation`);
+  }
   assert.match(app, /!SERVER_TOOL_VIEWS\.has\(item\.id\)/);
   assert.match(app, /label=\{t\('Mi cuenta'\)\}[\s\S]*?dataTestId="header-account"/);
   assert.match(app, /navigate\('\/view\/settings\?tab=server'\)/);

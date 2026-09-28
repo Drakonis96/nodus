@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -149,6 +150,7 @@ export const IT: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.it,
   ...GRAPH_HEALTH_TRANSLATIONS.it,
   ...STUDY_SOURCE_TRANSLATIONS["it"],
+  ...STUDY_FOCUS_TRANSLATIONS["it"],
   ...STUDY_IMPROVE_TRANSLATIONS.it,
   ...WORKSPACE_TRANSLATIONS.it,
   "Lo que cuenta el mapa": "Cosa racconta la mappa",
@@ -893,7 +895,7 @@ export const IT: Record<string, string> = {
   "Título del material": "Titolo del materiale",
   "Cargando vault de estudio…": "Caricamento del caveau dello studio…",
   "Curso": "Corso",
-  "Asignatura": "Oggetto",
+  "Asignatura": "Materia",
   "Buscar materiales…": "Cerca materiali...",
   "Todas las etiquetas": "Tutti i tag",
   "Material vacío": "Materiale vuoto",
@@ -948,7 +950,7 @@ export const IT: Record<string, string> = {
   "Markdown crudo": "Ribasso grezzo",
   "Dividir": "Diviso",
   "Añadir comentario": "Aggiungi commento",
-  "Modo concentración": "Modalità di messa a fuoco",
+  "Modo concentración": "Modalità concentrazione",
   "Pantalla completa": "Schermo intero",
   "Vista previa de impresión": "Anteprima di stampa",
   "caracteres": "personaggi",
@@ -5104,7 +5106,7 @@ export const IT: Record<string, string> = {
   "Término / definición": "Termine/definizione",
   "Completar huecos": "Riempi gli spazi vuoti",
   "Imagen / explicación": "Immagine/spiegazione",
-  "Sin asignatura": "Nessun argomento",
+  "Sin asignatura": "Nessuna materia",
   "Cara frontal": "Lato anteriore",
   "Guardar tarjeta": "Salva la flashcard",
   "Tarjetas": "Flashcard",

@@ -1,3 +1,4 @@
+import { STUDY_FOCUS_SQL, ensureStudyFocusTaskColumn } from './studyFocusSchema';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { migrateWorkspaceContent } from './workspaceMigration';
@@ -158,7 +159,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 193;
+export const SCHEMA_VERSION = 195;
 
 export const migrations: Migration[] = [
   {
@@ -9533,6 +9534,8 @@ export const migrations: Migration[] = [
       addColumnIfMissing(db, table, 'instructions', "TEXT NOT NULL DEFAULT ''");
     }
   } },
+  { version: 194, up: STUDY_FOCUS_SQL },
+  { version: 195, up: 'SELECT 1;', after: ensureStudyFocusTaskColumn },
 ];
 
 /**

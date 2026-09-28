@@ -1,3 +1,4 @@
+import { useStudyFocusReduced } from '../focus/StudyFocusContext';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, DragEvent } from 'react';
 import { createPortal } from 'react-dom';
@@ -427,6 +428,7 @@ export function StudyEditor({
   const [raw, setRaw] = useState(false);
   const [split, setSplit] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const globalFocus = useStudyFocusReduced();
   const [fullscreen, setFullscreen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
@@ -944,7 +946,7 @@ export function StudyEditor({
         {(settings.academicMode === 'manual' ? [] : quickImproveStyles).map((prompt) => <button type="button" key={prompt.id} data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn btn-ghost h-8 w-8 p-0 text-teal-700 dark:text-teal-300" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onClick={() => void runQuickImprovement(prompt)}><ImproveStyleMark style={prompt} size={15} /></button>)}
         <button data-testid="study-doc-style" className={`study-editor-style-button btn btn-ghost h-8 w-8 p-0 ${showStyle ? 'is-active bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Apariencia y metadatos')} aria-label={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={16} /></button>
         <button className={`btn btn-ghost h-8 w-8 p-0 ${showHistory ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Historial de versiones')} aria-label={t('Historial de versiones')} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
-        <button className={`btn btn-ghost h-8 w-8 p-0 ${focusMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setFocusMode(!focusMode)} title={t('Modo concentración')} aria-label={t('Modo concentración')}><Icon name="eye" size={13} /></button>
+        <button className={`btn btn-ghost h-8 w-8 p-0 ${focusMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setFocusMode(!focusMode)} aria-pressed={focusMode} title={t('Ocultar paneles')} aria-label={t('Ocultar paneles')}><Icon name="eye" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => setFullscreen(!fullscreen)} title={t('Pantalla completa')} aria-label={t('Pantalla completa')}><Icon name="fit" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => window.print()} title={t('Vista previa de impresión')} aria-label={t('Vista previa de impresión')}><Icon name="external" size={13} /></button>
         <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => void onDuplicate()} title={t('Duplicar')} aria-label={t('Duplicar')}><Icon name="copy" size={13} /></button>
@@ -1031,7 +1033,7 @@ export function StudyEditor({
         localOnly
         compact
       /></div>}
-      {showStyle && (
+      {showStyle && !globalFocus && (
         <div className="grid grid-cols-2 gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
           {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>}
           {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Color')}<input data-testid="study-doc-color" type="color" className="input mt-1 h-9 w-full p-1" value={active.color || '#0f766e'} onChange={(event) => void onUpdateMetadata({ color: event.target.value })} /></label>}
@@ -1069,7 +1071,7 @@ export function StudyEditor({
       <div className="flex min-h-0 flex-1" onMouseUp={(event) => showSelectionImproveShortcuts(event)} onKeyUp={() => showSelectionImproveShortcuts()} onDragOver={(event) => {
         if (event.dataTransfer.types.includes(port.dragType) || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
       }} onDrop={(event) => void handleEditorDrop(event)}>
-        {!focusMode && <DocOutline markdown={draft} onJump={jumpToHeading} />}
+        {!focusMode && !globalFocus && <DocOutline markdown={draft} onJump={jumpToHeading} />}
         <div className={`min-w-0 flex-1 overflow-y-auto ${split ? 'grid grid-cols-2 divide-x divide-neutral-800' : ''}`}>
           <div className="min-h-full overflow-y-auto">
             {raw ? (
@@ -1091,7 +1093,7 @@ export function StudyEditor({
           {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} onTestimonyLink={onTestimonyLink} /></div>}
         </div>
 
-        {!focusMode && (showHistory || data.annotations.length > 0 || data.backlinks.length > 0) && (
+        {!focusMode && !globalFocus && (showHistory || data.annotations.length > 0 || data.backlinks.length > 0) && (
           <aside className="w-72 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/50 p-3">
             {data.annotations.length > 0 && (
               <section className="mb-5">

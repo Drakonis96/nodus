@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -112,6 +113,7 @@ export const KO: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ko,
   ...GRAPH_HEALTH_TRANSLATIONS.ko,
   ...STUDY_SOURCE_TRANSLATIONS["ko"],
+  ...STUDY_FOCUS_TRANSLATIONS["ko"],
   ...STUDY_IMPROVE_TRANSLATIONS.ko,
   ...WORKSPACE_TRANSLATIONS.ko,
   ...WORLDBUILDING_TRANSLATIONS.ko,
@@ -910,7 +912,7 @@ export const KO: Record<string, string> = {
   "Título del material": "자료 제목",
   "Cargando vault de estudio…": "연구 저장소 로드 중…",
   "Curso": "강의",
-  "Asignatura": "주제",
+  "Asignatura": "과목",
   "Buscar materiales…": "자료 검색…",
   "Todas las etiquetas": "모든 태그",
   "Material vacío": "빈 재료",
@@ -965,7 +967,7 @@ export const KO: Record<string, string> = {
   "Markdown crudo": "원시 Markdown",
   "Dividir": "나뉘다",
   "Añadir comentario": "댓글 추가",
-  "Modo concentración": "초점 모드",
+  "Modo concentración": "집중 모드",
   "Pantalla completa": "전체 화면",
   "Vista previa de impresión": "인쇄 미리보기",
   "caracteres": "캐릭터",
@@ -2009,7 +2011,7 @@ export const KO: Record<string, string> = {
   "Predeterminado (sin configurar)": "기본값(구성되지 않음)",
   "Escaneo en pausa:": "스캔이 일시 중지됨:",
   "Corrígelo en Ajustes y pulsa": "설정에서 수정하고 클릭하세요.",
-  "Reanudar": "재개하다",
+  "Reanudar": "재개",
   "Cola": "대기줄",
   "Procesando:": "처리:",
   "Cola en pausa": "대기열이 일시중지되었습니다.",
@@ -4155,7 +4157,7 @@ export const KO: Record<string, string> = {
   "Publicación": "출판",
   "Editor / marca": "출판사/브랜드",
   "Ubicación": "위치",
-  "Material": "재료",
+  "Material": "자료",
   "Inscripción": "명",
   "Estado de conservación": "보존상태",
   "Figura de protección": "보호 상태",
@@ -4865,7 +4867,7 @@ export const KO: Record<string, string> = {
   "grabaciones": "녹음",
   "Aviso al alcanzar 2 GB; puedes borrar el audio y conservar la transcripción.": "2GB에서는 경고가 나타납니다. 스크립트를 유지하면서 오디오를 삭제할 수 있습니다.",
   "Omitir silencios largos": "긴 침묵을 건너뛰세요",
-  "Pausar": "정지시키다",
+  "Pausar": "일시정지",
   "Aún no hay grabaciones. Sube un audio o graba una clase.": "아직 녹음이 없습니다. 오디오를 업로드하거나 수업을 녹음하세요.",
   "Selecciona una grabación para escucharla, marcarla o transcribirla.": "듣고 싶은 녹음을 선택하고, 마커를 추가하거나, 텍스트로 변환하세요.",
   "Favorita": "가장 좋아하는",
@@ -5111,7 +5113,7 @@ export const KO: Record<string, string> = {
   "Término / definición": "용어/정의",
   "Completar huecos": "빈칸을 채워보세요",
   "Imagen / explicación": "이미지 / 설명",
-  "Sin asignatura": "제목 없음",
+  "Sin asignatura": "과목 없음",
   "Cara frontal": "정면",
   "Guardar tarjeta": "플래시카드 저장",
   "Tarjetas": "플래시카드",
@@ -5962,7 +5964,7 @@ export const KO: Record<string, string> = {
   "Re-maquetación con el estilo de Nodus (no reproduce el formato original de Word).": "Nodus 스타일로 다시 조판합니다(Word의 원래 형식을 재현하지 않음).",
   "Redimensionar imágenes": "이미지 크기 조정",
   "Reordenar o eliminar páginas": "페이지 재정렬 또는 삭제",
-  "Restablecer": "다시 놓기",
+  "Restablecer": "재설정",
   "Rotar páginas": "페이지 회전",
   "SHA-256": "SHA-256",
   "Se admiten varios archivos para procesar en lote.": "여러 파일을 일괄 처리할 수 있습니다.",

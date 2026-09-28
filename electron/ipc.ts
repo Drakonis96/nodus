@@ -1,3 +1,4 @@
+import { registerStudyFocusIpc } from './ipc/studyFocus';
 import { scheduleManualIndex } from './ai/manualIdeaIndex';
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
 import { dialogTitle } from './dialogTitles';
@@ -244,6 +245,7 @@ export function registerIpc(
   // imports. What remains below is everything not yet split out.
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
+  registerStudyFocusIpc(context);
   registerChatHistoryIpc(context);
   registerLibraryIpc(context);
   registerBrowserIpc(context);

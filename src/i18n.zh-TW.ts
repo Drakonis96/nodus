@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -147,6 +148,7 @@ export const ZH_TW: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS['zh-TW'],
   ...GRAPH_HEALTH_TRANSLATIONS['zh-TW'],
   ...STUDY_SOURCE_TRANSLATIONS["zh-TW"],
+  ...STUDY_FOCUS_TRANSLATIONS["zh-TW"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-TW'],
   ...WORKSPACE_TRANSLATIONS['zh-TW'],
   ...AI_OCR_TRANSLATIONS['zh-TW'],
@@ -3905,7 +3907,7 @@ export const ZH_TW: Record<string, string> = {
   "Titular": "標題",
   "Publicación": "出版物",
   "Editor / marca": "出版商 / 品牌",
-  "Material": "材質",
+  "Material": "資料",
   "Inscripción": "銘文",
   "Estado de conservación": "儲存狀況",
   "Figura de protección": "保護等級",

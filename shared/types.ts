@@ -1,3 +1,4 @@
+import type { StudyFocusApi } from './studyFocus';
 import type { SkillMarketplace } from './skillMarketplace';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
@@ -9228,7 +9229,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
+export interface NodusApi extends StudyFocusApi, ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

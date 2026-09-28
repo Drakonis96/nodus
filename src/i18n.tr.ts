@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -149,6 +150,7 @@ export const TR: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.tr,
   ...GRAPH_HEALTH_TRANSLATIONS.tr,
   ...STUDY_SOURCE_TRANSLATIONS["tr"],
+  ...STUDY_FOCUS_TRANSLATIONS["tr"],
   ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,
   "Lo que cuenta el mapa": "Haritanın anlattıkları",
@@ -332,7 +334,7 @@ export const TR: Record<string, string> = {
   "Transcripción de «{name}»": "«{name}» metninin transkripsiyonu",
   "Se eliminará «{name}» y su transcripción. Esta acción no se puede deshacer.": "“{name}” ve çeviri yazısı silinecek. Bu eylem geri alınamaz.",
   "Volver": "Geri dönmek",
-  "Cerrar": "Kapalı",
+  "Cerrar": "Kapat",
   "Cancelar": "İptal etmek",
   "Cancelando…": "İptal ediliyor…",
   "Eliminar": "Elemek",
@@ -650,7 +652,7 @@ export const TR: Record<string, string> = {
   "El servidor Docker sirve la última copia a ChatGPT o Claude aunque tu ordenador esté apagado.": "Docker sunucusu, bilgisayarınız kapalı olsa bile en son kopyayı ChatGPT veya Claude'a sunar.",
   "Vaults conectados": "Bağlantılı Kasalar",
   "Vault actual": "Mevcut Kasa",
-  "En pausa": "duraklamada",
+  "En pausa": "Duraklatıldı",
   "Cámbiate a este vault para editar su idioma y qué se publica.": "Dilini ve yayınlananları düzenlemek için bu kasaya geçin.",
   "Conectar también este vault": "Bu kasayı da bağla",
   "Instalación del servidor": "Sunucu kurulumu",
@@ -1288,7 +1290,7 @@ export const TR: Record<string, string> = {
   "Título del material": "Malzeme başlığı",
   "Cargando vault de estudio…": "Stüdyo kasası yükleniyor…",
   "Curso": "Kurs",
-  "Asignatura": "Konu",
+  "Asignatura": "Ders",
   "Buscar materiales…": "Materyal arayın…",
   "Todas las etiquetas": "Tüm etiketler",
   "Material vacío": "Boş malzeme",
@@ -1342,7 +1344,7 @@ export const TR: Record<string, string> = {
   "Markdown crudo": "Ham İndirim",
   "Dividir": "Bölünmüş",
   "Añadir comentario": "Yorum ekle",
-  "Modo concentración": "Konsantrasyon modu",
+  "Modo concentración": "Odak modu",
   "Vista previa de impresión": "Baskı önizlemesi",
   "caracteres": "karakterler",
   "párrafos": "paragraflar",
@@ -2224,7 +2226,7 @@ export const TR: Record<string, string> = {
   "Tutorial": "öğretici",
   "Saltar": "Atla",
   "Atrás": "geri",
-  "Ahora no": "şimdi değil",
+  "Ahora no": "Şimdi değil",
   "Sí, enséñame": "Evet, öğret bana",
   "Seleccionar los {n} de esta página": "Bu sayfada {n} öğesini seçin",
   "Tutorial avanzado": "Gelişmiş eğitim",
@@ -4516,7 +4518,7 @@ export const TR: Record<string, string> = {
   "Publicación": "Yayın",
   "Editor / marca": "Yayıncı/marka",
   "Ubicación": "Konum",
-  "Material": "malzeme",
+  "Material": "Materyal",
   "Inscripción": "Kayıt",
   "Estado de conservación": "Koruma durumu",
   "Figura de protección": "Koruma figürü",
@@ -5249,7 +5251,7 @@ export const TR: Record<string, string> = {
   "Literal": "Değişmez",
   "Corregida": "Düzeltildi",
   "Apuntes": "Notlar",
-  "Apunte": "nişan al",
+  "Apunte": "Not",
   "Apunte de estudio": "Ders notu",
   "Apunte creado en Nodus": "Nodus'ta oluşturulan not",
   "Abrir apunte": "Notu aç",
@@ -5470,7 +5472,7 @@ export const TR: Record<string, string> = {
   "Término / definición": "Terim/tanım",
   "Completar huecos": "Boşlukları doldurun",
   "Imagen / explicación": "Resim/açıklama",
-  "Sin asignatura": "Konu yok",
+  "Sin asignatura": "Ders yok",
   "Cara frontal": "Ön yüz",
   "Guardar tarjeta": "Kartı kaydet",
   "Tarjetas": "Kartlar",

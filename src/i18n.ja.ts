@@ -4,6 +4,7 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -112,6 +113,7 @@ export const JA: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ja,
   ...GRAPH_HEALTH_TRANSLATIONS.ja,
   ...STUDY_SOURCE_TRANSLATIONS["ja"],
+  ...STUDY_FOCUS_TRANSLATIONS["ja"],
   ...STUDY_IMPROVE_TRANSLATIONS.ja,
   ...WORKSPACE_TRANSLATIONS.ja,
   ...WORLDBUILDING_TRANSLATIONS.ja,
@@ -910,7 +912,7 @@ export const JA: Record<string, string> = {
   "Título del material": "資料名",
   "Cargando vault de estudio…": "研究用ボールトを読み込み中…",
   "Curso": "コース",
-  "Asignatura": "主題",
+  "Asignatura": "科目",
   "Buscar materiales…": "資料を検索…",
   "Todas las etiquetas": "すべてのタグ",
   "Material vacío": "空のマテリアル",
@@ -1830,7 +1832,7 @@ export const JA: Record<string, string> = {
   "Borrar grafo": "グラフの削除",
   "Contraseña de la copia": "バックアップパスワード",
   "Guarda esta contraseña. Nodus no puede recuperarla y será necesaria para importar la copia en otro ordenador.": "このパスワードを保存します。 Nodus では復元できないため、別のコンピューターにバックアップをインポートする必要があります。",
-  "Cerrar": "近い",
+  "Cerrar": "閉じる",
   "Copiada": "コピーされました",
   "Copiar contraseña": "パスワードをコピーする",
   "Importar copia cifrada": "暗号化されたバックアップをインポートする",
@@ -1851,7 +1853,7 @@ export const JA: Record<string, string> = {
   "Tutorial": "チュートリアル",
   "Saltar": "スキップ",
   "Atrás": "戻る",
-  "Ahora no": "今じゃない",
+  "Ahora no": "今はしない",
   "Sí, enséñame": "はい、見せてください",
   "Siguiente": "次",
   "Seleccionar los {n} de esta página": "このページの{n}を選択してください",
@@ -4155,7 +4157,7 @@ export const JA: Record<string, string> = {
   "Publicación": "出版物",
   "Editor / marca": "出版社/ブランド",
   "Ubicación": "位置",
-  "Material": "材料",
+  "Material": "資料",
   "Inscripción": "碑文",
   "Estado de conservación": "保存状態",
   "Figura de protección": "保護ステータス",
@@ -4889,7 +4891,7 @@ export const JA: Record<string, string> = {
   "Literal": "リテラル",
   "Corregida": "修正しました",
   "Apuntes": "注意事項",
-  "Apunte": "注記",
+  "Apunte": "ノート",
   "Apunte de estudio": "勉強ノート",
   "Apunte creado en Nodus": "Nodus で作成されたメモ",
   "Abrir apunte": "ノートを開く",
@@ -5111,7 +5113,7 @@ export const JA: Record<string, string> = {
   "Término / definición": "用語/定義",
   "Completar huecos": "空白を埋めてください",
   "Imagen / explicación": "画像・説明",
-  "Sin asignatura": "件名なし",
+  "Sin asignatura": "科目なし",
   "Cara frontal": "前面",
   "Guardar tarjeta": "フラッシュカードの保存",
   "Tarjetas": "フラッシュカード",
@@ -5917,7 +5919,7 @@ export const JA: Record<string, string> = {
   "HEIC → JPEG o PNG": "HEIC → JPEG または PNG",
   "HTML (.html)": "HTML (.html)",
   "Haz clic para elegir archivos": "クリックしてファイルを選択します",
-  "Hecho": "終わり",
+  "Hecho": "完了",
   "Idiomas de OCR": "OCR言語",
   "Imagen → texto (OCR)": "画像→テキスト（OCR）",
   "Imágenes → PDF": "画像→PDF",
