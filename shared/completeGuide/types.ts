@@ -145,3 +145,50 @@ export interface CompleteGuideResolvedSelection {
   subjectIds: string[];
   courseIds: string[];
 }
+
+/** Per-source accounting shown in the reader's coverage panel. */
+export interface CompleteGuideSourceSummary {
+  sourceKey: string;
+  kind: CompleteGuideSourceKind;
+  alias: string;
+  title: string;
+  path: string;
+  passagesTotal: number;
+  passagesRead: number;
+  pages?: { total: number; withText: number; empty: number[] };
+  itemsExtracted: number;
+  itemsUsed: number;
+  duplicates: number;
+  unreadRanges: string[];
+}
+
+/**
+ * Small metadata stored on the saved draft (the gallery loads every draft and drafts
+ * sync between devices): configuration to create another version, coverage and
+ * verification counts, and the review sheet for its separate export. Items, blocks
+ * and quotes live in the local evidence sidecar.
+ */
+export interface CompleteGuideDraftMeta {
+  version: 1;
+  runId: string;
+  config: Omit<CompleteGuideConfig, 'runId'>;
+  snapshotAt: string;
+  promptVersion: string;
+  sources: CompleteGuideSourceSummary[];
+  units: Array<{ unitKey: string; title: string; sections: number; items: number }>;
+  counts: {
+    items: number; itemsUsed: number; blocks: number; aiBlocks: number; windows: number; failedWindows: number;
+    auditedBlocks: number; removedSentences: number; repairedBlocks: number; invalidLatex: number; conflicts: number; cacheHits: number;
+  };
+  usage: { calls: number; inputTokens: number; outputTokens: number; usd: number | null };
+  warnings: string[];
+  cheatSheetMarkdown: string;
+}
+
+/** Exact quote behind one citation, read from the local sidecar for the reader popover. */
+export interface CompleteGuideEvidenceView {
+  itemId: string;
+  title: string;
+  statement: string;
+  evidence: Array<{ alias: string; sourceTitle: string; location: string; quote: string; anchor: 'exact' | 'fuzzy' | 'missing' }>;
+}

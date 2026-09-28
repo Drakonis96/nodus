@@ -11,6 +11,7 @@ import type {
 import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { normalizeDeepResearchMetadataVersion, parseDeepResearchRequestVersion } from '@shared/deepResearchVersions';
 import { normalizeDeepResearchSectionLength } from '@shared/deepResearchSectionLength';
+import { normalizeCompleteGuideConfig } from '@shared/completeGuide/types';
 
 export type { DeepResearchJobOrigin, DeepResearchJobRecord, DeepResearchJobStatus };
 
@@ -297,6 +298,10 @@ function vaultChangedMessage(job: QueuedJob, current: DeepResearchQueueVault): s
 function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listener' | 'resolve' | 'reject'>): QueuedJob {
   const vault = requireDeps().activeVault();
   const deepResearchVersion = parseDeepResearchRequestVersion(input.request.deepResearchVersion);
+  // A complete study guide is validated before it waits in the lane (an empty
+  // selection fails now, not minutes later) and gets its run id here, so a job
+  // re-queued after a restart resumes the same run instead of starting over.
+  const completeGuide = input.request.completeGuide ? normalizeCompleteGuideConfig(input.request.completeGuide) : undefined;
   const job: QueuedJob = {
     record: {
       id: `drj-${Date.now()}-${++sequence}`,
@@ -308,6 +313,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       deepResearchApproach: normalizeDeepResearchApproach(input.request.approach),
       deepResearchVersion,
       structure: input.request.sectionLimit === 'single' ? 'single' : 'sectioned',
+      ...(completeGuide ? { studyReportMode: 'complete_guide' as const } : {}),
       // Normalized at the queue boundary so a persisted job, an MCP payload and a
       // job queued before the control existed all resolve the same way on drain.
       sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
@@ -328,6 +334,7 @@ function enqueueJob(input: DeepResearchJobInput, waiter: Pick<QueuedJob, 'listen
       deepResearchVersion,
       sectionLength: normalizeDeepResearchSectionLength(input.request.sectionLength),
       model: input.request.model ? { ...input.request.model } : input.request.model,
+      ...(completeGuide ? { completeGuide } : {}),
     },
     save: input.save,
     draftTitle: input.title ?? null,

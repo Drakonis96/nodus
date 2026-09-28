@@ -44,6 +44,8 @@ export interface CompleteGuideSnapshotSource {
   sourceKey: string;
   kind: CompleteGuideSourceKind;
   sourceId: string;
+  /** Transcripts: the recording the citation link opens. */
+  recordingId?: string;
   title: string;
   /** A1… materials, D1… notes, G1… recordings. Used in labels, never invented by a model. */
   alias: string;
@@ -292,7 +294,7 @@ export function buildCompleteGuideSnapshot(inputs: CompleteGuideSourceText[], or
     }
     if (pageInfo) pages += pageInfo.total;
     sources.push({
-      sourceKey: source.sourceKey, kind: source.kind, sourceId: source.sourceId, title: source.title, alias,
+      sourceKey: source.sourceKey, kind: source.kind, sourceId: source.sourceId, ...(source.recordingId ? { recordingId: source.recordingId } : {}), title: source.title, alias,
       placement, path: paths.label(placement), locatorKind, passageIds: ids, chars,
       ...(pageInfo ? { pages: pageInfo } : {}), updatedAt: input.updatedAt,
     });

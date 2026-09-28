@@ -770,6 +770,8 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   listCompleteGuideCatalog(): Promise<import('../completeGuide/preview').CompleteGuideCatalog>;
   /** Study vaults: resolve a complete-guide selection and estimate what reading it in full costs. */
   previewCompleteGuide(request: import('../completeGuide/preview').CompleteGuidePreviewRequest): Promise<import('../completeGuide/preview').CompleteGuidePreview>;
+  /** Exact quotes behind one citation of a saved complete guide (local evidence sidecar). */
+  getCompleteGuideEvidence(draftId: string, itemId: string, language?: import('../types').PromptLanguage): Promise<import('../completeGuide/types').CompleteGuideEvidenceView | null>;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

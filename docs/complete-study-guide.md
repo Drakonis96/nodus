@@ -58,6 +58,45 @@ separating AI-written explanation from source content, exportable to MD, PDF and
   known list price, e.g. DeepSeek Flash) and minutes per stage, plus warnings.
 - IPC: `research:completeGuide:catalog`, `research:completeGuide:preview`.
 
+### Engine (milestones 3–4)
+
+`electron/ai/completeGuide/core.ts` is a pure orchestrator with injected model,
+cache, checkpoint and audit dependencies; `index.ts` binds it to the vault.
+
+1. **Reconnaissance** — every readable passage is read in context-sized windows
+   and mapped per source (topics with passage ranges, key terms). Cached.
+2. **Chapters** — one chapter per unit (topic, else folder, else subject) in the
+   user's organization order.
+3. **Extraction** — every passage is read again in smaller windows guided by the
+   source map. Items (definition, concept, formula with LaTeX/variables/conditions,
+   rule, procedure, worked example, mistake, event, fact, figure) must carry a quote
+   that code anchors in the named passage or a neighbour (exact or fuzzy after
+   normalizing ligatures, hyphenation, quotes and case); unanchored items are
+   discarded, damaged formulas are kept and flagged. Dense passages that yielded
+   nothing get a second focused read. Exact and semantic (bge-m3) duplicates merge.
+   Oversized windows are split, never truncated; failed windows are reported as
+   unread parts, and more than 10 % failed windows fail the job (resumable).
+4. **Plan** — per chapter; code assigns every item to exactly one section, drops
+   invented ids and splits sections above 36 items.
+5. **Writing** — typed blocks with `itemIds`. Material blocks without items are
+   dropped; AI examples/analogies and AI-suggested mistakes are labelled from data
+   and never link to materials; up to two continuation rounds cover missing items
+   and anything left becomes a cited "Detalles adicionales" table.
+6. **Verification** — KaTeX (with mhchem) validation and one repair call per
+   section, otherwise code spans; numbers absent from the evidence (or every block
+   in exhaustive mode) trigger the premise audit (`auditResearchProse`), with a
+   rewrite from the evidence before any sentence is removed.
+7. **Report level** — syllabus map, glossary, formula sheet, timeline (≥3 dated
+   events), cross-source discrepancies (`findResearchConflicts`), review sheet
+   (model only picks item ids and ≤20-word phrasings checked against the item),
+   coverage per source and source index.
+
+Reading passes are cached by `sha256(stage, prompt version, model, language,
+passage hashes)`, so another version or a restart re-reads nothing unchanged;
+plans, sections and final parts are checkpointed per run. Citation links carry the
+locator and item id (`nodus://study/material/<id>?page=12&e=K0012`); the local
+evidence sidecar answers the reader's exact-quote popover.
+
 ## Milestones
 
 1. [x] Foundations: types, fail-closed routing guard, selection, snapshot, tree,
@@ -65,9 +104,9 @@ separating AI-written explanation from source content, exportable to MD, PDF and
 2. [x] Infrastructure: run/cache/artifact tables (migration 194, local, not synced),
    usage meter, job-scoped output language (every Deep Research job now honours the
    language chosen in the form).
-3. [ ] Passes 1–3: reconnaissance, syllabus/unit coverage, anchored extraction.
-4. [ ] Passes 4–7: plan with code-checked coverage, block writer, verification
-   (anchors, KaTeX, premise audit), reference sections, review sheet.
+3. [x] Passes 1–3: reconnaissance, chapters from the user's units, anchored extraction.
+4. [x] Passes 4–7: plan with code-checked coverage, block writer, verification
+   (KaTeX, numbers, premise audit with repair), reference sections, review sheet.
 5. [ ] UI: mode selector, source tree, toggles, estimate, gallery chip/filter,
    callouts, locator links, coverage panel, entry from Materials.
 6. [ ] Exports: PDF with math and callouts in the Deep Research design, DOCX with
@@ -77,6 +116,12 @@ separating AI-written explanation from source content, exportable to MD, PDF and
    under a USD 5 ledger ceiling.
 
 ## Validation
+
+`scripts/test-complete-guide-engine.mjs` runs the whole orchestrator with a fake
+model (full single reading per pass, anchoring, coverage, provenance, KaTeX,
+audit/repair, cache reuse, resume, failed windows). `scripts/test-complete-guide-content.mjs`
+covers anchoring edge cases, sanitizing, provenance, plans, locators, reference
+sections and the 15 label packs.
 
 `node --test scripts/test-complete-guide-infrastructure.mjs` runs migration 194 on
 `node:sqlite` and covers frozen snapshots, resumable checkpoints, stale-run pruning,
