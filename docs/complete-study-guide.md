@@ -267,6 +267,58 @@ labelled ("Elaborado por IA: no procede de tus materiales") and shows no stray `
 and no truncated text; the Word file carries 317 native equations (`m:oMath`), 149
 tables and an updatable `TOC \h \o "1-2"` field.
 
+#### Web images against the live Commons (2026-09-28)
+
+Off by default, and verified against the real world without a model (so it costs
+nothing): the staged SearXNG answers the `images` category and `wikicommons.images`
+returns candidates, the Commons API confirms licence and author, and the raster is
+downloaded through the public-only guard and re-encoded with sharp. A real result:
+
+```
+item K0022 · 393×525 · 312 KB
+  caption:  La Restauración — Manuel Ruiz Zorrilla, Cosme Algarra y Hurtado · Public domain · Wikimedia Commons
+  author:   Cosme Algarra y Hurtado
+  licence:  Public domain
+  site:     Wikimedia Commons · https://commons.wikimedia.org/wiki/File:Manuel_Ruiz_Zorrilla_(Museo_de_Albacete).JPG
+```
+
+**Its coverage depends on the language of the query.** The concept the guide sends
+is the item's title in the output language, and Commons' file search is English-biased,
+so a Spanish concept often finds nothing at all (measured: `isotermas de un gas ideal
+diagrama presión volumen` → 0 results; `ideal gas isotherms pressure volume diagram` →
+9, four of them relevant; `escala de pH ácidos y bases` → 0 against `pH scale acids
+bases` → 4). Proper nouns and historical figures work in Spanish. The feature is
+best-effort by design — anything unconfirmed is skipped, never guessed, and the guide
+never invents an attribution — but a Spanish guide will mostly get no web images for
+scientific concepts until the query reaches Commons in English or through Commons' own
+search API. Not fixed here: it is a coverage limitation in an optional, off-by-default
+step, and changing the query shape without a measurement of the result would trade a
+known gap for an unknown one.
+
+#### Still open
+
+The composer's entry point was checked **in the real application** (built `dist/`, an
+isolated profile, no model call): a Study vault with the demo workspace, the tree the
+modal shows, and the estimate it prints before queueing.
+
+```
+catalog: A1 Guía de laboratorio · ósmosis (material) | D1 Membrana plasmática · resumen (document) | G1 Clase · transporte a través de membrana (transcript)
+selection: topic "Membrana plasmática" → 3 sources
+estimate: USD 0.31–0.66, 63 calls, 9 items, 5 sections, 23–54 min  (verify: 39 calls, 228k output tokens)
+```
+
+What that leaves: the walkthrough through the app's own UI (queue with per-stage
+progress, reader callouts and locator links, the exact-quote popover, the coverage
+panel, the export buttons and «Crear otra versión») has not been driven by hand, and
+the web *text* step (`Complementar con la web`) has never run against a real search
+plus a real model — it is exercised with fake dependencies in the engine test, where
+its passages, labels and `W1` citations are asserted. What stands in for the rest:
+`scripts/e2e-complete-guide.mjs` drives the composer and reader components in Chromium,
+the paid campaign covers the engine, the exports and the cache reuse, the figure paths
+are tested against real PDFs and decks by `scripts/test-complete-guide-figures.mjs`, and
+the web-image chain was verified live above. The paid campaign's budget (USD 4.0552 of
+USD 5) went to the guide itself, and an app-side run spends the user's own keys.
+
 ### Unit, integration and browser tests
 
 `node --test scripts/test-complete-guide-figures.mjs` covers figure selection and
