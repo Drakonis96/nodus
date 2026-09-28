@@ -76,6 +76,13 @@ test('the tools under the stage turn like a ring, one card focused', () => {
   assert.match(script, /if \(Math\.abs\(dx\) < 40\) return;/, 'a drag has to be meant before it turns the ring');
   assert.match(script, /const index = cards\.indexOf\(card\);\s*if \(index === active\) return;/, 'clicking a waiting card brings it to the middle');
   assert.match(script, /if \(moved > 6\) \{\s*event\.preventDefault\(\)/, 'and the click that ended a drag does not count');
+  // Capture must wait for the drag to start: capturing on pointerdown retargets the
+  // click that ends a plain press to the ring, and no card under it ever hears one.
+  const press = script.slice(script.indexOf("addEventListener('pointerdown'"), script.indexOf("addEventListener('pointermove'"));
+  assert.equal(/setPointerCapture/.test(press), false, 'a plain press does not capture the pointer');
+  const move = script.slice(script.indexOf("addEventListener('pointermove'"), script.indexOf('const settle'));
+  assert.match(move, /if \(moved <= 6 \|\| ring\.classList\.contains\('is-dragging'\)\) return;/, 'the drag is declared only once it has moved');
+  assert.match(move, /setPointerCapture\(event\.pointerId\)/, 'and the pointer is captured for the drag, not for the press');
   assert.match(script, /event\.key === 'ArrowLeft'[\s\S]{0,90}event\.key === 'ArrowRight'/, 'the arrow keys turn it');
   assert.match(script, /ring\.addEventListener\('wheel'/, 'so does a sideways wheel');
   // One trackpad swipe is dozens of wheel events plus a tail of inertia: it turns

@@ -241,13 +241,17 @@ lives in the wiki (site/wiki/wiki.js).
       dragging = true;
       moved = 0;
       startX = event.clientX;
-      try { ring.setPointerCapture(event.pointerId); } catch { /* not captureable here */ }
     });
 
     ring.addEventListener('pointermove', (event) => {
       if (!dragging) return;
       moved = Math.max(moved, Math.abs(event.clientX - startX));
-      if (moved > 6) ring.classList.add('is-dragging');
+      if (moved <= 6 || ring.classList.contains('is-dragging')) return;
+      ring.classList.add('is-dragging');
+      // Capture only once this is a drag. Capturing on pointerdown retargets the
+      // click that ends a plain press to the ring itself, and the card under the
+      // pointer never hears it — which is a card you cannot click.
+      try { ring.setPointerCapture(event.pointerId); } catch { /* not captureable here */ }
     });
 
     const settle = (event) => {
