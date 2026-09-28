@@ -2,8 +2,9 @@
 SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
 
-Home page behaviour: the opening sequence, and the PDF Presenter stage you can
-actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
+Home page behaviour: the opening sequence, the PDF Presenter stage you can
+actually draw on, and the Toolkit row that scrolls sideways. The video gallery
+lives in the wiki (site/wiki/wiki.js).
 */
 (function () {
   'use strict';
@@ -181,9 +182,62 @@ actually draw on. The video gallery lives in the wiki (site/wiki/wiki.js).
     fit();
   }
 
+  /* ------------------------------------------------------------ the tools row */
+  /* The Toolkit row is one line by design, so it scrolls. A trackpad, a shift+wheel
+     and a touch screen already scroll it; this adds the plain mouse drag people
+     reach for on a row of cards, and swallows the click a drag would otherwise
+     land on whichever card it ended over. */
+  function rail() {
+    const row = document.querySelector('.tool-cards');
+    if (!row) return;
+
+    let startX = 0;
+    let startLeft = 0;
+    let moved = 0;
+    let dragging = false;
+
+    row.addEventListener('pointerdown', (event) => {
+      // Touch already scrolls natively, with momentum this cannot match.
+      if (event.pointerType !== 'mouse' || event.button !== 0) return;
+      dragging = true;
+      moved = 0;
+      startX = event.clientX;
+      startLeft = row.scrollLeft;
+      // Capture keeps the drag alive outside the row; a browser that refuses it
+      // simply scrolls while the pointer stays inside, which is still a drag.
+      try { row.setPointerCapture(event.pointerId); } catch { /* not captureable here */ }
+    });
+
+    row.addEventListener('pointermove', (event) => {
+      if (!dragging) return;
+      const dx = event.clientX - startX;
+      moved = Math.max(moved, Math.abs(dx));
+      // A few pixels is a click with a shaky hand, not a drag.
+      if (moved <= 6) return;
+      row.classList.add('is-dragging');
+      row.scrollLeft = startLeft - dx;
+    });
+
+    const stop = () => {
+      dragging = false;
+      row.classList.remove('is-dragging');
+    };
+    row.addEventListener('pointerup', stop);
+    row.addEventListener('pointercancel', stop);
+
+    // Capture phase, so the card's own link never sees the click that ended a drag.
+    row.addEventListener('click', (event) => {
+      if (moved <= 6) return;
+      event.preventDefault();
+      event.stopPropagation();
+      moved = 0;
+    }, true);
+  }
+
   function boot() {
     opening();
     stage();
+    rail();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

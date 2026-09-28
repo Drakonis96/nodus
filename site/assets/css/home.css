@@ -421,6 +421,14 @@ body {
   border: 1px solid var(--membrane); border-radius: var(--r-xl);
   background: linear-gradient(140deg, rgba(32, 22, 58, 0.88), rgba(12, 9, 22, 0.84));
 }
+/* The hero wears the same badge the tool cards do — it was the one entry in the
+   Toolkit without one. */
+.tool-hero .pic {
+  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 16px;
+  border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
+}
+.tool-hero .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tool-hero h3 { font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 14px; }
 .tool-hero p { margin: 0 0 20px; color: var(--ink-2); font-size: 15px; }
 .tool-pills { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -430,15 +438,32 @@ body {
 .stage-slide {
   position: relative; aspect-ratio: 16 / 10; overflow: hidden;
   border: 1px solid var(--membrane); border-radius: var(--r-m);
-  background: linear-gradient(160deg, #16122a, #0b0913);
-  display: grid; align-content: center; gap: 12px; padding: 26px;
+  /* The deck is projected, so the slide is black — the same black a room would see. */
+  background: #04050a;
   cursor: crosshair;
 }
-.stage-slide small { font: 700 9.5px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
-.stage-slide strong { font-family: var(--serif); font-size: clamp(19px, 2.3vw, 27px); font-weight: 600; letter-spacing: -0.03em; }
-.stage-slide i { display: block; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
-.stage-slide i:nth-of-type(1) { width: 82%; }
-.stage-slide i:nth-of-type(2) { width: 64%; }
+/* The deck's one slide: Nodus's own cover, with the mascot standing beside it. It is
+   the single child the zoom tool scales, and deliberately short — what the stage is
+   for is the four tools underneath it. */
+.slide-deck {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  align-items: center; gap: 16px; padding: 28px 30px;
+}
+.slide-cover { display: grid; align-content: center; gap: 20px; min-width: 0; }
+.slide-brand { display: flex; align-items: center; gap: 13px; }
+.slide-mark { width: 36px; height: 36px; flex: 0 0 auto; }
+.slide-brand strong { display: block; font-family: var(--serif); font-size: clamp(21px, 2.5vw, 31px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+.slide-brand small { display: block; margin-top: 3px; font: 700 9.5px var(--mono); letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-3); }
+.slide-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.slide-points li { position: relative; padding-left: 19px; font-size: clamp(12px, 1.05vw, 14.5px); line-height: 1.45; color: var(--ink-2); }
+.slide-points li::before {
+  content: ''; position: absolute; left: 0; top: 0.42em;
+  width: 7px; height: 7px; border-radius: 2px;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+}
+.slide-nodi { display: grid; place-items: end center; min-width: 0; }
+.slide-nodi .nodi-svg { height: clamp(112px, 13vw, 176px); width: auto; }
 .stage-page {
   position: absolute; right: 16px; bottom: 14px;
   font: 600 10.5px var(--mono); color: var(--ink-3);
@@ -478,11 +503,20 @@ body {
 }
 .stage-hint { margin-top: 10px; font-size: 12px; color: var(--ink-3); }
 
+/* One row, never two. The cards keep their design and scroll sideways instead:
+   trackpads and shift+wheel scroll it natively, home.js adds a plain mouse drag,
+   and every card is still a target you can click. */
 .tool-cards {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px; margin-top: 20px;
+  display: flex; flex-wrap: nowrap; gap: 16px; margin-top: 20px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding-bottom: 10px; scrollbar-width: thin;
+  cursor: grab;
 }
-.tool-card { padding: 24px; }
+/* No scroll snapping: with it, a short drag springs back to the card it started on
+   and the row feels like a pager instead of something you can push around. */
+.tool-cards.is-dragging { cursor: grabbing; user-select: none; }
+.tool-cards:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-m); }
+.tool-card { flex: 0 0 clamp(232px, 31%, 320px); padding: 24px; }
 .tool-card .pic {
   display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 15px;
   border-radius: 11px; border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent);
@@ -496,6 +530,38 @@ body {
   padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--membrane); color: var(--ink-3);
 }
+
+/* The projected slide is small here: the cover keeps its two columns but gives the
+   text the room and the mascot what is left. */
+@media (max-width: 560px) {
+  /* A phone's "slide" is 300px wide, so the cover keeps its shape but drops to two
+     points: three paragraphs of text behind a 9px note is not a deck, it is a
+     texture. The mascot keeps its corner. */
+  .slide-deck { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 16px 16px 20px; }
+  .slide-cover { gap: 12px; }
+  .slide-mark { width: 24px; height: 24px; }
+  .slide-brand strong { font-size: 19px; }
+  .slide-brand small { font-size: 8.5px; letter-spacing: 0.12em; }
+  .slide-points { gap: 7px; }
+  .slide-points li { font-size: 11px; padding-left: 14px; }
+  .slide-points li:nth-child(3) { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(78px, 23vw, 104px); }
+  .tool-card { flex: 0 0 min(78%, 300px); }
+}
+
+/* Under 400px the strapline no longer fits beside the mascot: the cover keeps the
+   mark, the name and two points, which is as much slide as a phone can hold. */
+@media (max-width: 400px) {
+  .slide-brand small { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(62px, 20vw, 84px); }
+}
+
+/* 320px, the narrowest phone still out there: the cover keeps one point. */
+@media (max-width: 340px) {
+  .slide-points li:nth-child(2) { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(52px, 17vw, 72px); }
+}
+
 
 /* ============================================================ how it works */
 .steps { counter-reset: step; margin-top: 56px; display: grid; gap: 0; }
