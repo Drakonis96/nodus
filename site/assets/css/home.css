@@ -296,11 +296,62 @@ body {
 }
 
 /* ============================================================ more vaults */
+/* Two grids rather than one. Every mode now carries a window, and a screenshot
+   only reads at a decent width: the two modes whose surfaces are populated take
+   half the row, and the three pre-alpha ones sit under them as a narrower trio,
+   which is also the order of how finished they are. */
 .more-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px; margin-top: 48px;
 }
-.more-card { padding: 24px; }
+.more-grid-early { margin-top: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.more-card { padding: 20px; }
+/* The window comes first, so a card reads as a mode with its own screens. */
+.more-card .frame { margin-bottom: 18px; }
+.more-card .shot figcaption { font-size: 12px; }
+/* The window's own title bar is narrower here than in a scene, and on the three
+   pre-alpha cards its right end runs under the ribbon: shorten it rather than let
+   it wrap into two ragged lines. */
+.more-card .frame-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.more-grid-early .frame-bar { padding-right: 58px; }
+
+/* ── the pre-alpha corner ───────────────────────────────────────────────────────
+   The three preliminary modes carry a diagonal ribbon in the same amber the app's
+   own phase badge uses (src/components/vaultTypeUi.tsx), and the note behind it
+   repeats what that badge says: not usable for real work yet. The ribbon is
+   focusable, so the note is reachable without a mouse, and only the band takes
+   pointer events — the rest of the corner stays part of the card. */
+.mode-ribbon {
+  position: absolute; top: 0; right: 0; width: 104px; height: 104px;
+  overflow: hidden; pointer-events: none; z-index: 3;
+}
+.mode-ribbon-band {
+  position: absolute; top: 22px; right: -30px; width: 132px;
+  padding: 4px 0; transform: rotate(45deg);
+  text-align: center; pointer-events: auto;
+  font: 700 9.5px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+  color: #2a1c02; background: linear-gradient(180deg, #fcd34d, #f0a020);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.mode-ribbon:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: var(--r-l); }
+.mode-ribbon-tip {
+  position: absolute; top: 80px; right: 8px; width: 208px;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.4); background: #171106; color: var(--ink-2);
+  font-size: 12px; line-height: 1.5;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  opacity: 0; visibility: hidden; transform: translateY(-6px);
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), visibility 0s linear 0.2s;
+}
+.mode-ribbon:hover .mode-ribbon-tip,
+.mode-ribbon:focus .mode-ribbon-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+
+@media (max-width: 1180px) {
+  .more-grid-early { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .more-grid, .more-grid-early { grid-template-columns: minmax(0, 1fr); }
+}
 .more-card .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .more-card .pic {
   display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;

@@ -34,38 +34,68 @@ const scenes = home
   .split('<section class="scene"')
   .slice(1)
   .map((chunk) => chunk.slice(0, chunk.indexOf('</section>')));
+
+/** The figures and arrows of one window, read the same way wherever it sits: the
+ *  four vault scenes and the five mode cards carry the same markup. */
+function figuresOf(chunk) {
+  return [...chunk.matchAll(/<figure class="(shot[^"]*)"[^>]*>([\s\S]*?)<\/figure>/g)].map((match) => {
+    const block = match[2];
+    const image = block.match(/<img src="([^"]+)" width="(\d+)" height="(\d+)"[^>]*alt="([^"]*)"/);
+    return {
+      classes: match[1],
+      ariaHidden: /aria-hidden="true"/.test(match[0]),
+      src: image?.[1],
+      width: Number(image?.[2]),
+      height: Number(image?.[3]),
+      alt: image?.[4],
+      text: block.match(/<span class="shot-text">([\s\S]*?)<\/span>/)?.[1],
+      step: block.match(/<span class="shot-step">([^<]+)<\/span>/)?.[1],
+      lazy: /\bloading="lazy"/.test(block),
+      async: /\bdecoding="async"/.test(block),
+    };
+  });
+}
+
+function arrowsOf(chunk) {
+  return [...chunk.matchAll(/<button class="shot-arrow (\w+)"([^>]*)>/g)].map((match) => ({
+    side: match[1],
+    attributes: match[2],
+  }));
+}
+
 const windows = scenes
   .filter((scene) => scene.includes('<div class="frame" data-shots>'))
   .map((scene) => {
     const vault = scene.match(/<div class="frame-bar"><i><\/i><i><\/i><i><\/i><span>Nodus Research · ([^<]+)<\/span>/)?.[1];
-    const figures = [...scene.matchAll(/<figure class="(shot[^"]*)"[^>]*>([\s\S]*?)<\/figure>/g)].map((match) => {
-      const block = match[2];
-      const image = block.match(/<img src="([^"]+)" width="(\d+)" height="(\d+)"[^>]*alt="([^"]*)"/);
-      return {
-        classes: match[1],
-        ariaHidden: /aria-hidden="true"/.test(match[0]),
-        src: image?.[1],
-        width: Number(image?.[2]),
-        height: Number(image?.[3]),
-        alt: image?.[4],
-        text: block.match(/<span class="shot-text">([\s\S]*?)<\/span>/)?.[1],
-        step: block.match(/<span class="shot-step">([^<]+)<\/span>/)?.[1],
-        lazy: /\bloading="lazy"/.test(block),
-        async: /\bdecoding="async"/.test(block),
-      };
-    });
     return {
       scene,
       vault,
-      figures,
-      arrows: [...scene.matchAll(/<button class="shot-arrow (\w+)"([^>]*)>/g)].map((match) => ({
-        side: match[1],
-        attributes: match[2],
-      })),
+      figures: figuresOf(scene),
+      arrows: arrowsOf(scene),
       shotsLabel: scene.match(/<div class="shots"[^>]*aria-label="([^"]+)"/)?.[1],
       carouselRole: /<div class="shots"[^>]*aria-roledescription="carousel"/.test(scene),
     };
   });
+
+/* "More ways to work with Nodus": one card per mode, each with a window of its
+   own. Read a chunk per article, so a check on one mode cannot count another's. */
+const modeCards = home
+  .slice(home.indexOf('<section id="more-vaults"'), home.indexOf('</section>', home.indexOf('<section id="more-vaults"')))
+  .split('<article class="card lit more-card')
+  .slice(1)
+  .map((chunk) => chunk.slice(0, chunk.indexOf('</article>')))
+  .map((card) => ({
+    card,
+    title: card.match(/<h3>([^<]+)<\/h3>/)?.[1],
+    vault: card.match(/<div class="frame-bar"><i><\/i><i><\/i><i><\/i><span>Nodus Research · ([^<]+)<\/span>/)?.[1],
+    ribbon: card.includes('<span class="mode-ribbon"')
+      ? card.slice(card.indexOf('<span class="mode-ribbon"'), card.indexOf('<div class="frame" data-shots>'))
+      : null,
+    figures: figuresOf(card),
+    arrows: arrowsOf(card),
+    shotsLabel: card.match(/<div class="shots"[^>]*aria-label="([^"]+)"/)?.[1],
+    carouselRole: /<div class="shots"[^>]*aria-roledescription="carousel"/.test(card),
+  }));
 
 test('every main vault scene shows a window of real screenshots', () => {
   assert.deepEqual(
@@ -103,7 +133,7 @@ test('every main vault scene shows a window of real screenshots', () => {
 });
 
 test('the files on disk are exactly the ones the mirror script produces', () => {
-  const referenced = new Set(windows.flatMap((window) => window.figures.map((figure) => figure.src)));
+  const referenced = new Set([...windows, ...modeCards].flatMap((window) => window.figures.map((figure) => figure.src)));
   const mirrored = SITE_SHOTS.map((shot) => `assets/screenshots/${shot.target}`);
 
   for (const target of mirrored) {
@@ -195,8 +225,64 @@ test('the other vaults include their expanded, distinct feature galleries', () =
   assert.equal(new Set(hashes).size, hashes.length, 'each slide uses a distinct capture');
 });
 
-test('the drawn app views left with the graphics they belonged to', () => {
-  /* Matched as class names, not as words: "rubrics" is still the word the teaching
+test('every mode in "More ways to work with Nodus" shows its own window of screens', () => {
+  const counts = { Genealogy: 5, Worldbuilding: 7, 'Primary Sources': 2, Testimony: 2, Prosopography: 2 };
+  assert.equal(modeCards.length, Object.keys(counts).length, 'the section carries one card per mode');
+  for (const card of modeCards) {
+    const count = counts[card.title];
+    assert.ok(count, `${card.title} is a mode the section is expected to show`);
+    assert.ok(card.vault?.endsWith('vault'), `${card.title} labels its window with the vault it opens`);
+    assert.equal(card.figures.length, count, `${card.title} steps through ${count} screens`);
+    assert.equal(card.arrows.length, 2, `${card.title} has previous and next controls`);
+    assert.ok(card.carouselRole && /screenshot/.test(card.shotsLabel ?? ''), `${card.title} announces its carousel`);
+    assert.deepEqual(
+      card.figures.map((figure) => figure.step),
+      Array.from({ length: count }, (_, i) => `${String(i + 1).padStart(2, '0')} / ${String(count).padStart(2, '0')}`),
+      `${card.title} numbers its screens`,
+    );
+    assert.ok(card.figures[0].classes.includes('is-active'), `${card.title} rests on its first screen`);
+    for (const figure of card.figures) {
+      assert.equal(figure.width, SHOT_WIDTH, `${card.title} uses a mirrored width`);
+      assert.equal(figure.height, SHOT_HEIGHT, `${card.title} uses a mirrored height`);
+      assert.ok(figure.src.startsWith('assets/screenshots/'), `${card.title} publishes its own copy of the capture`);
+      assert.ok(figure.alt.length > 24, `${card.title} describes ${figure.src} for a screen reader`);
+      assert.ok(figure.text.length > 20, `${card.title} captions ${figure.src}`);
+      assert.ok(figure.async);
+    }
+    for (const figure of card.figures.slice(1)) {
+      assert.ok(figure.ariaHidden, `${card.title} hides the screens that are not showing`);
+      assert.ok(figure.lazy, `${card.title} loads the rest of its screens lazily`);
+    }
+  }
+  // The two modes whose surfaces are populated get the wider half of the row.
+  assert.match(css, /\.more-grid \{\s*display: grid; grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/, 'the lead modes take half the row each');
+  assert.match(css, /\.more-grid-early \{ margin-top: 16px; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/, 'the preliminary modes sit under them as a trio');
+});
+
+test('the preliminary modes carry the app\'s own phase, in the corner and on hover', () => {
+  const preliminary = modeCards.filter((card) => card.ribbon);
+  assert.deepEqual(
+    preliminary.map((card) => card.title),
+    ['Primary Sources', 'Testimony', 'Prosopography'],
+    'the three modes the app marks pre-alpha are the tagged ones',
+  );
+  for (const card of preliminary) {
+    assert.match(card.ribbon, /data-phase="pre-alpha"/, `${card.title} names the phase the app gives it`);
+    assert.match(card.ribbon, /tabindex="0"/, `${card.title}'s tag can be reached without a mouse`);
+    assert.match(card.ribbon, /<span class="mode-ribbon-band">Pre-alpha<\/span>/, `${card.title} prints the phase on the ribbon`);
+    const describedBy = card.ribbon.match(/aria-describedby="([^"]+)"/)?.[1];
+    assert.ok(describedBy, `${card.title}'s tag points at its note`);
+    assert.ok(
+      card.ribbon.includes(`<span class="mode-ribbon-tip" id="${describedBy}" role="tooltip">`),
+      `${card.title}'s note is the element its tag describes`,
+    );
+    assert.match(card.ribbon, /not usable for real work yet/i, `${card.title} says what pre-alpha means`);
+  }
+  assert.match(css, /\.mode-ribbon-band \{[^}]*transform: rotate\(45deg\)/, 'the tag is a diagonal band');
+  assert.match(css, /\.mode-ribbon:hover \.mode-ribbon-tip,\s*\.mode-ribbon:focus \.mode-ribbon-tip \{ opacity: 1/, 'hovering or focusing the tag raises the note');
+});
+
+test('the drawn app views left with the graphics they belonged to', () => {  /* Matched as class names, not as words: "rubrics" is still the word the teaching
      scene uses for the real feature, and that copy is not going anywhere. */
   const drawn = ['graph-svg', 'grid-table', 'mark-pill', 'rubric', 'week', 'flash', 'db-cols', 'bars-axis', 'evidence'];
   for (const name of drawn) {
@@ -205,8 +291,7 @@ test('the drawn app views left with the graphics they belonged to', () => {
   }
 });
 
-test('the window wears the three colours a desktop window wears', () => {
-  // The order is the order the controls appear in: close, minimise, zoom.
+test('the window wears the three colours a desktop window wears', () => {  // The order is the order the controls appear in: close, minimise, zoom.
   const controls = [
     ['1', '#ff5f57'],
     ['2', '#febc2e'],

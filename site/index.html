@@ -35,7 +35,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin/>
 <link rel="stylesheet" href="assets/css/nodus.css?v=20260927a"/>
 <link rel="stylesheet" href="assets/css/what-nodi.css?v=20260928a"/>
-<link rel="stylesheet" href="assets/css/home.css?v=20260928b"/>
+<link rel="stylesheet" href="assets/css/home.css?v=20260928c"/>
 <script>
   /* Arm the opening sequence before the first paint. Anything that goes wrong
      here simply leaves the page in its ordinary, fully visible state. */
@@ -536,6 +536,39 @@ SPDX-License-Identifier: AGPL-3.0-only
 
     <div class="more-grid">
       <article class="card lit more-card reveal" style="--vc:#fbbf24">
+        <div class="frame" data-shots>
+          <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Genealogy vault</span></div>
+          <div class="frame-body">
+            <div class="shots" role="group" aria-roledescription="carousel" aria-label="The genealogy vault in five screenshots">
+              <figure class="shot is-active">
+                <img src="assets/screenshots/genealogy-tree.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Family tree of a family-history vault, ancestors framed as portraits along the paternal and maternal lines"/>
+                <figcaption><span class="shot-text">The tree, with every ancestor tied to the record behind them</span><span class="shot-step">01 / 05</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/genealogy-persons.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Person record in the genealogy vault with the events, name variants and documents that mention them"/>
+                <figcaption><span class="shot-text">A life rebuilt from the documents that mention it</span><span class="shot-step">02 / 05</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/genealogy-archive.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Archive of marriages, censuses, diaries and death records with their document types and years"/>
+                <figcaption><span class="shot-text">Every record typed, dated and attached to the people in it</span><span class="shot-step">03 / 05</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/genealogy-timeline.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Timeline of vital records and family events, each one carrying the documentary evidence for it"/>
+                <figcaption><span class="shot-text">The chronology the documents support, and the gaps between them</span><span class="shot-step">04 / 05</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/genealogy-deep-research.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Family-history report drafted over the archive, with one section per set of evidence"/>
+                <figcaption><span class="shot-text">A family-history report written over the archive itself</span><span class="shot-step">05 / 05</span></figcaption>
+              </figure>
+              <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous genealogy vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next genealogy vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="head">
           <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.4"/><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="19" r="2.4"/><path d="M12 7.4V12M6 16.6V14a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2.6"/></svg></span>
           <h3>Genealogy</h3>
@@ -546,6 +579,47 @@ SPDX-License-Identifier: AGPL-3.0-only
       </article>
 
       <article class="card lit more-card reveal" style="--vc:#c084fc;--delay:70ms">
+        <div class="frame" data-shots>
+          <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Worldbuilding vault</span></div>
+          <div class="frame-body">
+            <div class="shots" role="group" aria-roledescription="carousel" aria-label="The worldbuilding vault in 7 screenshots">
+              <figure class="shot is-active">
+                <img src="assets/screenshots/worldbuilding-characters.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Character cards of a worldbuilding vault with portraits, narrative roles and in-world dates"/>
+                <figcaption><span class="shot-text">Characters, with their role, species and dates</span><span class="shot-step">01 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-encyclopedia.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Encyclopedia index of a worldbuilding vault listing its articles, characters, places and events"/>
+                <figcaption><span class="shot-text">One index over everything the world holds</span><span class="shot-step">02 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-places.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Places of the world with their thumbnails, descriptions and the map they sit on"/>
+                <figcaption><span class="shot-text">Places, with the map they belong to</span><span class="shot-step">03 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-factions.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Faction cards of the setting with their emblems, their members and their standing"/>
+                <figcaption><span class="shot-text">Factions, their emblems and their members</span><span class="shot-step">04 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-cultures.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Culture cards of the setting with their traditions, languages and territories"/>
+                <figcaption><span class="shot-text">Cultures, with their traditions and languages</span><span class="shot-step">05 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-timeline.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Timeline of the world's eras and events with the scenes and characters involved in each"/>
+                <figcaption><span class="shot-text">The history of the world, era by era</span><span class="shot-step">06 / 07</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/worldbuilding-scenes.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Scene cards with their images and the narrative threads each one advances"/>
+                <figcaption><span class="shot-text">Scenes, threaded into the arcs they advance</span><span class="shot-step">07 / 07</span></figcaption>
+              </figure>
+              <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous worldbuilding vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next worldbuilding vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="head">
           <span class="pic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.4 2.5 3.6 5.5 3.6 9S14.4 18.5 12 21c-2.4-2.5-3.6-5.5-3.6-9S9.6 5.5 12 3Z"/></svg></span>
           <h3>Worldbuilding</h3>
@@ -554,8 +628,35 @@ SPDX-License-Identifier: AGPL-3.0-only
         <a class="arrow-link" href="demo/worldbuilding.html">Open the worldbuilding demo
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </article>
+    </div>
 
+    <div class="more-grid more-grid-early">
       <article class="card lit more-card reveal" style="--vc:#93c5fd;--delay:140ms">
+        <span class="mode-ribbon" data-phase="pre-alpha" tabindex="0" aria-describedby="more-phase-primary-sources">
+          <span class="mode-ribbon-band">Pre-alpha</span>
+          <span class="mode-ribbon-tip" id="more-phase-primary-sources" role="tooltip">Not usable for real work yet. It is here so people who want to help can test incomplete features and report what breaks.</span>
+        </span>
+        <div class="frame" data-shots>
+          <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Primary Sources vault</span></div>
+          <div class="frame-body">
+            <div class="shots" role="group" aria-roledescription="carousel" aria-label="The primary-sources vault in two screenshots">
+              <figure class="shot is-active">
+                <img src="assets/screenshots/primary-sources-archive.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Archive of a primary-sources vault: catalogue folders, document types and the scans themselves"/>
+                <figcaption><span class="shot-text">The archive, with the scan beside its catalogue entry</span><span class="shot-step">01 / 02</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/primary-sources-timeline.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Documentary timeline with approximate dates, evidence counts and contradictions left visible"/>
+                <figcaption><span class="shot-text">What the documents assert, with the doubt preserved</span><span class="shot-step">02 / 02</span></figcaption>
+              </figure>
+              <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous primary-sources vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next primary-sources vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="head">
           <span class="pic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></svg></span>
           <h3>Primary Sources</h3>
@@ -564,6 +665,31 @@ SPDX-License-Identifier: AGPL-3.0-only
       </article>
 
       <article class="card lit more-card reveal" style="--vc:#22d3ee;--delay:210ms">
+        <span class="mode-ribbon" data-phase="pre-alpha" tabindex="0" aria-describedby="more-phase-testimony">
+          <span class="mode-ribbon-band">Pre-alpha</span>
+          <span class="mode-ribbon-tip" id="more-phase-testimony" role="tooltip">Not usable for real work yet. It is here so people who want to help can test incomplete features and report what breaks.</span>
+        </span>
+        <div class="frame" data-shots>
+          <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Testimony vault</span></div>
+          <div class="frame-body">
+            <div class="shots" role="group" aria-roledescription="carousel" aria-label="The testimony vault in two screenshots">
+              <figure class="shot is-active">
+                <img src="assets/screenshots/testimony-interviews.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Interviews in the testimony vault, each with its own cover image and its recording state"/>
+                <figcaption><span class="shot-text">Interviews, each with its recording and its consent</span><span class="shot-step">01 / 02</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/testimony-participants.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Participants of the oral-history corpus and the interviews each one appears in"/>
+                <figcaption><span class="shot-text">Who speaks, and in which interviews</span><span class="shot-step">02 / 02</span></figcaption>
+              </figure>
+              <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous testimony vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next testimony vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="head">
           <span class="pic"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/></svg></span>
           <h3>Testimony</h3>
@@ -572,6 +698,31 @@ SPDX-License-Identifier: AGPL-3.0-only
       </article>
 
       <article class="card lit more-card reveal" style="--vc:#f0abfc;--delay:280ms">
+        <span class="mode-ribbon" data-phase="pre-alpha" tabindex="0" aria-describedby="more-phase-prosopography">
+          <span class="mode-ribbon-band">Pre-alpha</span>
+          <span class="mode-ribbon-tip" id="more-phase-prosopography" role="tooltip">Not usable for real work yet. It is here so people who want to help can test incomplete features and report what breaks.</span>
+        </span>
+        <div class="frame" data-shots>
+          <div class="frame-bar"><i></i><i></i><i></i><span>Nodus Research · Prosopography vault</span></div>
+          <div class="frame-body">
+            <div class="shots" role="group" aria-roledescription="carousel" aria-label="The prosopography vault in two screenshots">
+              <figure class="shot is-active">
+                <img src="assets/screenshots/prosopography-persons.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Person dossier in the prosopography vault with the identity guesses and the sources behind them"/>
+                <figcaption><span class="shot-text">One person, with the identity guesses still open</span><span class="shot-step">01 / 02</span></figcaption>
+              </figure>
+              <figure class="shot" aria-hidden="true">
+                <img src="assets/screenshots/prosopography-population.webp" width="1280" height="800" loading="lazy" decoding="async" alt="Study design panel defining the population, the unit of analysis and the research question"/>
+                <figcaption><span class="shot-text">The population, defined before anything is counted</span><span class="shot-step">02 / 02</span></figcaption>
+              </figure>
+              <button class="shot-arrow prev" type="button" data-shots-prev hidden aria-label="Show the previous prosopography vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+              </button>
+              <button class="shot-arrow next" type="button" data-shots-next hidden aria-label="Show the next prosopography vault screenshot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="head">
           <span class="pic"><svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="m9 8.5 2 6M15 8.5l-2 6M9.5 7h5"/></svg></span>
           <h3>Prosopography</h3>
