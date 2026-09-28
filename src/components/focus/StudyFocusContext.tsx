@@ -126,6 +126,8 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
       // A work block is what the mode is for, so starting or resuming one turns it on
       // unless the student has unticked "Modo concentración".
       if ((action === 'start' || action === 'resume') && next.state.status === 'running' && next.state.phase === 'work' && next.state.preferences.enterOnStart) setReduced(true);
+      // Ending the session ends the mode with it: back to the normal view.
+      if (action === 'finish' && next.state.status === 'ready') setReduced(false);
     }
     catch (reason) { fail(reason); }
   }, [receive, fail, setReduced]);

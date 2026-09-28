@@ -80,6 +80,12 @@ try {
   assert.equal(await page.getByTestId('focus-rail').count(), 0);
   assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.enterOnStart, false);
   const running = await page.evaluate(() => window.nodus.getStudyFocus());
+  // Outside the mode the counter sits in the left half of the header, never in the right rail.
+  const counter = page.getByTestId('focus-header');
+  await counter.waitFor();
+  assert.equal(await page.getByTestId('header-actions').getByTestId('focus-header').count(), 0);
+  const counterPlace = await counter.evaluate(el => { const h = el.closest('header').getBoundingClientRect(); const r = el.getBoundingClientRect(); return (r.left + r.width / 2 - h.left) / h.width; });
+  assert.ok(counterPlace > 0.08 && counterPlace < 0.45, `counter centred in the left half (${counterPlace})`);
   assert.equal(running.state.status, 'running'); assert.equal(running.state.subjectId, ids.subject.id);
   assert.equal(running.state.task, 'Repasar el siglo XIX');
   await view().getByTestId('focus-current-block').getByText('Repasar el siglo XIX').waitFor();
@@ -141,10 +147,13 @@ try {
   const bars = view().getByRole('group', { name: 'Gráfico de minutos por día' }).getByRole('button');
   await bars.first().focus(); await page.keyboard.press('ArrowRight'); assert.equal(await bars.nth(1).evaluate(el => el === document.activeElement), true);
   // Header keyboard dismissal and settings, independent from reduced UI.
-  await page.getByTestId('focus-header').click();
+  // No session open: no counter anywhere in the header, only the focus icon on the right.
+  assert.equal(await page.getByTestId('focus-header').count(), 0);
+  const focusIcon = page.getByTestId('focus-quick-access').getByRole('button', { name: 'Modo concentración', exact: true });
+  await focusIcon.click();
   await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByText('Configurar temporizador').click();
   await page.screenshot({ path: path.join(shots, '04-header-panel.png') });
-  await page.keyboard.press('Escape'); assert.equal(await page.getByTestId('focus-header').evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('Escape'); assert.equal(await focusIcon.evaluate(el => el === document.activeElement), true);
   await page.evaluate(require('axe-core').source);
   const lightA11y = await page.evaluate(async () => (await window.axe.run('[data-testid="study-focus-view"]')).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target) })));
   assert.deepEqual(lightA11y.filter(v => ['critical', 'serious'].includes(v.impact)), []);
@@ -276,6 +285,20 @@ try {
   await page.getByTestId('focus-exit-keep').click();
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
   await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es' }));
+  // Finishing the session from inside the mode goes back to the normal view, and the
+  // counter goes with the session.
+  const headerFocusIcon = page.getByTestId('focus-quick-access').getByRole('button', { name: 'Modo concentración', exact: true });
+  await headerFocusIcon.click();
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByTestId('focus-mode-toggle').check();
+  await page.getByTestId('focus-rail').waitFor();
+  assert.equal(await page.getByTestId('focus-header').count(), 0, 'inside the mode the clock is in the rail, not the header');
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByRole('button', { name: 'Finalizar sesión', exact: true }).click();
+  await page.getByTestId('resizable-sidebar').waitFor();
+  assert.equal(await page.getByTestId('focus-rail').count(), 0);
+  assert.equal(await page.getByTestId('focus-header').count(), 0, 'no counter once the session is finished');
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'ready');
+  await page.keyboard.press('Escape');
+  await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'start', s.state.revision); });
   // Dark and narrow windows.
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
   await page.reload(); await page.locator('[data-tour="nav-studyFocus"]').click();

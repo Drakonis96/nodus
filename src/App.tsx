@@ -1567,11 +1567,13 @@ export function App() {
           </button>
         )}
 
+        {/* The focus counter takes the left half of the header (between the logo and the
+            centred badge), centred in it; the right rail only ever has the focus icon. */}
+        {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} />}
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
         <div ref={setHeaderActionsEl} data-testid="header-actions" className="header-action-rail flex min-w-0 items-center justify-end gap-0.5 overflow-hidden pr-4">
-          {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} />}
           {/* No Bóvedas button: the centred badge is the way in, and it is now shown at
               every width for exactly that reason (see the badge above). */}
           <HeaderAction

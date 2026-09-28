@@ -48,7 +48,9 @@ La casilla «Modo concentración» está marcada por defecto: iniciar o reanudar
 
 Todo es configurable en «Personalizar el modo concentración» (desde el panel, desde la cabecera o desde la paleta): cada bloque superior, cualquier sección de la bóveda y los elementos que conserva la cabecera (controles de medios del navegador, paleta de comandos, tema y cola de tareas). Solo afecta al modo concentración; se guarda por bóveda con el resto de preferencias del temporizador y solo se almacenan las diferencias con los valores por defecto.
 
-En la cabecera de una bóveda de Estudio, junto al tema claro/oscuro, hay un botón de concentración (resaltado mientras el modo está activo) que abre el panel del temporizador: dentro están la casilla del modo y el botón de ajustes. Salir del modo lleva a la página Concentración, pausa el bloque y, si hay una sesión abierta, pregunta si finalizarla o dejarla en pausa. Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
+En la cabecera de una bóveda de Estudio, junto al tema claro/oscuro, hay un botón de concentración (resaltado mientras el modo está activo) que abre el panel del temporizador: dentro están la casilla del modo y el botón de ajustes. Salir del modo lleva a la página Concentración, pausa el bloque y, si hay una sesión abierta, pregunta si finalizarla o dejarla en pausa. Finalizar la sesión, desde donde sea, devuelve siempre a la vista normal.
+
+El contador solo existe mientras hay una sesión abierta. Fuera del modo aparece en la mitad izquierda de la cabecera, centrado entre el logo y el centro; dentro del modo el reloj está en el panel lateral. La parte derecha de la cabecera solo lleva el icono de concentración. Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
 
 ## Detalles de persistencia
 
