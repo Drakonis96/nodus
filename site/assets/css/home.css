@@ -185,11 +185,19 @@ select,
 }
 
 /* ============================================================ vault scenes */
-.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
-.scene-inner {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-  gap: clamp(32px, 5vw, 72px); align-items: center;
+/* The window and the copy beside it. Every app window on the home page — the four
+   vault scenes and the five modes further down — takes the wide column of this
+   same pair, so they come out one size at every width and the copy keeps the rest.
+   A scene puts the copy first; a flipped scene and the mode carousel put the
+   window first, and the copy moves to the right. */
+.scene-inner, .mode-body {
+  display: grid; align-items: center;
+  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
 }
+.scene[data-flip] .scene-inner,
+.mode-body { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
 /* every other scene puts the visual first, so the eye zig-zags down the page */
 .scene[data-flip] .scene-copy { order: 2; }
 
@@ -302,6 +310,50 @@ select,
 .shot-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
 .shot-arrow[hidden] { display: none; }
 
+/* The control in the window's own bar that opens the screenshot bigger. It keeps
+   to the top right, the corner a window control is looked for in, and is small
+   enough not to add height to the bar it lives in. */
+.frame-zoom {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 22px; height: 22px; margin: -6px 0 -6px auto; padding: 0; cursor: pointer;
+  border: 1px solid var(--membrane); border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02); color: var(--ink-3);
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.frame-zoom svg { width: 12px; height: 12px; }
+.frame-zoom:hover {
+  color: var(--ink); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.frame-zoom:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.frame-zoom[hidden] { display: none; }
+/* The pre-alpha tag crosses that corner of its window, so the button steps in. */
+.frame.has-ribbon .frame-zoom { margin-right: 54px; }
+
+/* ------------------------------------------------------------ the gallery view */
+/* The window on its own, over the blurred page: the same frame the visitor clicked,
+   a rank bigger, keeping its caption, its counter and its own arrows. */
+.shot-viewer {
+  position: fixed; inset: 0; z-index: 170;
+  display: none; place-items: center;
+  padding: clamp(18px, 4vw, 48px);
+  background: rgba(4, 3, 8, 0.82);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.shot-viewer.open { display: grid; }
+/* Capped by the height as well as the width, so the whole window — bar, shot and
+   caption — is on screen without the viewer ever scrolling. */
+.shot-viewer-stage {
+  width: min(100%, 1080px, calc((100dvh - 190px) * 1.6));
+  animation: shot-in 0.34s var(--ease);
+}
+@keyframes shot-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.shot-viewer .frame { box-shadow: var(--shadow); }
+.shot-viewer .shot-arrow { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .shot-viewer-stage { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shot { transition: none; }
 }
@@ -310,6 +362,9 @@ select,
   .shot-arrow { width: 32px; height: 32px; }
   .shot-arrow.prev { left: 8px; }
   .shot-arrow.next { right: 8px; }
+  /* A finger needs more of it than a cursor does, without the bar growing. */
+  .frame-zoom { width: 28px; height: 28px; margin-top: -9px; margin-bottom: -9px; }
+  .frame-zoom svg { width: 14px; height: 14px; }
 }
 
 /* ============================================================ more vaults */
@@ -320,8 +375,8 @@ select,
    tab, an arrow key or a swipe. */
 .modes { margin-top: 48px; }
 .mode-nav {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: clamp(16px, 2.4vw, 26px);
 }
 .mode-tabs {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -351,11 +406,11 @@ select,
 }
 .mode-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* The window and the copy beside it: the same two columns a vault scene uses. */
-.mode-body {
-  display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
-  gap: clamp(24px, 3.4vw, 44px); align-items: start;
-}
+/* The window takes the wide column and the mode is described at its right, the way
+   a vault scene is laid out — with the copy level with the top of the window, since
+   a mode says less than a vault does. The pair of columns itself is the one
+   declared with the scenes, so this window is exactly the width of the four above. */
+.mode-body { align-items: start; }
 /* The slides are <section>s, and the page pads every section by up to 148px: that
    pushed the window down inside its own column while the copy stayed at the top,
    which is the misalignment this class exists to undo. */
@@ -415,7 +470,9 @@ select,
 .mode-ribbon:focus .mode-ribbon-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 @media (max-width: 900px) {
-  .mode-body { grid-template-columns: minmax(0, 1fr); }
+  /* The labels wrap while there is room for two rows; only below this width do
+     they become a row you have to scroll, which is what keeps every one of them
+     readable on a desktop window of any size. */
   .mode-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
   .mode-tab { flex: 0 0 auto; }
 }
@@ -664,7 +721,9 @@ select,
   /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so
      one wide child (a screenshot frame, a long label) pushes the whole column
      past the viewport and the page scrolls sideways */
-  .scene-inner { grid-template-columns: minmax(0, 1fr); }
+  /* The mode carousel folds here too, not at a width of its own: a window and its
+     copy are one pair everywhere on the page, so both stack at the same point. */
+  .scene-inner, .mode-body { grid-template-columns: minmax(0, 1fr); }
   .scene[data-flip] .scene-copy { order: 0; }
   .tool-hero { grid-template-columns: minmax(0, 1fr); }
 }

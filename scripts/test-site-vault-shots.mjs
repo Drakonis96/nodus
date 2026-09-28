@@ -365,3 +365,80 @@ test('the carousel is a row of screenshots that swaps in place, with real arrows
   // A swipe must not fire on a vertical drag: that is the page being scrolled.
   assert.match(script, /Math\.abs\(dx\) < Math\.abs\(dy\)\) return;/, 'a scroll is not a swipe');
 });
+
+test('every window carries the control that opens it in the gallery view', () => {
+  const bars = [...home.matchAll(/<div class="frame-bar">([\s\S]*?)<\/div>/g)].map((match) => ({
+    vault: match[1].match(/<span>Nodus Research · ([^<]+)<\/span>/)?.[1],
+    zoom: match[1].match(/<button class="frame-zoom" type="button" data-shot-zoom aria-label="([^"]+)" hidden>([\s\S]*?)<\/button>/),
+  }));
+  assert.equal(bars.length, 9, 'the four vault windows and the five mode windows all have a bar');
+  for (const bar of bars) {
+    assert.ok(bar.vault, `the window labels itself (${bar.vault})`);
+    assert.ok(bar.zoom, `${bar.vault}: the bar carries the control that opens the view`);
+    assert.match(bar.zoom[1], new RegExp(bar.vault.toLowerCase()), `${bar.vault}: the control names the window it belongs to`);
+    assert.match(bar.zoom[2], /<svg/, `${bar.vault}: the control is drawn with an icon`);
+  }
+  // `hidden` is the script-less page's resting state, exactly as the arrows are:
+  // a control that cannot do anything is not left sitting there to be clicked.
+  const zoomLabels = bars.map((bar) => bar.zoom?.[1]);
+  assert.equal(new Set(zoomLabels).size, zoomLabels.length, 'no two windows share one label');
+});
+
+test('the gallery view shows the window over the blurred page, and hands it back', () => {
+  const script = readSite('assets/js/vault-shots.js');
+  // The view is the page's own window, not a second design: the bar, the caption
+  // and the arrows are the classes the page already styles.
+  assert.match(script, /'<div class="shot-viewer-stage"><div class="frame">'/, 'the view carries the window frame the page draws');
+  assert.match(script, /overlay\.className = 'shot-viewer'/, 'the view builds its own overlay');
+  assert.match(script, /overlay\.setAttribute\('role', 'dialog'\)/, 'and announces itself as a dialog');
+  assert.match(script, /frame\.querySelector\('\[data-shot-zoom\]'\)/, 'the control in the bar is what opens it');
+  assert.match(script, /button\.hidden = false/, 'the control appears only once the view behind it can be built');
+  // Cloned from the figure the carousel is showing, so the caption, the counter and
+  // the image cannot drift from the window they came from.
+  assert.match(script, /const figure = slides\[index\]\.cloneNode\(true\);/, 'the view shows the window\'s own figure');
+  assert.match(script, /if \(source\) source\.show\(index\);/, 'the window follows the view back to the page');
+  assert.match(script, /if \(event\.target === overlay\) close\(\);/, 'the backdrop closes it');
+  assert.match(script, /event\.key === 'Escape'/, 'Escape closes it');
+  assert.match(script, /document\.body\.style\.overflow = 'hidden'/, 'the page behind it does not scroll');
+
+  // The veil is the download dialog's own: the same dim and the same blur.
+  assert.match(css, /\.shot-viewer \{[^}]*background: rgba\(4, 3, 8, 0\.82\)/, 'the page behind the view is dimmed');
+  assert.match(css, /\.shot-viewer \{[^}]*backdrop-filter: blur\(10px\)/, 'and blurred');
+  assert.match(css, /\.shot-viewer \.frame \{ box-shadow: var\(--shadow\); \}/, 'the view is the window, raised off the page');
+  // Never taller than the screen: the width is capped by the height the window needs.
+  assert.match(css, /\.shot-viewer-stage \{[^}]*width: min\(100%, 1080px, calc\(\(100dvh - 190px\) \* 1\.6\)\)/, 'the whole window fits the screen');
+  assert.match(css, /\.frame-zoom\[hidden\] \{ display: none; \}/, 'a hidden control is really hidden');
+});
+
+test('every window is one size, and a mode is described beside its window', () => {
+  const script = readSite('assets/js/vault-shots.js');
+  // One pair of columns gives every app window on the page its width: the four
+  // vault windows and the five mode windows take the same wide one, so none of
+  // them is a size of its own.
+  assert.match(
+    css,
+    /\.scene-inner, \.mode-body \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.5fr\)/,
+    'the scenes and the modes share one pair of columns',
+  );
+  assert.match(
+    css,
+    /\.scene\[data-flip\] \.scene-inner,\s*\.mode-body \{ grid-template-columns: minmax\(0, 1\.5fr\) minmax\(0, 1fr\); \}/,
+    'the window takes the wide column and the copy the one at its right',
+  );
+  assert.match(css, /\.scene-inner, \.mode-body \{ grid-template-columns: minmax\(0, 1fr\); \}/,
+    'and both fold to a single column when there is no room for two');
+
+  // The labels are a centred row that wraps while there is room for two rows, and
+  // only becomes a row you scroll once the columns have folded: on a desktop window
+  // of any size all five are on screen.
+  assert.match(css, /\.mode-nav \{[^}]*justify-content: center/, 'the tabs and their arrows sit in the middle');
+  assert.match(css, /\.mode-tabs \{[^}]*flex-wrap: wrap[^}]*min-width: 0;/, 'the labels wrap rather than hide');
+  assert.match(css, /@media \(max-width: 900px\) \{[\s\S]*?\.mode-tabs \{ flex-wrap: nowrap; overflow-x: auto/,
+    'they only become a scroller once the layout has one column');
+  assert.match(css, /\.mode-copy \{ min-width: 0; \}/, 'the copy takes its column, left-aligned like a scene\'s');
+
+  // The pre-alpha tag is sewn into the corner the new control takes, so the window
+  // that carries the tag is what moves the control clear of it.
+  assert.match(script, /if \(frame\.querySelector\('\.mode-ribbon'\)\) frame\.classList\.add\('has-ribbon'\);/, 'a pre-alpha window notes the tag in its corner');
+  assert.match(css, /\.frame\.has-ribbon \.frame-zoom \{ margin-right: 54px; \}/, 'and the control steps clear of it');
+});

@@ -758,6 +758,19 @@ footer.site-foot {
 }
 @keyframes dl-in { from { opacity: 0; transform: translateY(16px) scale(0.97); } }
 .dl-modal h3 { font-size: 23px; }
+/* The dialog repeats its bottom "Close" as an X in the corner it opens on: on a
+   phone the card fills the screen and the button at the end is a scroll away. It
+   sits in the top right, and `margin-left: auto` is what puts it there — the
+   button keeps its place as the first thing a keyboard reaches in the dialog. */
+.dl-x {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; margin: -6px -6px 8px auto; padding: 0;
+  border: 1px solid var(--membrane); border-radius: 50%;
+  background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: all 0.22s var(--ease);
+}
+.dl-x svg { width: 17px; height: 17px; }
+.dl-x:hover { color: var(--ink); background: var(--skin-2); border-color: rgba(167, 139, 250, 0.45); }
 .dl-modal .ver { margin-top: 6px; font-size: 13.5px; color: var(--ink-3); }
 .dl-modal .freeline {
   margin: 14px 0 20px; padding: 9px 12px; border-radius: var(--r-s);
