@@ -34,20 +34,17 @@ const appVersion = require(path.join(repoRoot, 'package.json')).version;
  *  preload method the app's own demo button calls; `views` is the order the card's
  *  carousel steps through, named by the sidebar id the capture clicks.
  *
- *  Two views a reader might expect are absent on purpose. The map is out because its
- *  tiles come from OpenStreetMap, which refuses this kind of client, so a capture of
- *  it shows "Access blocked" placeholders instead of a map. Genealogy carries five
- *  views rather than seven because its social graph, its Library and its search
- *  results hold a single row each on the seeded demo — an empty screen is worse than
- *  a shorter carousel. The archive record itself is left out too: its field labels
- *  still render in Spanish in the English interface (shared/archiveDocTypes.ts). */
+ *  Genealogy's social graph, its Library and its search results hold a single row
+ *  each on the seeded demo, so they are left out: an empty screen is worse than a
+ *  shorter carousel. The archive record itself is left out too, for now — its field
+ *  labels still render in Spanish in the English interface (shared/archiveDocTypes.ts). */
 export const MODES = [
   {
     key: 'genealogy',
     type: 'genealogy',
     name: 'Family papers',
     seed: 'seedGenealogyDemoData',
-    views: ['tree', 'persons', 'archive', 'timeline', 'deepResearch'],
+    views: ['tree', 'persons', 'archive', 'map', 'timeline', 'deepResearch'],
   },
   {
     key: 'worldbuilding',
@@ -118,8 +115,21 @@ const settings = {
   sidebarOrder: [],
 };
 
-await rm(outputRoot, { recursive: true, force: true });
+/** Named modes only, so one of them can be refreshed without touching the rest:
+ *  `node scripts/capture-site-more-vaults.mjs genealogy`. */
+const requested = process.argv.slice(2).filter((argument) => !argument.startsWith('-'));
+const unknown = requested.filter((key) => !MODES.some((mode) => mode.key === key));
+if (unknown.length) throw new Error(`unknown mode(s): ${unknown.join(', ')}`);
+const modes = requested.length ? MODES.filter((mode) => requested.includes(mode.key)) : MODES;
+
 await mkdir(outputRoot, { recursive: true });
+// A full run starts from an empty folder; a partial one replaces only its own shots.
+if (!requested.length) await rm(outputRoot, { recursive: true, force: true });
+else {
+  for (const mode of modes) {
+    for (const view of mode.views) await rm(path.join(outputRoot, `${mode.key}-${view}.png`), { force: true });
+  }
+}
 
 const app = await electron.launch({ executablePath: require('electron'), args: [repoRoot], env: childEnv });
 try {
@@ -180,7 +190,7 @@ try {
     if (await dismiss.count() === 1 && await dismiss.isVisible()) await dismiss.click();
   }
 
-  for (const mode of MODES) {
+  for (const mode of modes) {
     const created = await page.evaluate(({ vaultName, vaultType }) => window.nodus.createVault({ name: vaultName, type: vaultType }), { vaultName: mode.name, vaultType: mode.type });
     const switched = await page.evaluate((id) => window.nodus.switchVault(id), created.vault.id);
     assert.equal(switched.ok, true, switched.message);
@@ -222,7 +232,7 @@ try {
       console.log(`[more] ${mode.key}-${view}.png`);
     }
   }
-  console.log(`Captured ${MODES.reduce((total, mode) => total + mode.views.length, 0)} views in ${outputRoot}`);
+  console.log(`Captured ${modes.reduce((total, mode) => total + mode.views.length, 0)} views in ${outputRoot}`);
 } finally {
   await app.close();
   await rm(userData, { recursive: true, force: true });

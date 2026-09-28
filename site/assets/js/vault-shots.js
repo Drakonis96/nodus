@@ -7,6 +7,11 @@ ships; a vault with more than one view carries them all, and this steps through
 them: the two arrow controls, the left and right arrow keys while the window has
 focus, and a horizontal swipe on a touch screen.
 
+One of those windows carries several modes instead of one vault: its screens are
+grouped into sections, its tabs move between them, and the bar and the copy beside
+it follow whichever section the current screenshot belongs to. Nothing here ever
+advances by itself — every change comes from an arrow, a tab, a key or a swipe.
+
 Without this file the first screenshot is still there — the markup is the
 carousel's resting state, and the arrows stay hidden rather than sitting inert.
 */
@@ -20,8 +25,37 @@ carousel's resting state, and the arrows stay hidden rather than sitting inert.
     // One view is not a carousel: no arrows, nothing to step through.
     if (slides.length < 2 || !previous || !next) return;
 
+    // A frame with jumpers is one carousel over several sections. Everything the
+    // section carries — its button, its title in the window bar, the copy beside
+    // it and the phase on its corner — is read from the markup, never invented.
+    const jumpers = [...frame.querySelectorAll('[data-shots-jump]')];
+    const sections = [...frame.querySelectorAll('[data-shots-section]')];
+    const grouped = jumpers.length > 1 && sections.length > 1
+      && slides.every((slide) => Boolean(slide.dataset.section));
+    const bar = frame.querySelector('[data-shots-bar]');
+
     let index = Math.max(0, slides.findIndex((slide) => slide.classList.contains('is-active')));
     let shown = index;
+
+    function followSection() {
+      if (!grouped) return;
+      const key = slides[index].dataset.section;
+      jumpers.forEach((button) => {
+        if (button.dataset.shotsJump === key) button.setAttribute('aria-current', 'true');
+        else button.removeAttribute('aria-current');
+      });
+      let current = null;
+      sections.forEach((section) => {
+        const active = section.dataset.shotsSection === key;
+        section.classList.toggle('is-active', active);
+        if (active) { current = section; section.removeAttribute('hidden'); }
+        else section.setAttribute('hidden', '');
+      });
+      if (bar && current?.dataset.bar) bar.textContent = current.dataset.bar;
+      // Only a preliminary mode wears the corner ribbon; the others take it off.
+      if (current?.dataset.phase) frame.dataset.activePhase = current.dataset.phase;
+      else delete frame.dataset.activePhase;
+    }
 
     function show(target) {
       index = (target + slides.length) % slides.length;
@@ -35,12 +69,24 @@ carousel's resting state, and the arrows stay hidden rather than sitting inert.
         if (active) slide.removeAttribute('aria-hidden');
         else slide.setAttribute('aria-hidden', 'true');
       });
+      followSection();
     }
 
     previous.hidden = false;
     next.hidden = false;
     previous.addEventListener('click', () => show(index - 1));
     next.addEventListener('click', () => show(index + 1));
+
+    jumpers.forEach((button) => {
+      button.addEventListener('click', () => {
+        const first = slides.findIndex((slide) => slide.dataset.section === button.dataset.shotsJump);
+        if (first >= 0) show(first);
+      });
+    });
+
+    // The markup is already the resting state, but the sections behind it are not:
+    // the first screenshot decides which tab, copy and corner are live.
+    followSection();
 
     // The arrows are buttons, so they are reachable by keyboard on their own.
     // This adds the keys someone would try while looking at the window.

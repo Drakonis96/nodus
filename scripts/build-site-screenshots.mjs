@@ -59,6 +59,7 @@ export const SITE_SHOTS = [
   { source: 'docs/screenshots/more/genealogy-tree.png', target: 'genealogy-tree.webp' },
   { source: 'docs/screenshots/more/genealogy-persons.png', target: 'genealogy-persons.webp' },
   { source: 'docs/screenshots/more/genealogy-archive.png', target: 'genealogy-archive.webp' },
+  { source: 'docs/screenshots/more/genealogy-map.png', target: 'genealogy-map.webp' },
   { source: 'docs/screenshots/more/genealogy-timeline.png', target: 'genealogy-timeline.webp' },
   { source: 'docs/screenshots/more/genealogy-deepResearch.png', target: 'genealogy-deep-research.webp' },
   { source: 'docs/screenshots/more/worldbuilding-characters.png', target: 'worldbuilding-characters.webp' },

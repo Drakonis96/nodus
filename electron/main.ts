@@ -1043,6 +1043,23 @@ app.whenReady().then(async () => {
       callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://nodusresearch.com/' } });
     },
   );
+  // Third obstacle, the maps: OpenStreetMap's volunteer tile servers refuse a client
+  // they cannot identify, and the sanitized User-Agent above is exactly the shape their
+  // policy blocks, so every map in the app answered with "Access blocked" tiles. Naming
+  // Nodus, with a page to complain to, is what they ask for; scoped to the tile hosts,
+  // so nothing else sees a different agent or referer than it does today.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.tile.openstreetmap.org/*'] },
+    (details, callback) => {
+      callback({
+        requestHeaders: {
+          ...details.requestHeaders,
+          'User-Agent': `Nodus/${app.getVersion()} (+https://nodusresearch.com)`,
+          Referer: 'https://nodusresearch.com/',
+        },
+      });
+    },
+  );
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
   if (!process.env.NODUS_TESSDATA_CACHE) {

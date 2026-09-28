@@ -296,35 +296,69 @@ body {
 }
 
 /* ============================================================ more vaults */
-/* Two grids rather than one. Every mode now carries a window, and a screenshot
-   only reads at a decent width: the two modes whose surfaces are populated take
-   half the row, and the three pre-alpha ones sit under them as a narrower trio,
-   which is also the order of how finished they are. */
-.more-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px; margin-top: 48px;
+/* One carousel over five modes, not five windows. The tabs move between the
+   modes, the arrows keep stepping through their screens, and the bar and the copy
+   beside it follow whichever mode the current screenshot belongs to. Nothing
+   advances on its own: every change comes from an arrow, a tab, a key or a swipe. */
+.modes { margin-top: 48px; }
+.mode-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 16px;
 }
-.more-grid-early { margin-top: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-.more-card { padding: 20px; }
-/* The window comes first, so a card reads as a mode with its own screens. */
-.more-card .frame { margin-bottom: 18px; }
-.more-card .shot figcaption { font-size: 12px; }
-/* The window's own title bar is narrower here than in a scene, and on the three
-   pre-alpha cards its right end runs under the ribbon: shorten it rather than let
-   it wrap into two ragged lines. */
-.more-card .frame-bar span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.more-grid-early .frame-bar { padding-right: 58px; }
+.mode-tab {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.02);
+  color: var(--ink-2); font: 600 12.5px/1 var(--sans); letter-spacing: 0.01em;
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.mode-tab:hover { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.mode-tab[aria-current="true"] {
+  color: var(--ink); border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.mode-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The window and the copy beside it: the same two columns a vault scene uses. */
+.mode-body {
+  display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  gap: clamp(24px, 3.4vw, 44px); align-items: start;
+}
+.mode-body .frame { margin: 0; }
+.mode-body .shot figcaption { font-size: 12px; }
+.mode-copy { min-width: 0; }
+.mode-info[hidden] { display: none; }
+.mode-info .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.mode-info .pic {
+  display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
+  border-radius: 11px; border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
+  background: color-mix(in srgb, var(--vc) 14%, transparent); color: var(--vc);
+}
+.mode-info .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.mode-info h3 { font-size: 17px; }
+.mode-info p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.58; }
+.mode-info .arrow-link { color: var(--vc); font-size: 13.5px; }
+/* The phase a mode is in, said in words: the ribbon alone would be hover-only. */
+.mode-info .mode-phase {
+  margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-m);
+  border: 1px dashed color-mix(in srgb, #fbbf24 45%, transparent);
+  background: rgba(251, 191, 36, 0.06);
+  font-size: 12.5px; color: var(--ink-2);
+}
+.mode-info .mode-phase b { color: var(--warn); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
 
 /* ── the pre-alpha corner ───────────────────────────────────────────────────────
-   The three preliminary modes carry a diagonal ribbon in the same amber the app's
-   own phase badge uses (src/components/vaultTypeUi.tsx), and the note behind it
-   repeats what that badge says: not usable for real work yet. The ribbon is
-   focusable, so the note is reachable without a mouse, and only the band takes
-   pointer events — the rest of the corner stays part of the card. */
+   While the window is on one of the three preliminary modes, its corner carries the
+   diagonal ribbon, in the same amber the app's own phase badge uses
+   (src/components/vaultTypeUi.tsx). The note behind it repeats what that badge
+   says; the ribbon is focusable, so the note is reachable without a mouse, and only
+   the band takes pointer events. */
 .mode-ribbon {
   position: absolute; top: 0; right: 0; width: 104px; height: 104px;
   overflow: hidden; pointer-events: none; z-index: 3;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.25s var(--ease), visibility 0s linear 0.25s;
 }
+.modes[data-active-phase="pre-alpha"] .mode-ribbon { opacity: 1; visibility: visible; transition-delay: 0s; }
 .mode-ribbon-band {
   position: absolute; top: 22px; right: -30px; width: 132px;
   padding: 4px 0; transform: rotate(45deg);
@@ -346,25 +380,11 @@ body {
 .mode-ribbon:hover .mode-ribbon-tip,
 .mode-ribbon:focus .mode-ribbon-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
-@media (max-width: 1180px) {
-  .more-grid-early { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
 @media (max-width: 900px) {
-  .more-grid, .more-grid-early { grid-template-columns: minmax(0, 1fr); }
+  .mode-body { grid-template-columns: minmax(0, 1fr); }
+  .mode-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .mode-tab { flex: 0 0 auto; }
 }
-.more-card .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.more-card .pic {
-  display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
-  border-radius: 11px; border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
-  background: color-mix(in srgb, var(--vc) 14%, transparent); color: var(--vc);
-}
-.more-card .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.more-card h3 { font-size: 17px; }
-.more-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.58; }
-.more-card .arrow-link { color: var(--vc); font-size: 13.5px; }
-.more-card:hover { border-color: color-mix(in srgb, var(--vc) 45%, transparent); }
-.more-card .tag-status { margin-left: auto; }
-
 .roadmap-note {
   margin-top: 26px; padding: 16px 20px; border-radius: var(--r-m);
   border: 1px dashed var(--membrane); background: rgba(255, 255, 255, 0.02);
