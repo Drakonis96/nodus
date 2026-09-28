@@ -305,12 +305,12 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
   'zh-TW': {
     title: '隱私與資料控制',
     intro:
-      'Nodus主要在裝置上執行：無需帳戶，不包含廣告、遙測或遠端分析，也不執行接收你資料庫內容的自有後端。',
+      'Nodus主要在裝置上執行：無需帳戶，不包含廣告、遙測或遠端分析，也不執行接收你知識庫內容的自有後端。',
     sections: [
       {
         heading: '哪些內容留在你的裝置上',
         bullets: [
-          '資料庫、檔案、錄音、轉錄、筆記、檔案和結果都儲存在你的裝置上。',
+          '知識庫、檔案、錄音、轉錄、筆記、檔案和結果都儲存在你的裝置上。',
           '選擇檔案或開始錄音絕不會將其釋出或上傳到Nodus。',
         ],
       },
@@ -319,7 +319,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
         bullets: [
           '只有你明確啟用的可選功能才會聯絡第三方：你選擇的雲端AI提供商、Zotero、Unpaywall、GitHub（檢查更新）或Hugging Face（下載模型），或 Research Chat 的聯網檢索：它會把由你的問題衍生出的檢索詞傳送給公開搜尋引擎，並讀取找到的頁面。',
           '如果你通過OpenAI Secure MCP Tunnel連線ChatGPT，OpenAI會接收工具請求和結果；Nodus伺服器仍限於此裝置。',
-          '如果你連線可選的自託管Nodus Server，會通過HTTPS釋出一份過濾後的資料庫副本；其中不包含PDF、憑證、路徑、嵌入、學生名單或成績。',
+          '如果你連線可選的自託管Nodus Server，會通過HTTPS釋出一份過濾後的知識庫副本；其中不包含PDF、憑證、路徑、嵌入、學生名單或成績。',
           '每項外部服務在使用前都會被標識。',
         ],
       },
@@ -334,7 +334,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
   },
   ko: {
     title: "개인 정보 보호 및 데이터 제어",
-    intro: "Nodus는 주로 장치에서 작동합니다. 계정이 필요하지 않고, 광고, 원격 측정 또는 원격 분석이 포함되지 않으며, 볼트 콘텐츠를 수신하는 자체 백엔드를 운영하지 않습니다.",
+    intro: "Nodus는 주로 장치에서 작동합니다. 계정이 필요하지 않고, 광고, 원격 측정 또는 원격 분석이 포함되지 않으며, Vault 콘텐츠를 수신하는 자체 백엔드를 운영하지 않습니다.",
     sections: [
     {
     heading: "기기에 남아 있는 내용",
@@ -348,7 +348,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     bullets: [
     "귀하가 명시적으로 활성화한 선택적 기능만 제3자에게 연락할 수 있습니다: 귀하가 선택한 클라우드 AI 공급자, Zotero, Unpaywall, GitHub(업데이트 확인) 또는 Hugging Face(모델 다운로드), 또는 Research Chat의 웹 검색: 질문에서 도출된 검색어를 공개 검색 엔진으로 보내고 찾은 페이지를 읽습니다.",
     "OpenAI Secure MCP Tunnel을 통해 ChatGPT를 연결하면 OpenAI는 도구 요청 및 결과를 받습니다. Nodus 서버는 이 장치로 제한되어 있습니다.",
-    "선택 사항인 자체 호스팅 Nodus Server를 연결하면 필터링된 볼트 복사본이 HTTPS를 통해 게시됩니다. PDF, 자격 증명, 경로, 포함, 학생 명단 및 성적은 제외됩니다.",
+    "선택 사항인 자체 호스팅 Nodus Server를 연결하면 필터링된 Vault 복사본이 HTTPS를 통해 게시됩니다. PDF, 자격 증명, 경로, 포함, 학생 명단 및 성적은 제외됩니다.",
     "각 외부 서비스는 사용되기 전에 식별됩니다.",
   ],
   },
@@ -363,7 +363,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
   },
   ja: {
     title: "プライバシーとデータ管理",
-    intro: "Nodus は主にデバイス上で動作します。アカウントは必要なく、広告、テレメトリ、リモート分析は含まれず、ボールトのコンテンツを受信する独自​​のバックエンドは動作しません。",
+    intro: "Nodus は主にデバイス上で動作します。アカウントは必要なく、広告、テレメトリ、リモート分析は含まれず、Vaultのコンテンツを受信する独自​​のバックエンドは動作しません。",
     sections: [
     {
     heading: "デバイスに残るもの",
@@ -377,7 +377,7 @@ const PRIVACY: Record<AppLanguage, LegalDocContent> = {
     bullets: [
     "明示的に有効にしたオプション機能のみがサードパーティ (選択したクラウド AI プロバイダー、Zotero、Unpaywall、GitHub (更新チェック)、または Hugging Face (モデルのダウンロード)) に連絡します、または Research Chat のウェブ検索: 質問から導かれた検索語を公開検索エンジンに送信し、見つかったページを読み取ります。",
     "OpenAI Secure MCP トンネル経由で ChatGPT に接続すると、OpenAI はツールのリクエストと結果を受け取ります。 Nodus サーバーはこのデバイスに制限されたままになります。",
-    "オプションのセルフホスト型 Nodus Server に接続すると、フィルタリングされたボールトのコピーが HTTPS 経由で公開されます。 PDF、資格情報、パス、埋め込み、生徒名簿、成績は除外されます。",
+    "オプションのセルフホスト型 Nodus Server に接続すると、フィルタリングされたVaultのコピーが HTTPS 経由で公開されます。 PDF、資格情報、パス、埋め込み、生徒名簿、成績は除外されます。",
     "各外部サービスは使用前に識別されます。",
   ],
   },

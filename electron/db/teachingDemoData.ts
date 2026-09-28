@@ -414,9 +414,9 @@ export function seedTeachingDemoData(): boolean {
   ko: "9학년 · 지리와 역사",
   ja: "9年生 · 地理と歴史", }),
         pick({ es: 'Curso de ejemplo para explorar el vault de docencia.', en: 'Sample course for exploring the teaching vault.', 'zh-CN': '用于探索教学资料库的示例课程。' ,
-  'zh-TW': '用於探索教學資料庫的示例課程。',
+  'zh-TW': '用於探索教學知識庫的示例課程。',
   ko: "Teaching Vault를 탐색하기 위한 샘플 코스입니다.",
-  ja: "教育用ボールトを探索するためのサンプルコース。", }),
+  ja: "教育用Vaultを探索するためのサンプルコース。", }),
         '#ea580c', 'graduation', 1, 0, ID.academicYear, createdAt, updatedAt);
 
     const insertSubject = db.prepare(`INSERT INTO study_subjects

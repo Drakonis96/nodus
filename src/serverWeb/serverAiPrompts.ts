@@ -254,7 +254,7 @@ const COPY: Record<ServerPromptLanguage, {
   },
   tr: {
     dictionary: "Markdown biçiminde akademik bir sözlük maddesi yaz. Tanım, bağlam, tartışmalar ve sınırları ayır. Kaynak uydurma.",
-    deepResearch: "Yalnızca yayımlanmış bağlamı kullanarak Markdown biçiminde bir araştırma raporu yaz. Varsa nodus:// referanslarını kullan ve sınırlılıkları belirt. Sonuç özeldir: yayımlama veya vault'u değiştirme.",
+    deepResearch: "Yalnızca yayımlanmış bağlamı kullanarak Markdown biçiminde bir araştırma raporu yaz. Varsa nodus:// referanslarını kullan ve sınırlılıkları belirt. Sonuç özeldir: yayımlama veya kasayı değiştirme.",
     contentQuery: "Yayımlanmış belge hakkında yanıt ver. Bilgi uydurma.",
     databaseDeepResearch: "Dikkatli bir veri analistisin. Sağlanan bağlam hakkında Markdown raporu yaz. Yalnızca bu verileri kullan, sınırlılıkları belirt ve kaynak uydurma. Satır tanımlayıcılarını veya hassas verileri tekrarlama. Kaynağı, verilen adları kullanarak [veritabanı: sütun] biçiminde belirt; kanıt yetersizse bunu söyle.",
     translate: (language) => `Araştırma raporunu ${language} diline çevir. Markdown'ı, başlıkları, nodus:// bağlantılarını ve akademik anlamı koru. Yalnızca çevrilmiş raporu döndür. Sonuç özeldir ve vault'u değiştirmez.`,
@@ -282,7 +282,7 @@ const COPY: Record<ServerPromptLanguage, {
   },
   ja: {
     dictionary: "Markdown で学術的な辞書項目を作成してください。定義、文脈、論争、限界を分けて記述してください。出典を捏造しないでください。",
-    deepResearch: "公開済みのコンテキストのみを使用して、Markdown で調査レポートを作成してください。nodus:// 参照がある場合は引用し、限界を明記してください。結果は非公開です。公開したり保管庫を変更したりしないでください。",
+    deepResearch: "公開済みのコンテキストのみを使用して、Markdown で調査レポートを作成してください。nodus:// 参照がある場合は引用し、限界を明記してください。結果は非公開です。公開したりVaultを変更したりしないでください。",
     contentQuery: "公開済みの文書について回答してください。情報を捏造しないでください。",
     databaseDeepResearch: "あなたは慎重なデータアナリストです。提供されたコンテキストについて Markdown のレポートを作成してください。それらのデータのみを使用し、限界を明記し、出典を捏造しないでください。行識別子や機密データを繰り返さないでください。含まれている名前を使って [database: column] の形式で出典を示してください。証拠が不十分な場合はその旨を述べてください。",
     translate: (language) => `調査レポートを${language}に翻訳してください。Markdown、見出し、nodus:// リンク、学術的な意味を保持してください。翻訳されたレポートのみを返してください。結果は非公開で、保管庫は変更されません。`,

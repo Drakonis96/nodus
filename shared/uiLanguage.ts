@@ -663,7 +663,7 @@ export function knownRuntimeErrorText(message: string, language: unknown): strin
   if (message === 'Las funciones de IA del vault de estudio están desactivadas en Ajustes.') {
     return uiText(language, { es: message, en: 'Study vault AI features are disabled in Settings.', fr: 'Les fonctions d’IA du coffre d’étude sont désactivées dans les Réglages.', de: 'Die KI-Funktionen des Lernarchivs sind in den Einstellungen deaktiviert.', pt: 'As funções de IA do arquivo de estudo estão desativadas nas Definições.', 'pt-BR': 'Os recursos de IA do vault de estudo estão desativados nas Configurações.', it: 'Le funzioni IA del vault di studio sono disattivate nelle Impostazioni.', tr: 'Çalışma kasasının yapay zekâ özellikleri Ayarlar’da devre dışı.' ,
       'zh-CN': '学习资料库的 AI 功能已在设置中关闭。',
-      'zh-TW': '學習資料庫的 AI 功能已在設定中關閉。',
+      'zh-TW': '學習知識庫的 AI 功能已在設定中關閉。',
       ko: "설정에서 Study Vault AI 기능이 비활성화되어 있습니다.",
       ja: "Study Vault AI 機能は設定で無効になっています。",
      });
