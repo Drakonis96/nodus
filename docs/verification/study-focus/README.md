@@ -16,6 +16,7 @@ Implementación de escritorio por bóveda. Las capturas usan datos de ejemplo en
 - `10-narrow-rail-dark.png`: en ventana estrecha el panel se pliega a iconos.
 - `11-focus-layout-dialog.png`: ajustes del modo concentración (qué bloques, secciones y elementos de cabecera se ven).
 - `12-focus-exit-question.png`: al salir del modo, el bloque queda en pausa y se pregunta si finalizar la sesión.
+- `13-header-focus-panel.png`: el botón de concentración de la cabecera abre el panel del temporizador, con la casilla del modo y sus ajustes dentro.
 
 ## Resultado
 
@@ -47,7 +48,7 @@ La casilla «Modo concentración» está marcada por defecto: iniciar o reanudar
 
 Todo es configurable en «Personalizar el modo concentración» (desde el panel, desde la cabecera o desde la paleta): cada bloque superior, cualquier sección de la bóveda y los elementos que conserva la cabecera (controles de medios del navegador, paleta de comandos, tema y cola de tareas). Solo afecta al modo concentración; se guarda por bóveda con el resto de preferencias del temporizador y solo se almacenan las diferencias con los valores por defecto.
 
-En la cabecera de una bóveda de Estudio, junto al tema claro/oscuro, hay un acceso rápido para entrar o salir del modo y otro para sus ajustes. Salir del modo lleva a la página Concentración, pausa el bloque y, si hay una sesión abierta, pregunta si finalizarla o dejarla en pausa. Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
+En la cabecera de una bóveda de Estudio, junto al tema claro/oscuro, hay un botón de concentración (resaltado mientras el modo está activo) que abre el panel del temporizador: dentro están la casilla del modo y el botón de ajustes. Salir del modo lleva a la página Concentración, pausa el bloque y, si hay una sesión abierta, pregunta si finalizarla o dejarla en pausa. Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
 
 ## Detalles de persistencia
 

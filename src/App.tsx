@@ -1,4 +1,4 @@
-import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, toggleFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
 import { FocusExitDialog, FocusLayoutDialog, type FocusSectionOption } from './components/focus/FocusDialogs';
 import { focusLayoutVisible } from '@shared/studyFocus';
 import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
@@ -1665,20 +1665,14 @@ export function App() {
             focusKeep={focusKeeps('header:theme')}
           />
           {isEstudio && focusActions && (
-            <span className="focus-quick" data-testid="focus-quick-access">
+            // The same panel as the timer chip: the mode toggle and its settings live inside.
+            <span className="focus-quick" data-testid="focus-quick-access" data-focus-timer-trigger="">
               <HeaderAction
                 icon="focus"
-                label={focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración')}
+                label={t('Modo concentración')}
                 pressed={focusReduced}
                 dataTour="focus-mode"
-                onClick={() => { if (focusReduced) void focusActions.exitFocusMode(); else focusActions.setReduced(true); }}
-                focusKeep
-              />
-              <HeaderAction
-                icon="chevronDown"
-                label={t('Personalizar el modo concentración')}
-                tone="focus-quick-settings"
-                onClick={openFocusLayout}
+                onClick={toggleFocusTimer}
                 focusKeep
               />
             </span>

@@ -175,7 +175,19 @@ try {
   const storedLayout = (await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout;
   assert.deepEqual(storedLayout, { 'nav:notes': true, 'nav:studyReview': true, 'block:timer': false, 'header:theme': false });
   // The header quick access opens the same settings; restoring brings the timer back.
-  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Personalizar el modo concentración', exact: true }).click();
+  // The header's focus button opens the timer panel (no separate arrow); its settings live inside.
+  const quickAccess = page.getByTestId('focus-quick-access');
+  assert.equal(await quickAccess.getByRole('button').count(), 1);
+  assert.equal(await quickAccess.getByRole('button', { name: 'Modo concentración', exact: true }).getAttribute('aria-pressed'), 'true');
+  await quickAccess.getByRole('button', { name: 'Modo concentración', exact: true }).click();
+  const timerPanel = page.getByRole('dialog', { name: 'Temporizador de concentración' });
+  await timerPanel.waitFor();
+  await page.screenshot({ path: path.join(shots, '13-header-focus-panel.png') });
+  await quickAccess.getByRole('button', { name: 'Modo concentración', exact: true }).click();
+  await timerPanel.waitFor({ state: 'detached' });
+  await quickAccess.getByRole('button', { name: 'Modo concentración', exact: true }).click();
+  await timerPanel.getByTestId('focus-timer-settings').click();
+  assert.equal(await timerPanel.count(), 0);
   await layoutDialog.getByTestId('focus-layout-block:timer').check();
   await layoutDialog.getByTestId('focus-layout-header:theme').check();
   await layoutDialog.getByTestId('focus-layout-done').click();
@@ -212,7 +224,7 @@ try {
   assert.equal(await page.locator('main').getAttribute('data-nodi-view'), 'studyFocus');
   await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
   await page.getByTestId('focus-rail').waitFor();
-  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Salir del modo concentración', exact: true }).click();
+  await page.getByTestId('focus-exit').click();
   await page.getByTestId('focus-exit-keep').click();
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
   await page.getByTestId('resizable-sidebar').waitFor();
@@ -230,7 +242,10 @@ try {
     throw new Error('Audio fixture did not load');
   }, audioOrigin);
   await page.waitForFunction(async () => (await window.nodus.getBrowserMedia()).some(media => media.playing));
-  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Entrar en modo concentración', exact: true }).click();
+  // From the header's focus panel, with the block running, the box turns the mode on.
+  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Modo concentración', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByTestId('focus-mode-toggle').check();
+  await page.keyboard.press('Escape');
   await page.getByTestId('focus-rail').waitFor();
   // The browser stays reachable from the rail, and its media controls stay in the header.
   await page.getByTestId('focus-rail').getByTestId('focus-rail-nav-browser').click();
@@ -241,7 +256,7 @@ try {
   await page.getByTestId('browser-media-popover').waitFor();
   await page.screenshot({ path: path.join(shots, '09-focus-browser-media.png') });
   await page.keyboard.press('Escape');
-  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Salir del modo concentración', exact: true }).click();
+  await page.getByTestId('focus-exit').click();
   await page.getByTestId('focus-exit-dialog').waitFor();
   await page.getByTestId('focus-exit-keep').click();
   await page.getByTestId('resizable-sidebar').waitFor();

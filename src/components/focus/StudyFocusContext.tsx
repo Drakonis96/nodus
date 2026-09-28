@@ -42,6 +42,12 @@ export const OPEN_FOCUS_TIMER_EVENT = 'nodus:open-focus-timer';
 export function openFocusTimer(): void {
   window.dispatchEvent(new Event(OPEN_FOCUS_TIMER_EVENT));
 }
+/** The header's focus button: opens the timer panel, or closes it when already open. */
+export function toggleFocusTimer(): void {
+  window.dispatchEvent(new CustomEvent(OPEN_FOCUS_TIMER_EVENT, { detail: 'toggle' }));
+}
+/** Marks a control that toggles the timer panel itself, so a press on it is not "outside". */
+export const FOCUS_TIMER_TRIGGER_ATTRIBUTE = 'data-focus-timer-trigger';
 /** Opens the "what does the focus mode show" dialog, from the rail or the header. */
 export const OPEN_FOCUS_LAYOUT_EVENT = 'nodus:open-focus-layout';
 export function openFocusLayout(): void {

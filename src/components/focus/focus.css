@@ -188,7 +188,6 @@
 .focus-exit-dialog { width: min(440px, calc(100vw - 32px)); padding: 22px; gap: 0; }
 .focus-exit-dialog .focus-layout-actions { margin-top: 18px; }
 @media (max-width: 560px) { .focus-layout-grid { grid-template-columns: 1fr; } }
-/* The header's quick access: the focus mode toggle and its settings, beside the theme. */
+/* The header's quick access beside the theme: opens the timer panel, lit while the mode is on. */
 .focus-quick { display: inline-flex; align-items: center; }
 .focus-quick .header-action[aria-pressed=true] { color: var(--vault-accent, var(--a-500, #0f766e)); background: color-mix(in srgb, var(--vault-accent, #0f766e) 14%, transparent); }
-.focus-quick .focus-quick-settings { min-width: 22px !important; padding-left: 3px; padding-right: 3px; }
