@@ -33,7 +33,7 @@ SPDX-License-Identifier: AGPL-3.0-only
   <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-latin.woff2" crossorigin/>
 <link rel="preload" as="font" type="font/woff2" href="assets/fonts/fraunces-latin.woff2" crossorigin/>
-<link rel="stylesheet" href="assets/css/nodus.css?v=20260927a"/>
+<link rel="stylesheet" href="assets/css/nodus.css?v=20260928q"/>
 <link rel="stylesheet" href="assets/css/what-nodi.css?v=20260928a"/>
 <link rel="stylesheet" href="assets/css/home.css?v=20260928p"/>
 <script>
@@ -992,6 +992,9 @@ SPDX-License-Identifier: AGPL-3.0-only
 <!-- ============================================================ dialogs -->
 <div class="dl-overlay" id="dl-overlay">
   <div class="dl-modal" role="dialog" aria-modal="true" aria-labelledby="dl-title">
+    <button class="dl-x" type="button" onclick="closeDl()" aria-label="Close download dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5"/></svg>
+    </button>
     <h3 id="dl-title">Download Nodus</h3>
     <div class="ver" id="dl-version">Fetching the latest version…</div>
     <div class="freeline">100% free · open source · no account needed</div>
