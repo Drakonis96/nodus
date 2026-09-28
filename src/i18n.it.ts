@@ -2366,7 +2366,7 @@ export const IT: Record<string, string> = {
   "Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.": "Analizzare questa idea all'interno del corpus e sintetizzarne le connessioni, le tensioni e le letture prioritarie.",
   "Ideas conectadas ({n})": "Idee connesse ({n})",
   "Idea conectada": "Idea connessa",
-  "Obras": "Funziona",
+  "Obras": "Opere",
   "Ver detalle completo": "Visualizza i dettagli completi",
   "Ver en grafo": "Visualizza nel grafico",
   "Más relevante": "Più rilevante",

@@ -3,7 +3,7 @@ import { Icon } from "../components/ui";
 import { MarkdownReader } from "./readers";
 import { api } from "./api";
 import type { JsonRecord, PageResponse } from "./types";
-import { errorText, t } from "./i18nShim";
+import { errorText, t, tx } from "./i18nShim";
 
 type Tool =
   "argument" | "hypothesis" | "reading" | "immersion" | "writing" | "projects";
@@ -871,7 +871,7 @@ function ImmersionPlan({ value }: { value: unknown }) {
                   </div>
                   {station.minutes != null && (
                     <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-1 text-[10px] text-neutral-500 dark:bg-neutral-900">
-                      {text(station.minutes)} {t("min")}
+                      {tx("{n} min", { n: text(station.minutes) })}
                     </span>
                   )}
                 </div>
