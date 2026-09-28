@@ -46,6 +46,14 @@ async function waitUntil(read, timeout = 30_000) {
   throw new Error('Timed out waiting for the asynchronous application state');
 }
 async function settle() {
+  // A new academic vault offers once to prepare its library for full-text search. It only
+  // uses the local embeddings model, so Manual mode offers it too; answer it the way a
+  // user postpones it, which records the choice for this vault.
+  const welcome = page.getByTestId('research-preparation-welcome');
+  if (await welcome.isVisible()) {
+    await welcome.getByRole('button', { name: 'Más tarde', exact: true }).click();
+    await welcome.waitFor({ state: 'detached' });
+  }
   const hideBackup = page.getByTestId('backup-health-banner').getByRole('button', { name: 'Ocultar aviso' });
   if (await hideBackup.isVisible()) await hideBackup.click();
 }
