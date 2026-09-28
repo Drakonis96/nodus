@@ -828,7 +828,7 @@ export const AI_OCR_TRANSLATIONS = {
     "Transcripción de «{name}»": "「{name}」の表記",
     "Se eliminará «{name}» y su transcripción. Esta acción no se puede deshacer.": "「{name}」とその転写は削除されます。この操作は元に戻すことができません。",
     "Volver": "戻る",
-    "Cerrar": "近い",
+    "Cerrar": "閉じる",
     "Cancelar": "キャンセル",
     "Eliminar": "消去",
     "Revisar": "レビュー",

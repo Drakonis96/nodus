@@ -5960,7 +5960,7 @@ export const KO: Record<string, string> = {
   "Re-maquetación con el estilo de Nodus (no reproduce el formato original de Word).": "Nodus 스타일로 다시 조판합니다(Word의 원래 형식을 재현하지 않음).",
   "Redimensionar imágenes": "이미지 크기 조정",
   "Reordenar o eliminar páginas": "페이지 재정렬 또는 삭제",
-  "Restablecer": "다시 놓기",
+  "Restablecer": "재설정",
   "Rotar páginas": "페이지 회전",
   "SHA-256": "SHA-256",
   "Se admiten varios archivos para procesar en lote.": "여러 파일을 일괄 처리할 수 있습니다.",

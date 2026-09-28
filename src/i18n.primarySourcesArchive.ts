@@ -1381,7 +1381,7 @@ export const PRIMARY_SOURCES_ARCHIVE_TRANSLATIONS = {
     "Cambiar archivos": "ファイルを変更する",
     "Cancelar selección": "選択をキャンセルする",
     "Cargando archivo…": "アーカイブを読み込んでいます…",
-    "Cerrar": "近い",
+    "Cerrar": "閉じる",
     "Colecciones de trabajo": "ワーキングコレクション",
     "Colección creada.": "コレクションが作成されました。",
     "Confirmar cambios": "変更を確認する",
