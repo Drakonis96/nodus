@@ -7,10 +7,10 @@ ships; a vault with more than one view carries them all, and this steps through
 them: the two arrow controls, the left and right arrow keys while the window has
 focus, and a horizontal swipe on a touch screen.
 
-One of those windows carries several modes instead of one vault: its screens are
-grouped into sections, its tabs move between them, and the bar and the copy beside
-it follow whichever section the current screenshot belongs to. Nothing here ever
-advances by itself — every change comes from an arrow, a tab, a key or a swipe.
+The section that shows the other five modes nests two of these: an outer carousel
+picks the mode (its tabs and its own pair of arrows) and each mode brings its own
+window with its own screens inside. Nothing here ever advances by itself — every
+change comes from an arrow, a tab, a key or a swipe.
 
 Without this file the first screenshot is still there — the markup is the
 carousel's resting state, and the arrows stay hidden rather than sitting inert.
@@ -120,8 +120,49 @@ carousel's resting state, and the arrows stay hidden rather than sitting inert.
     frame.addEventListener('pointerleave', stopTracking);
   }
 
+  /** The outer carousel: one slide per mode, with the copy that belongs to it. The
+   *  slides carry their own inner windows; this only decides which one is showing. */
+  function sectioned(root) {
+    const slides = [...root.querySelectorAll('[data-sections-item]')];
+    const copies = [...root.querySelectorAll('[data-shots-section]')];
+    const tabs = [...root.querySelectorAll('[data-sections-jump]')];
+    const previous = root.querySelector('[data-sections-prev]');
+    const next = root.querySelector('[data-sections-next]');
+    // One mode is not a carousel either: the tabs stay, the arrows do not.
+    if (slides.length < 2 || !slides.some((slide) => !slide.hidden)) return;
+
+    let index = Math.max(0, slides.findIndex((slide) => !slide.hidden));
+
+    function show(target) {
+      index = (target + slides.length) % slides.length;
+      const key = slides[index].dataset.sectionsItem;
+      slides.forEach((slide) => {
+        if (slide.dataset.sectionsItem === key) slide.removeAttribute('hidden');
+        else slide.setAttribute('hidden', '');
+      });
+      copies.forEach((copy) => {
+        if (copy.dataset.shotsSection === key) copy.removeAttribute('hidden');
+        else copy.setAttribute('hidden', '');
+      });
+      tabs.forEach((tab) => {
+        if (tab.dataset.sectionsJump === key) tab.setAttribute('aria-current', 'true');
+        else tab.removeAttribute('aria-current');
+      });
+    }
+
+    if (previous) { previous.hidden = false; previous.addEventListener('click', () => show(index - 1)); }
+    if (next) { next.hidden = false; next.addEventListener('click', () => show(index + 1)); }
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = slides.findIndex((slide) => slide.dataset.sectionsItem === tab.dataset.sectionsJump);
+        if (target >= 0) show(target);
+      });
+    });
+  }
+
   function boot() {
     document.querySelectorAll('[data-shots]').forEach(carousel);
+    document.querySelectorAll('[data-sections]').forEach(sectioned);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

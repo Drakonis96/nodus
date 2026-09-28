@@ -296,15 +296,31 @@ body {
 }
 
 /* ============================================================ more vaults */
-/* One carousel over five modes, not five windows. The tabs move between the
-   modes, the arrows keep stepping through their screens, and the bar and the copy
-   beside it follow whichever mode the current screenshot belongs to. Nothing
-   advances on its own: every change comes from an arrow, a tab, a key or a swipe. */
+/* Two carousels, one inside the other. The outer picks the mode — its tabs, plus a
+   pair of arrows for stepping through them — and the slide it shows carries that
+   mode's own window, with the mode's own screenshots inside and their own arrows
+   and counter. Nothing advances on its own: every change comes from an arrow, a
+   tab, an arrow key or a swipe. */
 .modes { margin-top: 48px; }
-.mode-tabs {
-  display: flex; flex-wrap: wrap; gap: 8px;
+.mode-nav {
+  display: flex; align-items: center; gap: 10px;
   margin-bottom: 16px;
 }
+.mode-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  min-width: 0;
+}
+/* The outer arrows: the same circle the inner ones use, one rank up the hierarchy. */
+.mode-step {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  flex: 0 0 auto; cursor: pointer;
+  border: 1px solid var(--membrane); border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02); color: var(--ink-2);
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.mode-step:hover { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mode-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mode-step svg { width: 15px; height: 15px; }
 .mode-tab {
   padding: 7px 14px; border-radius: 999px; cursor: pointer;
   border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.02);
@@ -323,6 +339,7 @@ body {
   display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   gap: clamp(24px, 3.4vw, 44px); align-items: start;
 }
+.mode-slide[hidden] { display: none; }
 .mode-body .frame { margin: 0; }
 .mode-body .shot figcaption { font-size: 12px; }
 .mode-copy { min-width: 0; }
@@ -347,18 +364,14 @@ body {
 .mode-info .mode-phase b { color: var(--warn); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
 
 /* ── the pre-alpha corner ───────────────────────────────────────────────────────
-   While the window is on one of the three preliminary modes, its corner carries the
-   diagonal ribbon, in the same amber the app's own phase badge uses
-   (src/components/vaultTypeUi.tsx). The note behind it repeats what that badge
-   says; the ribbon is focusable, so the note is reachable without a mouse, and only
-   the band takes pointer events. */
+   The three preliminary modes carry the diagonal ribbon on their own window, in the
+   same amber the app's own phase badge uses (src/components/vaultTypeUi.tsx). The
+   note behind it repeats what that badge says; the ribbon is focusable, so the note
+   is reachable without a mouse, and only the band takes pointer events. */
 .mode-ribbon {
   position: absolute; top: 0; right: 0; width: 104px; height: 104px;
   overflow: hidden; pointer-events: none; z-index: 3;
-  opacity: 0; visibility: hidden;
-  transition: opacity 0.25s var(--ease), visibility 0s linear 0.25s;
 }
-.modes[data-active-phase="pre-alpha"] .mode-ribbon { opacity: 1; visibility: visible; transition-delay: 0s; }
 .mode-ribbon-band {
   position: absolute; top: 22px; right: -30px; width: 132px;
   padding: 4px 0; transform: rotate(45deg);
@@ -384,6 +397,10 @@ body {
   .mode-body { grid-template-columns: minmax(0, 1fr); }
   .mode-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
   .mode-tab { flex: 0 0 auto; }
+}
+@media (max-width: 560px) {
+  .mode-ribbon { width: 88px; height: 88px; }
+  .mode-ribbon-band { top: 18px; right: -34px; width: 128px; font-size: 9px; }
 }
 .roadmap-note {
   margin-top: 26px; padding: 16px 20px; border-radius: var(--r-m);

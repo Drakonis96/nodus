@@ -77,28 +77,37 @@ const windows = scenes
     };
   });
 
-/* "More ways to work with Nodus": one carousel over five modes. The figures carry
-   the section they belong to, the tabs name the sections, and the copy beside the
-   window is one block per section — the same three facts the script reads. */
-const modesBlock = home.slice(home.indexOf('<div class="modes"'), home.indexOf('</section>', home.indexOf('<section id="more-vaults"')));
+/* "More ways to work with Nodus": an inner window per mode, inside one outer
+   carousel of modes. A chunk per slide, so the counts stay per mode. */
+// The section now holds a <section> per mode, so the block ends where the wrap closes,
+// not at the first </section> (which would be the first mode's own).
+const modesBlock = home.slice(
+  home.indexOf('<div class="modes"'),
+  home.indexOf('\n  </div>\n</section>', home.indexOf('<div class="modes"')),
+);
+const modeSlides = [...modesBlock.matchAll(/<section class="mode-slide" data-sections-item="([^"]+)"([^>]*)>([\s\S]*?)<\/section>/g)].map((match) => ({
+  key: match[1],
+  hidden: / hidden/.test(match[2]),
+  body: match[3],
+  figures: figuresOf(match[3]),
+  arrows: arrowsOf(match[3]),
+  ribbon: match[3].includes('<span class="mode-ribbon"') ? match[3].slice(match[3].indexOf('<span class="mode-ribbon"'), match[3].indexOf('</span>\n              </span>') + 25) : null,
+  bar: match[3].match(/<div class="frame-bar"><i><\/i><i><\/i><i><\/i><span>([^<]+)<\/span>/)?.[1],
+  shotsLabel: match[3].match(/<div class="shots"[^>]*aria-label="([^"]+)"/)?.[1],
+  carouselRole: /<div class="shots"[^>]*aria-roledescription="carousel"/.test(match[3]),
+}));
+const modeShots = modeSlides.flatMap((slide) => slide.figures.map((figure) => ({ ...figure, section: slide.key })));
+const modeTabs = [...modesBlock.matchAll(/<button class="mode-tab" type="button" data-sections-jump="([^"]+)"([^>]*)>/g)].map((match) => ({
+  key: match[1],
+  current: /aria-current="true"/.test(match[2]),
+}));
 const modeSections = [...modesBlock.matchAll(/<article class="mode-info[^"]*"([^>]*)>([\s\S]*?)<\/article>/g)].map((match) => ({
-  attributes: match[1],
-  body: match[2],
   key: match[1].match(/data-shots-section="([^"]+)"/)?.[1],
-  bar: match[1].match(/data-bar="([^"]+)"/)?.[1],
-  phase: match[1].match(/data-phase="([^"]+)"/)?.[1],
+  body: match[2],
   title: match[2].match(/<h3>([^<]+)<\/h3>/)?.[1],
   copy: match[2].match(/<p[^>]*>([^<]+)<\/p>/)?.[1],
   link: match[2].match(/<a class="arrow-link" href="([^"]+)"/)?.[1],
   hidden: / hidden>/.test(match[0]),
-}));
-const modeTabs = [...modesBlock.matchAll(/<button class="mode-tab" type="button" data-shots-jump="([^"]+)"([^>]*)>/g)].map((match) => ({
-  key: match[1],
-  current: /aria-current="true"/.test(match[2]),
-}));
-const modeShots = figuresOf(modesBlock).map((figure, position) => ({
-  ...figure,
-  section: [...modesBlock.matchAll(/<figure class="[^"]*"([^>]*)>/g)][position][1].match(/data-section="([^"]+)"/)?.[1],
 }));
 
 test('every main vault scene shows a window of real screenshots', () => {
@@ -229,77 +238,75 @@ test('the other vaults include their expanded, distinct feature galleries', () =
   assert.equal(new Set(hashes).size, hashes.length, 'each slide uses a distinct capture');
 });
 
-test('"More ways to work with Nodus" is one carousel over five modes', () => {
+test('"More ways to work with Nodus" nests a window of screens inside each mode', () => {
   const counts = { genealogy: 6, worldbuilding: 7, 'primary-sources': 2, testimony: 2, prosopography: 2 };
-  assert.equal(modeSections.length, 5, 'every mode has its copy beside the window');
-  assert.deepEqual(modeTabs.map((tab) => tab.key), modeSections.map((section) => section.key), 'the tabs name the modes in order');
-  assert.equal(modeTabs.filter((tab) => tab.current).length, 1, 'exactly one mode is the current one');
-  assert.equal(modeTabs[0].current, true, 'the carousel appears on the first mode');
-  assert.equal(modeSections.filter((section) => !section.hidden).length, 1, 'one mode is shown at a time');
-  assert.equal(modeSections[0].hidden, false, 'the first mode is the one shown');
+  assert.equal(modeSlides.length, 5, 'the outer carousel has one slide per mode');
+  assert.equal(modeSlides.filter((slide) => !slide.hidden).length, 1, 'one mode is showing at a time');
+  assert.equal(modeSlides[0].hidden, false, 'the outer carousel rests on the first mode');
+  assert.deepEqual(modeSlides.map((slide) => slide.key), modeTabs.map((tab) => tab.key), 'the tabs name the modes in order');
+  assert.equal(modeTabs.filter((tab) => tab.current).length, 1, 'exactly one tab is current');
+  assert.match(modesBlock, /<button class="mode-step prev"[^>]*data-sections-prev/, 'the outer carousel can be stepped backwards');
+  assert.match(modesBlock, /<button class="mode-step next"[^>]*data-sections-next/, 'and forwards');
+  assert.equal(modeSections.length, 5, 'every mode keeps the copy that describes it');
+  assert.equal(modeSections.filter((section) => !section.hidden).length, 1, 'the copy of the showing mode is the one visible');
+  assert.deepEqual(modeSections.map((section) => section.key), modeSlides.map((slide) => slide.key), 'the copy follows the same order');
 
-  const arrows = arrowsOf(modesBlock);
-  assert.equal(arrows.length, 2, 'one pair of arrows drives every mode, not one pair each');
-  assert.equal(modesBlock.match(/<div class="frame">/g).length, 1, 'there is one window on the page, not one per mode');
-  assert.equal(modesBlock.match(/<div class="modes" data-shots>/g)?.length, 1, 'there is a single carousel frame');
-  assert.match(modesBlock, /<div class="shots"[^>]*aria-roledescription="carousel"/, 'and it is a carousel');
-
-  assert.equal(modeShots.length, Object.values(counts).reduce((total, count) => total + count, 0), 'every screen of every mode is in it');
-  for (const section of modeSections) {
-    const shots = modeShots.filter((shot) => shot.section === section.key);
-    assert.equal(shots.length, counts[section.key], `${section.key} contributes its own screens`);
-    assert.ok(section.bar?.endsWith('vault'), `${section.key} names its window bar`);
-    assert.ok(section.copy?.length > 80, `${section.key} keeps its description`);
-    assert.ok(section.title, `${section.key} keeps its title`);
+  for (const slide of modeSlides) {
+    const count = counts[slide.key];
+    assert.ok(count, `${slide.key} is a mode this section is expected to show`);
+    // The inner carousel: its own window, its own arrows, its own counter.
+    assert.equal(slide.figures.length, count, `${slide.key} carries ${count} screens of its own`);
+    assert.equal(slide.arrows.length, 2, `${slide.key} has its own pair of arrows`);
+    assert.ok(slide.carouselRole && /screenshot/.test(slide.shotsLabel ?? ''), `${slide.key} announces its own carousel`);
+    assert.ok(slide.bar?.endsWith('vault'), `${slide.key} labels its own window`);
     assert.deepEqual(
-      shots.map((shot) => shot.step),
-      Array.from({ length: counts[section.key] }, (_, i) => `${String(i + 1).padStart(2, '0')} / ${String(counts[section.key]).padStart(2, '0')}`),
-      `${section.key} numbers its screens`,
+      slide.figures.map((figure) => figure.step),
+      Array.from({ length: count }, (_, i) => `${String(i + 1).padStart(2, '0')} / ${String(count).padStart(2, '0')}`),
+      `${slide.key} numbers its own screens`,
     );
+    assert.equal(slide.figures.filter((figure) => figure.classes.includes('is-active')).length, 1, `${slide.key} shows one screen`);
+    assert.ok(slide.figures[0].classes.includes('is-active'), `${slide.key} rests on its first screen`);
+    for (const figure of slide.figures) {
+      assert.equal(figure.width, SHOT_WIDTH);
+      assert.equal(figure.height, SHOT_HEIGHT);
+      assert.ok(figure.src.startsWith('assets/screenshots/'), `${slide.key} shows its own copy of the capture`);
+      assert.ok(figure.alt.length > 24 && figure.text.length > 20, `${figure.src} is described and captioned`);
+      assert.ok(figure.async);
+    }
+    for (const figure of slide.figures.slice(1)) {
+      assert.ok(figure.ariaHidden, `${slide.key} hides the screens that are not showing`);
+      assert.ok(figure.lazy);
+    }
   }
-  assert.equal(modeShots.filter((shot) => shot.classes.includes('is-active')).length, 1, 'one screen is showing');
-  assert.ok(modeShots[0].classes.includes('is-active'), 'the rest state is the first screen');
-  for (const shot of modeShots) {
-    assert.equal(shot.width, SHOT_WIDTH);
-    assert.equal(shot.height, SHOT_HEIGHT);
-    assert.ok(shot.src.startsWith('assets/screenshots/'), 'the page shows its own copy of the capture');
-    assert.ok(shot.alt.length > 24 && shot.text.length > 20, `${shot.src} is described and captioned`);
-    assert.ok(shot.async);
+  for (const section of modeSections) {
+    assert.ok(section.title, `${section.key} keeps its title`);
+    assert.ok(section.copy?.length > 80, `${section.key} keeps its description`);
   }
-  for (const shot of modeShots.slice(1)) {
-    assert.ok(shot.ariaHidden, 'the screens that are not showing are hidden from the page');
-    assert.ok(shot.lazy);
-  }
-  // The two modes with a demo of their own keep the link; the others have none.
-  assert.deepEqual(modeSections.filter((section) => section.link).map((section) => section.key), ['genealogy', 'worldbuilding']);
+  assert.deepEqual(modeSections.filter((section) => section.link).map((section) => section.key), ['genealogy', 'worldbuilding'], 'the two modes with a demo of their own keep the link');
+  // Each of the five windows is a carousel in its own right; none of them is flat.
+  assert.equal(modesBlock.match(/<div class="frame" data-shots>/g).length, 5, 'there is one window per mode, not one window over all of them');
 });
 
 test('the preliminary modes wear the app\'s own phase, in the corner and in words', () => {
-  const preliminary = modeSections.filter((section) => section.phase);
-  assert.deepEqual(
-    preliminary.map((section) => section.key),
-    ['primary-sources', 'testimony', 'prosopography'],
-    'the three modes the app marks pre-alpha are the tagged ones',
-  );
-  for (const section of preliminary) {
-    assert.equal(section.phase, 'pre-alpha', `${section.key} names the phase the app gives it`);
-    assert.match(section.body, /<p class="mode-phase"[^>]*><b>Pre-alpha<\/b>[^<]*not usable for real work yet/i, `${section.key} says what the phase means in words, not only on hover`);
+  const preliminary = modeSlides.filter((slide) => slide.ribbon);
+  assert.deepEqual(preliminary.map((slide) => slide.key), ['primary-sources', 'testimony', 'prosopography'], 'the three modes the app marks pre-alpha are the tagged ones');
+  for (const slide of preliminary) {
+    assert.match(slide.ribbon, /tabindex="0"/, `${slide.key}'s tag can be reached without a mouse`);
+    assert.match(slide.ribbon, /<span class="mode-ribbon-band">Pre-alpha<\/span>/, `${slide.key} prints the phase on the ribbon`);
+    const describedBy = slide.ribbon.match(/aria-describedby="([^"]+)"/)?.[1];
+    assert.ok(describedBy, `${slide.key}'s tag points at its note`);
+    assert.ok(slide.ribbon.includes(`id="${describedBy}"`), `${slide.key}'s note is the element its tag describes`);
+    assert.match(slide.ribbon, /not usable for real work yet/i, `${slide.key} says what pre-alpha means on hover`);
   }
-  assert.equal(modeSections.filter((section) => section.phase).length, 3, 'the two modes that are further along are not tagged');
-
-  const ribbon = modesBlock.slice(modesBlock.indexOf('<span class="mode-ribbon"'), modesBlock.indexOf('<div class="mode-copy"'));
-  assert.match(ribbon, /tabindex="0"/, 'the tag can be reached without a mouse');
-  assert.match(ribbon, /<span class="mode-ribbon-band">Pre-alpha<\/span>/, 'the tag prints the phase on the ribbon');
-  const describedBy = ribbon.match(/aria-describedby="([^"]+)"/)?.[1];
-  assert.ok(describedBy, 'the tag points at its note');
-  assert.ok(ribbon.includes(`<span class="mode-ribbon-tip" id="${describedBy}" role="tooltip">`), 'the note is the element the tag describes');
-  assert.match(ribbon, /not usable for real work yet/i, 'the note says what pre-alpha means');
+  const copy = modeSections.filter((section) => /mode-phase/.test(section.body));
+  assert.deepEqual(copy.map((section) => section.key), ['primary-sources', 'testimony', 'prosopography'], 'and the same three say it in words under their copy');
+  assert.match(copy[0].body, /<b>Pre-alpha<\/b>[^<]*not usable for real work yet/i, 'the words repeat what the app badge says');
+  const ids = [...modesBlock.matchAll(/id="(more-phase-[a-z-]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length, 'each mode\'s note has an id of its own');
 
   assert.match(css, /\.mode-ribbon-band \{[^}]*transform: rotate\(45deg\)/, 'the tag is a diagonal band');
-  assert.match(css, /\.modes\[data-active-phase="pre-alpha"\] \.mode-ribbon \{ opacity: 1/, 'the band shows for a preliminary mode and not otherwise');
   assert.match(css, /\.mode-ribbon:hover \.mode-ribbon-tip,\s*\.mode-ribbon:focus \.mode-ribbon-tip \{ opacity: 1/, 'hovering or focusing the tag raises the note');
-  const script = readSite('assets/js/vault-shots.js');
-  assert.match(script, /frame\.dataset\.activePhase = current\.dataset\.phase/, 'the carousel hands the current phase to the corner');
+  assert.match(css, /\.mode-slide\[hidden\] \{ display: none; \}/, 'the modes that are not showing take no space');
 });
 
 test('the drawn app views left with the graphics they belonged to', () => {  /* Matched as class names, not as words: "rubrics" is still the word the teaching
