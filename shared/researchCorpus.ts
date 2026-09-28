@@ -299,7 +299,8 @@ export interface ResearchIndexRequestResult {
 export interface ResearchCorpusApi {
   getResearchPreparationPolicy(): Promise<ResearchPreparationPolicy>;
   setResearchPreparationPolicy(input: { welcomeVersion?: number; decision?: ResearchPreparationPolicy['decision']; futureAdditions?: boolean }): Promise<ResearchPreparationPolicy>;
-  previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): Promise<ResearchPreparationPreview>;
+  /** `inspect: false` skips the per-file preflight (it opens every unindexed PDF) for callers that do not show it. */
+  previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[]; inspect?: boolean }): Promise<ResearchPreparationPreview>;
   startResearchPreparationCampaign(input: { previewId: string; mode: 'embeddings' | 'text'; documentIds?: string[] }): Promise<string>;
   getResearchPreparationProgress(): Promise<ResearchPreparationProgress>;
   onResearchPreparationProgress(listener: (progress: ResearchPreparationProgress) => void): () => void;

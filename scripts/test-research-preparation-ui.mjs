@@ -38,6 +38,9 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     assert.equal(await dialog().locator('section').count(), 0);
     assert.equal(await dialog().getByRole('checkbox').count(), 0);
     assert.equal((await page.evaluate(() => window.actions)).some(action => action[0] === 'start'), false, 'welcome never silently enqueues');
+    // The per-file preflight opens every unindexed PDF; waiting for it left «Sí, iniciar»
+    // disabled behind «Cargando…» for minutes on a real library (5.7.0).
+    assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'preview' && action[1].inspect === false), 'the welcome skips the preflight');
     await dialog().getByRole('button', { name: 'No', exact: true }).click();
     await dialog().getByRole('button', { name: 'Sí, dejar desactivado', exact: true }).waitFor();
     assert.equal((await page.evaluate(() => window.actions)).some(action => action[0] === 'policy' && action[1].decision === 'declined'), false, 'No requires confirmation');
@@ -59,6 +62,7 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     await dialog().getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).uncheck();
     await dialog().getByRole('checkbox', { name: 'Preparar nuevas incorporaciones', exact: true }).check();
     await page.waitForFunction(() => window.actions.some(action => action[0] === 'policy' && action[1].futureAdditions === true));
+    assert.ok((await page.evaluate(() => window.actions)).some(action => action[0] === 'preview' && action[1].inspect === true), 'the manage view keeps the preflight');
     await dialog().getByRole('button', { name: 'Elegir obras', exact: true }).click();
     await dialog().getByRole('button', { name: 'Deseleccionar todo', exact: true }).click();
     assert.equal(await dialog().getByRole('button', { name: 'Preparar solo texto local', exact: true }).isDisabled(), true);
