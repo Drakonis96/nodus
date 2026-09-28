@@ -110,13 +110,23 @@ evidence sidecar answers the reader's exact-quote popover.
 5. [x] UI: mode selector, source tree, toggles, estimate, gallery chip/filter,
    callouts, locator links, exact-quote dialog, coverage panel, entry from Materials,
    translations in the 11 interface languages.
-6. [ ] Exports: PDF with math and callouts in the Deep Research design, DOCX with
-   native tables and equations, Markdown, separate review sheet, batch archive.
+6. [x] Exports: PDF in the Deep Research design (cover, contents, numbered parts,
+   chapters on new pages) with callout cards, tables and MathML formulas; Word with
+   native tables, callout boxes, editable OMML equations (LaTeX source when a structure
+   cannot be converted) and an updatable table of contents; Markdown with callouts and
+   LaTeX; the review sheet on its own (two-column PDF, Word, Markdown); batch archives
+   optionally include each guide's review sheet.
 7. [ ] Figures from materials, optional web text and images.
 8. [ ] Live campaign with DeepSeek `deepseek-flash` and OpenRouter `baai/bge-m3`
    under a USD 5 ledger ceiling.
 
 ## Validation
+
+`node --test scripts/test-complete-guide-export.mjs` checks the print HTML (MathML,
+callouts, tables, figures, anchors), the professional-report sections and the Word XML
+(`m:oMath`, fractions, radicals, `w:tbl`, TOC field). The browser script also prints the
+guide and the review sheet with JavaScript disabled and writes
+`docs/verification/complete-guide-pdf-chapter.png`.
 
 `node --test scripts/test-complete-guide-ui.mjs` renders callouts through the real
 remark pipeline and checks the reader/composer wiring. `node scripts/e2e-complete-guide.mjs`

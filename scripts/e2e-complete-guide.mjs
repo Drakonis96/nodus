@@ -71,6 +71,35 @@ try {
     await page.screenshot({ path: path.join(shotDir, `complete-guide-${theme}.png`), fullPage: true });
     await page.close();
   }
+  // The exported PDF: the professional report design with the guide's callouts and
+  // MathML formulas, printed by Chromium with JavaScript off (as htmlToPdf.ts does).
+  const reportModule = await build({
+    stdin: { contents: `export { completeGuideReportInput, completeGuideReviewSheetHtml } from './shared/completeGuide/reportInput'; export { renderProfessionalReportHtml } from './shared/professionalReport';`, resolveDir: repoRoot, loader: 'ts' },
+    bundle: true, write: false, format: 'cjs', platform: 'node', logLevel: 'silent',
+  });
+  const report = { exports: {} };
+  new Function('module', 'exports', 'require', reportModule.outputFiles[0].text)(report, report.exports, (await import('node:module')).createRequire(import.meta.url));
+  const sample = (await readFile(path.join(repoRoot, 'visual-tests/complete-guide-harness.tsx'), 'utf8')).match(/const SAMPLE = `([\s\S]*?)`;/)[1].replace(/\\\\/g, '\\');
+  const draft = {
+    title: 'Guía de estudio: Tema 1 · Gases', abstract: 'Los gases ideales, sus variables de estado y la ecuación que las relaciona.',
+    generatedAt: '2026-09-28T10:00:00.000Z', draftMarkdown: `## Cómo usar esta guía\n\nCada capítulo corresponde a una unidad.\n\n${sample}\n\n## Ficha de repaso\n\n### Tema 1 · Gases\n\n- $PV = nRT$ (A1 · p. 2)`,
+    brief: { kind: 'deep_research', objective: 'Guía', language: 'es' }, outline: [{ id: 't1' }], stats: { selectedWorks: 2 },
+    completeGuide: { sources: [{}, {}], config: { instructions: '' }, cheatSheetMarkdown: '# Ficha de repaso\n\n### Tema 1 · Gases\n\n- $PV = nRT$ (A1 · p. 2)\n- $\\ce{2H2 + O2 -> 2H2O}$' },
+  };
+  const reportHtml = report.exports.renderProfessionalReportHtml(report.exports.completeGuideReportInput(draft));
+  await writeFile(path.join(tmp, 'report.html'), reportHtml, 'utf8');
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 794, height: 1123 } });
+  const printPage = await context.newPage();
+  await printPage.goto(pathToFileURL(path.join(tmp, 'report.html')).href);
+  assert.ok(await printPage.locator('math').count() >= 5, 'formulas are MathML in the printed document');
+  assert.equal(await printPage.locator('aside.gc').count(), 7, 'callouts are cards in the printed document');
+  const pdf = await printPage.pdf({ format: 'A4', printBackground: true });
+  assert.ok(pdf.length > 20_000, 'a real PDF was printed');
+  await printPage.locator('#part-2').screenshot({ path: path.join(shotDir, 'complete-guide-pdf-chapter.png') });
+  await writeFile(path.join(tmp, 'sheet.html'), report.exports.completeGuideReviewSheetHtml(draft), 'utf8');
+  await printPage.goto(pathToFileURL(path.join(tmp, 'sheet.html')).href);
+  assert.ok((await printPage.pdf({ format: 'A4', printBackground: true })).length > 5_000, 'the review sheet prints on its own');
+  await context.close();
   console.log(`[complete guide e2e] passed; screenshots in ${path.relative(repoRoot, shotDir)}`);
 } finally {
   await browser?.close();

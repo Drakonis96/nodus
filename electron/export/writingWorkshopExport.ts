@@ -23,6 +23,7 @@ import { getDecorativeImage, getDecorativeImageData } from '../db/decorativeImag
 import { getWritingWorkshopDraft } from '../db/writingDraftsRepo';
 import { professionalReportPdf, type ProfessionalReportInput } from './professionalReportPdf';
 import { getSettings } from '../db/settingsRepo';
+import { renderCompleteGuideFiles } from './completeGuideExport';
 
 
 export async function exportWritingWorkshopDraft(
@@ -30,7 +31,8 @@ export async function exportWritingWorkshopDraft(
 ): Promise<{ path: string } | null> {
   const draft = request.draft;
   const requested = request.format ?? 'markdown';
-  const base = slug(draft.title || 'taller-escritura');
+  const cheatSheet = Boolean(draft.completeGuide) && request.part === 'cheatsheet';
+  const base = `${slug(draft.title || 'taller-escritura')}${cheatSheet ? '-ficha' : ''}`;
   const extension = requested === 'pdf' ? 'pdf' : requested === 'docx' ? 'docx' : 'md';
   const filters: Record<WritingWorkshopExportFormat, { name: string; extensions: string[] }> = {
     markdown: { name: 'Markdown', extensions: ['md'] },
@@ -48,6 +50,20 @@ export async function exportWritingWorkshopDraft(
 
   const chosen = path.extname(filePath).toLowerCase();
   const format: WritingWorkshopExportFormat = chosen === '.pdf' ? 'pdf' : chosen === '.docx' ? 'docx' : 'markdown';
+  if (draft.completeGuide) {
+    // Complete study guides have their own document model (callouts, math, tables).
+    const fileBase = path.basename(filePath, path.extname(filePath));
+    const files = await renderCompleteGuideFiles(draft, {
+      format, part: cheatSheet ? 'cheatsheet' : 'full', entityId: request.entityId, base: fileBase,
+      image: reportImage(request.entityId, DEEP_LABELS[draft.brief.language ?? 'es']),
+    });
+    for (const file of files) {
+      const target = path.join(path.dirname(filePath), file.name);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, file.bytes);
+    }
+    return { path: filePath };
+  }
   const visuals = request.entityId ? getDocumentVisuals({ kind: 'deep-research', id: request.entityId }) : null;
   const assetDirectory = `${path.basename(filePath, path.extname(filePath))}-assets`;
   const enriched = documentMarkdownWithFigures(renderDraftMarkdown(draft), 'body', visuals, assetDirectory);
@@ -90,9 +106,21 @@ function figureResolver(files: Array<{ name: string; base64: string }>): (url: s
 async function archiveEntries(
   saved: WritingWorkshopSavedDraft,
   base: string,
-  format: DeepResearchArchiveRequest['format']
+  format: DeepResearchArchiveRequest['format'],
+  includeCheatSheets = false,
 ): Promise<{ name: string; bytes: Buffer }[]> {
   const entries: { name: string; bytes: Buffer }[] = [];
+  if (saved.draft.completeGuide) {
+    const image = reportImage(saved.id, DEEP_LABELS[saved.draft.brief.language ?? 'es']);
+    const formats: WritingWorkshopExportFormat[] = format === 'both' ? ['markdown', 'pdf'] : [format ?? 'markdown'];
+    for (const each of formats) {
+      entries.push(...await renderCompleteGuideFiles(saved.draft, { format: each, entityId: saved.id, base, image }));
+      if (includeCheatSheets && saved.draft.completeGuide.cheatSheetMarkdown) {
+        entries.push(...await renderCompleteGuideFiles(saved.draft, { format: each, part: 'cheatsheet', base: `${base}-ficha` }));
+      }
+    }
+    return entries;
+  }
   if (format === 'markdown' || format === 'both') {
     const enriched = documentMarkdownWithFigures(renderDraftMarkdown(saved.draft), 'body', getDocumentVisuals({ kind: 'deep-research', id: saved.id }), `${base}-assets`);
     entries.push({ name: `${base}.md`, bytes: Buffer.from(enriched.markdown, 'utf8') });
@@ -150,7 +178,7 @@ export async function exportDeepResearchArchive(
     try {
       // Staged first, added second: a report whose PDF fails must not leave a lone
       // Markdown file behind while being reported as failed.
-      for (const entry of await archiveEntries(saved, base, format)) {
+      for (const entry of await archiveEntries(saved, base, format, request.includeCheatSheets === true)) {
         zip.addFile(entry.name, entry.bytes);
       }
     } catch (error) {

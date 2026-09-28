@@ -57,7 +57,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Reads the sources you choose in full and creates an exam-preparation guide with a review sheet.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Optional instructions: what to prioritize, level of detail, type of exam, style… If left empty, the guide will cover all the selected content.",
     "Crear guía de estudio": "Create study guide",
-    "{n} fuentes": "{n} sources"
+    "{n} fuentes": "{n} sources",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Include each guide’s review sheet as a separate file",
+    "Descargar la ficha de repaso (PDF)": "Download the review sheet (PDF)"
   },
   "fr": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "Vous avez choisi {n} matières. Le guide sera plus utile si vous en créez un par matière ou par unité.",
@@ -113,7 +115,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Lit intégralement les sources choisies et crée un guide de préparation à l’examen, avec fiche de révision.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Instructions facultatives : quoi privilégier, niveau de détail, type d’examen, style… Laissé vide, le guide couvrira tout le contenu sélectionné.",
     "Crear guía de estudio": "Créer un guide d’étude",
-    "{n} fuentes": "{n} sources"
+    "{n} fuentes": "{n} sources",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Inclure la fiche de révision de chaque guide comme fichier séparé",
+    "Descargar la ficha de repaso (PDF)": "Télécharger la fiche de révision (PDF)"
   },
   "de": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "Du hast {n} Fächer gewählt. Der Leitfaden ist nützlicher, wenn du einen pro Fach oder Einheit erstellst.",
@@ -169,7 +173,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Liest die gewählten Quellen vollständig und erstellt einen Leitfaden zur Prüfungsvorbereitung mit Wiederholungsblatt.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Optionale Anweisungen: Schwerpunkte, Detailgrad, Prüfungsart, Stil… Bleibt das Feld leer, deckt der Leitfaden den gesamten gewählten Inhalt ab.",
     "Crear guía de estudio": "Lernleitfaden erstellen",
-    "{n} fuentes": "{n} Quellen"
+    "{n} fuentes": "{n} Quellen",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Das Wiederholungsblatt jedes Leitfadens als eigene Datei beilegen",
+    "Descargar la ficha de repaso (PDF)": "Wiederholungsblatt herunterladen (PDF)"
   },
   "pt": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "Escolheste {n} disciplinas. O guia será mais útil se criares um por disciplina ou unidade.",
@@ -225,7 +231,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Lê na íntegra as fontes que escolheres e cria um guia para preparar o exame, com ficha de revisão.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Instruções opcionais: o que priorizar, nível de detalhe, tipo de exame, estilo… Se ficar vazio, o guia cobrirá todo o conteúdo selecionado.",
     "Crear guía de estudio": "Criar guia de estudo",
-    "{n} fuentes": "{n} fontes"
+    "{n} fuentes": "{n} fontes",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Incluir a ficha de revisão de cada guia como ficheiro separado",
+    "Descargar la ficha de repaso (PDF)": "Transferir a ficha de revisão (PDF)"
   },
   "pt-BR": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "Você escolheu {n} disciplinas. O guia será mais útil se você criar um por disciplina ou unidade.",
@@ -281,7 +289,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Lê na íntegra as fontes que você escolher e cria um guia para preparar a prova, com ficha de revisão.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Instruções opcionais: o que priorizar, nível de detalhe, tipo de prova, estilo… Se ficar vazio, o guia cobrirá todo o conteúdo selecionado.",
     "Crear guía de estudio": "Criar guia de estudo",
-    "{n} fuentes": "{n} fontes"
+    "{n} fuentes": "{n} fontes",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Incluir a ficha de revisão de cada guia como arquivo separado",
+    "Descargar la ficha de repaso (PDF)": "Baixar a ficha de revisão (PDF)"
   },
   "it": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "Hai scelto {n} materie. La guida sarà più utile se ne crei una per materia o unità.",
@@ -337,7 +347,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Legge per intero le fonti che scegli e crea una guida per preparare l’esame, con scheda di ripasso.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "Istruzioni facoltative: cosa privilegiare, livello di dettaglio, tipo di esame, stile… Se lo lasci vuoto, la guida coprirà tutto il contenuto selezionato.",
     "Crear guía de estudio": "Crea guida allo studio",
-    "{n} fuentes": "{n} fonti"
+    "{n} fuentes": "{n} fonti",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Includi la scheda di ripasso di ogni guida come file separato",
+    "Descargar la ficha de repaso (PDF)": "Scarica la scheda di ripasso (PDF)"
   },
   "tr": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "{n} ders seçtin. Her ders veya ünite için ayrı bir rehber oluşturursan daha yararlı olur.",
@@ -393,7 +405,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "Seçtiğin kaynakları eksiksiz okur ve tekrar kartıyla birlikte sınava hazırlık rehberi oluşturur.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "İsteğe bağlı talimatlar: neye öncelik verileceği, ayrıntı düzeyi, sınav türü, üslup… Boş bırakırsan rehber seçilen tüm içeriği kapsar.",
     "Crear guía de estudio": "Çalışma rehberi oluştur",
-    "{n} fuentes": "{n} kaynak"
+    "{n} fuentes": "{n} kaynak",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "Her rehberin tekrar kartını ayrı dosya olarak ekle",
+    "Descargar la ficha de repaso (PDF)": "Tekrar kartını indir (PDF)"
   },
   "zh-CN": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "你选择了 {n} 门科目。为每门科目或每个单元分别创建指南会更有用。",
@@ -449,7 +463,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "完整读取你选择的来源，生成带复习卡的备考指南。",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "可选说明：优先内容、详细程度、考试类型、风格…… 留空时，指南将涵盖所选的全部内容。",
     "Crear guía de estudio": "创建学习指南",
-    "{n} fuentes": "{n} 个来源"
+    "{n} fuentes": "{n} 个来源",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "将每份指南的复习卡作为单独文件包含",
+    "Descargar la ficha de repaso (PDF)": "下载复习卡（PDF）"
   },
   "zh-TW": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "你選擇了 {n} 門科目。為每門科目或每個單元分別建立指南會更有用。",
@@ -505,7 +521,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "完整讀取你選擇的來源，產生附複習卡的備考指南。",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "選填說明：優先內容、詳細程度、考試類型、風格…… 留空時，指南將涵蓋所選的全部內容。",
     "Crear guía de estudio": "建立學習指南",
-    "{n} fuentes": "{n} 個來源"
+    "{n} fuentes": "{n} 個來源",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "將每份指南的複習卡作為獨立檔案包含",
+    "Descargar la ficha de repaso (PDF)": "下載複習卡（PDF）"
   },
   "ja": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "{n} 科目を選択しました。科目または単元ごとに作成すると、より役立つガイドになります。",
@@ -561,7 +579,9 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "選んだ出典を全文読み取り、復習シート付きの試験対策ガイドを作成します。",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "任意の指示：重点、詳しさ、試験の種類、スタイルなど。空欄の場合は、選択した内容全体を扱います。",
     "Crear guía de estudio": "学習ガイドを作成",
-    "{n} fuentes": "{n} 件の出典"
+    "{n} fuentes": "{n} 件の出典",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "各ガイドの復習シートを別ファイルとして含める",
+    "Descargar la ficha de repaso (PDF)": "復習シートをダウンロード（PDF）"
   },
   "ko": {
     "Has elegido {n} asignaturas. La guía será más útil si creas una por asignatura o unidad.": "과목을 {n}개 선택했습니다. 과목이나 단원마다 따로 만들면 더 유용한 가이드가 됩니다.",
@@ -617,6 +637,8 @@ export const COMPLETE_GUIDE_TRANSLATIONS = {
     "Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.": "선택한 출처를 끝까지 읽고 복습 시트가 포함된 시험 대비 가이드를 만듭니다.",
     "Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.": "선택 사항: 우선순위, 자세한 정도, 시험 유형, 문체… 비워 두면 선택한 내용 전체를 다룹니다.",
     "Crear guía de estudio": "학습 가이드 만들기",
-    "{n} fuentes": "출처 {n}개"
+    "{n} fuentes": "출처 {n}개",
+    "Incluir la ficha de repaso de cada guía como archivo aparte": "각 가이드의 복습 시트를 별도 파일로 포함",
+    "Descargar la ficha de repaso (PDF)": "복습 시트 다운로드(PDF)"
   }
 } as const;

@@ -831,14 +831,14 @@ export function DeepResearchView({
     }
   };
 
-  const runArchive = async (format: DeepResearchArchiveFormat) => {
+  const runArchive = async (format: DeepResearchArchiveFormat, includeCheatSheets = false) => {
     const ids = archiveIds ?? [];
     if (ids.length === 0) return;
     setArchiveProgress({ done: 0, total: ids.length });
     setError(null);
     setMessage(null);
     try {
-      const result = await window.nodus.exportDeepResearchArchive({ ids, format }, (done, total) =>
+      const result = await window.nodus.exportDeepResearchArchive({ ids, format, ...(includeCheatSheets ? { includeCheatSheets: true } : {}) }, (done, total) =>
         setArchiveProgress({ done, total })
       );
       setArchiveIds(null);
@@ -878,13 +878,13 @@ export function DeepResearchView({
     setArchiveIds([...selected]);
   };
 
-  const exportDraft = async (format: WritingWorkshopExportFormat) => {
+  const exportDraft = async (format: WritingWorkshopExportFormat, part: 'full' | 'cheatsheet' = 'full') => {
     if (!openDraft) return;
     setExporting(true);
     setError(null);
     setMessage(null);
     try {
-      const result = await window.nodus.exportWritingWorkshopDraft({ draft: openDraft.draft, format, entityId: openDraft.id });
+      const result = await window.nodus.exportWritingWorkshopDraft({ draft: openDraft.draft, format, entityId: openDraft.id, ...(part === 'cheatsheet' ? { part } : {}) });
       if (result) setMessage(`${t('Exportado')}: ${result.path}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1043,6 +1043,7 @@ export function DeepResearchView({
             onToggleRead={() => void toggleRead(openDraft)}
             onTranslate={() => setTranslationOpen(true)}
             onExport={(format) => void exportDraft(format)}
+            onExportCheatSheet={openDraft.draft.completeGuide?.cheatSheetMarkdown ? () => void exportDraft('pdf', 'cheatsheet') : undefined}
             onCitation={setCitation}
             onImageChange={onImageChange}
             onOpenStudyDocument={onOpenStudyDocument}
@@ -1310,8 +1311,9 @@ export function DeepResearchView({
         <ArchiveModal
           count={archiveIds.length}
           progress={archiveProgress}
-          onDownload={(format) => void runArchive(format)}
+          onDownload={(format, includeCheatSheets) => void runArchive(format, includeCheatSheets)}
           onClose={() => setArchiveIds(null)}
+          offerCheatSheets={archiveIds.some((id) => Boolean(savedDrafts.find((draft) => draft.id === id)?.draft.completeGuide?.cheatSheetMarkdown))}
         />
       )}
 
@@ -1710,13 +1712,17 @@ function ArchiveModal({
   progress,
   onDownload,
   onClose,
+  offerCheatSheets = false,
 }: {
   count: number;
   progress: { done: number; total: number } | null;
-  onDownload: (format: DeepResearchArchiveFormat) => void;
+  onDownload: (format: DeepResearchArchiveFormat, includeCheatSheets: boolean) => void;
   onClose: () => void;
+  /** Some selected reports are complete study guides with a review sheet. */
+  offerCheatSheets?: boolean;
 }) {
   const [format, setFormat] = useState<DeepResearchArchiveFormat>('pdf');
+  const [includeCheatSheets, setIncludeCheatSheets] = useState(true);
   const busy = progress !== null;
 
   useEffect(() => {
@@ -1775,6 +1781,12 @@ function ArchiveModal({
               </span>
             </label>
           ))}
+          {offerCheatSheets && (
+            <label className="flex items-center gap-2 pt-1 text-xs text-neutral-700 dark:text-neutral-300">
+              <input type="checkbox" checked={includeCheatSheets} disabled={busy} onChange={(event) => setIncludeCheatSheets(event.target.checked)} data-testid="deep-research-archive-cheatsheets" />
+              {t('Incluir la ficha de repaso de cada guía como archivo aparte')}
+            </label>
+          )}
           {progress && (
             <div className="flex items-center gap-2 pt-1 text-xs text-indigo-500 dark:text-indigo-300">
               <Icon name="sync" size={13} className="animate-spin" />
@@ -1787,7 +1799,7 @@ function ArchiveModal({
           <button className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" onClick={onClose} disabled={busy}>
             {t('Cancelar')}
           </button>
-          <button className="btn btn-primary gap-1.5" onClick={() => onDownload(format)} disabled={busy}>
+          <button className="btn btn-primary gap-1.5" onClick={() => onDownload(format, offerCheatSheets && includeCheatSheets)} disabled={busy}>
             <Icon name={busy ? 'sync' : 'download'} className={busy ? 'animate-spin' : ''} />
             {busy ? t('Descargando…') : t('Descargar ZIP')}
           </button>
@@ -2104,6 +2116,7 @@ function ReaderView({
   onOpenStudyMaterial,
   onOpenStudyRecording,
   onGuideEvidence,
+  onExportCheatSheet,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
@@ -2132,6 +2145,8 @@ function ReaderView({
   onOpenStudyMaterial?: (id: string, location?: { pageNumber?: number | null; slideNumber?: number | null }) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
   onGuideEvidence?: (itemId: string, open: () => void) => void;
+  /** Complete study guides: export the review sheet on its own. */
+  onExportCheatSheet?: () => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -2237,6 +2252,16 @@ function ReaderView({
           onSaveToNotes={onSaveToNotes}
           onExport={onExport}
         />
+        {onExportCheatSheet && (
+          <HoverLabelButton
+            icon="flashcards"
+            label={t('Descargar la ficha de repaso (PDF)')}
+            onClick={onExportCheatSheet}
+            disabled={exporting}
+            data-testid="deep-research-export-cheatsheet"
+            className="btn-ghost h-9 min-h-9 border border-neutral-700"
+          />
+        )}
         <DocumentVisualActions />
         <ReaderFontControls targetRef={documentRef} scrollerRef={mainRef} initialSize={initialReaderFontSize} />
         <ReaderHighlighterControl value={highlighterColor} onChange={setHighlighterColor} />

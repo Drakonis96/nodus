@@ -9,10 +9,9 @@
  * recognized, so an ordinary quotation that happens to start with brackets is left
  * alone. The label text itself was written by code, never by the model.
  */
-export const GUIDE_CALLOUT_KINDS = new Set([
-  'definition', 'formula', 'rule', 'procedure', 'example', 'ai-example', 'ai-analogy',
-  'mistake', 'ai-mistake', 'memorize', 'selfcheck', 'web',
-]);
+import { GUIDE_CALLOUT_TYPES } from '@shared/completeGuide/calloutTypes';
+
+export const GUIDE_CALLOUT_KINDS = GUIDE_CALLOUT_TYPES;
 
 interface MdNode {
   type: string;
