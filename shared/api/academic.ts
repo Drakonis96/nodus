@@ -217,6 +217,9 @@ import type {
   WorkView,
   WorkspaceLibraryLink,
   WorkspaceLibraryLinkInput,
+  StudyNoteLink,
+  StudyNoteLinkFilter,
+  StudyNoteLinkInput,
   WorkspaceLinkOwnerKind,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
@@ -929,6 +932,12 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   createWorkspaceAnnotation(noteId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
   updateWorkspaceAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
   deleteWorkspaceAnnotation(id: string): Promise<void>;
+  /** Live links of Workspace notes to study places; a note or place in the trash hides its links. */
+  listStudyNoteLinks(filter?: StudyNoteLinkFilter): Promise<StudyNoteLink[]>;
+  /** Links a note to a course, subject, folder, topic or material; linking twice returns the same link. */
+  addStudyNoteLink(input: StudyNoteLinkInput): Promise<StudyNoteLink>;
+  /** Unlinks only: the note stays in the Workspace. */
+  removeStudyNoteLinks(ids: string[]): Promise<void>;
   listWorkspaceLibraryLinks(ownerKind: WorkspaceLinkOwnerKind, ownerId: string): Promise<WorkspaceLibraryLink[]>;
   listAllWorkspaceLibraryLinks(): Promise<WorkspaceLibraryLink[]>;
   addWorkspaceLibraryLink(input: WorkspaceLibraryLinkInput): Promise<WorkspaceLibraryLink>;

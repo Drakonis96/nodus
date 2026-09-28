@@ -309,6 +309,8 @@ import * as chat from '../db/chatRepo';
 import * as chatProjects from '../db/researchChatProjectsRepo';
 import * as notes from '../db/notesRepo';
 import * as workspace from '../db/workspaceRepo';
+import * as studyNoteLinks from '../db/studyNoteLinksRepo';
+import type { StudyNoteLinkFilter, StudyNoteLinkInput } from '@shared/studyNoteLinks';
 import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
@@ -1982,6 +1984,11 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('workspace:library:remove', async (_e, ownerKind: WorkspaceLinkOwnerKind, ownerId: string, libraryItemId: string, scope?: 'global' | 'vault') => {
     workspace.removeWorkspaceLibraryLink(ownerKind, ownerId, libraryItemId, scope ?? 'global');
   });
+  // Estudio y Docencia: una nota del Workspace vinculada a cursos, asignaturas, carpetas,
+  // temas y materiales, donde aparece sin copiarse.
+  h('study:noteLinks:list', async (_e, filter?: StudyNoteLinkFilter) => studyNoteLinks.listStudyNoteLinks(filter ?? {}));
+  h('study:noteLinks:add', async (_e, input: StudyNoteLinkInput) => studyNoteLinks.addStudyNoteLink(input));
+  h('study:noteLinks:remove', async (_e, ids: string[]) => { studyNoteLinks.removeStudyNoteLinks(Array.isArray(ids) ? ids : []); });
   h('citations:verify', async (_e, refs: CitationRef[]) => verifyCitations(refs ?? []));
   h('citations:preview', async (_e, ref: CitationRef) => (ref ? previewCitation(ref) : null));
   h('search:vaultContent', async (_e, query: string, kinds?: string[], semantic?: boolean, limit?: number) => searchVaultContent(query, kinds, semantic, limit));

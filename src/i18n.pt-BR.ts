@@ -5,6 +5,7 @@ import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
+import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -153,6 +154,7 @@ export const PT_BR: Record<string, string> = {
   ...GRAPH_HEALTH_TRANSLATIONS.ptBR,
   ...STUDY_SOURCE_TRANSLATIONS["pt-BR"],
   ...STUDY_FOCUS_TRANSLATIONS["pt-BR"],
+  ...STUDY_NOTE_LINKS_TRANSLATIONS["pt-BR"],
   ...STUDY_IMPROVE_TRANSLATIONS.ptBR,
   ...WORKSPACE_TRANSLATIONS.ptBR,
   "Lo que cuenta el mapa": "O que o mapa conta",

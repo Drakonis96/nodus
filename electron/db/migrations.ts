@@ -1,4 +1,5 @@
 import { STUDY_FOCUS_SQL, ensureStudyFocusTaskColumn } from './studyFocusSchema';
+import { STUDY_NOTE_LINKS_SQL } from './studyNoteLinksSchema';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { migrateWorkspaceContent } from './workspaceMigration';
@@ -159,7 +160,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 195;
+export const SCHEMA_VERSION = 196;
 
 export const migrations: Migration[] = [
   {
@@ -9536,6 +9537,8 @@ export const migrations: Migration[] = [
   } },
   { version: 194, up: STUDY_FOCUS_SQL },
   { version: 195, up: 'SELECT 1;', after: ensureStudyFocusTaskColumn },
+  // Workspace notes linked to courses, subjects, folders, topics and materials.
+  { version: 196, up: STUDY_NOTE_LINKS_SQL },
 ];
 
 /**

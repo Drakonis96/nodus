@@ -22,6 +22,19 @@ import type { StudyQuestion } from '@shared/studyQuestions';
 import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
 import { t } from '../i18n';
 import { ZoteroMaterialImportModal } from '../components/ZoteroMaterialImportModal';
+import { noteAsEditorDocument, workspaceNotePort } from '../components/editor/documentPort';
+import { StudyNoteLinkDialog } from '../components/StudyNoteLinkDialog';
+import {
+  openWorkspaceNote,
+  StudyLinkedNotesCollection,
+  StudyLinkedNoteTrashConfirm,
+  StudyNotePickerDialog,
+  unlinkStudyNote,
+  useStudyLinkedNotes,
+  type StudyLinkedNoteEntry,
+} from '../components/StudyLinkedNotes';
+import type { Note } from '@shared/types';
+import type { StudyLinkedNoteSummary } from '@shared/studyNoteLinks';
 
 const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
@@ -509,6 +522,15 @@ export function StudyOrganizationView({
   const [assessmentGenerator, setAssessmentGenerator] = useState<'test' | 'exam' | 'flashcards' | null>(null);
   const [generatedQuestions, setGeneratedQuestions] = useState<StudyQuestion[]>([]);
   const [zoteroMaterialImportOpen, setZoteroMaterialImportOpen] = useState(false);
+  // Workspace notes linked to this place: they are listed beside the materials, open in
+  // the same editor, and never stop living in the Workspace.
+  const linkFilter = useMemo(() => (target && target.kind !== 'document' ? { [`${target.kind}Id`]: target.id } : null), [target?.kind, target?.id]);
+  const { entries: linkedNoteEntries, reload: reloadLinkedNotes } = useStudyLinkedNotes(linkFilter);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [managingNote, setManagingNote] = useState<StudyLinkedNoteSummary | null>(null);
+  const [trashingNote, setTrashingNote] = useState<StudyLinkedNoteSummary | null>(null);
+  const [pickingNotes, setPickingNotes] = useState(false);
+  useEffect(() => { setEditingNote(null); }, [target?.kind, target?.id]);
 
   const reload = useCallback(async () => {
     const [next, nextMaterials] = await Promise.all([
@@ -772,6 +794,22 @@ export function StudyOrganizationView({
       ));
   }, [workspace, materials, target, query, kind, tagId, courseFilterId, subjectFilterId, topicFilterId, organizationSort]);
 
+  const linkedNotes = useMemo(() => {
+    if (kind !== 'all' || tagId !== 'all') return [];
+    const needle = query.trim().toLocaleLowerCase();
+    return linkedNoteEntries.filter((entry) =>
+      entry.links.some((link) =>
+        (courseFilterId === 'all' || link.courseId === courseFilterId) &&
+        (subjectFilterId === 'all' || link.subjectId === subjectFilterId) &&
+        (topicFilterId === 'all' || link.topicId === topicFilterId)) &&
+      (!needle || `${entry.note.title} ${entry.note.excerpt} ${entry.note.tags.join(' ')}`.toLocaleLowerCase().includes(needle)));
+  }, [linkedNoteEntries, kind, tagId, query, courseFilterId, subjectFilterId, topicFilterId]);
+
+  const openLinkedNote = async (entry: StudyLinkedNoteEntry) => {
+    const note = await window.nodus.getNote(entry.note.id);
+    if (note && !note.trashedAt) setEditingNote(note);
+  };
+
   const browserItems = useMemo<StudyBrowserItem[]>(() => {
     if (!workspace) return [];
     const needle = query.trim().toLocaleLowerCase();
@@ -934,6 +972,36 @@ export function StudyOrganizationView({
     }
   };
 
+  if (editingNote) {
+    const closeNote = () => { setEditingNote(null); void reloadLinkedNotes(); };
+    return (
+      <><Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
+      <StudyEditor
+        key={editingNote.id}
+        settings={settings}
+        port={workspaceNotePort}
+        documentIcon="notebook"
+        documents={[noteAsEditorDocument(editingNote)]}
+        subjectId={linkedNoteEntries.find((entry) => entry.note.id === editingNote.id)?.links.find((link) => link.subjectId)?.subjectId}
+        activeId={editingNote.id}
+        onActivate={() => undefined}
+        onClose={closeNote}
+        onSaved={(updated) => setEditingNote((current) => current && current.id === updated.id ? { ...current, title: updated.title, content: updated.contentMarkdown } : current)}
+        onDuplicate={async () => {
+          const copy = await window.nodus.createNote({ title: `${editingNote.title} (${t('copia')})`, content: editingNote.content, kind: editingNote.kind === 'idea' ? 'markdown' : editingNote.kind, folderId: editingNote.folderId, tags: editingNote.tags });
+          const here = linkedNoteEntries.find((entry) => entry.note.id === editingNote.id)?.links ?? [];
+          for (const link of here) await window.nodus.addStudyNoteLink(link.materialId ? { noteId: copy.id, materialId: link.materialId } : { noteId: copy.id, courseId: link.courseId, subjectId: link.subjectId, folderId: link.folderId, topicId: link.topicId });
+          announceStudyWorkspaceChanged();
+          setEditingNote(copy);
+        }}
+        onTrash={async () => setTrashingNote({ id: editingNote.id, title: editingNote.title, kind: editingNote.kind, excerpt: '', tags: editingNote.tags, updatedAt: editingNote.updatedAt })}
+        onOpenLinkedDocument={openWorkspaceNote}
+        onOpenRecording={onOpenRecording}
+      />
+      </Suspense>{trashingNote && <StudyLinkedNoteTrashConfirm note={trashingNote} onCancel={() => setTrashingNote(null)} onTrashed={() => { setTrashingNote(null); setEditingNote(null); }} />}</>
+    );
+  }
+
   if (editing) {
     return (
       <><Suspense fallback={<div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>}>
@@ -1080,11 +1148,19 @@ export function StudyOrganizationView({
         </section>
 
         {showDocuments && <section className="flex min-w-0 flex-col px-5 pb-5" data-testid="study-documents-section">
-          <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-neutral-300">{t('Apuntes y materiales')}</h2><span className="text-xs text-neutral-600">{documents.length + scopedMaterials.length}</span></div>
+          <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-sm font-semibold text-neutral-300">{t('Apuntes y materiales')}</h2><span className="flex items-center gap-2"><button data-testid="study-link-workspace-note" className="btn btn-ghost h-7 px-2 text-xs" title={t('Vincular notas del espacio de trabajo')} onClick={() => setPickingNotes(true)}><Icon name="link" size={12} />{t('Vincular nota')}</button><span className="text-xs text-neutral-600">{documents.length + scopedMaterials.length + linkedNotes.length}</span></span></div>
           <div className="flex-1 content-start overflow-y-auto">
             {documents.length > 0 && <StudyDocumentCollection documents={documents} layout={browserLayout} onOpen={openDocument} onEdit={setEditingDocumentMetadata} onMove={setMovingDocument} onDelete={(document) => requestSourceDelete([{ kind: 'document', id: document.id, title: document.title }])} />}
             {scopedMaterials.length > 0 && <StudyMaterialCollection materials={scopedMaterials} layout={browserLayout} onOpen={(material) => onOpenMaterial(material.id)} onRename={setRenamingMaterial} onMove={setMovingMaterial} onDelete={(material) => requestSourceDelete([{ kind: 'material', id: material.id, title: material.title }])} />}
-            {documents.length === 0 && scopedMaterials.length === 0 && (
+            {linkedNotes.length > 0 && <StudyLinkedNotesCollection
+              entries={linkedNotes}
+              layout={browserLayout}
+              onOpen={(entry) => void openLinkedNote(entry)}
+              onManage={(entry) => setManagingNote(entry.note)}
+              onUnlink={(entry) => void unlinkStudyNote(entry)}
+              onTrash={(entry) => setTrashingNote(entry.note)}
+            />}
+            {documents.length === 0 && scopedMaterials.length === 0 && linkedNotes.length === 0 && (
               <div className="col-span-full rounded-xl border border-dashed border-neutral-800 px-6 py-12 text-center text-sm text-neutral-500">
                 <Icon name="book" size={24} className="mb-3 text-neutral-700" /><p>{t('No hay materiales en esta selección.')}</p>
               </div>
@@ -1113,6 +1189,9 @@ export function StudyOrganizationView({
       {deletingItem && <ConfirmModal title={t('Eliminar elemento')} message={t('«{name}» y todo su contenido se moverán a la papelera.').replace('{name}', deletingItem.name)} confirmLabel={t('Mover a la papelera')} danger onCancel={() => setDeletingItem(null)} onConfirm={() => void window.nodus.setStudyLifecycle(deletingItem.kind, deletingItem.id, 'trash').then(async () => { setDeletingItem(null); await refreshAfterOrganizationChange(); })} />}
       {pendingSourceDelete && <LinkedKnowledgeDeleteFlow items={pendingSourceDelete.sources} step={pendingSourceDelete.step} onContinue={() => setPendingSourceDelete((current) => current ? { ...current, step: 'knowledge' } : current)} onChoose={(purge) => void deletePendingSources(purge)} onCancel={() => setPendingSourceDelete(null)} />}
       {renamingMaterial && <StudyMaterialRenameDialog material={renamingMaterial} onCancel={() => setRenamingMaterial(null)} onSave={async (title) => { await window.nodus.updateStudyMaterial(renamingMaterial.id, { title }); setRenamingMaterial(null); announceStudyWorkspaceChanged(); await reload(); }} />}
+      {pickingNotes && linkFilter && <StudyNotePickerDialog target={linkFilter} targetLabel={selectedTitle} linkedNoteIds={new Set(linkedNoteEntries.map((entry) => entry.note.id))} onClose={() => setPickingNotes(false)} />}
+      {managingNote && <StudyNoteLinkDialog noteId={managingNote.id} noteTitle={managingNote.title} onClose={() => setManagingNote(null)} />}
+      {trashingNote && <StudyLinkedNoteTrashConfirm note={trashingNote} onCancel={() => setTrashingNote(null)} onTrashed={() => setTrashingNote(null)} />}
       {zoteroMaterialImportOpen && <ZoteroMaterialImportModal placement={placementForTarget() ?? {}} onClose={() => setZoteroMaterialImportOpen(false)} onImported={async () => { announceStudyWorkspaceChanged(); await reload(); }} />}
     </div>
   );

@@ -399,6 +399,7 @@ export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './stud
 export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
 export type { StudyCalendarEvent, StudyCalendarEventInput, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
 export type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
+export type { StudyLinkedNoteSummary, StudyNoteLink, StudyNoteLinkFilter, StudyNoteLinkInput, StudyNoteLinkTargetKind } from './studyNoteLinks';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
