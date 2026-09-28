@@ -498,8 +498,10 @@ class ScanQueue {
     this.pendingIndexWorks.clear();
     let settledSuccessfully = false;
     try {
-      if (ids.length > 0) await this.autoReprocessConnections(ids);
-      else this.deepSinceReprocess = false;
+      if (ids.length > 0) {
+        await this.autoReprocessConnections(ids);
+        await this.refreshStaleIdeaEmbeddings();
+      } else this.deepSinceReprocess = false;
       this.maintenanceError = null;
       if (this.bridgeAfterDrain) {
         this.bridgeAfterDrain = false;
@@ -589,6 +591,28 @@ class ScanQueue {
       this.deepSinceReprocess = false;
     } finally {
       this.reprocessing = false;
+    }
+  }
+
+  /**
+   * Re-embed ideas whose theme links the reprocess pass just rewrote. An idea's
+   * embedding text includes its theme labels, so the per-work embeddings from
+   * chainAfterDeep go stale the moment reprocessConnections re-themes them — and
+   * not only in the scanned works: fused ideas shared with other works change too.
+   * Library-wide on purpose; startEmbedding only re-embeds ideas whose text hash no
+   * longer matches, so current works cost a hash check. Runs before bridge discovery
+   * so bridges compare fresh vectors. Non-fatal: the pipeline logs its own failure and
+   * the "Incomplete" filter still shows the stale works, whereas failing here would
+   * make the retry redo the whole model-driven reprocess pass.
+   */
+  private async refreshStaleIdeaEmbeddings(): Promise<void> {
+    if (!this.embeddingConfigured()) return;
+    this.maintenanceDetail = 'Actualizando el índice de ideas…';
+    this.emit();
+    try {
+      await startEmbedding();
+    } catch {
+      // Already logged by the embedding pipeline.
     }
   }
 
