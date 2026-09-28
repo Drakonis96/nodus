@@ -7,11 +7,13 @@ const compiled = await build({ entryPoints: ['shared/releaseNotes.ts'], bundle: 
 const { RELEASE_NOTES } = await import('data:text/javascript;base64,' + Buffer.from(compiled.outputFiles[0].text).toString('base64'));
 const current = RELEASE_NOTES[0];
 // Explicit display order, independent of the modal grouping implementation.
-// Four academic, three general, two study, then Nodi, Toolkit and Zotero.
+// Seven academic, three each for AI, languages and study, two general and two
+// for the browser, then teaching. The release array follows descending group size
+// with stable ties.
 // The release array already follows descending group size with stable ties.
 const indices = Array.from({ length: current.highlights.length }, (_, index) => index);
 const expected = indices.map(index => current.highlights[index]);
-const output = 'artifacts/release-5.6.0';
+const output = 'artifacts/release-5.7.0';
 const baseUrl = process.env.NODUS_RELEASE_NOTES_URL ?? 'http://127.0.0.1:5198';
 // The modal caps its own height and scrolls its body, and the shell pins html/body/#root
 // to the viewport with `overflow: hidden`, so a full-page screenshot would otherwise stop
@@ -29,12 +31,12 @@ try {
     await page.goto(`${baseUrl}/visual-tests/release-notes-harness.html?theme=${theme}&lang=${lang}`);
     const release = page.getByTestId('whats-new-selected-release');
     await release.waitFor();
-    assert.equal(await release.locator('.whats-new-release-version').textContent(), 'v5.6.0');
+    assert.equal(await release.locator('.whats-new-release-version').textContent(), 'v5.7.0');
     assert.deepEqual(await release.locator('li > span:last-child').allTextContents(), expected.map(highlight => highlight[lang]), `${theme}/${lang}: rendered order and every translation`);
     assert.deepEqual(await release.locator('li [data-testid^="whats-new-scope-"]').evaluateAll(items => items.map(item => item.getAttribute('data-testid').replace('whats-new-scope-', ''))), expected.map(highlight => highlight.scope));
     if (lang === 'es') await page.screenshot({ path: `${output}/modal-${theme}.png`, animations: 'disabled' });
     await page.getByTestId('whats-new-version-trigger').click();
-    assert.equal(await page.getByTestId('whats-new-version-5.5.0').count(), 1, `${theme}/${lang}: the release just superseded stays in the picker`);
+    assert.equal(await page.getByTestId('whats-new-version-5.6.0').count(), 1, `${theme}/${lang}: the release just superseded stays in the picker`);
     assert.equal(await page.getByTestId('whats-new-version-5.3.2').count(), 0);
   }
   for (const theme of ['light', 'dark']) {
@@ -44,6 +46,6 @@ try {
     await page.screenshot({ path: `${output}/modal-${theme}-full.png`, animations: 'disabled', fullPage: true });
   }
   assert.deepEqual(errors, []);
-  await fs.writeFile(`${output}/modal-order-es.md`, `# Novedades de Nodus 5.6.0\n\n${expected.map((highlight,index)=>`${index+1}. ${highlight.es}`).join('\n\n')}\n`);
-  console.log(`PASS: ${current.highlights.length} release notes in exact displayed order, all twelve languages in light/dark, v5.6.0 active and unpublished v5.3.2 absent.`);
+  await fs.writeFile(`${output}/modal-order-es.md`, `# Novedades de Nodus 5.7.0\n\n${expected.map((highlight,index)=>`${index+1}. ${highlight.es}`).join('\n\n')}\n`);
+  console.log(`PASS: ${current.highlights.length} release notes in exact displayed order, all twelve languages in light/dark, v5.7.0 active and unpublished v5.3.2 absent.`);
 } finally { await browser.close(); }
