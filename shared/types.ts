@@ -1229,6 +1229,74 @@ export interface ReprocessConnectionsResult {
   relationsAdded: number;
 }
 
+/**
+ * How a graph-integrity finding is resolved: `repairable` by the SQL repair, `rescan` only
+ * by analysing the listed works again, `info` needs nothing (expected or legacy state).
+ */
+export type GraphIntegrityCategory = 'repairable' | 'rescan' | 'info';
+
+export type GraphIntegrityCheckId =
+  | 'theme_links_missing_theme'
+  | 'work_themes_missing_theme'
+  | 'active_ideas_without_works'
+  | 'dormant_ideas_with_works'
+  | 'edges_missing_endpoint'
+  | 'orphan_edge_traces'
+  | 'rows_of_missing_works'
+  | 'unused_themes'
+  | 'rows_missing_idea'
+  | 'rows_missing_evidence'
+  | 'edges_of_missing_works'
+  | 'hidden_edges'
+  | 'legacy_gap_evidence'
+  | 'user_refs_missing_idea'
+  | 'stuck_document_jobs';
+
+export interface GraphIntegrityWork {
+  nodus_id: string;
+  title: string | null;
+}
+
+export interface GraphIntegrityCheck {
+  id: GraphIntegrityCheckId;
+  category: GraphIntegrityCategory;
+  count: number;
+  /** Works the finding belongs to, largest first (at most 50). */
+  works: Array<GraphIntegrityWork & { count: number }>;
+}
+
+export interface GraphIntegrityReport {
+  checks: GraphIntegrityCheck[];
+  /** Sum of the counts per category. */
+  totals: Record<GraphIntegrityCategory, number>;
+  /** Works a `rescan` finding names, deduplicated. */
+  rescanWorks: GraphIntegrityWork[];
+  /** Works whose idea theme links a repair removed and that can have their themes reassigned. */
+  pendingThemeWorks: GraphIntegrityWork[];
+  checkedAt: string;
+}
+
+export interface GraphIntegrityRepairCounts {
+  rowsOfMissingWorks: number;
+  danglingThemeLinks: number;
+  danglingWorkThemes: number;
+  wokenIdeas: number;
+  sleptIdeas: number;
+  danglingEdges: number;
+  orphanTraces: number;
+  prunedThemes: number;
+}
+
+export interface GraphIntegrityRepairResult {
+  counts: GraphIntegrityRepairCounts;
+  /** Works whose last deep analysis failed the integrity check. Listed, never requeued. */
+  integrityFailedWorks: GraphIntegrityWork[];
+  /** Consistent copy of the vault taken before a manual repair. */
+  backupPath?: string;
+  /** The audit right after the repair. */
+  report?: GraphIntegrityReport;
+}
+
 export interface Idea {
   global_id: string;
   type: IdeaType;

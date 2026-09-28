@@ -217,6 +217,9 @@ export function mergeWorks(db: Database.Database, canonicalId: string, duplicate
       for (const table of PLAIN_REPOINT_TABLES) {
         db.prepare(`UPDATE ${table} SET nodus_id = ? WHERE nodus_id = ?`).run(canonicalId, dup);
       }
+      // Edges carry their owning work in source_work: the canonical work's next rescan
+      // must be the one that replaces them, or nothing ever would.
+      db.prepare('UPDATE edges SET source_work = ? WHERE source_work = ?').run(canonicalId, dup);
       // Scan checkpoints are resumption caches tied to the old id — just drop them.
       db.prepare('DELETE FROM scan_checkpoints WHERE nodus_id = ?').run(dup);
       // The resolved text inventory is rebuilt from local files on the next resolution,

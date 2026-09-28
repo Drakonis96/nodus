@@ -25,6 +25,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -106,6 +107,7 @@ export const JA: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.ja,
   ...STUDY_BANK_TRANSLATIONS.ja,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ja,
+  ...GRAPH_HEALTH_TRANSLATIONS.ja,
   ...STUDY_SOURCE_TRANSLATIONS["ja"],
   ...STUDY_FOCUS_TRANSLATIONS["ja"],
   ...STUDY_IMPROVE_TRANSLATIONS.ja,

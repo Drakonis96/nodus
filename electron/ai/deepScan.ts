@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { completeJson, embedMany, AiError } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { deepScanPrompt } from './prompts';
-import { applyFusionPlan, resolveIdeaFusion, ExtractedIdea, FusionDecision, FusionPlan } from './fusion';
+import { applyFusionLink, applyFusionPlan, resolveIdeaFusion, ExtractedIdea, FusionDecision, FusionPlan } from './fusion';
 import {
   upsertOccurrence,
   addEvidence,
@@ -19,6 +19,7 @@ import {
   getWorkThemeLabels,
   listThemeLabels,
   normalizeThemeLabel,
+  pruneOrphanThemes,
   setIdeaThemeLinks,
   unionWorkThemes,
 } from '../db/themesRepo';
@@ -852,9 +853,11 @@ export async function runDeepScan(
         getDb().transaction(() => {
           purgeDeepData(work.nodus_id);
           unionWorkThemes(work.nodus_id, deepThemeLabels, 4);
+          const globalIds: string[] = [];
           for (let i = 0; i < preparedIdeas.length; i++) {
             const { labelKey, idea, ideaThemeLabels } = preparedIdeas[i];
-            const globalId = applyFusionPlan(resolvedPlans[i], work.nodus_id);
+            const globalId = applyFusionPlan(resolvedPlans[i]);
+            globalIds.push(globalId);
             labelToGlobal.set(labelKey, globalId);
             setIdeaThemeLinks(work.nodus_id, globalId, ideaThemeLabels, idea.confidence, 'explicit');
             upsertOccurrence(globalId, work.nodus_id, idea.role, idea.development, idea.confidence);
@@ -862,6 +865,14 @@ export async function runDeepScan(
               addEvidence(globalId, work.nodus_id, ev.quote, ev.location, ev.kind, { sourceRef: ev.source_ref, pageNumber: ev.page_number });
             }
           }
+          // Links go in once every idea of this pass has its occurrence: a target that
+          // another idea here merges into is active by now, one no work holds is dropped.
+          for (let i = 0; i < preparedIdeas.length; i++) {
+            applyFusionLink(resolvedPlans[i], globalIds[i], work.nodus_id);
+          }
+          // Theme cleanup waits until this work's idea links are rewritten, so it only
+          // drops themes that nothing references once the replacement is complete.
+          pruneOrphanThemes();
 
           for (const rel of merged.internal) {
             const from = labelToGlobal.get(rel.from);

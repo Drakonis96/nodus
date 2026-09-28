@@ -253,6 +253,20 @@ const manualReuse = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused
 assert.equal(manualReuse.imported, 0, 'manual vault cannot inherit generated knowledge from another vault');
 assert.equal(database.getDb().prepare("SELECT COUNT(*) AS n FROM idea_occurrences WHERE nodus_id='work-reused'").get().n, 0);
 database.getDb().prepare("UPDATE settings SET value=? WHERE key='app'").run(beforeManualSettings);
+// Same dormancy rule as a rescan: the target already holds the imported idea asleep
+// (INSERT OR IGNORE keeps that row), so the import has to wake it.
+// A shared global_id only happens when one vault started as a copy of the other, so the
+// sleeping row is the same idea: copy it verbatim, asleep.
+const sourceIdea = await database.withVaultDatabase('default', () => database.getDb().prepare("SELECT * FROM ideas WHERE global_id = 'idea-default'").get());
+registry.setActiveVault(researchVault.id);
+db = database.getDb();
+{
+  const columns = Object.keys(sourceIdea).filter((column) => column !== 'orphaned_at');
+  db.prepare(`INSERT INTO ideas (${columns.join(', ')}, orphaned_at) VALUES (${columns.map(() => '?').join(', ')}, ?)`)
+    .run(...columns.map((column) => sourceIdea[column]), '2026-09-01T00:00:00.000Z');
+}
+database.closeDb();
+
 const reused = await analysisReuse.reuseVaultAnalysisForWorks(['work-reused']);
 assert.equal(reused.requested, 1);
 assert.equal(reused.matched, 1);
@@ -275,6 +289,12 @@ db = database.getDb();
 assert.deepEqual(workTitles(db), ['Default work reused', 'Research work']);
 assert.equal(countWorks(db), 2, 'analysis reuse keeps the target library independent');
 assert.equal(countRows(db, 'ideas'), 1, 'reused ideas are available in the target vault');
+assert.equal(
+  db.prepare("SELECT orphaned_at FROM ideas WHERE global_id = 'idea-default'").get().orphaned_at,
+  null,
+  'an imported idea that already existed asleep in the target wakes up, since a work holds it now'
+);
+
 assert.equal(countRows(db, 'work_summaries'), 1, 'reused summaries are available in the target vault');
 assert.equal(countRows(db, 'passages'), 1, 'reused passage embeddings are available in the target vault');
 assert.equal(countRows(db, 'document_profile_versions'), 1, 'the current document profile version is copied');

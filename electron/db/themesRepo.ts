@@ -1,6 +1,7 @@
 import { isManualAcademic } from '../ai/academicMode';
 import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
+import { pruneOrphanThemesIn } from './graphIntegrity';
 import { v4 as uuid } from 'uuid';
 import type { ManagedTheme, Theme } from '@shared/types';
 import { COMPASS_THEME_ALIASES } from '../compass/compassVocabulary';
@@ -67,11 +68,9 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
       const theme_id = getOrCreateTheme(normalizeThemeLabel(label));
       db.prepare('INSERT OR IGNORE INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run(nodusId, theme_id);
     }
-    // Prune orphan auto-themes, but keep user-curated (pinned) ones so they survive a
-    // reprocess even before any work is assigned to them.
-    db.prepare(
-      'DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)'
-    ).run();
+    // No orphan prune here: callers write their per-idea links after this, in the
+    // same transaction (deepScan.ts via unionWorkThemes), so they call
+    // pruneOrphanThemes() once the whole replacement is written.
   });
   tx();
 }
@@ -168,12 +167,14 @@ export function replaceIdeaThemeLinks(
   tx();
 }
 
-/** Drop themes that are neither pinned nor referenced by any work. */
+/**
+ * Drop themes that are neither pinned nor referenced by any work or idea link. Call it at
+ * the end of the transaction that rewrote theme links, when nothing is left half-written.
+ */
 export function pruneOrphanThemes(): void {
-  getDb()
-    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)')
-    .run();
+  pruneOrphanThemesIn(getDb());
 }
+
 
 /** Every theme label currently known — the curated universe used when scans are locked. */
 export function listThemeLabels(): string[] {

@@ -1,5 +1,6 @@
 import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
+import { MANUAL_IDEA_REFS_SQL, sleepIdeasWithoutWorks, userIdeaReferencesSql } from './ideaDormancy';
 import { scanSimilar } from './vectorScan';
 import { v4 as uuid } from 'uuid';
 import { embeddingTextForIdea, embeddingTextHash } from './ideaEmbeddingText';
@@ -500,6 +501,22 @@ export function embeddedIdeaCount(): number {
   return row.count;
 }
 
+/**
+ * Restore a dormant idea to active status. An idea is active exactly while some work holds
+ * an occurrence of it (or a note owns it as a manual idea), so the only caller is
+ * `upsertOccurrence`. An edge is not a reason to wake an idea: edges that other works hold
+ * into a dormant idea stay in `edges`, and `visible_edges` hides them until a scan
+ * re-attaches the idea.
+ */
+export function reviveIdea(globalId: string): void {
+  getDb().prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
+}
+
+/** True when the idea exists and is not dormant. Skips the embedding BLOB `getIdea` decodes. */
+export function isActiveIdea(globalId: string): boolean {
+  return Boolean(getDb().prepare('SELECT 1 FROM ideas WHERE global_id = ? AND orphaned_at IS NULL').get(globalId));
+}
+
 export function upsertOccurrence(
   globalId: string,
   nodusId: string,
@@ -515,7 +532,7 @@ export function upsertOccurrence(
   ).run(globalId, nodusId, role, development, confidence);
   // Revival: re-attaching a work to a dormant idea restores it everywhere
   // (graph, search) with its original global_id intact.
-  db.prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
+  reviveIdea(globalId);
 }
 
 export function addEvidence(
@@ -729,16 +746,11 @@ export function purgeDeepData(nodusId: string): void {
     // occurrences / orphaned_at filters), remains a fusion candidate, and is
     // revived by upsertOccurrence the moment any scan re-attaches it. Manual
     // ideas are never flagged: they are owned by a note and may legitimately
-    // have no works linked yet.
-    db.prepare(
-      `UPDATE ideas SET orphaned_at = ?
-        WHERE orphaned_at IS NULL
-          AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
-          AND global_id NOT IN (
-            SELECT json_extract(source_json, '$.ref') FROM notes
-             WHERE json_extract(source_json, '$.note') = 'manual-idea'
-          )`
-    ).run(new Date().toISOString());
+    // have no works linked yet. Edges do not keep an idea awake either: the
+    // ones other works hold into it stay in `edges`, `visible_edges` hides them
+    // while it sleeps, and they reappear when a scan re-attaches it. Those
+    // works' rescans delete their own edges first, so nothing fails meanwhile.
+    sleepIdeasWithoutWorks(db, new Date().toISOString());
     db.prepare(
       `DELETE FROM edges
        WHERE from_id NOT IN (SELECT global_id FROM ideas)
@@ -811,8 +823,10 @@ export function assertDeepDataIntegrity(nodusId: string): void {
  * Delete ideas that have been dormant (no occurrences) longer than maxAgeDays.
  * Runs at startup as maintenance: recent dormancy is a revival opportunity —
  * fusion re-matches the idea on the next rescan and keeps its global_id —
- * while long-dormant ideas are genuinely gone from the corpus. Returns the
- * number of pruned ideas.
+ * while long-dormant ideas are genuinely gone from the corpus. An idea that
+ * user content still points at (a chapter, a database relation, a coverage
+ * link, an edge verdict…) is kept asleep instead, so the reference keeps
+ * resolving. Returns the number of pruned ideas.
  */
 export function pruneDormantIdeas(maxAgeDays = 30): number {
   const db = getDb();
@@ -824,11 +838,9 @@ export function pruneDormantIdeas(maxAgeDays = 30): number {
         `DELETE FROM ideas
           WHERE orphaned_at IS NOT NULL
             AND orphaned_at < ?
-            AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
-            AND global_id NOT IN (
-              SELECT json_extract(source_json, '$.ref') FROM notes
-               WHERE json_extract(source_json, '$.note') = 'manual-idea'
-            )`
+            AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = ideas.global_id)
+            AND global_id NOT IN (${MANUAL_IDEA_REFS_SQL})
+            AND global_id NOT IN (${userIdeaReferencesSql(db)})`
       )
       .run(cutoff);
     pruned = result.changes;

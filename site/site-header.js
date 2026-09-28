@@ -145,6 +145,30 @@ Hosts opt in with a placeholder element:
         downloads.setAttribute('data-state', 'ready');
       })
       .catch(() => downloads.setAttribute('data-state', 'error'));
+
+    /* The chip counts what the releases page holds, but a visitor who clicks it
+       wants the builds: where the page ships the download dialog it opens that
+       one, the same the Download button opens, and it announces itself as a
+       dialog opener. The href stays the honest destination for the pages
+       without a dialog, for a modifier click that asks for the releases page in
+       a new tab, and for JavaScript that never ran — so the click is only taken
+       over while there is a dialog to answer it. */
+    const opensDialog = () => typeof window.openDl === 'function';
+    /* The dialog is published by site.js, which boots on DOMContentLoaded: this
+       component runs earlier, on a deferred script, so the chip waits for the
+       same moment to say what it does. Where the page never publishes one, the
+       chip says nothing and stays the plain link to the releases page. */
+    const announceDialog = () => {
+      if (opensDialog()) downloads.setAttribute('aria-haspopup', 'dialog');
+    };
+    if (document.readyState === 'complete') announceDialog();
+    else document.addEventListener('DOMContentLoaded', announceDialog);
+    downloads.addEventListener('click', (event) => {
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (!opensDialog()) return;
+      event.preventDefault();
+      window.openDl();
+    });
   }
 
   document.querySelectorAll('[data-nodus-site-header]').forEach((host) => {

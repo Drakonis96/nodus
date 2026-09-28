@@ -157,6 +157,8 @@ import type {
   ReadingPathRequest,
   ReprocessConnectionsOptions,
   ReprocessConnectionsResult,
+  GraphIntegrityReport,
+  GraphIntegrityRepairResult,
   ReprocessProgress,
   ResearchChatRequest,
   ResearchChatResponse,
@@ -662,6 +664,19 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
     model?: ModelRef | null,
     onProgress?: (p: ReprocessProgress) => void
   ): Promise<ReprocessConnectionsResult>;
+  /** Reassign idea themes only in the works whose links a graph repair removed (uses the model). */
+  reprocessRepairedThemeWorks(
+    model?: ModelRef | null,
+    onProgress?: (p: ReprocessProgress) => void
+  ): Promise<ReprocessConnectionsResult>;
+
+  // graph health
+  /** Read-only audit of the whole idea graph, with the works each finding belongs to. */
+  checkGraphIntegrity(): Promise<GraphIntegrityReport>;
+  /** Back up the vault, then repair every `repairable` finding. Refused while the analysis queue runs. */
+  repairGraphIntegrity(): Promise<GraphIntegrityRepairResult>;
+  /** Forget the works waiting for their idea themes to be reassigned. */
+  dismissRepairedThemeWorks(): Promise<GraphIntegrityReport>;
 
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
