@@ -28,7 +28,7 @@ const catalog = [
     "Usa apenas dados deste vault",
     "Usa apenas dados deste vault",
     "Usa solo i dati di questo vault",
-    "Yalnızca bu vaulttaki verileri kullanır", "仅使用此资料库的数据", "僅使用此資料庫的資料", "このボールトのデータのみを使用します", "이 저장소의 데이터만 사용합니다."
+    "Yalnızca bu vaulttaki verileri kullanır", "仅使用此资料库的数据", "僅使用此資料庫的資料", "このVaultのデータのみを使用します", "이 저장소의 데이터만 사용합니다."
   ],
   [
     "1. Define el objetivo",

@@ -142,7 +142,7 @@ export const PROSOPOGRAPHY_TRANSLATIONS: Record<ProsopLanguage, Record<string, s
     "Configura el estudio": "연구 설정",
     "Comienza por la pregunta de investigación, la población objetivo y el cuestionario común.": "연구 질문, 대상 인구 및 공유 설문지부터 시작하세요.",
     "Abrir Población": "공개 인구",
-    "Buscar en prosopografía": "프로소그래피 검색",
+    "Buscar en prosopografía": "프로소포그래피 검색",
     "v{version} · {status}": "v{version} · {status}",
     "Publicada": "게시됨",
     "Retirada": "은퇴",

@@ -18,7 +18,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "tr": "Akademik kasa oluştururken Otomatik veya Manuel seçebilirsiniz. Manuel modda belge içe aktarma veya eşitleme, otomatik olarak fikir ya da tema oluşturmaz. Seçim bu kasa için kaydedilir ve oluşturulduktan sonra değiştirilemez.",
     "zh-CN": "创建学术库时，可以选择自动或手动模式。在手动模式下，导入或同步文献不会自动生成观点或主题。模式选择保存在该库中，创建后无法更改。",
     "zh-TW": "建立學術庫時，可以選擇自動或手動模式。在手動模式下，匯入或同步文獻不會自動產生觀點或主題。模式選擇儲存在該庫中，建立後無法變更。",
-    "ja": "学術保管庫を作成するときに、自動または手動を選べます。手動モードでは、文献をインポートまたは同期してもアイデアやテーマは自動生成されません。選択は保管庫ごとに保存され、作成後は変更できません。",
+    "ja": "学術Vaultを作成するときに、自動または手動を選べます。手動モードでは、文献をインポートまたは同期してもアイデアやテーマは自動生成されません。選択はVaultごとに保存され、作成後は変更できません。",
     "ko": "학술 보관함을 만들 때 자동 또는 수동을 선택할 수 있습니다. 수동 모드에서는 문서를 가져오거나 동기화해도 아이디어나 주제가 자동 생성되지 않습니다. 선택은 해당 보관함에 저장되며 생성 후에는 바꿀 수 없습니다."
   },
   {

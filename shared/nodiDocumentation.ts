@@ -304,19 +304,19 @@ const LOCALIZED_ROADMAP: Record<PromptLanguage, readonly RoadmapItem[]> = {
   tr: [
     { title: 'İyileştirme ve kararlılık', detail: 'Hataları düzeltmek, performansı artırmak ve kullanıcı geri bildirimleriyle genel deneyimi geliştirmek.', status: 'inProgress' },
     { title: 'Sunucu', detail: 'Yeni bağlantılı yetenekler için isteğe bağlı altyapı.', status: 'planned' },
-    { title: 'Vault paylaşımı ve ortak çalışma', detail: 'Veriler üzerindeki kontrolü koruyarak alanları paylaşmak ve iş birliği yapmak.', status: 'planned' },
+    { title: 'Kasa paylaşımı ve ortak çalışma', detail: 'Veriler üzerindeki kontrolü koruyarak alanları paylaşmak ve iş birliği yapmak.', status: 'planned' },
     { title: 'iOS ve iPadOS uygulamaları', detail: 'Nodus’u her cihaza uyarlanmış yerel uygulamalarla iPhone ve iPad’e taşımak.', status: 'planned' },
-    { title: 'Öğretim vaultu', detail: 'Öğrenci verilerini koruyarak dersleri, kursları ve öğretim materyallerini hazırlamak.', status: 'implemented' },
-    { title: 'Birincil kaynaklar vaultu', detail: 'Tarihî belgeleri düzenlemek ve belgesel kanıtlarla çalışmak.', status: 'implemented' },
-    { title: 'Tanıklıklar vaultu (sözlü tarih)', detail: 'Tarih ve gazetecilik için röportajlar, transkripsiyonlar ve sözlü kaynaklar.', status: 'implemented' },
-    { title: 'Kullanıcıların önerdiği vaultlar', detail: 'Uzmanlar, etkin iş birliği ve test kullanıcılarıyla yeni alanlar.', status: 'implemented', children: [
-      { title: 'Prosopografi vaultu', detail: 'Tarih araştırması için kişiler, ilişkiler, kimlikler ve biyografik kanıtlar.', status: 'implemented' },
-      { title: 'Worldbuilding vaultu', detail: 'Anlatı dünyalarının karakterleri, yerleri, kronolojileri ve kuralları.', status: 'implemented' },
+    { title: 'Öğretim kasası', detail: 'Öğrenci verilerini koruyarak dersleri, kursları ve öğretim materyallerini hazırlamak.', status: 'implemented' },
+    { title: 'Birincil kaynaklar kasası', detail: 'Tarihî belgeleri düzenlemek ve belgesel kanıtlarla çalışmak.', status: 'implemented' },
+    { title: 'Tanıklıklar kasası (sözlü tarih)', detail: 'Tarih ve gazetecilik için röportajlar, transkripsiyonlar ve sözlü kaynaklar.', status: 'implemented' },
+    { title: 'Kullanıcıların önerdiği kasalar', detail: 'Uzmanlar, etkin iş birliği ve test kullanıcılarıyla yeni alanlar.', status: 'implemented', children: [
+      { title: 'Prosopografi kasası', detail: 'Tarih araştırması için kişiler, ilişkiler, kimlikler ve biyografik kanıtlar.', status: 'implemented' },
+      { title: 'Worldbuilding kasası', detail: 'Anlatı dünyalarının karakterleri, yerleri, kronolojileri ve kuralları.', status: 'implemented' },
     ] },
     { title: 'Nodus Toolkit', detail: 'Nodus’a entegre, dosyaları dönüştürmek ve belgeleri işlemek için pratik local-first araçlar.', status: 'implemented' },
     { title: 'Nodus Translate', detail: 'Seçilen modelle metinleri, belgeleri ve Zotero eklerini çevirir; DOCX ve EPUB yapısını, PDF görünümünü ise faksimile moduyla korur.', status: 'implemented' },
     { title: 'Nodus PDF Presenter', detail: 'PDF dosyalarını ve harici sunumları sunucu görünümü, mobilden uzaktan kontrol, konuşmacı notları ve canlı açıklama araçlarıyla sunmak.', status: 'implemented' },
-    { title: 'Nodus OCR Workspace', detail: 'Taranmış PDF ve görseller için sayfa sayfa inceleme, metin temizleme, yeniden işleme ve Nodus vaultlarıyla doğrudan bütünleşme sunan yapay zekâ destekli OCR.', status: 'implemented' },
+    { title: 'Nodus OCR Workspace', detail: 'Taranmış PDF ve görseller için sayfa sayfa inceleme, metin temizleme, yeniden işleme ve Nodus kasalarıyla doğrudan bütünleşme sunan yapay zekâ destekli OCR.', status: 'implemented' },
   ],
   'zh-Hans': [
     { title: '打磨与稳定性', detail: '修复错误、提升性能，并根据用户反馈打磨整体体验。', status: 'inProgress' },
@@ -918,15 +918,15 @@ __ROADMAP_GUIDE__
 
 ## Okuma kuralları
 - Bu kılavuz mevcut arayüzü ve resmî yol haritasını açıklar. Belgelenmeyen özellik, yol, tarih, sürüm veya durum uydurmayın.
-- “Uygulandı” mevcut ve açılabilir demektir; kararlı demek değildir. Nodus local-first çalışır ve her vault verilerini bilgisayarda saklar.
+- “Uygulandı” mevcut ve açılabilir demektir; kararlı demek değildir. Nodus local-first çalışır ve her kasa verilerini bilgisayarda saklar.
 
-## Kullanılabilir vaultlar ve olgunluk
-- Vaultlar > Vault ekle üzerinden Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography ve Worldbuilding oluşturulabilir.
+## Kullanılabilir kasalar ve olgunluk
+- Kasalar > Kasa ekle üzerinden Academic, Primary sources, Testimonies, Databases, Teaching, Study, Genealogy, Prosopography ve Worldbuilding oluşturulabilir.
 - Primary sources, Testimonies ve Prosopography PRE-ALPHA; Worldbuilding ALPHA; Databases, Teaching, Study ve Genealogy BETA’dır. Academic aşama göstermez; demo verileri öğreticiyi açmaz.
 
 ## Başlık ve genel denetimler
-- Sağda genel olarak Commands, Assistant, Tools, vault denetimleri, Suggest / Report, tema, Notifications ve Settings bulunur; macOS’ta Commands kısayolu ⌘K’dır.
-- Ortadaki rozet vault seçicisini açar. Notifications “Nodus notices” ve “Activity” listelerini içerir ve Nodi kapalıyken de çalışır.
+- Sağda genel olarak Commands, Assistant, Tools, kasa denetimleri, Suggest / Report, tema, Notifications ve Settings bulunur; macOS’ta Commands kısayolu ⌘K’dır.
+- Ortadaki rozet kasa seçicisini açar. Notifications “Nodus notices” ve “Activity” listelerini içerir ve Nodi kapalıyken de çalışır.
 
 ## Resmî görünür yol haritası
 - Settings > About Nodus Research > View Nodus Research roadmap üzerinden veya komut paletinden açılır. Sıra ve durumlar:
@@ -936,36 +936,36 @@ __ROADMAP_GUIDE__
 - Gerçek sekmeler Providers, AI Models, Library, Text and OCR, Interface, Integrations, Server, Tutorials, Backup, About Nodus Research ve Updates and news’tur.
 - Providers anahtarları ve modelleri; Library Zotero eşzamanlamasını; Interface dil, tema, erişilebilirlik, kenar çubuğu ve Nodi’yi; Server filtrelenmiş kopyayı yönetir.
 
-## Akademik vault
+## Akademik kasa
 - Araştırma ve akademik yazım içindir; Home, Search, Library, Graph, Argument map, Ideas, Authors, Immersion, Gaps, Debates, Coverage, Hypotheses, Reading path, Deep Research, Writing, Projects, Notes ve Settings içerir.
 - Deep Research derlemden kanıt alır, rapor üretir ve belge veya PDF olarak dışa aktarır.
 
-## Soybilim vaultu
+## Soybilim kasası
 - People, Timeline, Family tree, Social relations, Map ve Archive içerir. Kimlik ve akrabalık iddiaları kayıt veya kanıt gerektirir; soyadı, adres ya da ortak belge yeterli değildir.
 
-## Veritabanı vaultları
+## Veritabanı kasaları
 - Yazılı sütunlara sahip yapılandırılmış tabloları, satırları, görünümleri, aramayı, analizi ve Data Chat’i yönetir; kullanıcı veritabanları kenar çubuğunda görünür.
 
-## Çalışma vaultu
+## Çalışma kasası
 - Hiyerarşi Course > Subject’tir; klasör, konu, alt konu, not ve materyaller içerir. Schedules, Calendar, Materials, Recordings, Study chat, Ideas, Graph, Question bank ve Review bulunur.
 - Schedules hücre başına etkinlik ekler; Calendar aylık, haftalık ve yıllık görünümler ile iCloud veya Google Calendar dışa aktarımı sunar; Question bank sorular, testler, sınavlar ve flashcard’lar içerir.
 
-## Öğretim vaultu
+## Öğretim kasası
 - BETA’da uygulanmıştır; Course > Subject düzenini kullanır ve gruplar, materyaller, Chat, Rubrics, Exams, Grades ve Unit design ekler. Teaching guide / Planning, Learning situations, Adaptations, Notes ve Innovation projects “In design” durumundadır.
 
-## Birincil kaynaklar vaultu
+## Birincil kaynaklar kasası
 - Test ve iş birliği için PRE-ALPHA’da uygulanmıştır; Search, Archive, People, Timeline, Map, Social relations, Notes, Toolkit ve Settings içerir. Archive provenans ve katalog verilerini yönetir.
 - Otomatik sonuçlar incelenmesi gereken önerilerdir; transkripsiyon, gözlem ve çıkarımı ayırın, konumlandırıcıları, çelişkileri ve belirsizliği koruyun.
 
-## Tanıklıklar vaultu
+## Tanıklıklar kasası
 - PRE-ALPHA’da uygulanmıştır; Search, Interviews, Participants, Contrasts, Notes, Toolkit ve Settings oturum, medya, transkripsiyon, parçalar, kodlar, anlaşmalar ve kısıtları düzenler.
 - Nodi erişim, anonimleştirme, ambargo ve atıfa uyar; hassas özellikleri, duyguları, samimiyeti veya güvenilirliği çıkarmaz.
 
-## Prosopografi vaultu
+## Prosopografi kasası
 - PRE-ALPHA’da uygulanmıştır; Search, Population, People, Sources, Analysis, Networks, Notes, Toolkit ve Settings yöntem, kimlik, üyelik, analiz ve ağ akışını destekler.
 - person, mention, source, factoid ve statement kavramlarını karıştırmayın; inceleme olmadan kimlikleri birleştirmeyin.
 
-## Worldbuilding vaultu
+## Worldbuilding kasası
 - ALPHA’da uygulanmıştır ve Encyclopedia, Characters, Places, Factions, Cultures, Timeline, Map, Relationships, Families, Dynasties, World chat, World rules, Conflicts, Narrative arcs, Continuity, Notes, Scenes ve Manuscript içerir.
 - Doğruluk kaynağı yazardır; Nodi yerleşik kanonu önerilerden ayırır.
 
@@ -975,11 +975,11 @@ __ROADMAP_GUIDE__
 - Convert deterministik ve %100 offline’dır; Protect belgeleri yapay zekâya göndermez. Yalnızca isteğe bağlı Tesseract OCR dil indirmesi ağ kullanır.
 
 ## Yerel MCP ve Nodus Server
-- MCP Settings > Integrations > MCP Server bölümünde kurulur. Nodus Server bağımsızdır, Settings > Server’dan ayarlanır ve her vault için HTTPS URL ile tek kullanımlık kod kullanır.
+- MCP Settings > Integrations > MCP Server bölümünde kurulur. Nodus Server bağımsızdır, Settings > Server’dan ayarlanır ve her kasa için HTTPS URL ile tek kullanımlık kod kullanır.
 - Yayınlanan kopya filtrelenmiş ve dışa giden bir kopyadır; OAuth uzaktan erişimi korur. Server ve ortak paylaşım “Planlandı” durumundadır.
 
 ## Yol haritası özet durumu
-- Geliştiriliyor: İyileştirme ve kararlılık. Planlandı: Server, vault paylaşımı ve ortak çalışma, iOS ve iPadOS uygulamaları. Uygulandı: Teaching, Primary sources, Testimonies, önerilen vaultlar, Nodus Toolkit, Nodus Translate, PDF Presenter ve OCR Workspace.
+- Geliştiriliyor: İyileştirme ve kararlılık. Planlandı: Server, kasa paylaşımı ve ortak çalışma, iOS ve iPadOS uygulamaları. Uygulandı: Teaching, Primary sources, Testimonies, önerilen kasalar, Nodus Toolkit, Nodus Translate, PDF Presenter ve OCR Workspace.
 - Kesin tarihler yoktur.
 
 ## Arayüz protokolü
