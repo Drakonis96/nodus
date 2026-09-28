@@ -2985,6 +2985,13 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  // 5.7.1 fixes the indexing welcome, whose «Yes, start» button stayed disabled while
+  // every unindexed PDF was inspected. Its What's New modal is the 5.7.0 one, unchanged.
+  {
+    version: '5.7.1',
+    date: '2026-09-28',
+    highlights: RELEASE_5_7_0_HIGHLIGHTS,
+  },
   {
     version: '5.7.0',
     date: '2026-09-28',

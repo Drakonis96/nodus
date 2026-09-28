@@ -114,6 +114,7 @@ const RELEASE_5_1_0_TR = [
 ];
 
 export const RELEASE_NOTES_TR: Record<string, string[]> = {
+  "5.7.1": RELEASE_5_7_0_HIGHLIGHTS.map(highlight => highlight['tr']),
   "5.7.0": RELEASE_5_7_0_HIGHLIGHTS.map(highlight => highlight['tr']),
   "5.6.0": RELEASE_5_6_0_HIGHLIGHTS.map(highlight => highlight['tr']),
   "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.tr),
