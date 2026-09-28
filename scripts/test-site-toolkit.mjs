@@ -78,6 +78,13 @@ test('the tools under the stage turn like a ring, one card focused', () => {
   assert.match(script, /if \(moved > 6\) \{\s*event\.preventDefault\(\)/, 'and the click that ended a drag does not count');
   assert.match(script, /event\.key === 'ArrowLeft'[\s\S]{0,90}event\.key === 'ArrowRight'/, 'the arrow keys turn it');
   assert.match(script, /ring\.addEventListener\('wheel'/, 'so does a sideways wheel');
+  // One trackpad swipe is dozens of wheel events plus a tail of inertia: it turns
+  // the ring once, and a click during that tail still lands where it was aimed.
+  assert.match(script, /if \(Math\.abs\(event\.deltaX\) <= Math\.abs\(event\.deltaY\)\) return;/, 'a vertical wheel stays a page scroll');
+  assert.match(script, /if \(Math\.abs\(wheelTotal\) < WHEEL_STEP\) return;/, 'a sideways gesture has to pass a threshold to count');
+  assert.match(script, /forgetWheel\(\);\s*wheelBlocked = Date\.now\(\) \+ WHEEL_QUIET;\s*step\(by\);/, 'and then the rest of the gesture is its tail, not a second turn');
+  assert.match(script, /if \(Date\.now\(\) < wheelBlocked\) \{ forgetWheel\(\); return; \}/, 'a gesture still in flight cannot turn it again');
+  assert.match(script, /forgetWheel\(\);\s*wheelBlocked = Date\.now\(\) \+ 400;\s*step\(index - active\);/, 'a click jumps straight to its card and ignores the trackpad tail');
   assert.match(script, /cards\.map\(\(card\) => card\.offsetHeight\)/, 'the ring is as tall as its tallest card');
   assert.match(script, /function place\(\) \{[\s\S]{0,200}cards\.forEach/, 'every card is placed from one table of distances');
   assert.equal(/setInterval|autoplay/i.test(script), false, 'and nothing turns it on its own');

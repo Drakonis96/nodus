@@ -277,6 +277,9 @@ lives in the wiki (site/wiki/wiki.js).
       if (index === active) return;
       event.preventDefault();
       event.stopPropagation();
+      // Straight there, in one move, and deaf to the trackpad's tail for a moment.
+      forgetWheel();
+      wheelBlocked = Date.now() + 400;
       step(index - active);
     }, true);
 
@@ -289,15 +292,35 @@ lives in the wiki (site/wiki/wiki.js).
       else if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
     });
 
-    // The wheel over the ring turns it one card at a time, and never scrolls the page.
-    let wheelLock = 0;
+    // One gesture, one card. A trackpad keeps sending events long after the fingers
+    // are off, so the sideways total has to pass a threshold before the ring turns,
+    // and the gesture has to go quiet before it may turn again — otherwise a single
+    // swipe skips three cards, and a click made during that tail gets undone.
+    const WHEEL_STEP = 60;
+    const WHEEL_QUIET = 240;
+    let wheelTotal = 0;
+    let wheelQuiet = 0;
+    let wheelBlocked = 0;
+
+    function forgetWheel() {
+      clearTimeout(wheelQuiet);
+      wheelTotal = 0;
+    }
+
     ring.addEventListener('wheel', (event) => {
-      if (Math.abs(event.deltaX) < Math.abs(event.deltaY)) return;
+      // A vertical wheel over the ring scrolls the page, as it should.
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
       event.preventDefault();
-      const now = Date.now();
-      if (now < wheelLock) return;
-      wheelLock = now + 320;
-      step(event.deltaX > 0 ? 1 : -1);
+      if (Date.now() < wheelBlocked) { forgetWheel(); return; }
+      wheelTotal += event.deltaX;
+      clearTimeout(wheelQuiet);
+      wheelQuiet = setTimeout(() => { wheelTotal = 0; }, WHEEL_QUIET);
+      if (Math.abs(wheelTotal) < WHEEL_STEP) return;
+      const by = wheelTotal > 0 ? 1 : -1;
+      // Turned once: the rest of this gesture is its tail, not a second turn.
+      forgetWheel();
+      wheelBlocked = Date.now() + WHEEL_QUIET;
+      step(by);
     }, { passive: false });
 
     addEventListener('resize', place, { passive: true });
