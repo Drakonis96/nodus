@@ -312,6 +312,8 @@ import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
 import { getActiveVault, withOwningVault } from '../vaults/vaultRegistry';
+import { completeGuideOrganization, listCompleteGuideCatalog, previewCompleteGuide } from '../ai/completeGuide/sources';
+import type { CompleteGuidePreviewRequest } from '@shared/completeGuide/preview';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
 // electron sub-build erases type-only @shared imports but cannot resolve the
@@ -1787,6 +1789,9 @@ export function registerAcademicIpc(context: IpcContext): void {
     ensureDeepResearchLane();
     return clearFinishedDeepResearchJobs();
   });
+  // Complete study guide: the composer's source tree and its pre-flight estimate.
+  h('research:completeGuide:catalog', async () => ({ sources: listCompleteGuideCatalog(), organization: completeGuideOrganization() }));
+  h('research:completeGuide:preview', async (_e, request: CompleteGuidePreviewRequest) => previewCompleteGuide(request));
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

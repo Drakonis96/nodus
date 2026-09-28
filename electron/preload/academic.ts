@@ -686,6 +686,8 @@ export const academicApi: AcademicApi = {
   enqueueDeepResearchJob: (request) => ipcRenderer.invoke('research:deep:queue:enqueue', request),
   cancelDeepResearchJob: (id) => ipcRenderer.invoke('research:deep:queue:cancel', id),
   clearFinishedDeepResearchJobs: () => ipcRenderer.invoke('research:deep:queue:clear'),
+  listCompleteGuideCatalog: () => ipcRenderer.invoke('research:completeGuide:catalog'),
+  previewCompleteGuide: (request) => ipcRenderer.invoke('research:completeGuide:preview', request),
   onDeepResearchQueue: (cb) => {
     const listener = (_e: unknown, jobs: import('@shared/types').DeepResearchJobRecord[]) => cb(jobs);
     ipcRenderer.on('research:deep:queue', listener);

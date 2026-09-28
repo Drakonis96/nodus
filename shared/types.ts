@@ -7510,6 +7510,12 @@ export interface DeepResearchRequest {
    * keep them as the throughline. Ignored outside the genealogy pipeline.
    */
   focusPersonId?: string | null;
+  /**
+   * Study vaults only: write a "Guía de estudio completa" from exactly these sources,
+   * read in full, instead of a retrieval-based study report. Present with an empty
+   * selection is an error, never a fallback to the whole vault.
+   */
+  completeGuide?: import('./completeGuide/types').CompleteGuideConfig;
 }
 
 /** One live progress event emitted while a report is being orchestrated. */

@@ -31,6 +31,7 @@ import { getSettings } from '../db/settingsRepo';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { generateGenealogyDeepResearchReport } from './genealogyDeepResearch';
 import { generateStudyDeepResearchReport } from './studyDeepResearch';
+import { normalizeCompleteGuideConfig } from '@shared/completeGuide/types';
 import {
   buildHistoricalWritingWorkshopSnapshot,
   buildIdeaFirstWritingWorkshopSnapshot,
@@ -149,6 +150,13 @@ async function generateDeepResearchReportWithVisualPlan(
   const versionedRequest: DeepResearchRequest = { ...request, deepResearchVersion, sectionLength };
   const finish = (result: DeepResearchReport) => { result.draft.documentSkills = request.documentSkills; result.draft.documentVisualHints = documentVisualHints; return withGenerationMetadata(result, approach, deepResearchVersion, model, sectionLength); };
   let report: DeepResearchReport;
+  // A complete study guide reads exactly the selected sources. It must never fall
+  // through to the retrieval-based study report, which would read the whole vault.
+  if (request.completeGuide) {
+    normalizeCompleteGuideConfig(request.completeGuide);
+    if (getActiveVault().type !== 'estudio') throw new Error('La guía de estudio completa solo está disponible en vaults de Estudio.');
+    throw new Error('La guía de estudio completa todavía no está disponible en esta versión.');
+  }
   // Study and teaching share one pipeline over the local study_* corpus. Teaching adds
   // the extracted idea network and the unit prompts, selected by `unitMode`; the vault
   // type sets it for anything that reaches here without the flag (MCP, a stale queue).
