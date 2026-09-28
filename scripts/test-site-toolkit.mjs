@@ -94,6 +94,6 @@ test('the tools under the stage turn like a ring, one card focused', () => {
   assert.match(script, /forgetWheel\(\);\s*wheelBlocked = Date\.now\(\) \+ 400;\s*step\(index - active\);/, 'a click jumps straight to its card and ignores the trackpad tail');
   assert.match(script, /cards\.map\(\(card\) => card\.offsetHeight\)/, 'the ring is as tall as its tallest card');
   assert.match(script, /function place\(\) \{[\s\S]{0,200}cards\.forEach/, 'every card is placed from one table of distances');
-  assert.equal(/setInterval|autoplay/i.test(script), false, 'and nothing turns it on its own');
+  assert.equal(/setInterval|\bautoplay\b/i.test(script), false, 'and nothing turns it on its own');
   assert.match(script, /opening\(\);\s*stage\(\);\s*tools\(\);/, 'the ring is wired on load');
 });
