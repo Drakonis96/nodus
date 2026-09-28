@@ -183,6 +183,8 @@ export interface CompleteGuideDraftMeta {
     figures?: number;
     /** Labelled web blocks (only when the web complement was enabled). */
     webBlocks?: number;
+    /** Attributed web images (only when web images were enabled). */
+    webImages?: number;
   };
   usage: { calls: number; inputTokens: number; outputTokens: number; usd: number | null };
   warnings: string[];

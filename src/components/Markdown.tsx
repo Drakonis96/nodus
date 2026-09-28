@@ -193,7 +193,10 @@ function MarkdownComponent({
                 const params = new URLSearchParams(material[2] ?? '');
                 const number = (key: string) => { const value = Number(params.get(key)); return Number.isFinite(value) && value > 0 ? value : null; };
                 onStudyMaterial(decodeURIComponent(material[1]), { pageNumber: number('page'), slideNumber: number('slide') });
+                return;
               }
+              // Attributed web images point to the file's page, where its licence is stated.
+              if (/^https:\/\//i.test(source)) void window.nodus.openExternal(source);
             }} /> : null;
           },
           img: ({ src, alt }) => chatVisuals && src?.startsWith('nodus-image://chat/') ? <ChatVisual source={src} alt={alt} /> : <img src={src} alt={alt} />,

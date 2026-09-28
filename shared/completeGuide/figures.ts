@@ -8,6 +8,7 @@
 import type { CompleteGuideItem } from './items';
 import type { CompleteGuidePassage, CompleteGuideSnapshotSource } from './snapshot';
 import { citationUrl } from './locators';
+import type { CompleteGuideWebImageAttribution } from './webImages';
 
 export interface CompleteGuideFigureRequest {
   itemId: string;
@@ -29,9 +30,11 @@ export interface CompleteGuideFigure {
   png: string;
   width: number;
   height: number;
-  /** A citation link to where the figure is in the material. */
+  /** A citation link to where the figure is in the material (web images: the file's page). */
   source: string;
   wholePage: boolean;
+  /** Web images only: licence and author confirmed by the image host. */
+  attribution?: CompleteGuideWebImageAttribution;
 }
 
 export const COMPLETE_GUIDE_FIGURES_PER_CHAPTER = 3;

@@ -47,6 +47,7 @@ import {
 } from '@shared/completeGuide/reference';
 import type { CompleteGuideStage } from '@shared/completeGuide/estimate';
 import { selectFigureRequests, type CompleteGuideFigure, type CompleteGuideFigureRequest } from '@shared/completeGuide/figures';
+import { selectWebImageRequests, type CompleteGuideWebImageRequest } from '@shared/completeGuide/webImages';
 import {
   CHEAT_SYSTEM,
   CONTINUE_SYSTEM,
@@ -89,6 +90,8 @@ export interface CompleteGuideDeps {
   figures?(requests: CompleteGuideFigureRequest[]): Promise<CompleteGuideFigure[]>;
   /** Optional web complement: recorded web passages for one chapter (config.webText). */
   web?(request: CompleteGuideWebRequest): Promise<CompleteGuideWebPassage[]>;
+  /** Optional licensed web images (config.webImages); each figure carries its attribution. */
+  webImages?(requests: CompleteGuideWebImageRequest[]): Promise<CompleteGuideFigure[]>;
   cacheGet<T>(key: string): T | null;
   cachePut(key: string, stage: string, value: unknown): void;
   checkpointGet<T>(stage: string, unit: string): T | null;
@@ -138,7 +141,7 @@ export interface CompleteGuideResult {
   counts: {
     windows: number; failedWindows: number; items: number; itemsUsed: number; blocks: number; aiBlocks: number;
     droppedUnsupported: number; auditedBlocks: number; removedSentences: number; repairedBlocks: number;
-    invalidLatex: number; conflicts: number; cacheHits: number; figures: number; webBlocks: number;
+    invalidLatex: number; conflicts: number; cacheHits: number; figures: number; webBlocks: number; webImages: number;
   };
   syllabus: { overview: string; connections: Array<{ from: string; to: string; relation: string }> };
   warnings: string[];
@@ -203,7 +206,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const warnings: string[] = [];
   const counts: CompleteGuideResult['counts'] = {
     windows: 0, failedWindows: 0, items: 0, itemsUsed: 0, blocks: 0, aiBlocks: 0, droppedUnsupported: 0,
-    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0, webBlocks: 0,
+    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0, webBlocks: 0, webImages: 0,
   };
   const guard = () => deps.checkpoint?.();
   const sourcesByKey = new Map(snapshot.sources.map((source) => [source.sourceKey, source]));
@@ -679,6 +682,25 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       counts.figures = figures.length;
     }
   }
+  // Web images only illustrate core concepts the materials left without a figure.
+  if (config.webImages && deps.webImages) {
+    const stored = deps.checkpointGet<CompleteGuideFigure[]>('final', 'web-images');
+    let found = stored;
+    if (!found) {
+      const requests = selectWebImageRequests(items, plans.filter((plan) => plan.sections.length).map((plan) => plan.unitKey), new Set(figures.map((figure) => figure.itemId)));
+      if (requests.length) {
+        guard();
+        found = await deps.webImages(requests).catch((error) => { if (isAbort(error)) throw error; warnings.push('web_images_failed'); return null; });
+        if (found) deps.checkpointPut('final', 'web-images', found.map((figure) => ({ ...figure })));
+      }
+    }
+    const requested = new Set(items.map((item) => item.id));
+    for (const figure of (found ?? []).filter((entry) => entry.attribution && requested.has(entry.itemId))) {
+      figures.push(figure);
+      figureSiblings[figure.itemId] = [];
+      counts.webImages += 1;
+    }
+  }
 
   // ── Assembly ───────────────────────────────────────────────────────────────────
   const usedItems = new Set<string>();
@@ -758,10 +780,17 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const indexed = new Set(index.map((entry) => entry.source.sourceKey));
   const sourceIndex = [...index, ...snapshot.sources.filter((source) => !indexed.has(source.sourceKey)).map((source) => ({ source, ranges: '' }))];
   parts.push(`## ${labels.sourceIndex}\n\n${renderSourceIndex(sourceIndex)}`);
+  // Web images join the list with their confirmed licence and author.
+  for (const figure of figures) {
+    const credit = figure.attribution;
+    if (!credit || webPages.has(credit.url)) continue;
+    webPages.set(credit.url, { alias: `W${webPages.size + 1}`, title: `${credit.title}${credit.author ? ` — ${credit.author}` : ''}`, site: `${credit.site} · ${credit.license}`, url: credit.url, passageIds: [] });
+  }
   const webSources = [...webPages.values()];
   if (webSources.length) {
     const escape = (value: string) => value.replace(/[[\]]/g, '').trim();
-    parts.push(`## ${labels.webSources}\n\n*${labels.webNote}*\n\n${webSources.map((page) => `- **${page.alias}** — [${escape(page.title) || page.url}](${page.url.replace(/[()\s]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)})${page.site ? ` · ${escape(page.site)}` : ''}`).join('\n')}`);
+    const href = (url: string) => url.replace(/[()\s]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+    parts.push(`## ${labels.webSources}\n\n*${labels.webNote}*\n\n${webSources.map((page) => `- **${page.alias}** — [${escape(page.title) || page.url}](${href(page.url)})${page.site ? ` · ${escape(page.site)}` : ''}`).join('\n')}`);
   }
 
   const limitations: string[] = [];

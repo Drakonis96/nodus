@@ -20,7 +20,7 @@ import { getActiveVault } from '../../vaults/vaultRegistry';
 type Row = Record<string, unknown>;
 const MAX_WIDTH = 1400;
 
-async function normalizePng(input: Buffer): Promise<{ png: Buffer; width: number; height: number } | null> {
+export async function normalizePng(input: Buffer): Promise<{ png: Buffer; width: number; height: number } | null> {
   try {
     const image = sharp(input, { failOn: 'none' }).rotate();
     const meta = await image.metadata();
@@ -131,7 +131,7 @@ export function seedCompleteGuideFigures(draftId: string, figures: CompleteGuide
     if (!blockId || taken.has(blockId)) continue;
     taken.add(blockId);
     seeded.push({
-      id: `material-${randomUUID()}`, blockId, skillId: 'nodus.material-figure', brief: '', caption: figure.caption,
+      id: `material-${randomUUID()}`, blockId, skillId: figure.attribution ? 'nodus.web-image' : 'nodus.material-figure', brief: '', caption: figure.caption,
       sources: [figure.source], layout: figure.wholePage ? 'compact' : 'wide', state: 'ready', poster: `data:image/png;base64,${figure.png}`,
     });
   }

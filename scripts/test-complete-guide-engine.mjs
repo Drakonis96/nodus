@@ -314,6 +314,32 @@ test('the optional web complement is one search per chapter, labelled, audited a
   assert.ok(down.markdown.length > 500);
 });
 
+test('web images illustrate core concepts without material figures, attributed and listed apart', async () => {
+  const asked = [];
+  const webImages = async (requests) => {
+    asked.push(...requests);
+    return requests.slice(0, 1).map((request) => ({ itemId: request.itemId, caption: `${request.caption} — Foto, Ana · CC BY-SA 4.0 · Wikimedia Commons`, png: 'iVBORw0KGgo=', width: 800, height: 600,
+      source: 'https://commons.wikimedia.org/wiki/File:Foto.png', wholePage: false,
+      attribution: { title: 'Foto', author: 'Ana', license: 'CC BY-SA 4.0', url: 'https://commons.wikimedia.org/wiki/File:Foto.png', site: 'Wikimedia Commons' } }));
+  };
+  const stores = { cache: new Map(), checkpoints: new Map() };
+  const result = await core.runCompleteGuide(input({ config: { ...config, webImages: true } }), memoryDeps(fakeModel(), stores, { webImages }));
+  assert.ok(asked.length >= 1 && asked.length <= 2, 'at most one request per chapter');
+  assert.ok(asked.every((request) => result.items.find((item) => item.id === request.itemId)?.importance === 'core'));
+  assert.equal(result.counts.webImages, 1);
+  assert.equal(result.figures.filter((figure) => figure.attribution).length, 1);
+  assert.match(result.markdown, /## Fuentes web[\s\S]*\*\*W1\*\* — \[Foto — Ana\]\(https:\/\/commons\.wikimedia\.org\/wiki\/File:Foto\.png\) · Wikimedia Commons · CC BY-SA 4\.0/);
+  const before = asked.length;
+  const again = await core.runCompleteGuide(input({ config: { ...config, webImages: true } }), memoryDeps(fakeModel(), stores, { webImages }));
+  assert.equal(asked.length, before, 'checkpointed: no second search');
+  assert.equal(again.counts.webImages, 1);
+
+  const off = await core.runCompleteGuide(input(), memoryDeps(fakeModel(), undefined, { webImages: async () => { throw new Error('must not run'); } }));
+  assert.equal(off.counts.webImages, 0);
+  const failing = await core.runCompleteGuide(input({ config: { ...config, webImages: true } }), memoryDeps(fakeModel(), undefined, { webImages: async () => { throw new Error('down'); } }));
+  assert.ok(failing.warnings.includes('web_images_failed'));
+});
+
 test('settlePool keeps siblings running when one task fails', async () => {
   const results = await core.settlePool([1, 2, 3, 4], 2, async (value) => { if (value === 2) throw new Error('x'); return value * 2; });
   assert.deepEqual(results.map((result) => (result.ok ? result.value : 'error')), [2, 'error', 6, 8]);

@@ -111,3 +111,72 @@ test('PDF pages: placed images are cropped; vector-only pages fall back to the w
   assert.ok(crops[1].width > 1000, 'whole page rendered at 2×');
   assert.deepEqual(await extractPdfPageFigures(bytes, [2]), [], 'no fallback, no figure');
 });
+
+const webImagesShared = await load('shared/completeGuide/webImages.ts');
+const { findCompleteGuideWebImages } = await load('electron/ai/completeGuide/webImages.ts');
+
+test('web images: only core concepts without a material figure, one per chapter, capped', () => {
+  const items = [
+    item('K0001', { type: 'concept', title: 'Diagrama de fases', unitKey: 'topic:1' }),
+    item('K0002', { type: 'figure', title: 'Curva de calentamiento', unitKey: 'topic:1' }),
+    item('K0003', { type: 'formula', title: 'Ley de Boyle', unitKey: 'topic:2' }),
+    item('K0004', { type: 'definition', title: 'Ácido de Brønsted', unitKey: 'topic:2', importance: 'support' }),
+    item('K0005', { type: 'definition', title: 'Base (química)', unitKey: 'topic:2' }),
+    item('K0006', { type: 'concept', title: 'Gas ideal', unitKey: 'topic:3' }),
+  ];
+  const requests = webImagesShared.selectWebImageRequests(items, ['topic:1', 'topic:2', 'topic:3'], new Set(['K0006']));
+  assert.deepEqual(requests.map((request) => [request.unitKey, request.itemId, request.query]), [['topic:1', 'K0002', 'Curva de calentamiento'], ['topic:2', 'K0005', 'Base química']],
+    'figure items first; formulas and support items skipped; an illustrated chapter gets nothing');
+  assert.equal(webImagesShared.selectWebImageRequests(items, ['topic:1', 'topic:2'], new Set(), { perChapter: 1, total: 1 }).length, 1);
+});
+
+test('web images: licences, relevance and Commons file titles are checked from data', () => {
+  const { freeImageLicense, imageMatchesQuery, commonsFileTitle, webImageCaption } = webImagesShared;
+  for (const ok of ['CC BY-SA 4.0', 'CC BY 2.0', 'CC0', 'Public domain', 'PD-US', 'cc-by-sa-3.0']) assert.ok(freeImageLicense(ok), ok);
+  for (const bad of ['CC BY-NC 2.0', 'CC BY-ND 4.0', 'Fair use', 'All rights reserved', '', 'GFDL']) assert.ok(!freeImageLicense(bad), bad);
+  assert.ok(imageMatchesQuery('Diagrama de fases', ['Phase diagram of water', 'Diagrama de fases del agua']));
+  assert.ok(!imageMatchesQuery('Diagrama de fases', ['Portrait of a cat']));
+  assert.equal(commonsFileTitle('https://commons.wikimedia.org/wiki/File:Phase_diagram_of_water.svg'), 'File:Phase diagram of water.svg');
+  assert.equal(commonsFileTitle('https://evil.test/wiki/File:x.png'), null);
+  assert.equal(webImageCaption('Diagrama de fases', { title: 'Phase diagram of water', author: 'Cmglee', license: 'CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:X', site: 'Wikimedia Commons' }),
+    'Diagrama de fases — Phase diagram of water, Cmglee · CC BY-SA 3.0 · Wikimedia Commons');
+});
+
+test('web images: Commons results with a confirmed free licence are downloaded as raster and attributed', async () => {
+  const png = await noisyPng(400, 300, 11);
+  const fetched = [];
+  const commons = (name) => `https://commons.wikimedia.org/wiki/File:${name}`;
+  const metadata = {
+    'File:Fases.svg': { LicenseShortName: 'CC BY-SA 4.0', Artist: '<a href="//x">Ana <b>Pérez</b></a>', ObjectName: 'Diagrama de fases del agua' },
+    'File:Nc.png': { LicenseShortName: 'CC BY-NC 2.0', Artist: 'X', ObjectName: 'Diagrama de fases' },
+    'File:Gato.png': { LicenseShortName: 'CC0', Artist: 'Y', ObjectName: 'Retrato de gato' },
+  };
+  const deps = {
+    search: async (query) => [
+      { url: 'https://example.org/fases.png', title: 'Diagrama de fases', content: '', engines: ['bing images'] },
+      { url: commons('Nc.png'), title: 'Diagrama de fases', content: '', engines: ['wikicommons.images'] },
+      { url: commons('Gato.png'), title: 'Gato', content: '', engines: ['wikicommons.images'] },
+      { url: commons('Fases.svg'), title: query, content: '', engines: ['wikicommons.images'] },
+    ],
+    fetchJson: async (url) => {
+      const title = new URL(url).searchParams.get('titles');
+      const meta = metadata[title];
+      return { query: { pages: [{ imageinfo: [{ url: `https://upload.wikimedia.org/${title}`, mime: title.endsWith('.svg') ? 'image/svg+xml' : 'image/png', thumburl: `https://upload.wikimedia.org/thumb/${title}.png`, thumbmime: 'image/png', descriptionurl: commons(title.slice(5)),
+        extmetadata: Object.fromEntries(Object.entries(meta).map(([key, value]) => [key, { value }])) }] }] } };
+    },
+    fetchImage: async (url) => { fetched.push(url); return { bytes: png, contentType: 'image/png' }; },
+  };
+  const figures = await findCompleteGuideWebImages([{ itemId: 'K0001', unitKey: 'topic:1', query: 'Diagrama de fases', caption: 'Diagrama de fases' }], 'es', undefined, deps);
+  assert.equal(figures.length, 1);
+  assert.deepEqual(fetched, ['https://upload.wikimedia.org/thumb/File:Fases.svg.png'], 'the NC file and the off-topic file are never downloaded; SVG arrives rasterized');
+  const [figure] = figures;
+  assert.deepEqual(figure.attribution, { title: 'Diagrama de fases del agua', author: 'Ana Pérez', license: 'CC BY-SA 4.0', url: commons('Fases.svg'), site: 'Wikimedia Commons' });
+  assert.equal(figure.caption, 'Diagrama de fases — Diagrama de fases del agua, Ana Pérez · CC BY-SA 4.0 · Wikimedia Commons');
+  assert.equal(figure.source, commons('Fases.svg'));
+  assert.equal(Buffer.from(figure.png, 'base64').subarray(1, 4).toString(), 'PNG');
+
+  const svg = await findCompleteGuideWebImages([{ itemId: 'K0001', unitKey: 'topic:1', query: 'Diagrama de fases', caption: 'x' }], 'es', undefined, { ...deps, fetchImage: async () => ({ bytes: Buffer.from('<svg/>'), contentType: 'image/svg+xml' }) });
+  assert.equal(svg.length, 0, 'a non-raster response is refused');
+  const down = await findCompleteGuideWebImages([{ itemId: 'K0001', unitKey: 'topic:1', query: 'Diagrama de fases', caption: 'x' }], 'es', undefined, { ...deps, search: async () => { throw new Error('searxng down'); } });
+  assert.equal(down.length, 0, 'search failures skip the request');
+});

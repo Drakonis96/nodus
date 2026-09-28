@@ -39,6 +39,7 @@ import { COMPLETE_GUIDE_PROMPT_VERSION } from './prompts';
 import { snapshotCompleteGuideSelection } from './sources';
 import { extractCompleteGuideFigures } from './figures';
 import { ResearchWebGrant } from '../researchWebStep';
+import { findCompleteGuideWebImages } from './webImages';
 
 interface FrozenRun { snapshot: CompleteGuideSnapshot; organization: StudySourceOrganization; snapshotAt: string }
 
@@ -146,6 +147,7 @@ export async function generateCompleteGuideReport(
         return [...grant.evidence.values()].map(({ id, item }) => ({ id, title: item.title, site: item.siteName ?? item.domain, url: item.url, text: item.text, retrievedAt: item.retrievedAt }));
       },
     } satisfies Partial<CompleteGuideDeps> : {}),
+    ...(config.webImages ? { webImages: (requests) => findCompleteGuideWebImages(requests, language.split('-')[0].toLowerCase(), signal) } satisfies Partial<CompleteGuideDeps> : {}),
     conflicts: async (statements) => (await withUsageMeter(job, () => withoutDocumentVisualPlanning(() => findResearchConflicts(statements, model, signal))))
       .filter((conflict) => conflict.incompatible)
       .map((conflict) => ({ a: conflict.a, b: conflict.b, reason: conflict.reason })),
@@ -188,6 +190,7 @@ export async function generateCompleteGuideReport(
       removedSentences: result.counts.removedSentences, repairedBlocks: result.counts.repairedBlocks, invalidLatex: result.counts.invalidLatex,
       conflicts: result.counts.conflicts, cacheHits: result.counts.cacheHits, figures: result.counts.figures,
       ...(config.webText ? { webBlocks: result.counts.webBlocks } : {}),
+      ...(config.webImages ? { webImages: result.counts.webImages } : {}),
     },
     usage: { calls: job.calls, inputTokens: job.inputTokens, outputTokens: job.outputTokens, usd: usd(job, model) },
     warnings: result.warnings,
