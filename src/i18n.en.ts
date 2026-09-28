@@ -1,6 +1,7 @@
 import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
+import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
@@ -24,6 +25,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -73,6 +75,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...CALENDAR_SYNC_TRANSLATIONS["en"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["en"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Browse the web and save sources for your research.",
@@ -143,6 +146,7 @@ export const EN: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.en,
   ...STUDY_BANK_TRANSLATIONS.en,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.en,
+  ...GRAPH_HEALTH_TRANSLATIONS.en,
   ...STUDY_SOURCE_TRANSLATIONS["en"],
   ...STUDY_IMPROVE_TRANSLATIONS.en,
   ...WORKSPACE_TRANSLATIONS.en,

@@ -5,7 +5,7 @@ const { execFileSync } = require('node:child_process');
 const { copyFileSync, existsSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
 const { Arch } = require('electron-builder');
-const { verifyPackagedNativeRuntime } = require('../scripts/verify-packaged-native-runtime.cjs');
+const { verifyPackagedNativeRuntime, assertBinaryArchitecture } = require('../scripts/verify-packaged-native-runtime.cjs');
 
 exports.default = async function afterPack(context) {
   const appName = context.packager.appInfo.productFilename; // "Nodus"
@@ -36,6 +36,7 @@ exports.default = async function afterPack(context) {
   // signing if the dependency tree does not match the slice being packed —
   // a mixed bundle installs fine and only breaks on the user's machine.
   verifyPackagedNativeRuntime(appPath, Arch[context.arch]);
+  assertBinaryArchitecture('Apple Calendar', path.join(resourcesPath, 'apple-calendar', 'nodus-apple-calendar.node'), Arch[context.arch]);
 
   if (process.env.NODUS_REQUIRE_MACOS_SIGNING === 'true') {
     console.log(`[afterPack] Deferred ${appPath} to the mandatory Developer ID signer`);

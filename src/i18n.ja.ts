@@ -1,6 +1,7 @@
 import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
+import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
@@ -24,6 +25,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -76,6 +78,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 export const JA: Record<string, string> = {
   // First, so every entry below wins: the server's English-only keys.
   ...SERVER_ENGLISH_FALLBACKS.ja,
+  ...CALENDAR_SYNC_TRANSLATIONS["ja"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["ja"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "ウェブを閲覧し、研究のための資料を保存します。",
@@ -107,6 +110,7 @@ export const JA: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.ja,
   ...STUDY_BANK_TRANSLATIONS.ja,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ja,
+  ...GRAPH_HEALTH_TRANSLATIONS.ja,
   ...STUDY_SOURCE_TRANSLATIONS["ja"],
   ...STUDY_IMPROVE_TRANSLATIONS.ja,
   ...WORKSPACE_TRANSLATIONS.ja,

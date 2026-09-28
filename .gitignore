@@ -123,3 +123,7 @@ work/stellar-preview/
 capability-signing-key-*.pem
 build/capability-bootstrap/
 build/zotero-mcp/
+
+# Architecture-specific EventKit builds; keep the Objective-C++ source.
+build/apple-calendar/arm64/
+build/apple-calendar/x64/

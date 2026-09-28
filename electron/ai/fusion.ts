@@ -9,6 +9,7 @@ import {
   getIdea,
   embeddingTextForIdea,
   currentEmbeddingConfig,
+  isActiveIdea,
 } from '../db/ideasRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { IdeaType, EdgeType, EdgeBasis, ModelRef } from '@shared/types';
@@ -189,7 +190,10 @@ export async function fuseIdea(
   sourceWork: string,
   optionsOrModel: FuseIdeaOptions | ModelRef | null = {}
 ): Promise<string> {
-  return applyFusionPlan(await planIdeaFusion(idea, optionsOrModel), sourceWork);
+  const plan = await planIdeaFusion(idea, optionsOrModel);
+  const globalId = applyFusionPlan(plan);
+  applyFusionLink(plan, globalId, sourceWork);
+  return globalId;
 }
 
 export interface FusionOutcome {
@@ -362,8 +366,12 @@ function buildFusionPlan(
   };
 }
 
-/** Apply a previously planned decision. Callers may compose this inside a transaction. */
-export function applyFusionPlan(plan: FusionPlan, sourceWork: string): string {
+/**
+ * Apply a previously planned decision: merge into the matched idea or create a new one.
+ * The plan's link to an existing idea is applied separately by `applyFusionLink`, once
+ * every idea of the pass has its occurrence. Callers may compose both inside a transaction.
+ */
+export function applyFusionPlan(plan: FusionPlan): string {
   assertAcademicAutomation();
   if (plan.existingId && getIdea(plan.existingId)) return plan.existingId;
   const created = createIdea({
@@ -374,24 +382,36 @@ export function applyFusionPlan(plan: FusionPlan, sourceWork: string): string {
     embeddingText: plan.embeddingText,
     themes: plan.themes,
   });
-  if (plan.edge && getIdea(plan.edge.to)) {
-    const config = plan.embedding ? currentEmbeddingConfig() : { provider: null, model: null };
-    addEdge({
-      from_id: created.global_id,
-      to_id: plan.edge.to,
-      type: plan.edge.type,
-      basis: plan.edge.basis,
-      confidence: plan.edge.confidence,
-      source_work: sourceWork,
-      trace: {
-        method: 'fusion',
-        model: plan.model,
-        embeddingProvider: config.provider,
-        embeddingModel: config.model,
-        similarity: plan.edge.similarity,
-        rationale: plan.edge.rationale,
-      },
-    });
-  }
   return created.global_id;
+}
+
+/**
+ * Add the plan's "variant_of"/"refines"/"contradicts" edge from `fromId`, if its target is
+ * still active. Plans are decided before the rescan purges the work, and fusion also
+ * considers dormant candidates so a merge can revive them, so a target may be asleep by
+ * now. A link adds no occurrence and cannot wake it, and an edge into a dormant idea is
+ * what `assertDeepDataIntegrity` rejects, so such a link is dropped: the idea it pointed
+ * at is no longer in any work. Run after the pass has attached its occurrences, so a
+ * target that another idea of the same pass merges into counts as active.
+ */
+export function applyFusionLink(plan: FusionPlan, fromId: string, sourceWork: string): void {
+  assertAcademicAutomation();
+  if (!plan.edge || !isActiveIdea(plan.edge.to)) return;
+  const config = plan.embedding ? currentEmbeddingConfig() : { provider: null, model: null };
+  addEdge({
+    from_id: fromId,
+    to_id: plan.edge.to,
+    type: plan.edge.type,
+    basis: plan.edge.basis,
+    confidence: plan.edge.confidence,
+    source_work: sourceWork,
+    trace: {
+      method: 'fusion',
+      model: plan.model,
+      embeddingProvider: config.provider,
+      embeddingModel: config.model,
+      similarity: plan.edge.similarity,
+      rationale: plan.edge.rationale,
+    },
+  });
 }

@@ -92,6 +92,7 @@ async function deepScanFrames({ concurrencyMode, concurrency, chunkDurations, ch
     [/^\.\/fusion$/, 'fusion', `
       export async function resolveIdeaFusion() { return { decision: null, plan: { kind: 'new' } }; }
       export function applyFusionPlan() { return 'global-idea'; }
+      export function applyFusionLink() {}
     `],
     [/^\.\.\/db\/ideasRepo$/, 'ideasRepo', `
       export function upsertOccurrence() {} export function addEvidence() { return 'evidence'; }
@@ -107,7 +108,7 @@ async function deepScanFrames({ concurrencyMode, concurrency, chunkDurations, ch
     [/^\.\.\/db\/themesRepo$/, 'themesRepo', `
       export function getWorkThemeLabels() { return []; } export function listThemeLabels() { return []; }
       export function normalizeThemeLabel(label) { return String(label).toLowerCase().trim(); }
-      export function setIdeaThemeLinks() {} export function unionWorkThemes() {}
+      export function setIdeaThemeLinks() {} export function unionWorkThemes() {} export function pruneOrphanThemes() {}
     `],
     [/^\.\.\/db\/scanCheckpointRepo$/, 'checkpoints', `
       export function loadCheckpoints() { return new Map(); } export function saveCheckpoint() {} export function clearCheckpoints() {}

@@ -377,15 +377,15 @@ export const SECTION_DOC_TOPICS: readonly NodusDocTopic[] = [
     id: 'sections-study-organization',
     area: 'sections',
     title: { es: 'Estudio: organización, horarios y calendario', en: 'Study: organisation, schedule and calendar' },
-    keywords: ['curso', 'asignatura', 'organizacion', 'jerarquia', 'tema', 'subtema', 'horario', 'horarios', 'calendario', 'eventos', 'recordatorios', 'ical', 'icloud', 'google calendar'],
+    keywords: ['curso', 'asignatura', 'organizacion', 'jerarquia', 'tema', 'subtema', 'horario', 'horarios', 'calendario', 'eventos', 'recordatorios', 'ical', 'outlook', 'apple calendar', 'icloud', 'google calendar'],
     body: {
       es: `- Cursos y asignaturas es el punto de partida: se crean cursos, asignaturas, carpetas, temas, subtemas y documentos, con editor y saltos a materiales y grabaciones.
 - Horarios dibuja una rejilla de días y franjas; las actividades se colorean por asignatura y el horario se puede copiar. Al pulsar una celda se añade una asignatura existente o una actividad independiente.
-- Calendario ofrece vistas mensual, semanal y anual, editor de eventos con recordatorios locales y exportación a iCloud o Google Calendar.
+- Calendario ofrece vistas mensual, semanal y anual, editor de eventos con recordatorios locales, exportación a Outlook (.ics) o Google Calendar y, en macOS, sincronización automática con el calendario de Apple que elijas mientras Nodus está abierto.
 - En Docencia, esta misma organización añade Grupos por asignatura y curso académico, con importación de alumnado desde otro grupo.`,
       en: `- Courses and subjects is the starting point: create courses, subjects, folders, topics, subtopics and documents, with an editor and jumps to materials and recordings.
 - Schedule draws a day-and-slot grid; activities are coloured per subject and the timetable can be copied. Clicking a cell adds an existing subject or a standalone activity.
-- Calendar offers month, week and year views, an event editor with local reminders and export to iCloud or Google Calendar.
+- Calendar offers month, week and year views, an event editor with local reminders, export to Outlook (.ics) or Google Calendar and, on macOS, automatic sync with the Apple calendar you choose while Nodus is open.
 - In Teaching, the same organisation adds Groups per subject and academic year, with student import from another group.`,
     },
     related: ['vault-estudio', 'sections-study-materials-recordings'],

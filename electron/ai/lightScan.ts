@@ -2,7 +2,7 @@ import { assertAcademicAutomation } from './academicMode';
 import { AiError, completeJson } from './aiClient';
 import { modelRefSupportsExtraction } from '@shared/localAiModels';
 import { lightScanPrompt } from './prompts';
-import { normalizeThemeLabel, setWorkThemes } from '../db/themesRepo';
+import { normalizeThemeLabel, pruneOrphanThemes, setWorkThemes } from '../db/themesRepo';
 import { setLightResult } from '../db/worksRepo';
 import { getSettings } from '../db/settingsRepo';
 import type { Work, ModelRef } from '@shared/types';
@@ -99,6 +99,7 @@ export async function runLightScan(
     // labels accumulating after prompt/model changes or global reassignments.
     getDb().transaction(() => {
       setWorkThemes(work.nodus_id, labels);
+      pruneOrphanThemes();
       setLightResult(work.nodus_id, 'done', hash, result.notes ?? null);
       recordLocalAnalysisProvenance({
         workId: work.nodus_id,

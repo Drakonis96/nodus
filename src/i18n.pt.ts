@@ -1,6 +1,7 @@
 import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
+import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
@@ -30,6 +31,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -76,6 +78,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 export const PT: Record<string, string> = {
   // First, so every entry below wins: the server's English-only keys.
   ...SERVER_ENGLISH_FALLBACKS.pt,
+  ...CALENDAR_SYNC_TRANSLATIONS["pt"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["pt"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Navega na web e guarda fontes para a tua investigação.",
@@ -146,6 +149,7 @@ export const PT: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.pt,
   ...STUDY_BANK_TRANSLATIONS.pt,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.pt,
+  ...GRAPH_HEALTH_TRANSLATIONS.pt,
   ...STUDY_SOURCE_TRANSLATIONS["pt"],
   ...STUDY_IMPROVE_TRANSLATIONS.pt,
   ...WORKSPACE_TRANSLATIONS.pt,
