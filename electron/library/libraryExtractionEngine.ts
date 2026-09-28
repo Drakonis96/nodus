@@ -1278,7 +1278,9 @@ async function pdfBlocks(
     const looseNotes = extractLoosePageNotes(mergePageContinuations(pageContent.filter((block) => block.kind !== 'note')), layouts);
     const endnotes = extractEndnotes(looseNotes.blocks);
     const blocks = linkNumericReferences(endnotes.blocks);
-    await renderComplexTableVisuals(pdf, folder, blocks, signal);
+    // Without images a complex table keeps its Markdown transcription instead of a
+    // rendered crop: text-only callers (documentary indexing) never read the assets.
+    if (options.extractImages) await renderComplexTableVisuals(pdf, folder, blocks, signal);
     if (options.extractImages) {
       onProgress?.({ phase: 'assets', progress: 0.78, message: 'Extrayendo imágenes y figuras…' });
       blocks.push(...await extractPdfAssets(pdf, folder, layouts, new Set(blank), signal));

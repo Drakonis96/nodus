@@ -27,7 +27,8 @@ export class DocumentaryRequests {
       attempts=CASE WHEN documentary_requests.state='running' AND documentary_requests.revision=excluded.revision AND documentary_requests.configuration_json IS excluded.configuration_json THEN documentary_requests.attempts ELSE 0 END,
       configuration_json=excluded.configuration_json,error=NULL,updated_at=excluded.updated_at,available_at=excluded.available_at,priority=excluded.priority`).run(documentId, revision, vaultId, now, now, priority, now, configuration == null ? null : JSON.stringify(configuration));
   }
-  claim(vaultId: string | string[], now = Date.now(), leaseMs = 60000, exactOwner = false): DocumentaryRequest | null {
+  /** `busySources` are sources another worker is preparing right now; their requests wait. */
+  claim(vaultId: string | string[], now = Date.now(), leaseMs = 60000, exactOwner = false, busySources: string[] = []): DocumentaryRequest | null {
     const owners = Array.isArray(vaultId) ? vaultId : [vaultId];
     if (!owners.length) return null;
     return this.db.transaction(() => {
@@ -35,7 +36,8 @@ export class DocumentaryRequests {
         lease_token=NULL,lease_until=NULL WHERE state='running' AND (lease_until IS NULL OR lease_until<=?)`).run(now);
       const row = this.db.prepare(`SELECT document_id,revision,vault_id,attempts,configuration_json,source_id FROM documentary_requests
         WHERE state='queued' AND available_at<=? AND attempts<3 AND (vault_id IN (${owners.map(() => '?').join(',')}) OR (?=0 AND vault_id=''))
-        ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, ...owners, Number(exactOwner || Array.isArray(vaultId)), now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
+        AND COALESCE(source_id,document_id) NOT IN (${busySources.map(() => '?').join(',')})
+        ORDER BY priority + ((? - created_at)/60000) DESC,created_at,document_id LIMIT 1`).get(now, ...owners, Number(exactOwner || Array.isArray(vaultId)), ...busySources, now) as Omit<DocumentaryRequest, 'lease_token'> | undefined;
       if (!row) return null;
       const owner = row.vault_id || owners[0];
       const lease_token = randomUUID();

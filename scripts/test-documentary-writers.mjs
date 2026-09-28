@@ -142,7 +142,8 @@ try {
   };
   await assert.rejects(() => preparation.prepareDocumentaryEmbeddings(checkpointText.indexKey, manyChunks, undefined, captured), /fixture-provider/);
   const workingDb = preparation.documentaryStore().db;
-  assert.equal(workingDb.prepare('SELECT COUNT(*) n FROM documentary_embedding_chunks WHERE operation LIKE ?').get('embedding:checkpoint-fixture:%').n, 32);
+  // Batches overlap: the third returned while the second failed, and its paid vectors are kept.
+  assert.equal(workingDb.prepare('SELECT COUNT(*) n FROM documentary_embedding_chunks WHERE operation LIKE ?').get('embedding:checkpoint-fixture:%').n, 38);
   assert.equal(preparation.documentaryStore().revision(checkpointText.indexKey).embedding_ready, 0, 'partial vectors are never published');
   assert.equal(workingDb.prepare("SELECT COUNT(*) n FROM documentary_embedding_attempts WHERE state='unknown'").get().n, 1, 'ambiguous provider outcomes remain recorded');
   // Live finding: the failed operation waits out a retry backoff, and a second request
@@ -150,7 +151,7 @@ try {
   assert.ok(workingDb.prepare("SELECT available_at FROM documentary_requests WHERE document_id LIKE 'embedding:checkpoint-fixture:%'").get().available_at > Date.now(), 'the failed operation is in backoff');
   const resumed = await preparation.prepareDocumentaryEmbeddings(checkpointText.indexKey, manyChunks, undefined, captured);
   assert.equal(resumed.vectors.length, 70);
-  assert.deepEqual(batches.map(batch => batch[0]), ['Known fragment 0', 'Known fragment 32', 'Known fragment 32', 'Known fragment 64'], 'recovery never re-embeds the committed first batch');
+  assert.deepEqual(batches.map(batch => batch[0]), ['Known fragment 0', 'Known fragment 32', 'Known fragment 64', 'Known fragment 32'], 'recovery re-embeds only the failed batch, never a committed one');
   assert.equal(preparation.documentaryStore().revision(resumed.indexKey).embedding_ready, 1);
   console.log('Legacy fencing, lexical-first preparation, frozen model dispatch, durable batches and compatible vector reuse passed.');
 } finally {
