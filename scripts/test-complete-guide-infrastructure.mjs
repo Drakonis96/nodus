@@ -1,5 +1,5 @@
 // Complete study guide, milestone 2: local run/cache/artifact persistence (migration
-// 194 executed on node:sqlite), the job-scoped output language and the usage meter.
+// 197 executed on node:sqlite), the job-scoped output language and the usage meter.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -28,19 +28,19 @@ const meter = await load('electron/ai/usageMeter.ts');
 
 function migratedDb() {
   const source = fs.readFileSync('electron/db/migrations.ts', 'utf8');
-  const block = source.match(/\{ version: 194, up: \/\* sql \*\/ `([\s\S]*?)` \}/);
-  assert.ok(block, 'migration 194 exists');
+  const block = source.match(/\{ version: 197, up: \/\* sql \*\/ `([\s\S]*?)` \}/);
+  assert.ok(block, 'migration 197 exists');
   const db = new DatabaseSync(':memory:');
   db.exec(block[1]);
   return db;
 }
 
-test('migration 194 tables are local-only (never synced) and the schema version advanced', () => {
+test('migration 197 tables are local-only (never synced) and the schema version advanced', () => {
   const sync = fs.readFileSync('electron/db/syncTables.ts', 'utf8');
   for (const table of ['complete_guide_runs', 'complete_guide_units', 'complete_guide_chunk_cache', 'complete_guide_artifacts']) {
     assert.match(sync, new RegExp(`'${table}'`), `${table} is classified as not synced`);
   }
-  assert.match(fs.readFileSync('electron/db/migrations.ts', 'utf8'), /export const SCHEMA_VERSION = 194;/);
+  assert.match(fs.readFileSync('electron/db/migrations.ts', 'utf8'), /export const SCHEMA_VERSION = 197;/);
 });
 
 test('a run freezes its first snapshot; checkpoints resume by unit and are deleted with the run', () => {
