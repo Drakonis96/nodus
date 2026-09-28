@@ -42,8 +42,8 @@ export function setResearchPreparationPolicy(input: { welcomeVersion?: number; d
   notifyDocumentaryPreparation();
   return getResearchPreparationPolicy();
 }
-export async function previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): Promise<ResearchPreparationPreview> {
-  if (!input || !['vault', 'selection'].includes(input.scope)
+export async function previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[]; inspect?: boolean }): Promise<ResearchPreparationPreview> {
+  if (!input || !['vault', 'selection'].includes(input.scope) || (input.inspect !== undefined && typeof input.inspect !== 'boolean')
     || (input.scope === 'selection' && (!Array.isArray(input.documentIds) || input.documentIds.length > 50000 || input.documentIds.some(id => typeof id !== 'string' || id.length > 1000)))) throw new Error('Invalid preparation selection');
   const vault = academicVault(), repo = campaigns();
   const eligible = getResearchPreparationInventory().documents.filter(document => document.workId && !document.noteId && !document.conversationAttachment);
@@ -57,7 +57,9 @@ export async function previewResearchPreparation(input: { scope: 'vault' | 'sele
     embedding: config ? { provider: config.provider, model: config.modelId, external: externalEmbedding(config) } : null,
     embeddingAvailable: available, block: available ? null : 'no_model' };
   const payload: PreviewRecord = { preview, configuration: { embedding: config, processingVersion: 'nodus-documentary/2' } };
-  preview.preflight = await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => preparationPreflight(documents)));
+  // The preflight opens every unindexed PDF in a worker, one after another: minutes on a
+  // large library. The welcome does not show it and must not wait for it to be clickable.
+  if (input.inspect !== false) preview.preflight = await withOwningVault(vault.id, () => withVaultDatabase(vault.id, () => preparationPreflight(documents)));
   repo.db.prepare('INSERT INTO documentary_preparation_previews VALUES(?,?,?,?)').run(preview.id, vault.id, JSON.stringify(payload), preview.createdAt);
   // Unconfirmed previews carry no authority and can be reconstructed safely.
   repo.db.prepare('DELETE FROM documentary_preparation_previews WHERE created_at<?').run(Date.now() - 7 * 86400000);

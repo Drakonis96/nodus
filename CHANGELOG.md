@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.7.1 — 2026-09-28
+
+- The indexing welcome answers at once: its Yes, start button no longer stays disabled behind Loading… while Nodus inspected every unindexed PDF, one after another, before letting you choose. That per-file check is only shown when managing the preparation, so the welcome no longer waits for it.
+- The What’s New modal is the 5.7.0 one, unchanged.
+- Updated the desktop, server, Zotero and browser connector versions, source release links, citation and website metadata.
+
 ## 5.7.0 — 2026-09-28
 
 - In academic vaults you can prepare your works to query their full text without extracting ideas. Research Chat and Deep Research answer with passages from that text and with the available ideas, and every citation points at the original and keeps the exact revision of the source. Extracting ideas is a separate, optional step, and the preparation notice explains the difference.

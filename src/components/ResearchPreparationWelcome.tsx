@@ -57,7 +57,9 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
         const sources = await window.nodus.getResearchCorpusSources();
         ids = sources.documents.filter(document => document.workId && wanted.has(document.workId)).map(document => document.id);
       }
-      const inventory = await window.nodus.previewResearchPreparation(ids ? { scope: 'selection', documentIds: ids } : { scope: 'vault' });
+      // Only the manage view shows the per-file preflight; the welcome must answer at once.
+      const inspect = !!request.manage;
+      const inventory = await window.nodus.previewResearchPreparation(ids ? { scope: 'selection', documentIds: ids, inspect } : { scope: 'vault', inspect });
       if (!current) return;
       setPolicy(previous); setPreview(inventory); setSelected(new Set(inventory.documents.map(document => document.id)));
       // Seeing the version is separate from authorizing any work.
