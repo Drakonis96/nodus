@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
+import 'katex/contrib/mhchem';
+import { remarkGuideCallouts } from './markdownCallouts';
 import type { CitationPreview } from '@shared/types';
 import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { t } from '../i18n';
@@ -57,6 +59,7 @@ function MarkdownComponent({
   onStudyMaterial,
   onStudyRecording,
   onStudyEvidence,
+  onGuideEvidence,
   onWorldEntry,
   onTestimonyLink,
   verify = true,
@@ -75,10 +78,13 @@ function MarkdownComponent({
   /** `nodus://testimonios/...`: abre la entrevista, el participante o el contraste, y
    *  salta al minuto exacto cuando el enlace lo lleva. */
   onTestimonyLink?: (link: TestimonyDeepLink) => void;
-  onStudyDocument?: (documentId: string) => void;
-  onStudyMaterial?: (materialId: string) => void;
+  onStudyDocument?: (documentId: string, location?: { from?: number | null }) => void;
+  onStudyMaterial?: (materialId: string, location?: { pageNumber?: number | null; slideNumber?: number | null }) => void;
   onStudyRecording?: (recordingId: string, timestamp?: number | null) => void;
   onStudyEvidence?: (citationId: string) => void;
+  /** Complete study guides: a citation carrying `e=<item>` can show its exact quote
+   *  before opening the source; `open` performs the ordinary jump. */
+  onGuideEvidence?: (itemId: string, open: () => void) => void;
   /** Resolve each `nodus://` citation against the corpus and flag unresolved ones. */
   verify?: boolean;
   /** Only for trusted local reader assets already confined by the main process. */
@@ -167,7 +173,7 @@ function MarkdownComponent({
   return (
     <div className={`md ${className}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkGuideCallouts]}
         rehypePlugins={[rehypeKatex, rehypeGroupParenthesizedCitations, insertDocumentFigures]}
         urlTransform={(value, key) => {
           if (chatVisuals && key === 'src' && /^nodus-image:\/\/chat\/[a-f0-9]{64}\/[a-f0-9-]{36}$/.test(value)) return value;
@@ -213,23 +219,33 @@ function MarkdownComponent({
                 })}
               >{children}</button>;
             }
-            const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?.*)?$/);
+            const studyMaterial = href?.match(/^nodus:\/\/study\/material\/([^?]+)(?:\?(.*))?$/);
             if (studyMaterial && onStudyMaterial) {
-              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyMaterial(decodeURIComponent(studyMaterial[1]))}>{children}</button>;
+              const params = new URLSearchParams(studyMaterial[2] ?? '');
+              const number = (key: string) => { const value = Number(params.get(key)); return Number.isFinite(value) && value > 0 ? value : null; };
+              const open = () => onStudyMaterial(decodeURIComponent(studyMaterial[1]), { pageNumber: number('page'), slideNumber: number('slide') });
+              const evidence = params.get('e');
+              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => (evidence && onGuideEvidence ? onGuideEvidence(evidence, open) : open())}>{children}</button>;
             }
             const studyEvidence = href?.match(/^nodus:\/\/study\/evidence\/(.+)$/);
             if (studyEvidence && onStudyEvidence) {
               return <button className="study-evidence-citation mx-0.5 inline-flex rounded-full border border-teal-800 bg-teal-950/80 px-1.5 py-0.5 text-[10px] font-semibold text-teal-300 hover:border-teal-500" onClick={() => onStudyEvidence(decodeURIComponent(studyEvidence[1]))}>{children}</button>;
             }
-            const studyDocument = href?.match(/^nodus:\/\/(?:study\/doc|note)\/(.+)$/);
+            const studyDocument = href?.match(/^nodus:\/\/(?:study\/doc|note)\/([^?]+)(?:\?(.*))?$/);
             if (studyDocument && onStudyDocument) {
-              return <button className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300" onClick={() => onStudyDocument(decodeURIComponent(studyDocument[1]))}>{children}</button>;
+              const params = new URLSearchParams(studyDocument[2] ?? '');
+              const from = Number(params.get('from'));
+              const open = () => onStudyDocument(decodeURIComponent(studyDocument[1]), Number.isFinite(from) && params.has('from') ? { from } : undefined);
+              const evidence = params.get('e');
+              return <button className="text-indigo-400 underline decoration-indigo-700 underline-offset-2 hover:text-indigo-300" onClick={() => (evidence && onGuideEvidence ? onGuideEvidence(evidence, open) : open())}>{children}</button>;
             }
             const studyRecording = href?.match(/^nodus:\/\/study\/recording\/([^?]+)(?:\?(.*))?$/);
             if (studyRecording && onStudyRecording) {
               const params = new URLSearchParams(studyRecording[2] ?? '');
               const timestamp = params.get('t');
-              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => onStudyRecording(decodeURIComponent(studyRecording[1]), timestamp == null ? null : Number(timestamp))}>{children}</button>;
+              const open = () => onStudyRecording(decodeURIComponent(studyRecording[1]), timestamp == null ? null : Number(timestamp));
+              const evidence = params.get('e');
+              return <button className="text-teal-400 underline decoration-teal-700 underline-offset-2 hover:text-teal-300" onClick={() => (evidence && onGuideEvidence ? onGuideEvidence(evidence, open) : open())}>{children}</button>;
             }
             // Encyclopedia links. Deliberately NOT routed through `parseCitation`: a
             // citation pill fetches a preview of an ACADEMIC source over IPC, which a

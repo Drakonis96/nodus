@@ -107,8 +107,9 @@ evidence sidecar answers the reader's exact-quote popover.
 3. [x] Passes 1–3: reconnaissance, chapters from the user's units, anchored extraction.
 4. [x] Passes 4–7: plan with code-checked coverage, block writer, verification
    (KaTeX, numbers, premise audit with repair), reference sections, review sheet.
-5. [ ] UI: mode selector, source tree, toggles, estimate, gallery chip/filter,
-   callouts, locator links, coverage panel, entry from Materials.
+5. [x] UI: mode selector, source tree, toggles, estimate, gallery chip/filter,
+   callouts, locator links, exact-quote dialog, coverage panel, entry from Materials,
+   translations in the 11 interface languages.
 6. [ ] Exports: PDF with math and callouts in the Deep Research design, DOCX with
    native tables and equations, Markdown, separate review sheet, batch archive.
 7. [ ] Figures from materials, optional web text and images.
@@ -116,6 +117,12 @@ evidence sidecar answers the reader's exact-quote popover.
    under a USD 5 ledger ceiling.
 
 ## Validation
+
+`node --test scripts/test-complete-guide-ui.mjs` renders callouts through the real
+remark pipeline and checks the reader/composer wiring. `node scripts/e2e-complete-guide.mjs`
+operates the production composer panel in Chromium (tick a unit, estimate, multi-subject
+warning, unreadable source), checks callouts, KaTeX and `\ce{}` and writes
+`docs/verification/complete-guide-{dark,light}.png`.
 
 `scripts/test-complete-guide-engine.mjs` runs the whole orchestrator with a fake
 model (full single reading per pass, anchoring, coverage, provenance, KaTeX,

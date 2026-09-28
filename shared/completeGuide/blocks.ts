@@ -158,6 +158,11 @@ const CALLOUT: Partial<Record<CompleteGuideBlockKind, { type: string; label: key
   web: { type: 'web', label: 'webSources' },
 };
 
+/** Display math on its own lines: `$$x$$` inline in a sentence renders as small inline math. */
+export function displayMathOnOwnLines(markdown: string): string {
+  return markdown.replace(/[ \t]*\$\$([\s\S]+?)\$\$[ \t]*/g, (_match, tex: string) => `\n\n$$\n${tex.trim()}\n$$\n\n`).replace(/\n{3,}/g, '\n\n').trim();
+}
+
 function quoteLines(markdown: string): string {
   return markdown.split('\n').map((line) => (line.trim() ? `> ${line}` : '>')).join('\n');
 }
@@ -184,8 +189,9 @@ export function renderTable(table: CompleteGuideTable): string {
  * which the reader, the PDF and Word render as cards and plain Markdown keeps legible.
  * Self-check answers are returned separately so they can be printed at chapter end.
  */
-export function renderBlock(block: CompleteGuideBlock, context: RenderContext, selfCheckNumber?: number): { markdown: string; answer?: string } {
+export function renderBlock(input: CompleteGuideBlock, context: RenderContext, selfCheckNumber?: number): { markdown: string; answer?: string } {
   const { labels } = context;
+  const block = { ...input, markdown: displayMathOnOwnLines(input.markdown), ...(input.question ? { question: displayMathOnOwnLines(input.question) } : {}), ...(input.answer ? { answer: displayMathOnOwnLines(input.answer) } : {}) };
   const cites = citations(block, context);
   const citeLine = cites ? `\n\n${cites}` : '';
   if (block.kind === 'selfcheck') {

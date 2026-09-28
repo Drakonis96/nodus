@@ -135,7 +135,7 @@ test('reference sections come from items: glossary, formula sheet, timeline, rev
   ];
   assert.match(reference.renderGlossary(list, cite, labels), /\| Presión \| Fuerza por unidad de área\. \| \[A1 · p\. 1\]/);
   const sheet = reference.renderFormulaSheet([{ title: 'Gases', items: list }], cite, labels);
-  assert.match(sheet, /\$\$PV = nRT\$\$/);
+  assert.match(sheet, /\$\$\nPV = nRT\n\$\$/);
   assert.match(sheet, /\*Condiciones:\* baja presión/);
   const timeline = reference.renderTimeline(list, cite, labels);
   assert.ok(timeline.indexOf('44 a. C.') < timeline.indexOf('s. XV') && timeline.indexOf('s. XV') < timeline.indexOf('1789'));

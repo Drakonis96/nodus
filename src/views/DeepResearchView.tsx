@@ -4,6 +4,8 @@ import type { ResearchEffort } from '@shared/researchReasoning';
 import { DocumentVisualScope, DocumentVisualActions } from '../components/DocumentVisualScope';
 import { ResearchNotebookControl } from '../components/ResearchNotebookControl';
 import { DocumentSkillsControl, useDocumentSkills } from '../components/DocumentSkillsControl';
+import { CompleteGuideComposer, EMPTY_COMPLETE_GUIDE_STATE, type CompleteGuideComposerState } from '../components/CompleteGuideComposer';
+import { CompleteGuideCoveragePanel, CompleteGuideEvidenceDialog } from '../components/CompleteGuideReaderPanels';
 // Deep Research — a gallery of saved reports (grid/list, search, sort), a
 // chained generation queue, and tabbed readers that expand reports to full width
 // with a persistent route back to the gallery. The heavy lifting (generation,
@@ -279,6 +281,8 @@ export function DeepResearchView({
   onOpenStudyDocument,
   onOpenStudyMaterial,
   onOpenStudyRecording,
+  completeGuideTarget,
+  onCompleteGuideTargetConsumed,
 }: {
   settings: AppSettings;
   isGenealogy?: boolean;
@@ -289,9 +293,12 @@ export function DeepResearchView({
   snapshot?: DeepResearchSnapshot;
   onSnapshotChange?: (patch: Partial<DeepResearchSnapshot>) => void;
   onOpenLibraryWork?: OpenCitationLibraryWork;
-  onOpenStudyDocument?: (id: string) => void;
-  onOpenStudyMaterial?: (id: string) => void;
+  onOpenStudyDocument?: (id: string, location?: { from?: number | null }) => void;
+  onOpenStudyMaterial?: (id: string, location?: { pageNumber?: number | null; slideNumber?: number | null }) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
+  /** Study vaults: open the composer as a complete guide over these sources (from Materials). */
+  completeGuideTarget?: { sourceKeys: string[]; nonce: number } | null;
+  onCompleteGuideTargetConsumed?: () => void;
 }) {
   const variant: DeepResearchVariant = isTeaching ? 'unit' : isGenealogy ? 'genealogy' : isStudy ? 'study' : 'academic';
   const copy = DEEP_RESEARCH_COPY[variant];
@@ -324,6 +331,13 @@ export function DeepResearchView({
   const [audience, setAudience] = useState<StudyDeepResearchAudience>(isTeaching ? 'teacher' : 'students');
   const [includeImage, setIncludeImage] = useState(false);
   const documentSkills = useDocumentSkills();
+  // Study vaults: a retrieval-based report, or a complete guide over chosen sources.
+  const [studyReportMode, setStudyReportMode] = useState<'research' | 'complete_guide'>('research');
+  const [guideState, setGuideState] = useState<CompleteGuideComposerState>(EMPTY_COMPLETE_GUIDE_STATE);
+  const [guideReady, setGuideReady] = useState(false);
+  const [kindFilter, setKindFilter] = useState<'all' | 'reports' | 'guides'>('all');
+  const [guideEvidence, setGuideEvidence] = useState<{ itemId: string; open: () => void } | null>(null);
+  const guideMode = isStudy && !isTeaching && studyReportMode === 'complete_guide';
   const [imageStyle, setImageStyle] = useState<DecorativeImageStyle>(settings.imageStyle);
   const [focusPersonId, setFocusPersonId] = useState<string | null>(null);
   const [personsList, setPersonsList] = useState<Person[]>([]);
@@ -435,6 +449,15 @@ export function DeepResearchView({
     report.current?.({ placement: null });
   }, [readFilter, search, sortKey]);
 
+  // Materials → "Crear guía de estudio": open the composer with those sources ticked.
+  useEffect(() => {
+    if (!completeGuideTarget || !isStudy || isTeaching) return;
+    setStudyReportMode('complete_guide');
+    setGuideState({ ...EMPTY_COMPLETE_GUIDE_STATE, selection: { nodes: completeGuideTarget.sourceKeys.map((id) => ({ kind: 'source' as const, id })), excludedSourceKeys: [] } });
+    setComposerOpen(true);
+    onCompleteGuideTargetConsumed?.();
+  }, [completeGuideTarget?.nonce]);
+
   useEffect(() => {
     void window.nodus.listDeepResearchJobs().then(setLaneJobs);
     return window.nodus.onDeepResearchQueue(setLaneJobs);
@@ -535,6 +558,41 @@ export function DeepResearchView({
   }, [laneJobs, refreshSavedDrafts]);
 
   const submitComposer = () => {
+    if (guideMode) {
+      if (!guideReady) { setError(t('Selecciona al menos una fuente con texto legible.')); return; }
+      if (!documentSkills.valid) { setError(t('Corregir límites de skills')); return; }
+      const instructions = objective.trim();
+      const guideRequest: DeepResearchRequest = {
+        objective: instructions || t('Guía de estudio completa'),
+        language,
+        documentSkills: documentSkills.policy,
+        model: selectedModel,
+        thinkingEffort,
+        decorativeImage: { enabled: includeImage, style: imageStyle },
+        studyMode: true,
+        deepResearchVersion: 'v2',
+        completeGuide: {
+          version: 1,
+          runId: `cg-${crypto.randomUUID()}`,
+          selection: guideState.selection,
+          instructions,
+          aiExamples: guideState.aiExamples,
+          webText: guideState.webText,
+          webImages: guideState.webImages,
+          ...(guideState.rereadAll ? { rereadAll: true } : {}),
+          verification: guideState.verification,
+          maxCostUsd: null,
+        },
+      };
+      void window.nodus.enqueueDeepResearchJob(guideRequest).catch((enqueueError) => {
+        setError(enqueueError instanceof Error ? enqueueError.message : String(enqueueError));
+      });
+      setComposerOpen(false);
+      setObjective('');
+      setError(null);
+      setMessage(t('La guía se ha añadido a la cola. Leerá todas las fuentes seleccionadas antes de redactar.'));
+      return;
+    }
     if (!objective.trim()) {
       setError(t(copy.missingObjective));
       return;
@@ -649,6 +707,25 @@ export function DeepResearchView({
   );
 
   const reusePrompt = (saved: WritingWorkshopSavedDraft) => {
+    const guide = saved.draft.completeGuide;
+    if (guide && isStudy && !isTeaching) {
+      // "Crear otra versión": same sources and options, a new run (and a new guide).
+      setStudyReportMode('complete_guide');
+      setGuideState({
+        selection: guide.config.selection,
+        aiExamples: guide.config.aiExamples,
+        webText: guide.config.webText,
+        webImages: guide.config.webImages,
+        rereadAll: false,
+        verification: guide.config.verification ?? 'standard',
+      });
+      setObjective(guide.config.instructions);
+      if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
+      if (saved.model) setSelectedModel(saved.model);
+      setComposerOpen(true);
+      return;
+    }
+    if (isStudy) setStudyReportMode('research');
     setObjective(saved.brief.objective);
     if (saved.brief.language) setLanguage(saved.brief.language as PromptLanguage);
     setApproach(normalizeDeepResearchApproach(saved.draft.deepResearchApproach ?? saved.brief.deepResearchApproach));
@@ -849,14 +926,15 @@ export function DeepResearchView({
         || (draft.brief.objective ?? '').toLowerCase().includes(q);
       const matchesReadState = readFilter === 'all'
         || (readFilter === 'read' ? !!draft.readAt : !draft.readAt);
-      return matchesSearch && matchesReadState;
+      const matchesKind = kindFilter === 'all' || (kindFilter === 'guides') === Boolean(draft.draft.completeGuide);
+      return matchesSearch && matchesReadState && matchesKind;
     });
     const sorted = [...filtered];
     if (sortKey === 'title') sorted.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
     else if (sortKey === 'oldest') sorted.sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? ''));
     else sorted.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
     return sorted;
-  }, [savedDrafts, search, readFilter, sortKey]);
+  }, [savedDrafts, search, readFilter, sortKey, kindFilter]);
 
   // The strip mirrors the one durable lane. This keeps its visible ids identical to
   // the ids the main process can cancel, including after an application restart.
@@ -970,6 +1048,7 @@ export function DeepResearchView({
             onOpenStudyDocument={onOpenStudyDocument}
             onOpenStudyMaterial={onOpenStudyMaterial}
             onOpenStudyRecording={onOpenStudyRecording}
+            onGuideEvidence={openDraft.draft.completeGuide ? (itemId, open) => setGuideEvidence({ itemId, open }) : undefined}
           />
           </DocumentVisualScope>
         </div>
@@ -983,6 +1062,15 @@ export function DeepResearchView({
             activeTranslationId={appliedTranslation?.id ?? null}
             onApply={setAppliedTranslation}
             onClose={() => setTranslationOpen(false)}
+          />
+        )}
+        {guideEvidence && (
+          <CompleteGuideEvidenceDialog
+            draftId={openDraft.id}
+            itemId={guideEvidence.itemId}
+            language={openDraft.brief.language as PromptLanguage | undefined}
+            onOpen={guideEvidence.open}
+            onClose={() => setGuideEvidence(null)}
           />
         )}
         {citation && (
@@ -1072,6 +1160,20 @@ export function DeepResearchView({
           <option value="read">{t('Solo leído')}</option>
           <option value="unread">{t('Solo no leído')}</option>
         </select>
+        {isStudy && !isTeaching && (
+          <select
+            className="input !py-1.5 text-xs"
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as 'all' | 'reports' | 'guides')}
+            aria-label={t('Filtrar por tipo')}
+            title={t('Filtrar por tipo')}
+            data-testid="deep-research-kind-filter"
+          >
+            <option value="all">{t('Informes y guías')}</option>
+            <option value="reports">{t('Solo informes')}</option>
+            <option value="guides">{t('Solo guías de estudio')}</option>
+          </select>
+        )}
         <select className="input !py-1.5 text-xs" value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
           <option value="recent">{t('Más recientes')}</option>
           <option value="oldest">{t('Más antiguos')}</option>
@@ -1259,6 +1361,12 @@ export function DeepResearchView({
           onFocusPerson={setFocusPersonId}
           onSubmit={submitComposer}
           onClose={() => setComposerOpen(false)}
+          studyReportMode={isStudy && !isTeaching ? studyReportMode : undefined}
+          onStudyReportMode={setStudyReportMode}
+          guideReady={guideReady}
+          guidePanel={guideMode ? (
+            <CompleteGuideComposer value={guideState} onChange={setGuideState} model={selectedModel ?? null} thinkingEffort={thinkingEffort} onReadyChange={setGuideReady} />
+          ) : undefined}
         />
       )}
     </div>
@@ -1372,12 +1480,18 @@ function ReportGenerationTags({ saved, compact = false }: { saved: WritingWorksh
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5" data-testid="deep-research-generation-tags">
       {model && <span className={chipClass} title={`${model.provider}/${model.model}`}>{compactModelName(model)}</span>}
+      {saved.draft.completeGuide ? (
+        <span className={`${chipClass} border-emerald-800/70 bg-emerald-950/35 text-emerald-300`} data-testid="deep-research-guide-tag">
+          {t('Guía de estudio')} · {tx('{n} fuentes', { n: saved.draft.completeGuide.sources.length })}
+        </span>
+      ) : (<>
       <span className={`${chipClass} border-indigo-800/70 bg-indigo-950/35 text-indigo-300`}>
         {t(approachOption.label)}
       </span>
       <span className={`${chipClass} border-cyan-800/70 bg-cyan-950/35 text-cyan-300`} title={t(deepResearchVersionOption(version).description)}>
         {version.toUpperCase()}
       </span>
+      </>)}
     </div>
   );
 }
@@ -1989,6 +2103,7 @@ function ReaderView({
   onOpenStudyDocument,
   onOpenStudyMaterial,
   onOpenStudyRecording,
+  onGuideEvidence,
 }: {
   saved: WritingWorkshopSavedDraft;
   settings: AppSettings;
@@ -2013,9 +2128,10 @@ function ReaderView({
   onExport: (format: WritingWorkshopExportFormat) => void;
   onCitation: (target: CitationTarget) => void;
   onImageChange: (image: DecorativeImage) => void;
-  onOpenStudyDocument?: (id: string) => void;
-  onOpenStudyMaterial?: (id: string) => void;
+  onOpenStudyDocument?: (id: string, location?: { from?: number | null }) => void;
+  onOpenStudyMaterial?: (id: string, location?: { pageNumber?: number | null; slideNumber?: number | null }) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
+  onGuideEvidence?: (itemId: string, open: () => void) => void;
 }) {
   const mainRef = useRef<HTMLElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
@@ -2149,7 +2265,7 @@ function ReaderView({
         />
         <HoverLabelButton
           icon="layers"
-          label={t('Matriz de apoyo')}
+          label={saved.draft.completeGuide ? t('Cobertura de la guía') : t('Matriz de apoyo')}
           onClick={onToggleMatrix}
           showLabel={showMatrix}
           className={`btn-ghost h-9 min-h-9 border ${showMatrix ? 'border-indigo-700/60 text-indigo-200' : 'border-neutral-700'}`}
@@ -2192,7 +2308,7 @@ function ReaderView({
               data-testid="deep-research-reader-document"
               style={{ '--deep-research-font-size': `${initialReaderFontSize}px` } as CSSProperties}
             >
-              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} onCitation={onCitation} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} /> : <DraftResultMain
+              {appliedTranslation ? <Markdown content={appliedTranslation.markdown} onCitation={onCitation} onStudyDocument={onOpenStudyDocument} onStudyMaterial={onOpenStudyMaterial} onStudyRecording={onOpenStudyRecording} onGuideEvidence={onGuideEvidence} /> : <DraftResultMain
                 draft={saved.draft}
                 exporting={exporting}
                 savingDraft={false}
@@ -2207,6 +2323,7 @@ function ReaderView({
                 onStudyDocument={onOpenStudyDocument}
                 onStudyMaterial={onOpenStudyMaterial}
                 onStudyRecording={onOpenStudyRecording}
+                onGuideEvidence={onGuideEvidence}
               />}
             </div>
           </div>
@@ -2227,7 +2344,7 @@ function ReaderView({
         />
         {showMatrix && (
           <aside className="w-80 shrink-0 overflow-y-auto border-l border-neutral-800 p-4 max-lg:hidden">
-            <SupportMatrix draft={saved.draft} onCitation={onCitation} />
+            {saved.draft.completeGuide ? <CompleteGuideCoveragePanel meta={saved.draft.completeGuide} /> : <SupportMatrix draft={saved.draft} onCitation={onCitation} />}
           </aside>
         )}
       </div>
@@ -2282,6 +2399,10 @@ export function ComposerModal({
   onFocusPerson,
   onSubmit,
   onClose,
+  studyReportMode,
+  onStudyReportMode,
+  guidePanel,
+  guideReady = false,
 }: {
   documentSkills: ReturnType<typeof useDocumentSkills>;
   isAcademic?: boolean;
@@ -2324,7 +2445,13 @@ export function ComposerModal({
   onFocusPerson?: (v: string | null) => void;
   onSubmit: () => void;
   onClose: () => void;
+  /** Study vaults only: which kind of report the composer creates. */
+  studyReportMode?: 'research' | 'complete_guide';
+  onStudyReportMode?: (mode: 'research' | 'complete_guide') => void;
+  guidePanel?: ReactNode;
+  guideReady?: boolean;
 }) {
+  const guideMode = studyReportMode === 'complete_guide';
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
@@ -2355,16 +2482,39 @@ export function ComposerModal({
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
           {notebookControl}
+          {studyReportMode && onStudyReportMode && (
+            <div className="grid grid-cols-2 gap-2 max-sm:grid-cols-1" role="radiogroup" aria-label={t('Tipo de recurso')} data-testid="deep-research-study-mode">
+              {([
+                ['research', 'telescope', t('Investigación de estudio'), t('Un informe sobre un tema, buscando en todo el vault.')],
+                ['complete_guide', 'graduation', t('Guía de estudio completa'), t('Lee íntegras las fuentes que elijas y crea una guía para preparar el examen, con ficha de repaso.')],
+              ] as const).map(([id, icon, label, help]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={studyReportMode === id}
+                  onClick={() => onStudyReportMode(id)}
+                  className={`rounded-lg border p-2.5 text-left ${studyReportMode === id ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-500/70 dark:bg-indigo-950/40' : 'border-neutral-200 hover:border-neutral-400 dark:border-neutral-800 dark:hover:border-neutral-600'}`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-neutral-900 dark:text-neutral-100"><Icon name={icon} size={14} /> {label}</span>
+                  <span className="mt-0.5 block text-[11px] leading-4 text-neutral-500">{help}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {guideMode && guidePanel}
           <textarea
             className="input min-h-28 w-full resize-y"
             value={objective}
             autoFocus
             onChange={(e) => onObjective(e.target.value)}
-            placeholder={isTeaching && audience === 'students'
+            placeholder={guideMode
+              ? t('Instrucciones opcionales: qué priorizar, nivel de detalle, tipo de examen, estilo… Si lo dejas vacío, la guía cubrirá todo el contenido seleccionado.')
+              : isTeaching && audience === 'students'
               ? t('Escribe el tema de los apuntes. El contenido lo explicará paso a paso con ejemplos y autoevaluación usando tus materiales.')
               : t(copy.objectivePlaceholder)}
           />
-          <label className="block rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/45">
+          {!guideMode && <label className="block rounded-lg border border-neutral-200 bg-neutral-50/70 p-3 dark:border-neutral-800 dark:bg-neutral-900/45">
             <span className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-neutral-600 dark:text-neutral-400">
               <Icon name="compass" size={12} className="text-indigo-500 dark:text-indigo-300" />
               {t('Enfoque de investigación')}
@@ -2382,7 +2532,7 @@ export function ComposerModal({
             <span className="mt-1.5 block text-[11px] leading-4 text-neutral-500" data-testid="deep-research-approach-help">
               {t(deepResearchApproachOption(approach).description)}
             </span>
-          </label>
+          </label>}
           {isTeaching && (
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
@@ -2433,6 +2583,7 @@ export function ComposerModal({
             />
           )}
           <div className="grid grid-cols-2 items-start gap-2 max-sm:grid-cols-1">
+            {!guideMode && <>
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">
                 {t('Versión del sistema')}
@@ -2493,6 +2644,7 @@ export function ComposerModal({
               onChange={onSectionLength}
               onValidityChange={onSectionLengthValid}
             />
+            </>}
             <label className="block min-w-0">
               <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-neutral-500">{t('Idioma')}</span>
               <select data-testid="deep-research-language" className="input w-full text-sm" value={language} onChange={(e) => onLanguage(e.target.value as PromptLanguage)}>
@@ -2536,7 +2688,7 @@ export function ComposerModal({
           <button
             className="btn btn-primary gap-1.5"
             onClick={onSubmit}
-            disabled={!hasModel || !objective.trim() || !documentSkills.valid}
+            disabled={!hasModel || (guideMode ? !guideReady : !objective.trim()) || !documentSkills.valid}
             title={!hasModel ? t('Configura un modelo de síntesis') : undefined}
           >
             <Icon name="plus" /> {t('Añadir a la cola')}

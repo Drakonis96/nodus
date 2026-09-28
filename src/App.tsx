@@ -386,6 +386,7 @@ export function App() {
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
+  const [completeGuideTarget, setCompleteGuideTarget] = useState<{ sourceKeys: string[]; nonce: number } | null>(null);
   const [radarTarget, setRadarTarget] = useState<{ updateId?: string; nonce: number } | null>(null);
   const [primarySourceTarget, setPrimarySourceTarget] = useState<{
     itemId: string;
@@ -1371,6 +1372,7 @@ export function App() {
     studyRecordingTarget,
     studyGraphTarget,
     studyChatTarget,
+    completeGuideTarget,
     assistantTarget,
     researchConversationTarget,
     radarTarget,
@@ -1400,6 +1402,7 @@ export function App() {
     setStudyRecordingTarget,
     setStudyGraphTarget,
     setStudyChatTarget,
+    setCompleteGuideTarget,
     setActiveDatabaseId,
     setPendingRecordId,
     setCollectionsOpen,

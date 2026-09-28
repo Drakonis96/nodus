@@ -27,7 +27,7 @@ export function renderGlossary(items: CompleteGuideItem[], cite: Cite, labels: C
 
 function formulaLines(item: CompleteGuideItem, cite: Cite, labels: CompleteGuideLabels): string[] {
   const lines = [`**${item.title}** — ${citeText(cite, item.id)}`];
-  if (item.latex) lines.push('', `$$${item.latex}$$`);
+  if (item.latex) lines.push('', '$$', item.latex, '$$');
   else lines.push('', item.statement);
   if (item.variables?.length) lines.push('', `*${labels.variables}:* ${item.variables.map((variable) => `$${variable.symbol}$ ${variable.meaning}${variable.unit ? ` (${variable.unit})` : ''}`).join('; ')}`);
   if (item.conditions?.length) lines.push('', `*${labels.conditions}:* ${item.conditions.join('; ')}`);

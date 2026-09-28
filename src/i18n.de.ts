@@ -3,6 +3,7 @@ import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -145,6 +146,7 @@ export const DE: Record<string, string> = {
   ...STUDY_BANK_TRANSLATIONS.de,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.de,
   ...STUDY_SOURCE_TRANSLATIONS["de"],
+  ...COMPLETE_GUIDE_TRANSLATIONS["de"],
   ...STUDY_IMPROVE_TRANSLATIONS.de,
   ...WORKSPACE_TRANSLATIONS.de,
   "Lo que cuenta el mapa": "Was die Karte erzählt",

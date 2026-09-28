@@ -86,7 +86,12 @@ function MaterialAction({ icon, label, testId, disabled = false, tone = '', onCl
   return <span className="group inline-flex" title={label}><button data-testid={testId} className={`icon-reveal-button btn btn-ghost h-7 min-h-7 justify-center px-2 ${tone}`} aria-label={label} disabled={disabled} onClick={onClick}>{children ?? <Icon name={icon ?? 'help'} size={12} className="shrink-0" />}<span className="ml-0 max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 group-hover:ml-1.5 group-hover:max-w-40 group-hover:opacity-100 group-focus-within:ml-1.5 group-focus-within:max-w-40 group-focus-within:opacity-100">{label}</span></button></span>;
 }
 
-export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument: (id: string) => void; target?: StudyMaterialNavigationTarget | null }) {
+export function StudyMaterialsView({ onOpenDocument, target, onCreateStudyGuide }: {
+  onOpenDocument: (id: string) => void;
+  target?: StudyMaterialNavigationTarget | null;
+  /** Study vaults: open Deep Research's complete study guide over the selection. */
+  onCreateStudyGuide?: (sourceKeys: string[]) => void;
+}) {
   const [materials, setMaterials] = useState<StudyMaterialSummary[]>([]);
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [query, setQuery] = useState('');
@@ -297,7 +302,7 @@ export function StudyMaterialsView({ onOpenDocument, target }: { onOpenDocument:
         <select className="input h-8 text-xs" value={subjectId} onChange={(event) => { setSubjectId(event.target.value); setTopicId(''); }}><option value="">{t('Todas las asignaturas')}</option>{subjects.map((subject) => <option key={subject.id} value={subject.id}>{subject.name}</option>)}</select>
         <select className="input h-8 text-xs" value={topicId} onChange={(event) => setTopicId(event.target.value)}><option value="">{t('Todos los temas')}</option>{topics.map((topic) => <option key={topic.id} value={topic.id}>{topic.name}</option>)}</select>
       </div>
-      {selectedSources.size > 0 && <div className="mt-3 flex items-center gap-2 rounded-xl border border-red-900/40 bg-red-950/20 px-3 py-2"><span className="text-xs text-neutral-300">{tx('{n} seleccionados', { n: selectedSources.size })}</span><button className="btn btn-ghost ml-auto h-7 text-xs" onClick={() => setSelectedSources(new Set())}>{t('Quitar selección')}</button><button data-testid="study-library-delete-selected" className="btn h-7 bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={requestSelectedDelete}><Icon name="trash" size={12} />{t('Eliminar selección')}</button></div>}
+      {selectedSources.size > 0 && <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-neutral-700 bg-neutral-900/50 px-3 py-2" data-testid="study-library-selection-bar"><span className="text-xs text-neutral-300">{tx('{n} seleccionados', { n: selectedSources.size })}</span><button className="btn btn-ghost ml-auto h-7 text-xs" onClick={() => setSelectedSources(new Set())}>{t('Quitar selección')}</button>{onCreateStudyGuide && <button data-testid="study-library-create-guide" className="btn btn-primary h-7 gap-1 px-3 text-xs" onClick={() => onCreateStudyGuide([...selectedSources])}><Icon name="graduation" size={12} />{t('Crear guía de estudio')}</button>}<button data-testid="study-library-delete-selected" className="btn h-7 bg-red-600 px-3 text-xs text-white hover:bg-red-500" onClick={requestSelectedDelete}><Icon name="trash" size={12} />{t('Eliminar selección')}</button></div>}
       {message && <p className="mt-2 text-xs text-amber-300">{message}</p>}
     </header>
     <main className="relative min-h-0 flex-1 overflow-auto">

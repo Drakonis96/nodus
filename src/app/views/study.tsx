@@ -58,7 +58,14 @@ export const studyViews = {
     />
   ),
   studyLibrary: (ctx) => (
-    <StudyMaterialsView target={ctx.studyMaterialTarget} onOpenDocument={openDocument(ctx)} />
+    <StudyMaterialsView
+      target={ctx.studyMaterialTarget}
+      onOpenDocument={openDocument(ctx)}
+      onCreateStudyGuide={ctx.isDocencia ? undefined : (sourceKeys) => {
+        ctx.setCompleteGuideTarget({ sourceKeys, nonce: Date.now() });
+        ctx.setView('studyDeepResearch');
+      }}
+    />
   ),
   studyRecordings: (ctx) => (
     <StudyRecordingsView
@@ -118,6 +125,8 @@ export const studyViews = {
       onOpenStudyDocument={openDocument(ctx)}
       onOpenStudyMaterial={openMaterial(ctx)}
       onOpenStudyRecording={(id, timestamp) => { ctx.setStudyRecordingTarget({ id, timestamp }); ctx.setView('studyRecordings'); }}
+      completeGuideTarget={ctx.completeGuideTarget}
+      onCompleteGuideTargetConsumed={() => ctx.setCompleteGuideTarget(null)}
     />
   ),
 } satisfies Record<string, ViewRenderer>;
