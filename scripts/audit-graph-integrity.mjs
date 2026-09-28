@@ -1,29 +1,13 @@
 #!/usr/bin/env node
-// Whole-library idea-graph consistency audit. Read-only (better-sqlite3 `readonly`),
-// so it is safe to run anytime, including while a scan is in progress.
+// Whole-library idea-graph consistency audit, read-only (better-sqlite3 `readonly`), so it
+// is safe to run anytime, including while a scan is in progress.
 //
-// assertDeepDataIntegrity() (electron/db/ideasRepo.ts) checks one work, inside the
-// transaction that rewrites it, right after that work's purge. This script checks the
-// whole vault as it sits on disk, so two of its rules differ on purpose:
-//
-// - An edge whose endpoint is DORMANT is expected, not a violation. When a work is
-//   rescanned and no longer contains an idea, the idea goes to sleep, and the edges other
-//   works hold into it stay in `edges`; the `visible_edges` view hides them until a scan
-//   re-attaches the idea. Those works' own rescans delete their edges first, so they
-//   never trip the write-time check. They are reported as information only. An edge
-//   whose endpoint is MISSING is a real violation.
-// - An ACTIVE idea with no occurrence (and no note owning it as a manual idea) is a
-//   violation: an idea is active exactly while some work holds it.
-//
-// The theme checks cover references the write path never validates. Before 5.6.0 the
-// orphan-theme sweep ignored idea_theme_links and deleted themes only idea links used,
-// which left links pointing at nothing. The app repairs all of these once per vault
-// (electron/db/graphIntegrityRepair.ts); a clean report afterwards is the confirmation.
-// Theme links of manual ideas use the 'manual' pseudo-work, which is not a missing work.
-//
-// Keep the checks shared with assertDeepDataIntegrity in step if that function changes.
-// They are duplicated as plain SQL on purpose: this runs outside the app, read-only,
-// without Electron or vault-switching machinery.
+// It runs the app's own audit, electron/db/graphIntegrity.ts, the same code behind
+// Settings › Data › Graph health, bundled on the fly with esbuild. Nothing is duplicated
+// here, so the script and the app cannot disagree. Findings come in three categories:
+//   repairable  fixed by the app's SQL repair (once per vault at startup, or on demand)
+//   rescan      fixed only by analysing the listed works again
+//   info        expected or legacy state (for example edges hidden by a dormant endpoint)
 //
 // Usage:
 //   node scripts/audit-graph-integrity.mjs                   # every vault in vaults.json
@@ -31,24 +15,20 @@
 //   node scripts/audit-graph-integrity.mjs --user-data <dir> # override the userData dir
 //   node scripts/audit-graph-integrity.mjs --json            # machine-readable output
 //
-// Exit code: 0 if every vault is clean, 1 if any violation (or stuck job) was found,
-// 2 if no vault could be located at all.
+// Exit code: 0 if no vault has a repairable or rescan finding, 1 otherwise, 2 if no vault
+// could be located at all.
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 // better-sqlite3 in this repo is compiled against Electron's Node ABI, not the system
-// node — re-exec through Electron-as-Node so the native binary matches, same as every
-// other script here that touches a real database (test-idea-identity.mjs, etc.).
+// node — re-exec through Electron-as-Node so the native binary matches. The child's exit
+// code is the report's verdict, so it is passed through as is.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 if (!process.argv.includes('--electron-audit-graph-integrity')) {
-  // The child's own exit code IS the report's verdict (0 clean / 1 violations found /
-  // 2 no vault) — status.status here, not a thrown error, is the normal outcome for a
-  // report tool (unlike the test scripts this pattern is borrowed from, where a
-  // non-zero exit is itself the failure being reported).
   const result = spawnSync(
     path.join(repoRoot, 'node_modules/.bin/electron'),
     [path.join(repoRoot, 'scripts/audit-graph-integrity.mjs'), '--electron-audit-graph-integrity', ...process.argv.slice(2)],
@@ -58,6 +38,7 @@ if (!process.argv.includes('--electron-audit-graph-integrity')) {
 }
 
 const { default: Database } = await import('better-sqlite3');
+const { build } = await import('esbuild');
 
 const args = process.argv.slice(2).filter((a) => a !== '--electron-audit-graph-integrity');
 const flag = (name) => {
@@ -83,7 +64,6 @@ function discoverVaults() {
   if (explicitDb) {
     return [{ id: 'explicit', name: path.basename(explicitDb), path: path.resolve(explicitDb) }];
   }
-
   const userData = flag('--user-data') || defaultUserDataDir();
   const registryPath = path.join(userData, 'vaults.json');
   if (fs.existsSync(registryPath)) {
@@ -92,297 +72,60 @@ function discoverVaults() {
       return registry.vaults.map((v) => ({ id: v.id, name: v.name, path: v.path }));
     }
   }
-  // No registry (a very old profile, or a fresh userData dir): fall back to the
-  // single-vault layout the app used before multi-vault support.
+  // No registry (a very old profile, or a fresh userData dir): the single-vault layout.
   const fallback = path.join(userData, 'nodus.sqlite');
   return fs.existsSync(fallback) ? [{ id: 'default', name: 'My vault', path: fallback }] : [];
 }
 
-// Each check's `count` is the WHERE clause of the matching assertDeepDataIntegrity check
-// without its work filter. `detail` adds the work title and, where it helps, whether the
-// target is missing or dormant. `info` checks are reported but never count as violations.
-// Ideas a note owns as a manual idea (the same exclusion purgeDeepData's dormancy sweep
-// makes). Guarded with json_valid so one malformed note cannot abort the audit.
-const MANUAL_IDEA_REFS = `SELECT json_extract(doc, '$.ref') FROM (
-    SELECT CASE WHEN json_valid(source_json) THEN source_json END AS doc FROM notes
-  ) WHERE json_extract(doc, '$.note') = 'manual-idea' AND json_extract(doc, '$.ref') IS NOT NULL`;
+/** Bundle the app's audit module into a temporary ESM file and load it. */
+async function loadAudit() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-graph-audit-'));
+  try {
+    const out = path.join(dir, 'graphIntegrity.mjs');
+    await build({
+      entryPoints: [path.join(repoRoot, 'electron/db/graphIntegrity.ts')],
+      outfile: out,
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      logLevel: 'error',
+      alias: { '@shared': path.join(repoRoot, 'shared') },
+    });
+    return await import(pathToFileURL(out).href);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
-const CHECKS = [
-  {
-    label: 'occurrences→ideas',
-    count: `SELECT COUNT(*) AS n FROM idea_occurrences io
-      LEFT JOIN ideas i ON i.global_id = io.global_id
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL`,
-    detail: `SELECT io.nodus_id, w.title, io.global_id,
-        CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
-      FROM idea_occurrences io
-      LEFT JOIN ideas i ON i.global_id = io.global_id
-      LEFT JOIN works w ON w.nodus_id = io.nodus_id
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'evidence→ideas',
-    count: `SELECT COUNT(*) AS n FROM evidence ev
-      LEFT JOIN ideas i ON i.global_id = ev.global_id
-      WHERE ev.global_id IS NOT NULL AND ev.global_id <> ''
-        AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`,
-    detail: `SELECT ev.nodus_id, w.title, ev.id AS evidence_id, ev.global_id,
-        CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
-      FROM evidence ev
-      LEFT JOIN ideas i ON i.global_id = ev.global_id
-      LEFT JOIN works w ON w.nodus_id = ev.nodus_id
-      WHERE ev.global_id IS NOT NULL AND ev.global_id <> ''
-        AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    // Before 2026-09-02 a gap in a work with no ideas stored its evidence under the idea
-    // id ''. The gap still shows the quote, and the work's next rescan replaces it.
-    label: 'gap evidence w/o idea',
-    info: true,
-    count: `SELECT COUNT(*) AS n FROM evidence ev WHERE ev.global_id = ''`,
-    detail: `SELECT ev.nodus_id, w.title, ev.id AS evidence_id
-      FROM evidence ev LEFT JOIN works w ON w.nodus_id = ev.nodus_id
-      WHERE ev.global_id = '' ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'edges→ideas',
-    count: `SELECT COUNT(*) AS n FROM edges e
-      LEFT JOIN ideas src ON src.global_id = e.from_id
-      LEFT JOIN ideas dst ON dst.global_id = e.to_id
-      WHERE src.global_id IS NULL OR dst.global_id IS NULL`,
-    detail: `SELECT e.source_work AS nodus_id, w.title, e.id AS edge_id, e.from_id, e.to_id,
-        CASE WHEN src.global_id IS NULL THEN 'from_id missing' ELSE 'to_id missing' END AS reason
-      FROM edges e
-      LEFT JOIN ideas src ON src.global_id = e.from_id
-      LEFT JOIN ideas dst ON dst.global_id = e.to_id
-      LEFT JOIN works w ON w.nodus_id = e.source_work
-      WHERE src.global_id IS NULL OR dst.global_id IS NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'edges hidden (dormant end)',
-    info: true,
-    count: `SELECT COUNT(*) AS n FROM edges e
-      JOIN ideas src ON src.global_id = e.from_id
-      JOIN ideas dst ON dst.global_id = e.to_id
-      WHERE src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL`,
-    detail: `SELECT e.source_work AS nodus_id, w.title, e.id AS edge_id, e.from_id, e.to_id
-      FROM edges e
-      JOIN ideas src ON src.global_id = e.from_id
-      JOIN ideas dst ON dst.global_id = e.to_id
-      LEFT JOIN works w ON w.nodus_id = e.source_work
-      WHERE src.orphaned_at IS NOT NULL OR dst.orphaned_at IS NOT NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'active ideas w/o works',
-    count: `SELECT COUNT(*) AS n FROM ideas i
-      WHERE i.orphaned_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = i.global_id)
-        AND i.global_id NOT IN (${MANUAL_IDEA_REFS})`,
-    detail: `SELECT NULL AS nodus_id, '(no work holds it)' AS title, i.global_id, i.label
-      FROM ideas i
-      WHERE i.orphaned_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = i.global_id)
-        AND i.global_id NOT IN (${MANUAL_IDEA_REFS})
-      ORDER BY i.label LIMIT 200`,
-  },
-  {
-    label: 'theme links→ideas',
-    count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
-      LEFT JOIN ideas i ON i.global_id = itl.global_id
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL`,
-    detail: `SELECT itl.nodus_id, w.title, itl.global_id,
-        CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
-      FROM idea_theme_links itl
-      LEFT JOIN ideas i ON i.global_id = itl.global_id
-      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'gaps→ideas',
-    count: `SELECT COUNT(*) AS n FROM gaps g
-      LEFT JOIN ideas i ON i.global_id = g.related_idea
-      WHERE g.related_idea IS NOT NULL AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)`,
-    detail: `SELECT g.nodus_id, w.title, g.id AS gap_id, g.related_idea,
-        CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
-      FROM gaps g
-      LEFT JOIN ideas i ON i.global_id = g.related_idea
-      LEFT JOIN works w ON w.nodus_id = g.nodus_id
-      WHERE g.related_idea IS NOT NULL AND (i.global_id IS NULL OR i.orphaned_at IS NOT NULL)
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'gaps→evidence',
-    count: `SELECT COUNT(*) AS n FROM gaps g
-      LEFT JOIN evidence ev ON ev.id = g.evidence_id
-      WHERE g.evidence_id IS NOT NULL AND ev.id IS NULL`,
-    detail: `SELECT g.nodus_id, w.title, g.id AS gap_id, g.evidence_id
-      FROM gaps g
-      LEFT JOIN evidence ev ON ev.id = g.evidence_id
-      LEFT JOIN works w ON w.nodus_id = g.nodus_id
-      WHERE g.evidence_id IS NOT NULL AND ev.id IS NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'external refs→ideas',
-    count: `SELECT COUNT(*) AS n FROM external_refs er
-      LEFT JOIN ideas i ON i.global_id = er.from_idea
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL`,
-    detail: `SELECT er.nodus_id, w.title, er.id AS ref_id, er.from_idea,
-        CASE WHEN i.global_id IS NULL THEN 'missing idea' ELSE 'idea is dormant' END AS reason
-      FROM external_refs er
-      LEFT JOIN ideas i ON i.global_id = er.from_idea
-      LEFT JOIN works w ON w.nodus_id = er.nodus_id
-      WHERE i.global_id IS NULL OR i.orphaned_at IS NOT NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'external refs→evidence',
-    count: `SELECT COUNT(*) AS n FROM external_refs er
-      LEFT JOIN evidence ev ON ev.id = er.evidence_id
-      WHERE er.evidence_id IS NOT NULL AND ev.id IS NULL`,
-    detail: `SELECT er.nodus_id, w.title, er.id AS ref_id, er.evidence_id
-      FROM external_refs er
-      LEFT JOIN evidence ev ON ev.id = er.evidence_id
-      LEFT JOIN works w ON w.nodus_id = er.nodus_id
-      WHERE er.evidence_id IS NOT NULL AND ev.id IS NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'edge traces→edges',
-    count: `SELECT COUNT(*) AS n FROM edge_traces et
-      LEFT JOIN edges e ON e.id = et.edge_id WHERE e.id IS NULL`,
-    detail: `SELECT et.edge_id
-      FROM edge_traces et
-      LEFT JOIN edges e ON e.id = et.edge_id
-      WHERE e.id IS NULL LIMIT 200`,
-  },
-  // Theme references: assertDeepDataIntegrity never checks these.
-  {
-    label: 'theme links→themes',
-    count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
-      LEFT JOIN themes t ON t.theme_id = itl.theme_id
-      WHERE t.theme_id IS NULL`,
-    detail: `SELECT itl.nodus_id, w.title, itl.global_id, itl.theme_id
-      FROM idea_theme_links itl
-      LEFT JOIN themes t ON t.theme_id = itl.theme_id
-      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE t.theme_id IS NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'theme links→works',
-    count: `SELECT COUNT(*) AS n FROM idea_theme_links itl
-      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE w.nodus_id IS NULL AND itl.nodus_id <> 'manual'`,
-    detail: `SELECT itl.nodus_id, itl.global_id, itl.theme_id
-      FROM idea_theme_links itl
-      LEFT JOIN works w ON w.nodus_id = itl.nodus_id
-      WHERE w.nodus_id IS NULL AND itl.nodus_id <> 'manual' LIMIT 200`,
-  },
-  {
-    label: 'work themes→themes',
-    count: `SELECT COUNT(*) AS n FROM work_themes wt
-      LEFT JOIN themes t ON t.theme_id = wt.theme_id
-      WHERE t.theme_id IS NULL`,
-    detail: `SELECT wt.nodus_id, w.title, wt.theme_id
-      FROM work_themes wt
-      LEFT JOIN themes t ON t.theme_id = wt.theme_id
-      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
-      WHERE t.theme_id IS NULL
-      ORDER BY w.title LIMIT 200`,
-  },
-  {
-    label: 'work themes→works',
-    count: `SELECT COUNT(*) AS n FROM work_themes wt
-      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
-      WHERE w.nodus_id IS NULL`,
-    detail: `SELECT wt.nodus_id, wt.theme_id
-      FROM work_themes wt
-      LEFT JOIN works w ON w.nodus_id = wt.nodus_id
-      WHERE w.nodus_id IS NULL LIMIT 200`,
-  },
-];
-
-// A different, simpler signal from a different failure mode: a job an app crash left
-// behind mid-scan rather than one a running process is genuinely still advancing.
-// Not part of assertDeepDataIntegrity — that only ever checks the graph, never job
-// bookkeeping — but it is the other way an analysis can go stray, so it belongs in the
-// same sweep.
-const STUCK_JOB_MINUTES = 30;
-const STUCK_JOBS_SQL = `
-  SELECT j.job_id, j.status, j.phase, w.title, j.updated_at
-  FROM document_index_jobs j
-  LEFT JOIN works w ON w.nodus_id = j.nodus_id
-  WHERE j.status = 'running'
-    AND j.updated_at < datetime('now', '-${STUCK_JOB_MINUTES} minutes')
-  ORDER BY j.updated_at
-`;
+const { auditGraphIntegrity } = await loadAudit();
 
 function auditVault(vault) {
-  if (!fs.existsSync(vault.path)) {
-    return { vault, error: `database file not found: ${vault.path}` };
-  }
+  if (!fs.existsSync(vault.path)) return { vault, error: `database file not found: ${vault.path}` };
   const db = new Database(vault.path, { readonly: true, fileMustExist: true });
   try {
-    const results = CHECKS.map((check) => {
-      const n = db.prepare(check.count).get().n;
-      const rows = n > 0 ? db.prepare(check.detail).all() : [];
-      return { label: check.label, info: Boolean(check.info), count: n, rows };
-    });
-    const stuckJobs = db.prepare(STUCK_JOBS_SQL).all();
-    return { vault, results, stuckJobs };
+    return { vault, report: auditGraphIntegrity(db) };
   } finally {
     db.close();
   }
 }
 
-function groupByWork(rows) {
-  const byWork = new Map();
-  for (const row of rows) {
-    const key = row.title ?? row.nodus_id ?? '(no work)';
-    if (!byWork.has(key)) byWork.set(key, []);
-    byWork.get(key).push(row);
-  }
-  return byWork;
-}
-
-function printReport(audit) {
-  const { vault } = audit;
+function printReport({ vault, error, report }) {
   console.log(`\n=== ${vault.name} (${vault.path}) ===`);
-  if (audit.error) {
-    console.log(`  ! ${audit.error}`);
+  if (error) {
+    console.log(`  ! ${error}`);
     return;
   }
-  let anyViolations = false;
-  for (const { label, info, count, rows } of audit.results) {
-    if (count === 0) {
-      console.log(`  ${label.padEnd(26)} ${info ? 'none' : 'clean'}`);
-      continue;
-    }
-    if (info) {
-      console.log(`  ${label.padEnd(26)} ${count} (expected, not a violation)`);
-      continue;
-    }
-    anyViolations = true;
-    console.log(`  ${label.padEnd(26)} ${count} violation${count === 1 ? '' : 's'}`);
-    for (const [work, workRows] of groupByWork(rows)) {
-      const shownNote = workRows.length >= 200 ? '+ (truncated at 200)' : '';
-      console.log(`      ${work}: ${workRows.length}${shownNote}`);
+  for (const category of ['repairable', 'rescan', 'info']) {
+    const findings = report.checks.filter((check) => check.category === category && check.count > 0);
+    console.log(`  ${category.padEnd(10)} ${report.totals[category]}`);
+    for (const check of findings) {
+      console.log(`      ${check.id.padEnd(28)} ${check.count}`);
+      for (const work of check.works.slice(0, 10)) console.log(`          ${work.title ?? work.nodus_id}: ${work.count}`);
     }
   }
-  if (audit.stuckJobs.length > 0) {
-    anyViolations = true;
-    console.log(`  stuck jobs (running > ${STUCK_JOB_MINUTES}min, possible crash):`);
-    for (const job of audit.stuckJobs) {
-      console.log(`      ${job.title ?? job.job_id} — last update ${job.updated_at}`);
-    }
+  if (report.pendingThemeWorks.length > 0) {
+    console.log(`  works waiting for their idea themes to be reassigned: ${report.pendingThemeWorks.length}`);
   }
-  if (!anyViolations) console.log('  all clear.');
 }
 
 const vaults = discoverVaults();
@@ -392,16 +135,10 @@ if (vaults.length === 0) {
 }
 
 const audits = vaults.map(auditVault);
+if (asJson) console.log(JSON.stringify(audits, null, 2));
+else for (const audit of audits) printReport(audit);
 
-if (asJson) {
-  console.log(JSON.stringify(audits, null, 2));
-} else {
-  for (const audit of audits) printReport(audit);
-}
-
-const anyViolations = audits.some(
-  (a) => a.error || (a.results && a.results.some((r) => !r.info && r.count > 0)) || (a.stuckJobs && a.stuckJobs.length > 0)
-);
+const failing = audits.some((a) => a.error || a.report.totals.repairable > 0 || a.report.totals.rescan > 0);
 // exitCode, not process.exit(): exiting at once truncates a large --json report that is
 // still being written to a pipe.
-process.exitCode = anyViolations ? 1 : 0;
+process.exitCode = failing ? 1 : 0;

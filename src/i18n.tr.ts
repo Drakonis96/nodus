@@ -24,6 +24,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { PROSOPOGRAPHY_TRANSLATIONS } from './i18n.prosopography';
@@ -142,6 +143,7 @@ export const TR: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.tr,
   ...STUDY_BANK_TRANSLATIONS.tr,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.tr,
+  ...GRAPH_HEALTH_TRANSLATIONS.tr,
   ...STUDY_SOURCE_TRANSLATIONS["tr"],
   ...STUDY_IMPROVE_TRANSLATIONS.tr,
   ...WORKSPACE_TRANSLATIONS.tr,

@@ -1,6 +1,7 @@
 import { isManualAcademic } from '../ai/academicMode';
 import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
+import { pruneOrphanThemesIn } from './graphIntegrity';
 import { v4 as uuid } from 'uuid';
 import type { ManagedTheme, Theme } from '@shared/types';
 import { COMPASS_THEME_ALIASES } from '../compass/compassVocabulary';
@@ -171,10 +172,9 @@ export function replaceIdeaThemeLinks(
  * the end of the transaction that rewrote theme links, when nothing is left half-written.
  */
 export function pruneOrphanThemes(): void {
-  getDb()
-    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)')
-    .run();
+  pruneOrphanThemesIn(getDb());
 }
+
 
 /** Every theme label currently known — the curated universe used when scans are locked. */
 export function listThemeLabels(): string[] {

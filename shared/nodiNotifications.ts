@@ -39,6 +39,8 @@ export const NODI_NOTIFICATION_TEXT = {
   graphMaintenanceFailedBody: 'Error: {error}',
   connectionsTitle: 'Nuevas conexiones en tu bóveda',
   connectionsBody: '{relations} relaciones y {themes} temas nuevos detectados.',
+  graphRepairedTitle: 'Se ha reparado el grafo',
+  graphRepairedThemesBody: '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.',
   radarUpdatesTitle: 'Nodus Radar ha encontrado novedades',
   radarUpdatesBody: 'Actualizaciones de investigación listas para revisar: {count}.',
   bridgesTitle: 'Nodi ha encontrado relaciones semánticas',

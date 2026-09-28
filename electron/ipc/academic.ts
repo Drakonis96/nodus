@@ -154,6 +154,7 @@ import { DictionaryGenerationQueue } from '../ai/dictionaryGenerationQueue';
 import * as zotero from '../zotero/zoteroClient';
 import * as dedupe from '../db/dedupeRepo';
 import * as ideaDedupe from '../db/ideaDedupeRepo';
+import { checkGraphIntegrity, dismissPendingThemeWorks, pendingThemeWorkIds, runGraphIntegrityRepair } from '../db/graphIntegrityRepair';
 import { listCollectionFacets } from '../db/collectionsRepo';
 import { setEdgeFeedback, listEdgeFeedback } from '../db/edgeFeedbackRepo';
 import { aggregateGaps, aggregateGapsPage, contradictionCount, getGapDetail } from '../db/gapsRepo';
@@ -1588,6 +1589,30 @@ export function registerAcademicIpc(context: IpcContext): void {
       e.sender.send('themes:reprocess:progress', p);
     })
   );
+  // Reassign idea themes only in the works whose links a graph repair removed. The
+  // channel name keeps the `themes:reprocess` prefix so Manual mode blocks it like the
+  // full reprocess; the list is cleared only once the reprocess has committed.
+  h('themes:reprocessRepairedWorks', async (e, model?: ModelRef | null) => {
+    const nodusIds = pendingThemeWorkIds();
+    if (nodusIds.length === 0) return { ideas: 0, themedIdeas: 0, newThemes: 0, relationsAdded: 0 };
+    const result = await reprocessConnections({ relations: false, nodusIds }, model, (p) => {
+      e.sender.send('themes:reprocess:progress', p);
+    });
+    dismissPendingThemeWorks();
+    return result;
+  });
+
+  // Graph health (Settings › Data): read-only audit, on-demand repair, pending themes.
+  h('graph:integrity:check', async () => checkGraphIntegrity());
+  h('graph:integrity:repair', async () => {
+    if (scanQueue.isBusy()) throw new Error('Espera a que termine la cola de análisis antes de reparar el grafo.');
+    const backupPath = await ideaDedupe.backupDatabase('pre-graph-repair');
+    return { ...runGraphIntegrityRepair(), backupPath };
+  });
+  h('graph:integrity:dismissThemeWorks', async () => {
+    dismissPendingThemeWorks();
+    return checkGraphIntegrity();
+  });
 
   // gaps + reading path
   h('gaps:aggregate', async () => aggregateGaps());

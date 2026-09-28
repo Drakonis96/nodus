@@ -48,6 +48,49 @@ export function ThemesModal({
     void load();
   }, [load]);
 
+  // Works whose idea theme links a graph repair removed (see Settings › Data › Graph health).
+  const [pendingThemeWorks, setPendingThemeWorks] = useState(0);
+  const loadPendingThemeWorks = useCallback(async () => {
+    if (settings.academicMode === 'manual') return;
+    try {
+      setPendingThemeWorks((await window.nodus.checkGraphIntegrity()).pendingThemeWorks.length);
+    } catch {
+      setPendingThemeWorks(0);
+    }
+  }, [settings.academicMode]);
+  useEffect(() => {
+    void loadPendingThemeWorks();
+  }, [loadPendingThemeWorks]);
+
+  const reassignRepairedThemes = async () => {
+    setBusy(true);
+    setReprocessing(true);
+    setNotice(null);
+    setProgress(null);
+    try {
+      const result = await window.nodus.reprocessRepairedThemeWorks(undefined, (p) => setProgress(p));
+      setNotice(tx('Temas reasignados: {n} ideas.', { n: result.themedIdeas }));
+      setThemes(await window.nodus.listManagedThemes());
+      await loadPendingThemeWorks();
+      onReprocessed?.();
+    } catch (e) {
+      setNotice(`${t('Error al reprocesar:')} ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+      setReprocessing(false);
+      setProgress(null);
+    }
+  };
+
+  const dismissRepairedThemes = async () => {
+    setBusy(true);
+    try {
+      setPendingThemeWorks((await window.nodus.dismissRepairedThemeWorks()).pendingThemeWorks.length);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   useEffect(() => {
     if (editingId) editRef.current?.focus();
   }, [editingId]);
@@ -172,6 +215,22 @@ export function ThemesModal({
         </header>
 
         <div className="p-4 overflow-y-auto space-y-4">
+          {settings.academicMode !== 'manual' && pendingThemeWorks > 0 && (
+            <div className="rounded-md border border-amber-900/60 bg-amber-950/20 px-3 py-2 text-xs text-amber-200" data-testid="themes-repaired-notice">
+              <p>
+                {tx('{n} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores.', { n: pendingThemeWorks })}{' '}
+                {t('Reasignarlos usa el modelo de IA configurado.')}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button className="btn btn-primary" disabled={busy} onClick={() => void reassignRepairedThemes()} data-testid="themes-reassign-repaired">
+                  {t('Reasignar temas')}
+                </button>
+                <button className="btn btn-ghost" disabled={busy} onClick={() => void dismissRepairedThemes()} data-testid="themes-dismiss-repaired">
+                  {t('Descartar')}
+                </button>
+              </div>
+            </div>
+          )}
           {settings.academicMode !== 'manual' && (
           <p className="text-xs text-neutral-400 leading-relaxed">
             {t('Los temas principales son los grandes nodos que agrupan tus ideas en el grafo. Añade los tuyos para controlarlos manualmente; mientras estén bloqueados, los análisis solo usarán estos temas y no generarán otros nuevos.')}{' '}

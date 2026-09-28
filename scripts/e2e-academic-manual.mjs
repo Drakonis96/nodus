@@ -179,12 +179,22 @@ try {
   await page.getByTestId('ideas-tab-idea').filter({ hasText: a.title }).click();
   log('Same form opened from Graph and Workspace; editing the destination preserves the original relationship identity and direction.');
   const blocked = await page.evaluate(async id => {
-    const checks = [() => window.nodus.processFull(id), () => window.nodus.rescan(id, 'deep'), () => window.nodus.summarizeWork(id), () => window.nodus.discoverSemanticBridges(), () => window.nodus.reprocessThemeConnections({ relations: true }), () => window.nodus.startDocumentIndexCampaign({ nodusIds: [id] })];
+    const checks = [() => window.nodus.processFull(id), () => window.nodus.rescan(id, 'deep'), () => window.nodus.summarizeWork(id), () => window.nodus.discoverSemanticBridges(), () => window.nodus.reprocessThemeConnections({ relations: true }), () => window.nodus.reprocessRepairedThemeWorks(), () => window.nodus.startDocumentIndexCampaign({ nodusIds: [id] })];
     return Promise.all(checks.map(async run => { try { await run(); return 'NOT BLOCKED'; } catch (e) { return String(e); } }));
   }, detail.occurrences[0].nodus_id);
   assert.ok(blocked.every(result => /modo Manual|manual/i.test(result)), JSON.stringify(blocked));
   assert.equal((await page.evaluate(() => window.nodus.getQueue())).total, 0);
   log('Backend guards reject generative corpus operations with an empty scan queue.');
+  // Graph health stays available in Manual mode: it is plain SQL. Manual ideas are owned by
+  // their notes, so the audit must not call them ideas without a work, and a repair must
+  // leave every one of them visible.
+  const health = await page.evaluate(() => window.nodus.checkGraphIntegrity());
+  assert.equal(health.checks.find(item => item.id === 'active_ideas_without_works').count, 0, JSON.stringify(health.checks));
+  const healthRepair = await page.evaluate(() => window.nodus.repairGraphIntegrity());
+  assert.equal(healthRepair.counts.sleptIdeas, 0, 'the repair puts no manual idea to sleep');
+  assert.ok(healthRepair.backupPath, 'the manual repair takes a backup first');
+  assert.equal((await page.evaluate(id => window.nodus.getIdeaDetail(id), a.source.ref))?.idea?.global_id, a.source.ref, 'the manual idea is still there after the repair');
+  log('Graph health checks and repairs a Manual vault without touching its note-owned ideas.');
   await waitUntil(() => page.evaluate(async () => (await window.nodus.getManualIndexStatus()).state === 'ready'), 240_000);
   const search = await page.evaluate(() => window.nodus.semanticSearch('experiencia individual relato compartido', { kinds: ['idea'], minSimilarity: 0, limit: 10 }));
   assert.ok(search.results.some(hit => hit.id === fixtures.independent.globalId), 'standalone idea is retrieved through real local semantic search');
