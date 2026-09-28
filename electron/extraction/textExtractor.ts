@@ -134,14 +134,18 @@ function sourceMarkedText(text: string, marker: string): string {
   return /\[\[src:/i.test(replaced) ? replaced : `[[src:${marker}]]\n${replaced}`;
 }
 
-function combineSegments(segments: ExtractedTextSegment[], notes: string | null, hadTextAttachment: boolean): ExtractedDoc {
+export function combineSegments(segments: ExtractedTextSegment[], notes: string | null, hadTextAttachment: boolean): ExtractedDoc {
   const unique: ExtractedTextSegment[] = [];
   const hashes = new Set<string>();
   for (const segment of segments) {
     if (hashes.has(segment.contentHash)) continue;
     hashes.add(segment.contentHash);
     const marker = `s${unique.length + 1}`;
-    unique.push({ ...segment, marker });
+    // PDF text layers occasionally carry U+0000. SQLite's text functions and FTS
+    // snippets stop at it, truncating every citation that crosses one. A space keeps
+    // every character offset (page markers, quote offsets) where it was.
+    const text = segment.text.includes('\u0000') ? segment.text.replaceAll('\u0000', ' ') : segment.text;
+    unique.push({ ...segment, text, marker });
   }
   const text = unique.map((segment) => sourceMarkedText(segment.text, segment.marker)).join('\n\n');
   return {
