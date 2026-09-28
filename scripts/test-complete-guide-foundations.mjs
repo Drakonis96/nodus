@@ -204,10 +204,12 @@ function syntheticSnapshot(pages, charsPerPage = 2_000) {
   return { sources: [{ sourceKey: 'material:x' }], passages, issues: [], totals: { sources: 1, passages: pages, readablePassages: pages, chars, pages, estimatedTokens: Math.ceil(chars / 3.6) } };
 }
 
-test('estimate: small corpus is cheap with DeepSeek Flash; large or multi-subject selections warn; cache reduces reading', () => {
+test('estimate: the audit is most of the cost; large or multi-subject selections warn; cache reduces reading', () => {
   const flash = { provider: 'deepseek', model: 'deepseek-flash' };
   const small = estimateCompleteGuide({ snapshot: syntheticSnapshot(15), model: flash, unitCount: 2, subjectCount: 1 });
-  assert.ok(small.usd && small.usd.max < 1, JSON.stringify(small.usd));
+  // No sub-dollar guide: the measured run below cost $1.08 over thirteen passages of dense
+  // material, and the premise audit is most of it.
+  assert.ok(small.usd && small.usd.max > 1, JSON.stringify(small.usd));
   assert.ok(small.usd.min > 0);
   assert.deepEqual(small.warnings, []);
   assert.equal(small.expected.units, 2);
@@ -226,4 +228,32 @@ test('estimate: small corpus is cheap with DeepSeek Flash; large or multi-subjec
   assert.ok(exhaustive.usd.max > cold.usd.max);
   const withWeb = estimateCompleteGuide({ snapshot: syntheticSnapshot(100), model: flash, webText: true });
   assert.ok(withWeb.stages.some((stage) => stage.stage === 'web'));
+});
+
+test('estimate: the ceiling covers the measured live campaign run', () => {
+  // scripts/verify-complete-guide-live.mjs over its seeded corpus (DeepSeek Flash chat,
+  // bge-m3 embeddings, 2026-09-28): five sources, thirteen passages, 29 extracted items,
+  // 160 written blocks, 18 of them audited. The first run spent $1.0813 and the second
+  // $0.9222; the numbers travel in docs/verification/complete-guide-live-metrics.json.
+  // The constants before this test were calibrated on nothing measured and promised $0.23.
+  const sizes = [4, 3, 1, 3, 2];
+  const keys = ['material:gases', 'material:acids', 'document:acid-notes', 'material:restoration', 'transcript:class-5'];
+  const passages = [];
+  keys.forEach((sourceKey, source) => {
+    for (let index = 0; index < sizes[source]; index += 1) passages.push({ id: `${sourceKey}.${index + 1}`, sourceKey, chars: 166, duplicateOf: null });
+  });
+  const snapshot = {
+    sources: keys.map((sourceKey) => ({ sourceKey })),
+    passages,
+    issues: [],
+    totals: { sources: keys.length, passages: passages.length, readablePassages: passages.length, chars: 2_160, pages: 0, estimatedTokens: 600 },
+  };
+  const estimate = estimateCompleteGuide({ snapshot, model: { provider: 'deepseek', model: 'deepseek-flash' }, verification: 'standard', unitCount: 3, subjectCount: 2 });
+  assert.ok(estimate.usd, 'a listed model always gets a price');
+  assert.ok(estimate.usd.max >= 1.0813, `the ceiling must cover the measured first run: ${JSON.stringify(estimate.usd)}`);
+  assert.ok(estimate.expected.items >= 20, `the measured extraction found 29 items, the estimate says ${estimate.expected.items}`);
+  const verify = estimate.stages.find((stage) => stage.stage === 'verify');
+  const cost = (stage) => (stage.inputTokens * 0.3 + stage.outputTokens * 1.2) / 1e6;
+  const price = estimate.stages.filter((stage) => stage.stage !== 'embed').reduce((sum, stage) => sum + cost(stage), 0);
+  assert.ok(cost(verify) / price > 0.5, `the audit carried 76 % of the measured run: ${(cost(verify) / price).toFixed(2)}`);
 });

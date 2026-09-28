@@ -58,8 +58,27 @@ const LARGE_TOKENS = 350_000;
 /** Context-sized reading units; small enough for a 32k window with room for output. */
 const RECON_WINDOW_TOKENS = 20_000;
 const EXTRACT_WINDOW_TOKENS = 8_000;
-const TOKENS_PER_ITEM = 120;
-const ITEMS_PER_SECTION = 30;
+/**
+ * Measured against the live campaign (`scripts/verify-complete-guide-live.mjs`, DeepSeek
+ * Flash, 2026-09-28; the run's own numbers are in
+ * `docs/verification/complete-guide-live-metrics.json`): a selection of thirteen dense
+ * passages yielded 29 items and 160 written blocks, the planner made a section per ~2
+ * items, and 18 of those blocks were audited — one in nine — at ~4 calls and ~36,000
+ * output tokens each.
+ *
+ * The premise audit is 76 % of what a guide costs (it re-reads every audited block and
+ * answers with one atomic-premise verdict per sentence), so it is modelled on its own
+ * rather than as a footnote of the writing. The constants that preceded these — 120 tokens
+ * per item, 8 sentences per audit call, 1,800 output tokens per call — under-promised that
+ * same run five times over ($0.23 estimated against $1.08 spent).
+ */
+const TOKENS_PER_ITEM = 22;
+const ITEMS_PER_SECTION = 2;
+const BLOCKS_PER_ITEM = 5.5;
+const AUDITED_BLOCK_SHARE = 0.12;
+const AUDIT_CALLS_PER_BLOCK = 4;
+const AUDIT_INPUT_PER_CALL = 8_000;
+const AUDIT_OUTPUT_PER_CALL = 9_000;
 
 function effortMultiplier(effort: ResearchEffort | null | undefined): number {
   if (!effort || effort === 'standard' || effort === 'none' || effort === 'off' || effort === 'minimal' || effort === 'low') return 1;
@@ -99,18 +118,20 @@ export function estimateCompleteGuide(input: CompleteGuideEstimateInput): Comple
   const units = Math.max(1, input.unitCount ?? 1);
   const sections = Math.max(units, Math.ceil(items / ITEMS_PER_SECTION));
   const multiplier = effortMultiplier(input.effort);
-  const writeCalls = Math.ceil(sections * 1.6);
+  const writeCalls = Math.ceil(sections * 2);
   const writeOutput = Math.round(sections * 5_000 * multiplier);
   const sentences = writeOutput / 25;
-  const auditShare = input.verification === 'exhaustive' ? 1 : 0.15;
-  const auditCalls = Math.ceil((sentences * auditShare) / 8);
+  const auditedBlocks = Math.ceil(Math.max(1, Math.round(items * BLOCKS_PER_ITEM)) * (input.verification === 'exhaustive' ? 1 : AUDITED_BLOCK_SHARE));
+  const auditCalls = auditedBlocks * AUDIT_CALLS_PER_BLOCK;
+  const auditInput = Math.round(auditCalls * AUDIT_INPUT_PER_CALL * multiplier);
+  const auditOutput = Math.round(auditCalls * AUDIT_OUTPUT_PER_CALL * multiplier);
 
   const stages: CompleteGuideStageEstimate[] = [
     { stage: 'recon', calls: reconCalls, inputTokens: Math.round(uncached * 1.1 + reconCalls * 1_500), outputTokens: Math.round(uncached * 0.04 + reconCalls * 600) },
     { stage: 'extract', calls: extractCalls, inputTokens: Math.round(uncached + extractCalls * 2_500), outputTokens: Math.round(uncached * 0.35) },
     { stage: 'plan', calls: units * 2, inputTokens: Math.round(items * 45 + units * 4_000), outputTokens: units * 3_000 },
-    { stage: 'write', calls: writeCalls, inputTokens: writeCalls * 9_000, outputTokens: writeOutput },
-    { stage: 'verify', calls: sections * 3 + auditCalls, inputTokens: sections * 3 * 8_000 + auditCalls * 3_500, outputTokens: Math.round(sentences * 12 + auditCalls * 1_800) },
+    { stage: 'write', calls: writeCalls, inputTokens: writeCalls * 4_000, outputTokens: writeOutput },
+    { stage: 'verify', calls: sections * 3 + auditCalls, inputTokens: sections * 3 * 8_000 + auditInput, outputTokens: Math.round(sentences * 12 + auditOutput) },
     { stage: 'finalize', calls: units + 4, inputTokens: (units + 4) * 6_000, outputTokens: (units + 4) * 1_500 },
   ];
   // One web step per chapter (plan, pick, rate: ~6 calls), web passages in each writer

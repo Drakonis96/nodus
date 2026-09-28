@@ -214,6 +214,28 @@ test('audit removes unsupported sentences after a repair attempt', async () => {
   assert.ok(result.counts.repairedBlocks > 0);
 });
 
+test('the audit is handed a citation URL, so its own links never nest inside a Markdown link', async () => {
+  const seen = [];
+  const deps = memoryDeps(fakeModel(), undefined, {
+    // What the real audit does with what it is given: `applyResearchProseVerdicts` wraps every
+    // sentence it verifies as `[label](citation)`. That is a link when the caller passes a URL
+    // (ideas, works, passages all do) and a link inside a link when it passes the guide's
+    // rendered Markdown link, which Markdown refuses to parse.
+    audit: async (markdown, sources) => {
+      const sentences = markdown.split(/(?<=\.)\s+/);
+      const kept = sentences.filter((sentence) => !/INVENTADO/.test(sentence));
+      if (sources.length) seen.push(...sources.map((source) => source.citation));
+      const cited = sources.map((source) => `[${source.label}](${source.citation})`).join(' ');
+      return { markdown: [kept.join(' '), cited].filter(Boolean).join(' '), removed: sentences.length - kept.length };
+    },
+  });
+  const result = await core.runCompleteGuide(input({ config: { ...config, verification: 'exhaustive' } }), deps);
+  assert.ok(seen.length, 'the audit ran on at least one block');
+  for (const citation of seen) assert.match(citation, /^nodus:\/\/study\//, `a citation URL, never a rendered link: ${citation}`);
+  assert.ok(!result.markdown.includes('](['), 'nothing renders as a link inside a link');
+  assert.match(result.markdown, /\]\(nodus:\/\/study\/material\//, 'the verified sentence carries a single link to its material');
+});
+
 test('a second version reuses the reading cache; an interrupted run resumes from checkpoints', async () => {
   const stores = { cache: new Map(), checkpoints: new Map() };
   await core.runCompleteGuide(input(), memoryDeps(fakeModel(), stores));

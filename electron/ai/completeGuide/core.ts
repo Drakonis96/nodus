@@ -25,7 +25,7 @@ import {
   type PendingItem,
 } from '@shared/completeGuide/items';
 import { completeGuideLabels, type CompleteGuideLabels } from '@shared/completeGuide/labels';
-import { citationLink, locatorLabel, readMoreRanges } from '@shared/completeGuide/locators';
+import { citationLink, citationUrl, locatorLabel, readMoreRanges } from '@shared/completeGuide/locators';
 import {
   coveredItemIds,
   normalizeWrittenBlocks,
@@ -521,7 +521,14 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     const item = itemsById.get(id);
     if (!item) return [];
     const passages = item.evidence.map((evidence) => passagesById.get(evidence.passageId)?.text ?? '').join('\n').slice(0, 3_000);
-    return [{ id, label: item.title, citation: cite(id)[0] ?? id, text: [item.statement, item.latex ? `LaTeX: ${item.latex}` : '', item.solution ?? '', ...(item.conditions ?? []), passages].filter(Boolean).join('\n') }];
+    // The audit writes `[label](citation)` around every sentence it keeps, so this is a URL
+    // and never the guide's rendered link: `[título]([A1 · p. 2](nodus://…))` is a link inside
+    // a link, which Markdown refuses to parse and the reader, the PDF and Word printed as
+    // literal `[título](` text with a stray bracket.
+    const first = item.evidence[0];
+    const passage = first ? passagesById.get(first.passageId) : undefined;
+    const source = first ? sourcesByKey.get(first.sourceKey) : undefined;
+    return [{ id, label: item.title, citation: passage && source ? citationUrl(source, passage.locator, id) : id, text: [item.statement, item.latex ? `LaTeX: ${item.latex}` : '', item.solution ?? '', ...(item.conditions ?? []), passages].filter(Boolean).join('\n') }];
   });
 
   const numbersSupported = (block: CompleteGuideBlock): boolean => {
