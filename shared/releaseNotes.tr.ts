@@ -255,7 +255,7 @@ export const RELEASE_NOTES_TR: Record<string, string[]> = {
     "Akademik Kitaplık ve Genel Kitaplık, gezinirken aramayı, filtreleri, konumu ve açık belgeyi daha güvenilir biçimde koruyor. Bağlı ekler ve grup kitaplığı ekleri yeniden gerçek yollarından açılıyor, eylemler eski bir seçime uygulanmıyor ve kaynak alıntıları tam hedeflerini koruyor.",
     "Belge anlama, kesintiye uğramış kampanyaları eski bir durumda takılmadan kurtarıyor ve bekleyen işler onarılırken ya da yeniden denenirken yayımlanmış profilleri görünür tutuyor. Arka plan süreçlerinden gelen durumlar ve hatalar arayüz dilinde gösteriliyor, analiz sırasında değişen kaynaklar güvenle yeniden sıraya alınıyor.",
     "Deep Research artık uygulamadan ve MCP istemcilerinden başlatılan raporlar için tek bir kalıcı kuyruk kullanıyor. Bekleyen veya çalışan rapor onayla kaldırılabiliyor, kuyruk yeniden başlatmadan sonra korunuyor ve takılı kalan eski işleri kurtarıyor. İş bitince taslak, yinelenen veya hayalet raporlar olmadan galeride görünüyor.",
-    "Ayarlar'ı açmak, Nodus geçiş öncesi kopyaları incelerken veya otomatik yedekleri temizlerken artık uygulamayı donduramıyor. Dosya ve SQLite kontrolleri pencere sürecinin dışında, açık sınırlarla çalışıyor ve işlem sırasında vault ya da klasör değiştirirseniz eskiyen sonuçları yok sayıyor.",
+    "Ayarlar'ı açmak, Nodus geçiş öncesi kopyaları incelerken veya otomatik yedekleri temizlerken artık uygulamayı donduramıyor. Dosya ve SQLite kontrolleri pencere sürecinin dışında, açık sınırlarla çalışıyor ve işlem sırasında kasa ya da klasör değiştirirseniz eskiyen sonuçları yok sayıyor.",
     "Ayarlar artık her modelin ve yapay zekâ denetiminin amacını kısa ve tutarlı bir açıklamayla anlatıyor. Yapılandırılmış model olmadan bir yapay zekâ görevi başlatırsanız Nodus açık veya koyu temaya uygun küçük bir uyarı gösterip doğrudan Ayarlar ve Modellere götürüyor. Mesaj sekiz arayüz dilinin tamamında bulunuyor.",
   ],
   "5.0.0": [
@@ -547,7 +547,7 @@ export const RELEASE_NOTES_TR: Record<string, string[]> = {
     "macOS'ta Keychain, kurtarma sırasında izin isteyebilir. İsteğin Nodus'a ait olup olmadığını kontrol edin ve \"Her Zaman İzin Ver\"i seçin; reddettiyseniz Ayarlar → Sağlayıcılar'dan tekrar deneyin.",
   ],
   "2.3.0": [
-    "Study Vault ileriye doğru büyük bir adım atıyor: kurslar ve konular, klasörler ve notlar, açıklama eklenebilir materyaller, transkript içeren kayıtlar, zaman çizelgesi, takvim, soru bankası, testler, bilgi kartları, incelemeler, ilerleme, bilgi grafiği ve kaynağa dayalı sohbet.",
+    "Ders çalışma kasası ileriye doğru büyük bir adım atıyor: kurslar ve konular, klasörler ve notlar, açıklama eklenebilir materyaller, transkript içeren kayıtlar, zaman çizelgesi, takvim, soru bankası, testler, bilgi kartları, incelemeler, ilerleme, bilgi grafiği ve kaynağa dayalı sohbet.",
     "Zotero entegrasyonu daha da derinleşiyor: kasalar grup kitaplıklarını kullanabilir ve kurslar veya materyaller arasından bir öğe arayabilir ve ekini Nodus'a aktarmayı veya onu Zotero'da açan bir bağlantıyı tutmayı seçebilir.",
     "Groq ve Cerebras, sağlayıcı desteklediğinde model keşfiyle yapay zeka sağlayıcılarına katılıyor. Temel ve gelişmiş kurulum artık modlar arasında geçiş yapmadan önce onay istiyor, böylece yanlışlıkla tamamlanmamış model yapılandırmalarının önüne geçiliyor.",
     "Yerel modellerin kullanımı daha kolaydır: farklı görevler için entegre modelleri indirin, seçin ve kaldırın; bir model ilk önce bir motor gerektirdiğinde, Nodus indirmeyi başlatmadan önce onu otomatik olarak yükler.",

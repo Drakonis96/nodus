@@ -647,27 +647,27 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     close: '關閉',
     play: '觀看影片',
     tourVideo: '觀看影片教程',
-    categories: { introduction: '介紹', vaults: '資料庫', features: '功能', integrations: '整合' },
+    categories: { introduction: '介紹', vaults: '知識庫', features: '功能', integrations: '整合' },
     allCategories: '全部',
     searchPlaceholder: '搜尋教程…',
     searchLabel: '搜尋教程',
     noMatches: '沒有符合搜尋條件的教程。',
     startHere: '從這裡開始',
     startHereLede: '現在你只需要這一個教程。其餘內容會在你需要時等著你。',
-    whereVaults: { title: '每個資料庫的教程，會在建立時出現', body: '建立學術、族譜、資料庫或教學資料庫後，第一次開啟時就能看到它的影片。' },
-    whereSettings: { title: '所有教程都在設定裡', body: '「設定 → 幫助」彙集了完整目錄——介紹、資料庫、功能與整合——並帶有搜尋和篩選。' },
+    whereVaults: { title: '每個知識庫的教程，會在建立時出現', body: '建立學術、族譜、資料庫或教學知識庫後，第一次開啟時就能看到它的影片。' },
+    whereSettings: { title: '所有教程都在設定裡', body: '「設定 → 幫助」彙集了完整目錄——介紹、知識庫、功能與整合——並帶有搜尋和篩選。' },
     videos: {
-      essentials: { title: '介紹與第一步', body: 'Nodus是什麼、資料庫如何組織內容，以及開始前需要準備什麼。' },
-      academic: { title: '學術資料庫', body: '從你的文獻庫到由觀點、作者和關係構成的圖譜。' },
-      genealogy: { title: '族譜資料庫', body: '家族樹、文獻檔案與親屬關係，每一項都附有來源。' },
-      databases: { title: '資料庫資料庫', body: '用表格、檢視、公式和關係整理任何內容。' },
-      teaching: { title: '教學資料庫', body: '課程、課表、班級、評分標準、考試和成績冊。' },
+      essentials: { title: '介紹與第一步', body: 'Nodus是什麼、知識庫如何組織內容，以及開始前需要準備什麼。' },
+      academic: { title: '學術知識庫', body: '從你的文獻庫到由觀點、作者和關係構成的圖譜。' },
+      genealogy: { title: '族譜知識庫', body: '家族樹、文獻檔案與親屬關係，每一項都附有來源。' },
+      databases: { title: '資料庫知識庫', body: '用表格、檢視、公式和關係整理任何內容。' },
+      teaching: { title: '教學知識庫', body: '課程、課表、班級、評分標準、考試和成績冊。' },
       nodi: { title: 'Nodi，你的夥伴', body: '如何使用Nodi聊天、檢視通知和開啟幫助。' },
       toolkit: { title: 'Nodus工具箱', body: '轉換檔案、演示PDF，並用AI從圖片中識別文字。' },
       'pdf-presenter': { title: 'PDF Presenter', body: '學習如何演示PDF，使用演講者備註、即時批註和手機遙控。' },
       word: { title: 'Microsoft Word版Nodus Copilot', body: '在Word中寫作，語料就在旁邊，引注直接來自你的文獻庫。' },
       zotero: { title: 'Zotero', body: '同步你的收藏集，並在Zotero內通過Nodus外掛工作。' },
-      mcp: { title: 'MCP與Nodus Server', body: '把你的資料庫開放給其他AI助手，並在你的網路中釋出。' },
+      mcp: { title: 'MCP與Nodus Server', body: '把你的知識庫開放給其他AI助手，並在你的網路中釋出。' },
     },
   },
   ko: {
@@ -695,7 +695,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     tourVideo: "비디오 튜토리얼 보기",
     categories: {
     introduction: "소개",
-    vaults: "금고",
+    vaults: "Vault",
     features: "특징",
     integrations: "통합",
   },
@@ -707,7 +707,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     startHereLede: "이것이 지금 당장 필요한 유일한 튜토리얼입니다. 나머지 카탈로그는 사용자가 원할 때까지 기다립니다.",
     whereVaults: {
     title: "각 Vault의 튜토리얼(생성 시)",
-    body: "학술, 계보, 데이터베이스 또는 교육용 금고를 생성하면 처음 열 때 비디오가 기다리고 있습니다.",
+    body: "학술, 계보, 데이터베이스 또는 교육용 Vault를 생성하면 처음 열 때 비디오가 기다리고 있습니다.",
   },
     whereSettings: {
     title: "설정의 모든 튜토리얼",
@@ -719,7 +719,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "Nodus가 무엇인지, Vault가 어떻게 구성되어 있는지, 시작하려면 무엇이 필요한지 알아보세요.",
   },
     academic: {
-    title: "학술 금고",
+    title: "학술 Vault",
     body: "도서관에서 아이디어, 작가, 관계의 그래프까지.",
   },
     genealogy: {
@@ -731,7 +731,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
     body: "테이블, 보기, 수식 및 관계를 통해 원하는 것을 구성할 수 있습니다.",
   },
     teaching: {
-    title: "가르치는 금고",
+    title: "가르치는 Vault",
     body: "코스, 시간표, 그룹, 기준표, 시험 및 성적표.",
   },
     nodi: {
@@ -756,7 +756,7 @@ const COPY: Record<TutorialLanguage, TutorialVideoCopy> = {
   },
     mcp: {
     title: "MCP 및 Nodus 서버",
-    body: "다른 AI 보조자에게 볼트를 열고 네트워크에 게시하세요.",
+    body: "다른 AI 보조자에게 Vault를 열고 네트워크에 게시하세요.",
   },
   },
   },

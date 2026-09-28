@@ -13,7 +13,7 @@ const translations: Record<string, string[]> = {
   pt: ['Será adicionado à Biblioteca global e a este vault.', '{n} documento(s) adicionado(s) a este vault e à Biblioteca global. Serão indexados automaticamente.', '{n} documento(s) adicionado(s) a este vault e à Biblioteca global. A indexação automática está desativada.', 'Esses documentos já estavam neste vault.'],
   'pt-BR': ['Será adicionado à Biblioteca global e a este vault.', '{n} documento(s) adicionado(s) a este vault e à Biblioteca global. Eles serão indexados automaticamente.', '{n} documento(s) adicionado(s) a este vault e à Biblioteca global. A indexação automática está desativada.', 'Esses documentos já estavam neste vault.'],
   it: ['Verrà aggiunto alla Biblioteca globale e a questo vault.', '{n} documento/i aggiunto/i a questo vault e alla Biblioteca globale. Verranno indicizzati automaticamente.', '{n} documento/i aggiunto/i a questo vault e alla Biblioteca globale. L’indicizzazione automatica è disattivata.', 'Quei documenti erano già in questo vault.'],
-  tr: ['Küresel Kitaplığa ve bu vault’a eklenecek.', '{n} belge bu vault’a ve Küresel Kitaplığa eklendi. Otomatik olarak dizinlenecek.', '{n} belge bu vault’a ve Küresel Kitaplığa eklendi. Otomatik dizinleme kapalı.', 'Bu belgeler zaten bu vault’taydı.'],
+  tr: ['Küresel Kitaplığa ve bu kasaya eklenecek.', '{n} belge bu kasaya ve Küresel Kitaplığa eklendi. Otomatik olarak dizinlenecek.', '{n} belge bu kasaya ve Küresel Kitaplığa eklendi. Otomatik dizinleme kapalı.', 'Bu belgeler zaten bu kasadaydı.'],
   'zh-CN': ['将添加到全局文献库和此 vault。', '已将 {n} 个文档添加到此 vault 和全局文献库，将自动建立索引。', '已将 {n} 个文档添加到此 vault 和全局文献库。自动索引已关闭。', '这些文档已在此 vault 中。'],
   'zh-TW': ['將新增到全域文獻庫和此 vault。', '已將 {n} 份文件新增到此 vault 和全域文獻庫，將自動建立索引。', '已將 {n} 份文件新增到此 vault 和全域文獻庫。自動索引已關閉。', '這些文件已在此 vault 中。'],
   ko: ['글로벌 라이브러리와 이 vault에 추가됩니다.', '문서 {n}개를 이 vault와 글로벌 라이브러리에 추가했습니다. 자동으로 색인됩니다.', '문서 {n}개를 이 vault와 글로벌 라이브러리에 추가했습니다. 자동 색인이 꺼져 있습니다.', '이 문서들은 이미 이 vault에 있습니다.'],
@@ -52,7 +52,7 @@ for (const [language, values] of Object.entries(indexNowTranslations)) translati
 keys.push('Indiferente', 'Preparación', 'Años', 'Vaults');
 const filterTranslations: Record<string, string[]> = {
   en: ['Either', 'Preparation', 'Years', 'Vaults'], fr: ['Indifférent', 'Préparation', 'Années', 'Vaults'], de: ['Egal', 'Vorbereitung', 'Jahre', 'Vaults'], pt: ['Indiferente', 'Preparação', 'Anos', 'Vaults'],
-  'pt-BR': ['Indiferente', 'Preparação', 'Anos', 'Vaults'], it: ['Indifferente', 'Preparazione', 'Anni', 'Vault'], tr: ['Fark etmez', 'Hazırlık', 'Yıllar', 'Vault’lar'],
+  'pt-BR': ['Indiferente', 'Preparação', 'Anos', 'Vaults'], it: ['Indifferente', 'Preparazione', 'Anni', 'Vault'], tr: ['Fark etmez', 'Hazırlık', 'Yıllar', 'Kasalar'],
   'zh-CN': ['不限', '准备', '年份', 'Vault'], 'zh-TW': ['不限', '準備', '年份', 'Vault'], ko: ['상관없음', '준비', '연도', 'Vault'], ja: ['指定なし', '準備', '年', 'Vault'],
 };
 for (const [language, values] of Object.entries(filterTranslations)) translations[language].push(...values);
