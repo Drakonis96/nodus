@@ -53,17 +53,33 @@ test('the stage presents a Nodus cover instead of placeholder text', () => {
   assert.match(slide, /<span class="stage-page">Slide \d+ of \d+<\/span>/, 'and the deck still has its page label');
 });
 
-test('the tools under the stage are one row that scrolls', () => {
-  assert.equal(toolkit.match(/<div class="tool-cards">/g).length, 1, 'one row, not a grid of them');
-  assert.equal(toolkit.match(/<article class="card lit tool-card/g).length, 5, 'with the five tools in it');
-  assert.match(css, /\.tool-cards \{[^}]*display: flex; flex-wrap: nowrap;/, 'the row never wraps');
-  assert.match(css, /\.tool-cards \{[^}]*overflow-x: auto;/, 'so it scrolls sideways');
-  assert.match(css, /\.tool-card \{ flex: 0 0 clamp\(232px, 31%, 320px\);/, 'each card keeps a width of its own');
-  // Drag: the mouse gets the drag, the touch screen keeps its native scroll.
-  assert.match(script, /function rail\(\)/, 'home.js drives the row');
-  assert.match(script, /if \(event\.pointerType !== 'mouse' \|\| event\.button !== 0\) return;/, 'a drag is a left-button mouse gesture');
-  assert.match(script, /row\.setPointerCapture\(event\.pointerId\);/, 'the drag survives leaving the row');
-  assert.match(script, /if \(moved <= 6\) return;[\s\S]{0,80}event\.preventDefault\(\)/, 'a drag that ends on a card is not a click on it');
-  assert.match(css, /\.tool-cards\.is-dragging \{ cursor: grabbing;/, 'and the cursor says so while it happens');
-  assert.match(script, /opening\(\);\s*stage\(\);\s*rail\(\);/, 'the row is wired on load');
+test('the tools under the stage turn like a ring, one card focused', () => {
+  assert.equal(toolkit.match(/<div class="tool-cards reveal">/g).length, 1, 'the row is one element, and it is the thing that fades in');
+  assert.equal(toolkit.match(/<article class="card lit tool-card"/g).length, 5, 'with the five tools in it');
+  // The cards must NOT carry .reveal: its `transform: none` beats the ring's
+  // transform, and the ring would paint all five cards on top of each other.
+  assert.equal(toolkit.match(/<article class="card lit tool-card reveal"/g), null, 'a card carries no reveal of its own');
+
+  // home.js keeps the signed distance to the middle on each card; the CSS reads it.
+  assert.match(css, /\.tool-cards \{[^}]*position: relative;/, 'the ring positions its cards');
+  assert.match(css, /\.tool-cards \{[^}]*perspective: 1500px;/, 'and has depth');
+  assert.match(css, /\.tool-cards \{[^}]*overflow: hidden;/, 'the waiting cards are clipped, so the page never scrolls sideways');
+  assert.match(css, /\.tool-cards \{[^}]*margin-inline: calc\(var\(--gut, 24px\) \* -1\);/, 'the clip happens out in the page margins, where the look wants it');
+  assert.match(css, /\.tool-cards \.tool-card \{[^}]*position: absolute;/, 'a card is placed by the ring, not by the flow');
+  assert.match(css, /\.tool-cards \.tool-card \{[^}]*transform:\s*translateX\(calc\(var\(--d, 0\) \* var\(--slot, 296px\)\)\)/, 'its distance to the middle moves it');
+  assert.match(css, /\.tool-cards \.tool-card \{[^}]*opacity: var\(--alpha, 1\);/, 'and how far it is fades it');
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\s*\.tool-cards \.tool-card \{ transition: none; \}/, 'the turning stops for reduced motion');
+
+  assert.match(script, /function tools\(\)/, 'home.js turns the ring');
+  assert.match(script, /if \(distance > cards\.length \/ 2\) distance -= cards\.length;/, 'distance is measured the short way round');
+  assert.match(script, /active = \(active \+ by \+ cards\.length\) % cards\.length;/, 'so stepping past the last card arrives at the first');
+  assert.match(script, /if \(Math\.abs\(dx\) < 40\) return;/, 'a drag has to be meant before it turns the ring');
+  assert.match(script, /const index = cards\.indexOf\(card\);\s*if \(index === active\) return;/, 'clicking a waiting card brings it to the middle');
+  assert.match(script, /if \(moved > 6\) \{\s*event\.preventDefault\(\)/, 'and the click that ended a drag does not count');
+  assert.match(script, /event\.key === 'ArrowLeft'[\s\S]{0,90}event\.key === 'ArrowRight'/, 'the arrow keys turn it');
+  assert.match(script, /ring\.addEventListener\('wheel'/, 'so does a sideways wheel');
+  assert.match(script, /cards\.map\(\(card\) => card\.offsetHeight\)/, 'the ring is as tall as its tallest card');
+  assert.match(script, /function place\(\) \{[\s\S]{0,200}cards\.forEach/, 'every card is placed from one table of distances');
+  assert.equal(/setInterval|autoplay/i.test(script), false, 'and nothing turns it on its own');
+  assert.match(script, /opening\(\);\s*stage\(\);\s*tools\(\);/, 'the ring is wired on load');
 });

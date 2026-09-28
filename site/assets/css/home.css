@@ -503,20 +503,46 @@ body {
 }
 .stage-hint { margin-top: 10px; font-size: 12px; color: var(--ink-3); }
 
-/* One row, never two. The cards keep their design and scroll sideways instead:
-   trackpads and shift+wheel scroll it natively, home.js adds a plain mouse drag,
-   and every card is still a target you can click. */
+/* The five tools turn around like a ring: one card sits in the middle, the ones
+   either side of it wait behind it, and the row wraps — past the last card comes
+   the first one again. home.js keeps `--d` (the signed distance to the middle) on
+   every card and this file reads it; nothing moves on its own. */
 .tool-cards {
-  display: flex; flex-wrap: nowrap; gap: 16px; margin-top: 20px;
-  overflow-x: auto; overscroll-behavior-x: contain;
-  padding-bottom: 10px; scrollbar-width: thin;
+  position: relative; margin-top: 20px;
+  height: var(--stage-h, 340px);
+  perspective: 1500px;
   cursor: grab;
+  touch-action: pan-y;
+  outline-offset: 6px;
+  /* The waiting cards are meant to run into the page's own margins, so the ring's
+     box is the viewport wide and the clip happens out there: wide enough for the
+     look, and no sideways scrollbar from cards nobody is looking at. */
+  margin-inline: calc(var(--gut, 24px) * -1);
+  overflow: hidden;
 }
-/* No scroll snapping: with it, a short drag springs back to the card it started on
-   and the row feels like a pager instead of something you can push around. */
 .tool-cards.is-dragging { cursor: grabbing; user-select: none; }
-.tool-cards:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-m); }
-.tool-card { flex: 0 0 clamp(232px, 31%, 320px); padding: 24px; }
+.tool-cards.is-dragging .tool-card { transition: none; }
+.tool-cards .tool-card {
+  position: absolute; top: 0;
+  left: calc(50% - var(--card-w, 320px) / 2);
+  width: var(--card-w, 320px);
+  padding: 24px;
+  /* The lit border is how the centred card reads as focused. */
+  border-color: color-mix(in srgb, var(--tc) calc(var(--lit, 0) * 45%), var(--membrane));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, calc(var(--lit, 0) * 0.45));
+  z-index: var(--z, 1);
+  pointer-events: var(--pe, auto);
+  opacity: var(--alpha, 1);
+  transform:
+    translateX(calc(var(--d, 0) * var(--slot, 296px)))
+    scale(var(--scale, 1))
+    rotateY(calc(var(--d, 0) * -7deg));
+  transition: transform 0.5s var(--ease), opacity 0.4s var(--ease), border-color 0.4s var(--ease), box-shadow 0.4s var(--ease);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool-cards .tool-card { transition: none; }
+}
 .tool-card .pic {
   display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 15px;
   border-radius: 11px; border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent);
@@ -533,6 +559,9 @@ body {
 
 /* The projected slide is small here: the cover keeps its two columns but gives the
    text the room and the mascot what is left. */
+@media (max-width: 900px) {
+  .tool-cards { --slot: clamp(180px, 34vw, 260px); --card-w: clamp(216px, 46vw, 290px); }
+}
 @media (max-width: 560px) {
   /* A phone's "slide" is 300px wide, so the cover keeps its shape but drops to two
      points: three paragraphs of text behind a 9px note is not a deck, it is a
@@ -546,7 +575,7 @@ body {
   .slide-points li { font-size: 11px; padding-left: 14px; }
   .slide-points li:nth-child(3) { display: none; }
   .slide-nodi .nodi-svg { height: clamp(78px, 23vw, 104px); }
-  .tool-card { flex: 0 0 min(78%, 300px); }
+  .tool-cards { --slot: clamp(150px, 40vw, 220px); --card-w: clamp(196px, 62vw, 260px); }
 }
 
 /* Under 400px the strapline no longer fits beside the mascot: the cover keeps the
