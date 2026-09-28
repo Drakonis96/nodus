@@ -1,0 +1,395 @@
+{
+  "mode": "real",
+  "models": {
+    "chat": "deepseek-flash",
+    "embeddings": "baai/bge-m3"
+  },
+  "limitUsd": 4.8,
+  "ledgerUsd": {
+    "before": 2.0516736599999987,
+    "after": 4.0551542000000005
+  },
+  "estimate": {
+    "usd": {
+      "min": 0.11,
+      "max": 0.23
+    },
+    "calls": 50,
+    "stages": [
+      {
+        "stage": "recon",
+        "calls": 5,
+        "inputTokens": 8167,
+        "outputTokens": 3024
+      },
+      {
+        "stage": "extract",
+        "calls": 5,
+        "inputTokens": 13106,
+        "outputTokens": 212
+      },
+      {
+        "stage": "plan",
+        "calls": 6,
+        "inputTokens": 12225,
+        "outputTokens": 9000
+      },
+      {
+        "stage": "write",
+        "calls": 5,
+        "inputTokens": 45000,
+        "outputTokens": 15000
+      },
+      {
+        "stage": "verify",
+        "calls": 21,
+        "inputTokens": 114000,
+        "outputTokens": 28800
+      },
+      {
+        "stage": "finalize",
+        "calls": 7,
+        "inputTokens": 42000,
+        "outputTokens": 10500
+      },
+      {
+        "stage": "embed",
+        "calls": 1,
+        "inputTokens": 200,
+        "outputTokens": 0
+      }
+    ]
+  },
+  "runs": {
+    "first": {
+      "stages": {
+        "recon": {
+          "calls": 5,
+          "inputTokens": 2493,
+          "outputTokens": 4737,
+          "usd": 0.006432299999999999
+        },
+        "extract": {
+          "calls": 5,
+          "inputTokens": 4250,
+          "outputTokens": 8884,
+          "usd": 0.0119358
+        },
+        "embed": {
+          "calls": 1,
+          "inputTokens": 1207,
+          "outputTokens": 0,
+          "usd": 0.00001207
+        },
+        "plan": {
+          "calls": 3,
+          "inputTokens": 3338,
+          "outputTokens": 2869,
+          "usd": 0.0044442
+        },
+        "write": {
+          "calls": 32,
+          "inputTokens": 39191,
+          "outputTokens": 180378,
+          "usd": 0.22821089999999997
+        },
+        "verify": {
+          "calls": 136,
+          "inputTokens": 143680,
+          "outputTokens": 645791,
+          "usd": 0.8180531999999998
+        },
+        "finalize": {
+          "calls": 6,
+          "inputTokens": 4187,
+          "outputTokens": 9157,
+          "usd": 0.0122445
+        }
+      },
+      "counts": {
+        "windows": 5,
+        "failedWindows": 0,
+        "items": 29,
+        "itemsUsed": 29,
+        "blocks": 160,
+        "aiBlocks": 40,
+        "droppedUnsupported": 2,
+        "auditedBlocks": 18,
+        "removedSentences": 50,
+        "repairedBlocks": 7,
+        "invalidLatex": 0,
+        "conflicts": 1,
+        "cacheHits": 0,
+        "figures": 0,
+        "webBlocks": 0,
+        "webImages": 0
+      },
+      "warnings": [],
+      "refusals": 70
+    },
+    "second": {
+      "stages": {
+        "embed": {
+          "calls": 1,
+          "inputTokens": 1207,
+          "outputTokens": 0,
+          "usd": 0.00001207
+        },
+        "plan": {
+          "calls": 3,
+          "inputTokens": 3338,
+          "outputTokens": 3436,
+          "usd": 0.0051246
+        },
+        "write": {
+          "calls": 25,
+          "inputTokens": 30546,
+          "outputTokens": 137858,
+          "usd": 0.1745934
+        },
+        "verify": {
+          "calls": 133,
+          "inputTokens": 140831,
+          "outputTokens": 569321,
+          "usd": 0.7254345000000001
+        },
+        "finalize": {
+          "calls": 6,
+          "inputTokens": 4198,
+          "outputTokens": 13103,
+          "usd": 0.016982999999999998
+        }
+      },
+      "counts": {
+        "windows": 5,
+        "failedWindows": 0,
+        "items": 29,
+        "itemsUsed": 29,
+        "blocks": 168,
+        "aiBlocks": 48,
+        "droppedUnsupported": 0,
+        "auditedBlocks": 17,
+        "removedSentences": 48,
+        "repairedBlocks": 7,
+        "invalidLatex": 0,
+        "conflicts": 1,
+        "cacheHits": 10,
+        "figures": 0,
+        "webBlocks": 0,
+        "webImages": 0
+      },
+      "refusals": 64
+    }
+  },
+  "coverage": [
+    {
+      "alias": "A1",
+      "title": "Tema 1 · Gases ideales (apuntes)",
+      "read": 4,
+      "total": 4,
+      "itemsExtracted": 11,
+      "itemsUsed": 11,
+      "unread": []
+    },
+    {
+      "alias": "A2",
+      "title": "Tema 2 · Ácidos y bases (diapositivas)",
+      "read": 3,
+      "total": 3,
+      "itemsExtracted": 6,
+      "itemsUsed": 6,
+      "unread": []
+    },
+    {
+      "alias": "D1",
+      "title": "Mis notas de ácidos",
+      "read": 1,
+      "total": 1,
+      "itemsExtracted": 2,
+      "itemsUsed": 2,
+      "unread": []
+    },
+    {
+      "alias": "A3",
+      "title": "La Restauración (1874-1923)",
+      "read": 3,
+      "total": 3,
+      "itemsExtracted": 6,
+      "itemsUsed": 6,
+      "unread": []
+    },
+    {
+      "alias": "G1",
+      "title": "Clase 5 · El sistema canovista",
+      "read": 2,
+      "total": 2,
+      "itemsExtracted": 4,
+      "itemsUsed": 4,
+      "unread": []
+    }
+  ],
+  "checks": [
+    {
+      "name": "the excluded material never enters the snapshot",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "every readable passage is read",
+      "ok": true,
+      "detail": "A1 4/4, A2 3/3, D1 1/1, A3 3/3, G1 2/2",
+      "soft": false
+    },
+    {
+      "name": "fact \"Ley de Boyle\" extracted at p. 1 and cited in the guide",
+      "ok": true,
+      "detail": "K0002",
+      "soft": false
+    },
+    {
+      "name": "fact \"Definición de presión\" extracted at p. 1 and cited in the guide",
+      "ok": true,
+      "detail": "K0001",
+      "soft": false
+    },
+    {
+      "name": "fact \"Ecuación de los gases ideales\" extracted at p. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0003",
+      "soft": false
+    },
+    {
+      "name": "fact \"Valor de R\" extracted at p. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0004",
+      "soft": false
+    },
+    {
+      "name": "fact \"Condiciones de validez\" extracted at p. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0005",
+      "soft": false
+    },
+    {
+      "name": "fact \"Ejemplo resuelto (4,92 atm)\" extracted at p. 3 and cited in the guide",
+      "ok": true,
+      "detail": "K0007",
+      "soft": false
+    },
+    {
+      "name": "fact \"Conversión a kelvin\" extracted at p. 3 and cited in the guide",
+      "ok": true,
+      "detail": "K0009",
+      "soft": false
+    },
+    {
+      "name": "fact \"Definición de pH\" extracted at diap. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0013",
+      "soft": false
+    },
+    {
+      "name": "fact \"Producto iónico del agua\" extracted at diap. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0014",
+      "soft": false
+    },
+    {
+      "name": "fact \"Neutralización\" extracted at diap. 3 and cited in the guide",
+      "ok": true,
+      "detail": "K0017",
+      "soft": false
+    },
+    {
+      "name": "fact \"Constitución de 1876\" extracted at p. 1 and cited in the guide",
+      "ok": true,
+      "detail": "K0021",
+      "soft": false
+    },
+    {
+      "name": "fact \"Turno pacífico\" extracted at p. 2 and cited in the guide",
+      "ok": true,
+      "detail": "K0022",
+      "soft": false
+    },
+    {
+      "name": "the excluded material and its unique fact never appear",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "AI examples and analogies are labelled and never cite materials",
+      "ok": true,
+      "detail": "40 AI blocks",
+      "soft": false
+    },
+    {
+      "name": "all LaTeX compiles in KaTeX (mhchem included) and no formula is cut",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "the review sheet carries the formulas",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "the contradiction between the note and the slides is reported",
+      "ok": true,
+      "detail": "1 conflicts",
+      "soft": true
+    },
+    {
+      "name": "the history unit uses no scientific callouts it has no content for",
+      "ok": false,
+      "detail": "",
+      "soft": true
+    },
+    {
+      "name": "a second version reuses ≥ 90 % of the reading passes",
+      "ok": true,
+      "detail": "100 % (0/10 reading calls, 10 cache hits)",
+      "soft": false
+    },
+    {
+      "name": "the pre-run estimate covers the real cost",
+      "ok": false,
+      "detail": "estimate ≤ $0.2300, spent $1.0813",
+      "soft": false
+    },
+    {
+      "name": "the ledger stays below $4.8",
+      "ok": true,
+      "detail": "$2.0035 this run, $4.0552 in the ledger",
+      "soft": false
+    },
+    {
+      "name": "Markdown export keeps callouts, LaTeX and citations",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "Word export has native equations and tables",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    },
+    {
+      "name": "PDF export renders (cover, contents, chapters)",
+      "ok": true,
+      "detail": "60 pages",
+      "soft": false
+    },
+    {
+      "name": "the review sheet exports on its own",
+      "ok": true,
+      "detail": "",
+      "soft": false
+    }
+  ]
+}

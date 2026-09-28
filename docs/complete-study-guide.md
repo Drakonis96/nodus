@@ -148,8 +148,8 @@ evidence sidecar answers the reader's exact-quote popover.
    optionally include each guide's review sheet.
 7. [x] Figures from materials, optional web text and images.
 8. [x] Live campaign harness with DeepSeek `deepseek-flash` and OpenRouter
-   `baai/bge-m3` under a USD 5 ledger ceiling (prepared and verified in simulated
-   mode; the paid run needs the provider keys, see below).
+   `baai/bge-m3` under a USD 5 ledger ceiling, executed for real on 2026-09-28 (see
+   [Live campaign](#live-campaign-scriptsverify-complete-guide-livemjs)).
 
 ## Validation
 
@@ -180,9 +180,92 @@ review-sheet PDF are produced with PNG snapshots for visual review; a second ver
 reuses at least 90 % of the reading passes; the pre-run estimate covers the real
 cost. Metrics per stage (calls, tokens, USD), coverage and every check are written
 to `<root>/artifacts/complete-guide-metrics.json`. The simulated run passes every check
-(about USD 0.02 of simulated usage, estimate USD 0.11–0.23). The paid run could not
-be executed in this environment (no provider keys); with DeepSeek Flash prices the
-corpus is expected to cost well under USD 0.50.
+(about USD 0.02 of simulated usage).
+
+#### Paid run, 2026-09-28 (DeepSeek `deepseek-flash` + OpenRouter `baai/bge-m3`)
+
+Executed on the Mac with the keys the installed app already holds
+(`scripts/with-nodus-keys.cjs`), on one campaign root reused across attempts so the
+USD 5 authorization stayed cumulative. **USD 4.0552 of the USD 5 was spent** and the
+run stopped there: one full campaign execution (both versions) costs about USD 2.00,
+so the remaining USD 0.94 could not fund another. The final recorded run is in
+[`docs/verification/complete-guide-live-metrics.json`](verification/complete-guide-live-metrics.json):
+25 of 26 checks pass, one informative check reports what it is meant to report, and
+one fails — the estimate, whose fix arrived after the last affordable run (see
+"The estimate under-promised by five").
+
+Cost of the recorded run (first version $1.0813, second $0.9222):
+
+| stage | calls | input tokens | output tokens | USD |
+| --- | --- | --- | --- | --- |
+| recon | 5 | 2,493 | 4,737 | 0.0064 |
+| extract | 5 | 4,250 | 8,884 | 0.0119 |
+| plan | 3 | 3,338 | 2,869 | 0.0044 |
+| write | 32 | 39,191 | 180,378 | 0.2282 |
+| **verify (the premise audit)** | **136** | **143,680** | **645,791** | **0.8181** |
+| finalize | 6 | 4,187 | 9,157 | 0.0122 |
+| embed | 1 | 1,207 | 0 | 0.0000 |
+
+What the paid run found, and what was fixed because of it:
+
+- **The campaign did not speak to the provider the way the app does.** DeepSeek
+  refuses `response_format: json_object` with a 400 when the prompt does not contain
+  the word "json", and the claim audit's prompt does not; the application answers by
+  replaying the request once without its optional fields
+  (`aiClient`'s `optionalBody`/`replayRefusedOptionalFields`), and the harness sent it
+  bare. Every audit call therefore died, the verification pass removed the whole
+  block it had never audited (110 "removed" sentences in the first attempt), the
+  conflict check never ran (0 conflicts) and the ledger booked the refused bounds as
+  spend until the run aborted at its ceiling. The harness now mirrors the replay, and
+  the scripted upstream enforces the same contract so the free run covers it.
+- **The transport sent the bare output bound.** The application adds DeepSeek's
+  thinking allowance before dispatch (`thinkingEffort.ts#thinkingOutputAllowance`);
+  without it every audit batch hit the 6,000-token cap, and the audit answers
+  truncation by bisecting, so the campaign paid several times the calls the
+  application makes for the same work (149 calls truncated at exactly 6,000 tokens).
+- **A refused request is not spend.** The proxy now settles a 4xx at zero — the
+  reading `providerErrors.ts` already documents, "a 400/422 is a refusal, not a
+  completed generation" — instead of keeping the reservation for ever.
+- **The audit's citation is a URL.** The guide handed the premise audit its rendered
+  Markdown link where every other caller (ideas, works, passages) passes a URL. The
+  audit writes `[label](citation)` around every sentence it keeps, so the guide
+  rendered a link inside a link — `[título]([A1 · p. 2](nodus://…))` — which Markdown
+  refuses to parse: the reader, the PDF and Word printed the literal `[título](`
+  text. 61 occurrences in the campaign's own guide, all inside audited blocks.
+- **The estimate under-promised by five.** It said USD 0.11–0.23 for a run that cost
+  USD 1.08, on constants nobody had measured, and modelled the premise audit — 76 %
+  of a guide's cost — as a footnote of the writing. The constants now come from the
+  measured run (`shared/completeGuide/estimate.ts`): one item per ~22 tokens of dense
+  material, a section per ~2 items, one block in nine audited at four calls and
+  ~36,000 output tokens each. For the same snapshot the estimate now returns
+  USD 0.88–1.88, and
+  `scripts/test-complete-guide-foundations.mjs` pins the ceiling against the measured
+  USD 1.0813 so a future recalibration cannot under-promise again.
+- **Four main-process errors had no translation.** The guide's "no readable text",
+  "only in Study vaults", "no review sheet" and "could not read N of M parts"
+  sentences reached a non-Spanish window untranslated or collapsed into the generic
+  line; they are in `shared/mainProcessErrors.ts` now (the count of unread parts as a
+  pattern, so the numbers survive) and `test-main-error-i18n.mjs` passes.
+- **A pinned schema version.** `scripts/test-project-instructions.mjs` pins
+  `SCHEMA_VERSION` so a bump is deliberate; migration 194 is, and the pin moved.
+
+Two things the paid run reports and did not change:
+
+- the contradiction between the note ("pH 7 at any temperature") and the slides
+  ("pH 7 only at 25 °C") is found and printed in "Contradicciones entre fuentes";
+- the informative check "the history unit uses no scientific callouts it has no
+  content for" reports two `[!formula]` cards in the history chapter: the model
+  expressed the turno pacífico as an alternation and the encasillado as a relation,
+  each explained in prose. A stylistic stretch, not a defect, and the check is
+  deliberately informative.
+
+Artifacts of the recorded run (kept out of the repository: they are 2.4 MB and carry
+the whole guide): `complete-guide.md`, `complete-guide.docx`, `complete-guide.pdf`
+(60 pages), `complete-guide-review-sheet.pdf`/`.png`, `complete-guide-page.png`. The
+PDF embeds its fonts (54 subsets), renders formulas as MathML, keeps every AI block
+labelled ("Elaborado por IA: no procede de tus materiales") and shows no stray `$`
+and no truncated text; the Word file carries 317 native equations (`m:oMath`), 149
+tables and an updatable `TOC \h \o "1-2"` field.
 
 ### Unit, integration and browser tests
 
