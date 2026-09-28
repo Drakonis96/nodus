@@ -23,6 +23,21 @@ export function findMath(markdown: string): MathSpan[] {
   return spans;
 }
 
+/** A `$` outside every formula: a cut or half-written formula that would print raw. */
+export function strayDollar(markdown: string): boolean {
+  let rest = markdown.replace(/```[\s\S]*?```|`[^`\n]*`/g, ' ');
+  for (const span of findMath(rest).reverse()) rest = `${rest.slice(0, span.start)} ${rest.slice(span.end)}`;
+  return /(?<!\\)\$/.test(rest);
+}
+
+/** Cut text to at most `max` characters (plus an ellipsis) without splitting a formula. */
+export function truncateOutsideMath(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let cut = max;
+  for (const span of findMath(text)) if (span.start < cut && span.end > cut) cut = span.start;
+  return `${text.slice(0, cut).trimEnd()}…`;
+}
+
 export function latexError(tex: string, display = false): string | null {
   try {
     katex.renderToString(tex, { displayMode: display, throwOnError: true, strict: 'ignore', trust: false, output: 'mathml' });

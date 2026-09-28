@@ -647,10 +647,13 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   }
   deps.progress?.({ stage: 'finalize', done: 2, total: 3 });
 
-  // Conflicts between sources on definitions and formulas.
+  // Conflicts between sources on definitions, formulas, rules and stated values.
   let conflictsMarkdown = '';
   if (deps.conflicts) {
-    const candidates = items.filter((item) => (item.type === 'definition' || item.type === 'formula' || item.type === 'rule') && item.importance !== 'detail').slice(0, 80);
+    const candidates = items
+      .filter((item) => item.importance !== 'detail' && (item.type === 'definition' || item.type === 'formula' || item.type === 'rule' || (item.type === 'fact' && /\d/.test(item.statement))))
+      .sort((a, b) => Number(b.importance === 'core') - Number(a.importance === 'core') || a.order - b.order)
+      .slice(0, 80);
     const multiSource = new Set(candidates.map((item) => item.evidence[0]?.sourceKey)).size > 1;
     if (multiSource) {
       guard();

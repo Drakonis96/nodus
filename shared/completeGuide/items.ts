@@ -64,6 +64,9 @@ export interface CompleteGuideRawItem {
 const TYPES = new Set<string>(COMPLETE_GUIDE_ITEM_TYPES);
 const IMPORTANCE = new Set<string>(['core', 'support', 'detail']);
 const text = (value: unknown, max: number) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, max) : '');
+/** Item prose is inserted into lists, tables and cards: block markup copied from notes
+ * (headings, callout markers, quote bars) would break them. Quotes keep the raw text. */
+const prose = (value: unknown, max: number) => text(typeof value === 'string' ? value.replace(/^\s*(?:>\s*)+/, '').replace(/(^|\s)#{1,6}\s+/g, '$1').replace(/\[![\w-]+\]\s*/g, '') : value, max);
 const list = (value: unknown, max: number, each: number) => (Array.isArray(value) ? value.map((entry) => text(entry, each)).filter(Boolean).slice(0, max) : []);
 
 export function validExtractionResult(value: unknown): value is { items: unknown[] } {
@@ -74,8 +77,8 @@ export function normalizeRawItem(raw: unknown): CompleteGuideRawItem | null {
   if (!raw || typeof raw !== 'object') return null;
   const input = raw as Record<string, unknown>;
   const type = TYPES.has(String(input.type)) ? input.type as CompleteGuideItemType : 'concept';
-  const statement = text(input.statement, 1_600);
-  const title = text(input.title, 160) || statement.slice(0, 80);
+  const statement = prose(input.statement, 1_600);
+  const title = prose(input.title, 160) || statement.slice(0, 80);
   const passageId = text(input.passageId, 40);
   if (!statement || !passageId) return null;
   const variables = Array.isArray(input.variables)
@@ -88,7 +91,7 @@ export function normalizeRawItem(raw: unknown): CompleteGuideRawItem | null {
     }).filter((entry): entry is CompleteGuideVariable => Boolean(entry)).slice(0, 16)
     : [];
   const latex = typeof input.latex === 'string' ? input.latex.trim().replace(/^\$+|\$+$/g, '').slice(0, 600) : '';
-  const solution = text(input.solution, 2_400);
+  const solution = prose(input.solution, 2_400);
   const date = text(input.date, 60);
   const conditions = list(input.conditions, 10, 300);
   const steps = list(input.steps, 16, 400);

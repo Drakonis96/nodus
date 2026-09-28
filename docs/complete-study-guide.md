@@ -30,14 +30,15 @@ separating AI-written explanation from source content, exportable to MD, PDF and
 
 ## Architecture
 
-- `shared/completeGuide/` — pure contracts and algorithms (config, selection
-  expansion, reading snapshot, composer tree, estimate; later: items, plan, render,
-  reference sections, print HTML).
-- `electron/ai/completeGuide/` — vault access and the pass orchestrator (injected
-  dependencies, testable with a fake model).
+- `shared/completeGuide/` — pure contracts and algorithms: config, selection
+  expansion, reading snapshot, composer tree, estimate, items and anchoring, plans,
+  blocks and rendering, reference sections, figure and web-image selection, print HTML
+  and the report input.
+- `electron/ai/completeGuide/` — vault access, the pass orchestrator (injected
+  dependencies, testable with a fake model), figure extraction and web images.
 - Routed from `generateDeepResearchReportWithVisualPlan` in
-  `electron/ai/deepResearch.ts`. Until the engine lands, a request carrying
-  `completeGuide` fails closed instead of falling through to the vault-wide study report.
+  `electron/ai/deepResearch.ts` when the request carries `completeGuide` in the Study
+  vault; other Deep Research modes are unchanged.
 
 ### Selection and snapshot (milestone 1)
 
@@ -97,6 +98,35 @@ plans, sections and final parts are checkpointed per run. Citation links carry t
 locator and item id (`nodus://study/material/<id>?page=12&e=K0012`); the local
 evidence sidecar answers the reader's exact-quote popover.
 
+### Figures and the optional web (milestone 7)
+
+- **Figures from the materials.** No model sees images (DeepSeek Flash has no vision).
+  Extracted items of type `figure` (a caption or an explicit "Figura 3.2") name their
+  page or slide; at most three per chapter and 24 per guide, one per page. PDF pages
+  give crops of the images placed on them (`extractPdfPageFigures`, rendered at 2×),
+  or the whole page when the art is vector-only; PPTX slides give their biggest
+  picture, skipping template art repeated across the deck; image materials are used
+  as they are. After saving, the figures are seeded as ready figures of the guide's
+  document-visual manifest (`nodus.material-figure`), right after the block that
+  cites their item, so the reader, PDF, Word and Markdown show them through the
+  existing figure path. Their source opens the material at that page or slide.
+- **Web text** (`webText`, off by default). One fast web step per chapter
+  (`ResearchWebGrant`, intent `expand`) from the chapter title, sections and core
+  items; passages are recorded as `web:<sha>`. The writer may add `web` blocks only
+  with recorded passage ids; they are always audited against those passages,
+  labelled "Fuente web: no procede de tus materiales", cited as `W1 · site`
+  (`nodus://passage/web:<sha>`) and never cite materials. A final **Fuentes web**
+  section lists the pages. A search outage only adds a warning.
+- **Web images** (`webImages`, off by default). At most one per chapter (six in total),
+  only for a core concept without a figure from the materials. SearXNG's `images`
+  category searches `wikicommons.images` (name verified at the pinned upstream
+  commit); the Commons API then confirms licence and author, and only CC0, public
+  domain, CC BY and CC BY-SA files that share a term with the concept are kept.
+  Commons' raster rendering is downloaded through the public-only guard (5 MB cap, no
+  SVG ever parsed), re-encoded with sharp and seeded as `nodus.web-image` with a
+  caption carrying title, author, licence and site; it is also listed under Fuentes
+  web. Openverse stays off: SearXNG's result omits the licence.
+
 ## Milestones
 
 1. [x] Foundations: types, fail-closed routing guard, selection, snapshot, tree,
@@ -116,11 +146,50 @@ evidence sidecar answers the reader's exact-quote popover.
    cannot be converted) and an updatable table of contents; Markdown with callouts and
    LaTeX; the review sheet on its own (two-column PDF, Word, Markdown); batch archives
    optionally include each guide's review sheet.
-7. [ ] Figures from materials, optional web text and images.
-8. [ ] Live campaign with DeepSeek `deepseek-flash` and OpenRouter `baai/bge-m3`
-   under a USD 5 ledger ceiling.
+7. [x] Figures from materials, optional web text and images.
+8. [x] Live campaign harness with DeepSeek `deepseek-flash` and OpenRouter
+   `baai/bge-m3` under a USD 5 ledger ceiling (prepared and verified in simulated
+   mode; the paid run needs the provider keys, see below).
 
 ## Validation
+
+### Live campaign (`scripts/verify-complete-guide-live.mjs`)
+
+Runs the real engine, the real premise audit and the real exports headlessly in Node
+over a seeded synthetic corpus: two chemistry units (formulas with conditions,
+`\ce{}`, a table, a figure caption, slides and a note that contradicts them), a
+history unit (no scientific categories, a lecture transcript) and a fourth, highly
+relevant material placed in a selected unit but excluded by the student. Every paid
+call goes through `scripts/research-provider-proxy.mjs` and the campaign's cost
+ledger, authorized for USD 5; the run stops before `--limit-usd` (default 4.8).
+
+```sh
+# Real providers (keys from the environment or from the installed app)
+DEEPSEEK_API_KEY=… OPENROUTER_API_KEY=… node scripts/verify-complete-guide-live.mjs
+./node_modules/.bin/electron scripts/with-nodus-keys.cjs --providers deepseek,openrouter -- node scripts/verify-complete-guide-live.mjs
+# Mechanics only (scripted upstream; proxy, ledger, validators, audit and exports are real)
+node scripts/verify-complete-guide-live.mjs --simulated
+```
+
+Checks: every readable passage is read; twelve seeded facts are extracted at their
+exact page or slide and cited in the guide; the excluded material and its unique
+fact never appear; AI blocks are labelled and never cite materials; all LaTeX
+compiles; the review sheet carries the formulas; the note/slides contradiction is
+reported (informative); Markdown, Word (native equations, tables), the PDF and the
+review-sheet PDF are produced with PNG snapshots for visual review; a second version
+reuses at least 90 % of the reading passes; the pre-run estimate covers the real
+cost. Metrics per stage (calls, tokens, USD), coverage and every check are written
+to `<root>/artifacts/complete-guide-metrics.json`. The simulated run passes every check
+(about USD 0.02 of simulated usage, estimate USD 0.11–0.23). The paid run could not
+be executed in this environment (no provider keys); with DeepSeek Flash prices the
+corpus is expected to cost well under USD 0.50.
+
+### Unit, integration and browser tests
+
+`node --test scripts/test-complete-guide-figures.mjs` covers figure selection and
+placement, slide pictures without template art, real PDF crops and whole-page
+fallback, and web images (licence filter, relevance, Commons titles, raster-only
+downloads, attribution).
 
 `node --test scripts/test-complete-guide-export.mjs` checks the print HTML (MathML,
 callouts, tables, figures, anchors), the professional-report sections and the Word XML
@@ -136,7 +205,9 @@ warning, unreadable source), checks callouts, KaTeX and `\ce{}` and writes
 
 `scripts/test-complete-guide-engine.mjs` runs the whole orchestrator with a fake
 model (full single reading per pass, anchoring, coverage, provenance, KaTeX,
-audit/repair, cache reuse, resume, failed windows). `scripts/test-complete-guide-content.mjs`
+audit/repair, cache reuse, resume, failed windows, and figures, web text and web
+images through fake dependencies: requests, labels, audit, W citations, the Fuentes
+web section, checkpoints and fail-soft outages). `scripts/test-complete-guide-content.mjs`
 covers anchoring edge cases, sanitizing, provenance, plans, locators, reference
 sections and the 15 label packs.
 

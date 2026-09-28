@@ -42,6 +42,10 @@ test('raw items are validated and merged; semantic duplicates merge within a uni
   assert.equal(raw.importance, 'support');
   assert.equal(raw.latex, 'P=F/A');
   assert.deepEqual(raw.variables, [{ symbol: 'P', meaning: 'presión', unit: 'Pa' }]);
+  const noted = items.normalizeRawItem({ type: 'fact', title: '## Repaso', statement: '> [!note] # Repaso El agua pura tiene pH 7. ## Indicadores Si T > 0 vale.', passageId: 'D1.1', quote: '# Repaso' });
+  assert.equal(noted.title, 'Repaso', 'block markup copied from notes is removed');
+  assert.equal(noted.statement, 'Repaso El agua pura tiene pH 7. Indicadores Si T > 0 vale.', 'comparisons survive');
+  assert.equal(noted.quote, '# Repaso', 'quotes keep the raw text for anchoring');
   const passage = (id, sourceKey = 'material:a') => ({ id, sourceKey });
   const pending = [
     { raw: { ...raw, type: 'definition', statement: 'Presión: fuerza por área', importance: 'support' }, passage: passage('A1.2'), anchor: 'exact', position: 0 },
@@ -147,6 +151,12 @@ test('reference sections come from items: glossary, formula sheet, timeline, rev
   assert.ok(timeline.indexOf('44 a. C.') < timeline.indexOf('s. XV') && timeline.indexOf('s. XV') < timeline.indexOf('1789'));
   assert.equal(reference.acceptCheatPhrase('PV = nRT para gases ideales', list[1]), 'PV = nRT para gases ideales');
   assert.match(reference.acceptCheatPhrase('La presión vale 101325 Pa siempre', list[0]), /^Presión: Fuerza/, 'a phrase with a new number falls back to the item');
+  const water = { id: 'K0100', type: 'fact', title: 'Producto iónico', statement: `A 25 °C el producto iónico del agua vale $K_w = 1{,}0 \\cdot 10^{-14}$. ${'Texto largo. '.repeat(16)}` };
+  const cut = reference.acceptCheatPhrase('A 25 °C el producto iónico del agua vale $K_w = 1{,}0', water);
+  assert.ok(cut.startsWith('Producto iónico: A 25 °C') && cut.includes('$K_w = 1{,}0 \\cdot 10^{-14}$'), 'a phrase cut inside a formula falls back to the whole item');
+  const long = { ...water, statement: `${'Texto largo previo. '.repeat(10)}vale $K_w = 1{,}0 \\cdot 10^{-14}$ a 25 °C.` };
+  const truncated = reference.acceptCheatPhrase('', long);
+  assert.ok(truncated.endsWith('…') && (truncated.match(/\$/g) ?? []).length % 2 === 0, `the fallback never cuts a formula: ${truncated}`);
   const cheat = reference.renderCheatSheet([{ title: 'Gases', items: list, points: [{ itemId: 'K0001', phrase: 'Presión es fuerza por área' }, { itemId: 'K0404', phrase: 'x' }] }], cite, labels);
   assert.match(cheat, /### Gases/);
   assert.match(cheat, /- Presión es fuerza por área \(\[A1/);

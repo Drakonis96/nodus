@@ -235,7 +235,7 @@ export function CompleteGuideComposer({ value, onChange, model, thinkingEffort, 
       <section className="grid gap-2 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">
         {option('aiExamples', t('Ejemplos y analogías elaborados por IA'), t('Se añaden cuando los materiales no bastan y siempre aparecen etiquetados como elaborados por IA.'))}
         {option('webText', t('Complementar con la web'), t('Busca en la web solo lo que falte; se cita como fuente web, nunca como tus materiales.'))}
-        {option('webImages', t('Imágenes de la web'), t('Ilustraciones con licencia abierta y su atribución (Wikimedia Commons, Openverse).'))}
+        {option('webImages', t('Imágenes de la web'), t('Ilustraciones con licencia abierta y su atribución (Wikimedia Commons).'))}
         {option('rereadAll', t('Releer todo sin caché'), t('Por defecto se reutiliza lo ya leído de fuentes que no han cambiado.'))}
         <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
           <span className="font-medium">{t('Comprobación de afirmaciones')}</span>

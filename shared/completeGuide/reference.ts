@@ -9,6 +9,7 @@ import type { CompleteGuideLabels } from './labels';
 import { renderTable } from './blocks';
 import type { CompleteGuideSnapshotSource } from './snapshot';
 import { compactRanges } from './snapshot';
+import { invalidMath, strayDollar, truncateOutsideMath } from './math';
 
 type Cite = (itemId: string) => string[];
 const citeText = (cite: Cite, id: string) => cite(id).slice(0, 3).join('; ');
@@ -115,9 +116,10 @@ export function acceptCheatPhrase(phrase: string, item: CompleteGuideItem): stri
   const phraseTokens = normalizeForAnchor(phrase).split(/[^\p{L}\p{N}]+/u).filter((token) => token.length > 3);
   const overlap = phraseTokens.length ? phraseTokens.filter((token) => own.has(token)).length / phraseTokens.length : 0;
   const digitsOk = (phrase.match(/\d+(?:[.,]\d+)?/g) ?? []).every((number) => `${item.statement} ${item.latex ?? ''} ${item.title}`.includes(number));
-  if (words.length && words.length <= 24 && overlap >= 0.5 && digitsOk) return phrase.trim();
-  const fallback = `${item.title}: ${item.statement}`;
-  return fallback.length > 220 ? `${fallback.slice(0, 219)}…` : fallback;
+  // A phrase cut inside a formula would print a raw `$`: fall back to the item itself.
+  const mathOk = !strayDollar(phrase) && !invalidMath(phrase).length;
+  if (words.length && words.length <= 24 && overlap >= 0.5 && digitsOk && mathOk) return phrase.trim();
+  return truncateOutsideMath(`${item.title}: ${item.statement}`, 219);
 }
 
 export function renderCheatSheet(
