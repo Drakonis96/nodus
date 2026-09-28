@@ -307,6 +307,9 @@ test('the preliminary modes wear the app\'s own phase, in the corner and in word
   assert.match(css, /\.mode-ribbon-band \{[^}]*transform: rotate\(45deg\)/, 'the tag is a diagonal band');
   assert.match(css, /\.mode-ribbon:hover \.mode-ribbon-tip,\s*\.mode-ribbon:focus \.mode-ribbon-tip \{ opacity: 1/, 'hovering or focusing the tag raises the note');
   assert.match(css, /\.mode-slide\[hidden\] \{ display: none; \}/, 'the modes that are not showing take no space');
+  // nodus.css pads every <section> by up to 148px, which pushed the window down
+  // inside its column while the copy stayed at the top: the slide has to undo it.
+  assert.match(css, /\.mode-slide \{ padding: 0; \}/, 'a slide carries no section padding, so the window sits level with its copy');
 });
 
 test('the drawn app views left with the graphics they belonged to', () => {  /* Matched as class names, not as words: "rubrics" is still the word the teaching

@@ -339,6 +339,10 @@ body {
   display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   gap: clamp(24px, 3.4vw, 44px); align-items: start;
 }
+/* The slides are <section>s, and the page pads every section by up to 148px: that
+   pushed the window down inside its own column while the copy stayed at the top,
+   which is the misalignment this class exists to undo. */
+.mode-slide { padding: 0; }
 .mode-slide[hidden] { display: none; }
 .mode-body .frame { margin: 0; }
 .mode-body .shot figcaption { font-size: 12px; }
