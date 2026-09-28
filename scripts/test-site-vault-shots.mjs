@@ -410,21 +410,33 @@ test('the gallery view shows the window over the blurred page, and hands it back
   assert.match(css, /\.frame-zoom\[hidden\] \{ display: none; \}/, 'a hidden control is really hidden');
 });
 
-test('the five modes sit centred, with the copy under the window', () => {
+test('every window is one size, and a mode is described beside its window', () => {
   const script = readSite('assets/js/vault-shots.js');
-  // One measure for every app window on the page, so the four vault windows above
-  // and the five mode windows below come out the same size.
-  assert.match(css, /:root \{ --shot-w: min\(606px, 44\.13vw\); \}/, 'the windows share one measure');
-  assert.match(css, /\.scene-inner \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, var\(--shot-w\)\)/, 'a vault window is that wide');
-  assert.match(css, /\.scene\[data-flip\] \.scene-inner \{ grid-template-columns: minmax\(0, var\(--shot-w\)\) minmax\(0, 1fr\); \}/,
-    'a flipped scene moves the window, not the measure');
-  assert.match(css, /\.mode-stage \{ width: min\(100%, var\(--shot-w\)\); \}/, 'a mode window is the width of a vault window');
-  assert.match(css, /\.mode-stage \{ width: 100%; \}/, 'and takes the row when the columns fold');
+  // One pair of columns gives every app window on the page its width: the four
+  // vault windows and the five mode windows take the same wide one, so none of
+  // them is a size of its own.
+  assert.match(
+    css,
+    /\.scene-inner, \.mode-body \{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1\.5fr\)/,
+    'the scenes and the modes share one pair of columns',
+  );
+  assert.match(
+    css,
+    /\.scene\[data-flip\] \.scene-inner,\s*\.mode-body \{ grid-template-columns: minmax\(0, 1\.5fr\) minmax\(0, 1fr\); \}/,
+    'the window takes the wide column and the copy the one at its right',
+  );
+  assert.match(css, /\.scene-inner, \.mode-body \{ grid-template-columns: minmax\(0, 1fr\); \}/,
+    'and both fold to a single column when there is no room for two');
 
+  // The labels are a centred row that wraps while there is room for two rows, and
+  // only becomes a row you scroll once the columns have folded: on a desktop window
+  // of any size all five are on screen.
   assert.match(css, /\.mode-nav \{[^}]*justify-content: center/, 'the tabs and their arrows sit in the middle');
-  assert.match(css, /\.mode-body \{[^}]*grid-template-columns: minmax\(0, 1fr\); justify-items: center/, 'one column, both parts centred');
-  assert.match(css, /\.mode-copy \{ min-width: 0; width: min\(100%, 660px\); text-align: center; \}/, 'the copy is centred under the window');
-  assert.match(css, /\.mode-info \.head \{[^}]*justify-content: center/, 'so is the icon and title of the mode');
+  assert.match(css, /\.mode-tabs \{[^}]*flex-wrap: wrap[^}]*min-width: 0;/, 'the labels wrap rather than hide');
+  assert.match(css, /@media \(max-width: 900px\) \{[\s\S]*?\.mode-tabs \{ flex-wrap: nowrap; overflow-x: auto/,
+    'they only become a scroller once the layout has one column');
+  assert.match(css, /\.mode-copy \{ min-width: 0; \}/, 'the copy takes its column, left-aligned like a scene\'s');
+
   // The pre-alpha tag is sewn into the corner the new control takes, so the window
   // that carries the tag is what moves the control clear of it.
   assert.match(script, /if \(frame\.querySelector\('\.mode-ribbon'\)\) frame\.classList\.add\('has-ribbon'\);/, 'a pre-alpha window notes the tag in its corner');

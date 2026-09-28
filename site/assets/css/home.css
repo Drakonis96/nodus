@@ -185,20 +185,21 @@ select,
 }
 
 /* ============================================================ vault scenes */
-/* One measure for every app window on the home page: the width a scene gives its
-   frame (the wrap's 1.08fr column, the gap taken out), written once so the four
-   windows above and the five modes below them come out the same size. */
-:root { --shot-w: min(606px, 44.13vw); }
-.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
-.scene-inner {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, var(--shot-w));
-  gap: clamp(32px, 5vw, 72px); align-items: center;
+/* The window and the copy beside it. Every app window on the home page — the four
+   vault scenes and the five modes further down — takes the wide column of this
+   same pair, so they come out one size at every width and the copy keeps the rest.
+   A scene puts the copy first; a flipped scene and the mode carousel put the
+   window first, and the copy moves to the right. */
+.scene-inner, .mode-body {
+  display: grid; align-items: center;
+  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
 }
+.scene[data-flip] .scene-inner,
+.mode-body { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
 /* every other scene puts the visual first, so the eye zig-zags down the page */
 .scene[data-flip] .scene-copy { order: 2; }
-/* Flipping moves the window to the leading column, not into the narrow one: every
-   window on the page is the same width, whichever side of the copy it sits on. */
-.scene[data-flip] .scene-inner { grid-template-columns: minmax(0, var(--shot-w)) minmax(0, 1fr); }
 
 .scene-index {
   display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px;
@@ -405,13 +406,11 @@ select,
 }
 .mode-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* The window on its own, with the copy under it: one centred column — the tabs, the
-   window at the width a vault window has, then what the mode is. */
-.mode-body {
-  display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center;
-  gap: clamp(24px, 3vw, 38px);
-}
-.mode-stage { width: min(100%, var(--shot-w)); }
+/* The window takes the wide column and the mode is described at its right, the way
+   a vault scene is laid out — with the copy level with the top of the window, since
+   a mode says less than a vault does. The pair of columns itself is the one
+   declared with the scenes, so this window is exactly the width of the four above. */
+.mode-body { align-items: start; }
 /* The slides are <section>s, and the page pads every section by up to 148px: that
    pushed the window down inside its own column while the copy stayed at the top,
    which is the misalignment this class exists to undo. */
@@ -419,9 +418,9 @@ select,
 .mode-slide[hidden] { display: none; }
 .mode-body .frame { margin: 0; }
 .mode-body .shot figcaption { font-size: 12px; }
-.mode-copy { min-width: 0; width: min(100%, 660px); text-align: center; }
+.mode-copy { min-width: 0; }
 .mode-info[hidden] { display: none; }
-.mode-info .head { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 14px; }
+.mode-info .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .mode-info .pic {
   display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
   border-radius: 11px; border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
@@ -433,7 +432,7 @@ select,
 .mode-info .arrow-link { color: var(--vc); font-size: 13.5px; }
 /* The phase a mode is in, said in words: the ribbon alone would be hover-only. */
 .mode-info .mode-phase {
-  max-width: 560px; margin: 0 auto 16px; padding: 10px 12px; border-radius: var(--r-m);
+  margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-m);
   border: 1px dashed color-mix(in srgb, #fbbf24 45%, transparent);
   background: rgba(251, 191, 36, 0.06);
   font-size: 12.5px; color: var(--ink-2);
@@ -471,9 +470,9 @@ select,
 .mode-ribbon:focus .mode-ribbon-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 @media (max-width: 900px) {
-  .mode-body { grid-template-columns: minmax(0, 1fr); }
-  /* One column each: the window takes the row, as the vault windows do. */
-  .mode-stage { width: 100%; }
+  /* The labels wrap while there is room for two rows; only below this width do
+     they become a row you have to scroll, which is what keeps every one of them
+     readable on a desktop window of any size. */
   .mode-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
   .mode-tab { flex: 0 0 auto; }
 }
@@ -722,7 +721,9 @@ select,
   /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so
      one wide child (a screenshot frame, a long label) pushes the whole column
      past the viewport and the page scrolls sideways */
-  .scene-inner { grid-template-columns: minmax(0, 1fr); }
+  /* The mode carousel folds here too, not at a width of its own: a window and its
+     copy are one pair everywhere on the page, so both stack at the same point. */
+  .scene-inner, .mode-body { grid-template-columns: minmax(0, 1fr); }
   .scene[data-flip] .scene-copy { order: 0; }
   .tool-hero { grid-template-columns: minmax(0, 1fr); }
 }
