@@ -16,7 +16,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -74,6 +74,8 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const KO: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.ko,
   ...ACADEMIC_MANUAL_TRANSLATIONS["ko"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "웹을 탐색하고 연구 자료를 저장하세요.",
@@ -97,7 +99,7 @@ export const KO: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.ko,
   ...AI_OCR_TRANSLATIONS.ko,
   ...TOOLKIT_APPS_TRANSLATIONS.ko,
-  ...SERVER_TRANSLATIONS.ko,
+  ...SERVER_LOCALE_TRANSLATIONS.ko,
   ...CLOUDFLARE_TRANSLATIONS.ko,
   ...TRANSLATE_TRANSLATIONS.ko,
   ...BROWSER_CONNECTOR_TRANSLATIONS.ko,
@@ -1286,7 +1288,7 @@ export const KO: Record<string, string> = {
   "Bóveda activa": "활성 볼트",
   "Bóveda": "볼트",
   "Bóvedas": "금고",
-  "Activa": "활동적인",
+  "Activa": "활성",
   "Sin bóveda activa": "활성 저장소 없음",
   "Cargar": "짐",
   "Nueva bóveda": "새로운 금고",
@@ -1669,7 +1671,7 @@ export const KO: Record<string, string> = {
   "Copia el macro nodus_copilot.py en la carpeta de macros de LibreOffice. Para usarlo en LibreOffice Writer, ve a Herramientas -> Macros -> Ejecutar macro -> Mis macros -> nodus_copilot -> start_nodus_copilot.": "nodus_copilot.py 매크로를 LibreOffice 매크로 폴더에 복사합니다. LibreOffice Writer에서 사용하려면 도구 -> 매크로 -> 매크로 실행 -> 내 매크로 -> nodus_copilot -> start_nodus_copilot으로 이동하세요.",
   "Ayuda para conectar un cliente MCP": "MCP 클라이언트 연결 도움말",
   "Puerto local": "로컬 포트",
-  "Activo": "달리기",
+  "Activo": "활성",
   "Error del servidor MCP": "MCP 서버 오류",
   "Apagado": "끄다",
   "Ver datos de conexión": "연결 세부정보 보기",
@@ -2087,7 +2089,7 @@ export const KO: Record<string, string> = {
   "Ver obras": "작품보기",
   "progreso": "진전",
   "pausada": "일시중지됨",
-  "activa": "활동적인",
+  "activa": "활성",
   "{n} fallidos": "{n} 실패",
   "sin pendientes": "보류 중인 항목 없음",
   "ideas navegables": "탐색 가능한 아이디어",
@@ -2984,7 +2986,7 @@ export const KO: Record<string, string> = {
   "Preparar estructura": "구조 준비",
   "Subir capítulo": "장 업로드",
   "Revisar capítulo": "검토 장",
-  "Completado": "완벽한",
+  "Completado": "완료",
   "Objetivo, alcance, pregunta principal y criterio de selección": "목표, 범위, 주요 질문 및 선정 기준",
   "Guardar brief": "요약 저장",
   "Brief actualizado. El flujo guiado ya usa este objetivo.": "간략하게 업데이트되었습니다. 이제 안내식 흐름에서 이 목표를 사용합니다.",

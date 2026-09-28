@@ -16,7 +16,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -74,6 +74,8 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * translator's review debt and should be treated as a first pass.
  */
 export const JA: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.ja,
   ...ACADEMIC_MANUAL_TRANSLATIONS["ja"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "ウェブを閲覧し、研究のための資料を保存します。",
@@ -97,7 +99,7 @@ export const JA: Record<string, string> = {
   ...PROTECT_TRANSLATIONS.ja,
   ...AI_OCR_TRANSLATIONS.ja,
   ...TOOLKIT_APPS_TRANSLATIONS.ja,
-  ...SERVER_TRANSLATIONS.ja,
+  ...SERVER_LOCALE_TRANSLATIONS.ja,
   ...CLOUDFLARE_TRANSLATIONS.ja,
   ...TRANSLATE_TRANSLATIONS.ja,
   ...BROWSER_CONNECTOR_TRANSLATIONS.ja,
@@ -1669,7 +1671,7 @@ export const JA: Record<string, string> = {
   "Copia el macro nodus_copilot.py en la carpeta de macros de LibreOffice. Para usarlo en LibreOffice Writer, ve a Herramientas -> Macros -> Ejecutar macro -> Mis macros -> nodus_copilot -> start_nodus_copilot.": "nodus_copilot.py マクロを LibreOffice マクロフォルダーにコピーします。 LibreOffice Writer で使用するには、[ツール] -> [マクロ] -> [マクロの実行] -> [マイマクロ] -> [nodus_copilot] -> [start_nodus_copilot] に移動します。",
   "Ayuda para conectar un cliente MCP": "MCP クライアントの接続に関するヘルプ",
   "Puerto local": "ローカルポート",
-  "Activo": "ランニング",
+  "Activo": "アクティブ",
   "Error del servidor MCP": "MCPサーバーエラー",
   "Apagado": "オフ",
   "Ver datos de conexión": "接続の詳細を表示する",

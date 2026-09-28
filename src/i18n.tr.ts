@@ -16,7 +16,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -69,6 +69,8 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Turkish interface table; coverage prohibits runtime fallbacks. */
 export const TR: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.tr,
   ...ACADEMIC_MANUAL_TRANSLATIONS["tr"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Web’de gezinin ve araştırmanız için kaynakları kaydedin.",
@@ -279,7 +281,7 @@ export const TR: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.tr,
   ...PROTECT_TRANSLATIONS.tr,
   ...TOOLKIT_APPS_TRANSLATIONS.tr,
-  ...SERVER_TRANSLATIONS.tr,
+  ...SERVER_LOCALE_TRANSLATIONS.tr,
   ...CLOUDFLARE_TRANSLATIONS.tr,
   ...TRANSLATE_TRANSLATIONS.tr,
   ...BROWSER_CONNECTOR_TRANSLATIONS.tr,

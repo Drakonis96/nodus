@@ -1065,7 +1065,6 @@ const SERVER_READER_EN: Record<string, string> = {
 
 const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
   fr: {
-    ...SERVER_READER_EN,
     Publicado: "Publié",
     Borrador: "Brouillon",
     Archivado: "Archivé",
@@ -1158,7 +1157,6 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Vault publicado": "Vault publié",
   },
   de: {
-    ...SERVER_READER_EN,
     Publicado: "Veröffentlicht",
     Borrador: "Entwurf",
     Archivado: "Archiviert",
@@ -1251,7 +1249,6 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Vault publicado": "Veröffentlichter Vault",
   },
   pt: {
-    ...SERVER_READER_EN,
     Publicado: "Publicado",
     Borrador: "Rascunho",
     Archivado: "Arquivado",
@@ -1344,7 +1341,6 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Vault publicado": "Vault publicado",
   },
   "pt-BR": {
-    ...SERVER_READER_EN,
     Publicado: "Publicado",
     Borrador: "Rascunho",
     Archivado: "Arquivado",
@@ -1437,7 +1433,6 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Vault publicado": "Vault publicado",
   },
   it: {
-    ...SERVER_READER_EN,
     Publicado: "Pubblicato",
     Borrador: "Bozza",
     Archivado: "Archiviato",
@@ -1452,7 +1447,7 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Informe sin contenido": "Rapporto senza contenuto",
     "La lectura en voz alta no está disponible en este navegador":
       "La lettura ad alta voce non è disponibile in questo browser",
-    Proveedor: "Provider",
+    Proveedor: "Fornitore",
     Modelo: "Modello",
     "Nueva conversación": "Nuova conversazione",
     "Conversaciones privadas": "Conversazioni private",
@@ -1530,7 +1525,6 @@ const SERVER_READER_LOCALE_OVERRIDES: Record<string, Record<string, string>> = {
     "Vault publicado": "Vault pubblicato",
   },
   tr: {
-    ...SERVER_READER_EN,
     Publicado: "Yayınlandı",
     Borrador: "Taslak",
     Archivado: "Arşivlendi",
@@ -4530,11 +4524,12 @@ const complete = (values: Record<string, string>): Record<string, string> => ({
   ...SERVER_NATIVE_EN,
   ...values,
 });
-const completeWith = (
+/** A locale's own table plus every override slice written for it. */
+const localeOwn = (
   locale: string,
   values: Record<string, string>,
 ): Record<string, string> => ({
-  ...complete(values),
+  ...values,
   ...(DEEP_RESEARCH_LOCALE_OVERRIDES[locale] || {}),
   ...(DATABASE_DEEP_LOCALE_OVERRIDES[locale] || {}),
   ...(SERVER_READER_LOCALE_OVERRIDES[locale] || {}),
@@ -4542,28 +4537,21 @@ const completeWith = (
   ...(SERVER_WEB_TEXT_LOCALE_OVERRIDES[locale] || {}),
 });
 
-export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
+/**
+ * What each locale translates itself, with no English underneath. The desktop
+ * tables (src/i18n.<lang>.ts) merge THIS, never SERVER_TRANSLATIONS: a key the
+ * server only has in English would otherwise reach them as an English value
+ * and replace the desktop's own translation (IT['Completado'] read
+ * "Completed" over the Italian table's "Completo"). A key missing here still
+ * reads in English on the desktop, through its own English fallback.
+ */
+export const SERVER_LOCALE_TRANSLATIONS: Record<string, Record<string, string>> = {
   // Every other locale receives SERVER_READER_EN through complete(); English is
   // the base of that catalogue, so without it here English is the one language
   // where the server reader chrome falls back to Spanish.
   en: { ...EN, ...SERVER_READER_EN, ...SERVER_NATIVE_EN, ...SERVER_WEB_TEXT_EN },
-  // Simplified Chinese mirror of the en slice: every Spanish key is translated
-  // below, so the base spreads only keep the shapes identical. The Traditional
-  // entry mirrors it the same way, over ZH_TW_SERVER.
-  'zh-CN': {
-    ...EN,
-    ...SERVER_READER_EN,
-    ...SERVER_NATIVE_EN,
-    ...SERVER_WEB_TEXT_EN,
-    ...ZH_CN_SERVER,
-  },
-  'zh-TW': {
-    ...EN,
-    ...SERVER_READER_EN,
-    ...SERVER_NATIVE_EN,
-    ...SERVER_WEB_TEXT_EN,
-    ...ZH_TW_SERVER,
-  },
+  'zh-CN': ZH_CN_SERVER,
+  'zh-TW': ZH_TW_SERVER,
   ko: {
     "Conectado a": "연결됨",
     "Vault publicado correctamente.": "Vault가 게시되었습니다.",
@@ -4834,7 +4822,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "Cola e historial privados": "개인 큐 및 기록",
     "En cola": "대기 중",
     "Procesando": "처리",
-    "Completado": "완벽한",
+    "Completado": "완료",
     "Cancelado": "취소",
     "Fallido": "실패한",
     "Cancelar": "취소",
@@ -5866,7 +5854,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "Hay más registros publicados. Usa la paginación de la vista para continuar.": "さらに多くの公開レコードが入手可能です。続行するには、ビューのページネーションを使用してください。",
     "Datos privados; no se muestran en el servidor": "個人データ。サーバーには表示されない",
   },
-  fr: completeWith("fr", {
+  fr: localeOwn("fr", {
     Bandeja: "Boîte de réception",
     "1 cambio": "1 modification",
     "{n} cambios": "{n} modifications",
@@ -5951,7 +5939,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "s'exécute avec Docker sur un autre ordinateur ou VPS. Il peut utiliser le Caddy inclus ou votre Caddy/Nginx existant avec un domaine ou sous-domaine et HTTPS. La configuration initiale et la gestion des utilisateurs se font dans le navigateur.",
   }),
-  de: completeWith("de", {
+  de: localeOwn("de", {
     Bandeja: "Posteingang",
     "1 cambio": "1 Änderung",
     "{n} cambios": "{n} Änderungen",
@@ -6036,7 +6024,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "läuft mit Docker auf einem anderen Computer oder VPS. Es kann das enthaltene Caddy oder Ihr vorhandenes Caddy/Nginx mit Domain bzw. Subdomain und HTTPS verwenden. Ersteinrichtung und Benutzerverwaltung erfolgen im Browser.",
   }),
-  pt: completeWith("pt", {
+  pt: localeOwn("pt", {
     Bandeja: "Caixa de entrada",
     "1 cambio": "1 alteração",
     "{n} cambios": "{n} alterações",
@@ -6120,7 +6108,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "é executado com Docker noutro computador ou VPS. Pode usar o Caddy incluído ou o teu Caddy/Nginx existente com um domínio ou subdomínio e HTTPS. A configuração inicial e a gestão de utilizadores são feitas no navegador.",
   }),
-  "pt-BR": completeWith("pt-BR", {
+  "pt-BR": localeOwn("pt-BR", {
     Bandeja: "Caixa de entrada",
     "1 cambio": "1 alteração",
     "{n} cambios": "{n} alterações",
@@ -6204,7 +6192,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "é executado com Docker em outro computador ou VPS. Pode usar o Caddy incluído ou seu Caddy/Nginx existente com domínio ou subdomínio e HTTPS. A configuração inicial e o gerenciamento de usuários são feitos no navegador.",
   }),
-  it: completeWith("it", {
+  it: localeOwn("it", {
     Bandeja: "Posta in arrivo",
     "1 cambio": "1 modifica",
     "{n} cambios": "{n} modifiche",
@@ -6289,7 +6277,7 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "viene eseguito con Docker su un altro computer o VPS. Può usare Caddy incluso oppure il tuo Caddy/Nginx esistente con un dominio o sottodominio e HTTPS. La configurazione iniziale e la gestione degli utenti avvengono nel browser.",
   }),
-  tr: completeWith("tr", {
+  tr: localeOwn("tr", {
     Bandeja: "Gelen kutusu",
     "1 cambio": "1 değişiklik",
     "{n} cambios": "{n} değişiklik",
@@ -6372,4 +6360,44 @@ export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
     "se ejecuta con Docker en otro equipo o VPS. Puede usar el Caddy incluido o tu Caddy/Nginx existente con un dominio o subdominio y HTTPS. La configuración inicial y la gestión de usuarios se hacen desde el navegador.":
       "başka bir bilgisayarda veya VPS’te Docker ile çalışır. Dahili Caddy’yi veya bir alan adı/alt alan adı ve HTTPS ile mevcut Caddy/Nginx’inizi kullanabilir. İlk kurulum ve kullanıcı yönetimi tarayıcıdan yapılır.",
   }),
-} as const;
+};
+
+/**
+ * The catalogue Server Web resolves through: every locale completed over the
+ * English bases, so a string it has not translated reads in English rather
+ * than in the Spanish source.
+ */
+export const SERVER_TRANSLATIONS: Record<string, Record<string, string>> = {
+  en: SERVER_LOCALE_TRANSLATIONS.en,
+  // Simplified Chinese mirror of the en slice: every Spanish key is translated
+  // in ZH_CN_SERVER, so the English base only keeps the shapes identical. The
+  // Traditional entry mirrors it the same way, over ZH_TW_SERVER.
+  'zh-CN': { ...SERVER_LOCALE_TRANSLATIONS.en, ...ZH_CN_SERVER },
+  'zh-TW': { ...SERVER_LOCALE_TRANSLATIONS.en, ...ZH_TW_SERVER },
+  ko: SERVER_LOCALE_TRANSLATIONS.ko,
+  ja: SERVER_LOCALE_TRANSLATIONS.ja,
+  fr: complete(SERVER_LOCALE_TRANSLATIONS.fr),
+  de: complete(SERVER_LOCALE_TRANSLATIONS.de),
+  pt: complete(SERVER_LOCALE_TRANSLATIONS.pt),
+  "pt-BR": complete(SERVER_LOCALE_TRANSLATIONS["pt-BR"]),
+  it: complete(SERVER_LOCALE_TRANSLATIONS.it),
+  tr: complete(SERVER_LOCALE_TRANSLATIONS.tr),
+};
+
+/**
+ * The keys a locale has only in English, as SERVER_TRANSLATIONS fills them in.
+ * A desktop table spreads this FIRST, before any entry of its own, so the key
+ * exists there yet any desktop translation beats it; the locale's real
+ * translations arrive separately through SERVER_LOCALE_TRANSLATIONS.
+ */
+export const SERVER_ENGLISH_FALLBACKS: Record<string, Record<string, string>> =
+  Object.fromEntries(
+    Object.entries(SERVER_TRANSLATIONS).map(([locale, table]) => [
+      locale,
+      Object.fromEntries(
+        Object.entries(table).filter(
+          ([key]) => !Object.hasOwn(SERVER_LOCALE_TRANSLATIONS[locale] ?? {}, key),
+        ),
+      ),
+    ]),
+  );

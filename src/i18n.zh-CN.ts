@@ -16,7 +16,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -75,6 +75,8 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_CN: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS['zh-CN'],
   ...ACADEMIC_MANUAL_TRANSLATIONS["zh-CN"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "浏览网页并保存研究资料。",
@@ -146,7 +148,7 @@ export const ZH_CN: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS['zh-CN'],
   ...PROTECT_TRANSLATIONS['zh-CN'],
   ...TOOLKIT_APPS_TRANSLATIONS['zh-CN'],
-  ...SERVER_TRANSLATIONS['zh-CN'],
+  ...SERVER_LOCALE_TRANSLATIONS['zh-CN'],
   ...CLOUDFLARE_TRANSLATIONS['zh-CN'],
   ...TRANSLATE_TRANSLATIONS['zh-CN'],
   ...BROWSER_CONNECTOR_TRANSLATIONS['zh-CN'],

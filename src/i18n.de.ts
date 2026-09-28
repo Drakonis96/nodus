@@ -22,7 +22,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -74,6 +74,8 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const DE: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.de,
   ...ACADEMIC_MANUAL_TRANSLATIONS["de"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Durchsuche das Web und speichere Quellen für deine Forschung.",
@@ -282,7 +284,7 @@ export const DE: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.de,
   ...PROTECT_TRANSLATIONS.de,
   ...TOOLKIT_APPS_TRANSLATIONS.de,
-  ...SERVER_TRANSLATIONS.de,
+  ...SERVER_LOCALE_TRANSLATIONS.de,
   ...CLOUDFLARE_TRANSLATIONS.de,
   ...TRANSLATE_TRANSLATIONS.de,
   ...BROWSER_CONNECTOR_TRANSLATIONS.de,
