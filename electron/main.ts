@@ -54,6 +54,7 @@ import { seedWelcomeNotification } from './notifications';
 import { startRadarScheduler, stopRadarScheduler } from './radar/scheduler';
 import { refreshAnnouncements } from './announcements';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
+import { startAppleCalendarSync, stopAppleCalendarSync } from './calendar/appleCalendarSync';
 import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
@@ -1220,6 +1221,7 @@ app.whenReady().then(async () => {
   seedWelcomeNotification();
   startRadarScheduler();
   startStudyCalendarReminders();
+  startAppleCalendarSync();
   applyMascotWindow();
   setupAutoUpdates();
   void reportInterruptedUpdateInstall();
@@ -1285,6 +1287,7 @@ app.on('before-quit', () => {
   stopDocumentaryPreparation();
   void stopResearchZotero();
   stopStudyCalendarReminders();
+  stopAppleCalendarSync();
   stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);

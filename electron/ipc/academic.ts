@@ -313,6 +313,8 @@ import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
 import { getActiveVault, withOwningVault } from '../vaults/vaultRegistry';
+import { configureAppleCalendarSync, getAppleCalendarSyncStatus, requestAppleCalendarSync } from '../calendar/appleCalendarSync';
+import { listAppleCalendars } from '../calendar/appleCalendarBridge';
 
 // Mirrors MANUAL_IDEA_MARKER in shared/types.ts. Defined locally because the
 // electron sub-build erases type-only @shared imports but cannot resolve the
@@ -1491,10 +1493,14 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('study:planner:get', async () => studyLearning.getStudyPlanner());
   h('study:planner:create', async (_e, input) => studyLearning.createStudyPlan(input));
   h('study:planner:block:create', async (_e, input) => studyLearning.createStudyPlanBlock(input));
-  h('study:planner:event:create', async (_e, input) => studyLearning.createStudyCalendarEvent(input));
-  h('study:planner:event:update', async (_e, id: string, input) => studyLearning.updateStudyCalendarEvent(id, input));
-  h('study:planner:event:delete', async (_e, id: string) => studyLearning.deleteStudyCalendarEvent(id));
-  h('study:planner:event:external', async (_e, id: string, target: 'google' | 'icloud') => {
+  h('study:planner:event:create', async (_e, input) => { const event = studyLearning.createStudyCalendarEvent(input); requestAppleCalendarSync(); return event; });
+  h('study:planner:event:update', async (_e, id: string, input) => { const event = studyLearning.updateStudyCalendarEvent(id, input); requestAppleCalendarSync(); return event; });
+  h('study:planner:event:delete', async (_e, id: string) => { studyLearning.deleteStudyCalendarEvent(id); requestAppleCalendarSync(); });
+  h('study:calendar:apple:status', async () => getAppleCalendarSyncStatus(getActiveVault().id));
+  h('study:calendar:apple:destinations', async () => listAppleCalendars(true));
+  h('study:calendar:apple:configure', async (_e, input) => configureAppleCalendarSync(getActiveVault().id, input));
+  h('study:planner:event:external', async (_e, id: string, target: 'google' | 'icloud' | 'outlook') => {
+    if (!['google', 'icloud', 'outlook'].includes(target)) throw new Error('Destino de calendario no válido.');
     const event = studyLearning.getStudyPlanner().events.find((item) => item.id === id);
     if (!event) throw new Error('Evento no encontrado.');
     if (target === 'google') {
@@ -1504,21 +1510,35 @@ export function registerAcademicIpc(context: IpcContext): void {
       params.append('sprop', 'name:Nodus');
       if (event.url) params.set('location', event.url);
       await shell.openExternal(`https://calendar.google.com/calendar/render?${params.toString()}`);
-      return;
+      return null;
+    }
+    const ics = studyLearning.renderStudyCalendarEventIcs(id);
+    if (target === 'outlook') {
+      const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, {
+        title: `${dialogTitle('exportStudyCalendar', getSettings().uiLanguage)} · Outlook`,
+        defaultPath: `nodus-evento-${event.shortId.replace(/[^a-zA-Z0-9_-]/g, '')}.ics`,
+        filters: [{ name: 'iCalendar · Outlook', extensions: ['ics'] }],
+      });
+      if (picked.canceled || !picked.filePath) return null;
+      fs.writeFileSync(picked.filePath, ics, 'utf8');
+      return { path: picked.filePath };
     }
     const filePath = path.join(os.tmpdir(), `nodus-${event.id}.ics`);
-    fs.writeFileSync(filePath, studyLearning.renderStudyCalendarEventIcs(id), 'utf8');
+    fs.writeFileSync(filePath, ics, 'utf8');
     const error = await shell.openPath(filePath);
     if (error) throw new Error(error);
+    return null;
   });
   h('study:planner:goal:create', async (_e, input) => studyLearning.createStudyGoal(input));
-  h('study:planner:item:update', async (_e, kind, id: string, patch) => studyLearning.updateStudyPlannerItem(kind, id, patch));
+  h('study:planner:item:update', async (_e, kind, id: string, patch) => { studyLearning.updateStudyPlannerItem(kind, id, patch); if (kind === 'event') requestAppleCalendarSync(); });
   h('study:planner:session:start', async (_e, input) => studyLearning.startStudySession(input));
   h('study:planner:session:finish', async (_e, id: string, input) => studyLearning.finishStudySession(id, input));
-  h('study:planner:exportIcs', async () => {
-    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('exportStudyCalendar', getSettings().uiLanguage), defaultPath: 'nodus-estudio.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
+  h('study:planner:exportIcs', async (_e, target?: 'outlook') => {
+    // Capture the originating vault before the user can switch vaults in the save dialog.
+    const ics = studyLearning.renderStudyPlannerIcs();
+    const picked = await dialog.showSaveDialog(getWindow() ?? undefined!, { title: dialogTitle('exportStudyCalendar', getSettings().uiLanguage) + (target === 'outlook' ? ' · Outlook' : ''), defaultPath: 'nodus-calendario.ics', filters: [{ name: 'iCalendar', extensions: ['ics'] }] });
     if (picked.canceled || !picked.filePath) return null;
-    fs.writeFileSync(picked.filePath, studyLearning.renderStudyPlannerIcs(), 'utf8'); return { path: picked.filePath };
+    fs.writeFileSync(picked.filePath, ics, 'utf8'); return { path: picked.filePath };
   });
   h('study:ai:usage:list', async (_e, limit?: number) => studyAiUsage.listStudyAiUsage(limit));
   h('study:ai:usage:summary', async () => studyAiUsage.getStudyAiUsageSummary());
