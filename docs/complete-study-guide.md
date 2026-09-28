@@ -62,8 +62,9 @@ separating AI-written explanation from source content, exportable to MD, PDF and
 
 1. [x] Foundations: types, fail-closed routing guard, selection, snapshot, tree,
    estimate, catalog/preview IPC.
-2. [ ] Infrastructure: run/cache/artifact tables (local, not synced), usage meter,
-   job-scoped output language.
+2. [x] Infrastructure: run/cache/artifact tables (migration 194, local, not synced),
+   usage meter, job-scoped output language (every Deep Research job now honours the
+   language chosen in the form).
 3. [ ] Passes 1–3: reconnaissance, syllabus/unit coverage, anchored extraction.
 4. [ ] Passes 4–7: plan with code-checked coverage, block writer, verification
    (anchors, KaTeX, premise audit), reference sections, review sheet.
@@ -76,6 +77,11 @@ separating AI-written explanation from source content, exportable to MD, PDF and
    under a USD 5 ledger ceiling.
 
 ## Validation
+
+`node --test scripts/test-complete-guide-infrastructure.mjs` runs migration 194 on
+`node:sqlite` and covers frozen snapshots, resumable checkpoints, stale-run pruning,
+the shared LRU reading cache, sidecar deletion, the job language scope and nested
+usage meters.
 
 `node --test scripts/test-complete-guide-foundations.mjs` covers config
 validation, nested folder/unit expansion, legacy placements, exclusions, transcript

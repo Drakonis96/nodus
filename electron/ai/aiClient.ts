@@ -3,6 +3,8 @@ import { withJobThinking } from './thinkingEffort';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { documentVisualPlanningPrompt } from './documentVisualContext';
+import { jobOutputLanguage } from './jobOutputLanguage';
+import { recordProviderUsage } from './usageMeter';
 import { excludeInvisibleArtifacts } from '../capabilities/modelHistory';
 import { getApiKey } from '../secrets/secretStore';
 import {
@@ -743,7 +745,7 @@ function outputLanguageDirective(lang: PromptLanguage): string {
 /** Exported for unit testing: appends the output-language directive per the current
  *  `promptLanguage` setting without mutating the base prompt. */
 export function withPromptLanguage<T extends { system: string; englishImagePrompts?: boolean }>(opts: T): T {
-  const lang = getSettings().promptLanguage ?? 'es';
+  const lang = jobOutputLanguage() ?? getSettings().promptLanguage ?? 'es';
   const toolException = opts.englishImagePrompts ? '\nIMAGE TOOL PROTOCOL EXCEPTION: In nodus-image JSON requests, the prompt field is an internal production instruction and MUST be written in English. Visible prose, title and alt still follow the output language above. Keep JSON keys and aspect-ratio values unchanged.' : '';
   return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}${toolException}` };
 }
@@ -759,7 +761,7 @@ export function withPromptLanguage<T extends { system: string; englishImagePromp
 export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
   let pack = '';
   try {
-    pack = vaultTypePromptPack(getActiveVault().type, getSettings().promptLanguage ?? 'es');
+    pack = vaultTypePromptPack(getActiveVault().type, jobOutputLanguage() ?? getSettings().promptLanguage ?? 'es');
   } catch {
     pack = '';
   }
@@ -1390,6 +1392,7 @@ async function rawCompleteTransport(
           images: opts.images,
         }));
       if (result.headers) observeProviderQuota(model, opts, key, endpoint, result.headers);
+      recordProviderUsage(model, result.inputTokens ?? null, result.outputTokens ?? null);
       perfLogNs('AI response metadata', 0n, opts.perf, {
         provider: model.provider,
         model: model.model,
@@ -1501,6 +1504,7 @@ async function rawCompleteTransport(
         timestamp: Date.now(),
       });
     }
+    recordProviderUsage(model, Number((res as any).usage?.prompt_tokens) || null, Number((res as any).usage?.completion_tokens) || null);
     perfLogNs('AI response metadata', 0n, opts.perf, {
       provider: model.provider,
       model: model.model,

@@ -32,6 +32,7 @@ import { getActiveVault } from '../vaults/vaultRegistry';
 import { generateGenealogyDeepResearchReport } from './genealogyDeepResearch';
 import { generateStudyDeepResearchReport } from './studyDeepResearch';
 import { normalizeCompleteGuideConfig } from '@shared/completeGuide/types';
+import { withJobOutputLanguage } from './jobOutputLanguage';
 import {
   buildHistoricalWritingWorkshopSnapshot,
   buildIdeaFirstWritingWorkshopSnapshot,
@@ -123,8 +124,10 @@ export async function generateDeepResearchReport(request: DeepResearchRequest, o
   const runSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   try {
     // The thinking level chosen in the form applies to every call the report makes to its model.
-    return await withJobThinkingEffort(request.thinkingEffort, request.model ?? settings.deepResearchModel ?? settings.synthesisModel,
-      () => withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints)), runSignal);
+    // The language chosen in the form, when present, is the output language of every
+    // call; the vault-wide setting only applies to requests that do not name one.
+    return await withJobOutputLanguage(request.language, () => withJobThinkingEffort(request.thinkingEffort, request.model ?? settings.deepResearchModel ?? settings.synthesisModel,
+      () => withDocumentVisualPlanning(catalog, hints, () => generateDeepResearchReportWithVisualPlan(request, onProgress, runSignal, hints)), runSignal));
   } finally { release(); }
 }
 
