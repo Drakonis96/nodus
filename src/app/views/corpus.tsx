@@ -242,6 +242,10 @@ export const corpusViews = {
         onOpenStudyMaterial={(id) => { ctx.setStudyMaterialTarget({ id }); ctx.setView('studyLibrary'); }}
         onOpenStudyRecording={(id, timestamp) => { ctx.setStudyRecordingTarget({ id, timestamp }); ctx.setView('studyRecordings'); }}
         onOpenWorldEntry={(kind) => { const target = WORLD_REFERENCE_VIEW[kind]; if (target) ctx.setView(target); }}
+        studyLinks={ctx.isEstudio || ctx.isDocencia ? {
+          onOpenLocation: (target) => { ctx.setStudyTarget(target); ctx.setView('studyCourses'); },
+          onOpenMaterial: (id) => { ctx.setStudyMaterialTarget({ id }); ctx.setView('studyLibrary'); },
+        } : undefined}
       />
     )),
 } satisfies Record<string, ViewRenderer>;

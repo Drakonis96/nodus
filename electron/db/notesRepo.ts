@@ -13,6 +13,7 @@ import type {
 import { getDb } from './database';
 import { currentEmbeddingConfig, encodeEmbedding, embeddingTextHash } from './ideasRepo';
 import { synchronizeNotePage } from './pagesRepo';
+import { deleteStudyNoteLinksFor } from './studyNoteLinksRepo';
 import { notifyAuthoredResearchSourceChanged } from '../ai/researchCorpusEvents';
 
 interface NoteFolderRow {
@@ -293,7 +294,12 @@ export function moveNote(id: string, folderId: string | null): Note | null {
 }
 
 export function deleteNote(id: string): boolean {
-  return getDb().prepare('DELETE FROM notes WHERE id = ?').run(id).changes > 0;
+  // The note's links to study places go with it: they have no foreign key (see
+  // studyNoteLinksSchema.ts), so this is the one place a permanent delete clears them.
+  return getDb().transaction(() => {
+    deleteStudyNoteLinksFor('note_id', id);
+    return getDb().prepare('DELETE FROM notes WHERE id = ?').run(id).changes > 0;
+  })();
 }
 
 export function patchNoteTags(ids: string[], patch: NoteTagPatch): Note[] {

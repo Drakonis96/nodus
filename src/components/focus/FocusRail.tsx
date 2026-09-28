@@ -6,6 +6,8 @@ import { openFocusLayout, openFocusTimer, useStudyFocus, useStudyFocusLayout } f
 import { focusClock, focusRemaining, phaseName } from './FocusControls';
 import { STUDY_WORKSPACE_CHANGED, announceStudyWorkspaceChanged } from '../StudySidebar';
 import { Icon } from '../ui';
+import { openWorkspaceNote } from '../StudyLinkedNotes';
+import type { StudyNoteLink } from '@shared/studyNoteLinks';
 import { errorText, getActiveLang, t, tx } from '../../i18n';
 
 /** One destination of the focus rail, already translated and resolved by the shell. */
@@ -68,7 +70,8 @@ const RailNav = memo(function RailNav({ items }: { items: FocusRailItem[] }) {
 });
 
 type ShelfEntry = { kind: 'document'; id: string; title: string; icon: string; updatedAt: string; pinned: boolean }
-  | { kind: 'material'; id: string; title: string; icon: string; updatedAt: string; pinned: boolean };
+  | { kind: 'material'; id: string; title: string; icon: string; updatedAt: string; pinned: boolean }
+  | { kind: 'note'; id: string; title: string; icon: string; updatedAt: string; pinned: boolean };
 
 const MATERIAL_ICON: Record<StudyMaterialPreviewKind, string> = { pdf: 'fileText', document: 'file', presentation: 'presentation', image: 'image', audio: 'audio', unknown: 'file' };
 const SHELF_LIMIT = 8;
@@ -84,6 +87,7 @@ const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjec
 }) {
   const [workspace, setWorkspace] = useState<StudyWorkspace | null>(null);
   const [materials, setMaterials] = useState<StudyMaterialSummary[] | null>(null);
+  const [linkedNotes, setLinkedNotes] = useState<StudyNoteLink[]>([]);
   const [filter, setFilter] = useState('');
   const [failed, setFailed] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -104,9 +108,12 @@ const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjec
       void Promise.all([
         window.nodus.getStudyWorkspace(),
         window.nodus.listStudyMaterials(subjectId ? { subjectId } : {}),
-      ]).then(([nextWorkspace, nextMaterials]) => {
+        // Workspace notes linked to the subject belong on its shelf; without a subject the
+        // shelf is about recent study files, so they stay out.
+        subjectId ? window.nodus.listStudyNoteLinks({ subjectId }).catch(() => [] as StudyNoteLink[]) : Promise.resolve([] as StudyNoteLink[]),
+      ]).then(([nextWorkspace, nextMaterials, nextLinks]) => {
         if (!alive) return;
-        setWorkspace(nextWorkspace); setMaterials(nextMaterials); setFailed(false);
+        setWorkspace(nextWorkspace); setMaterials(nextMaterials); setLinkedNotes(nextLinks); setFailed(false);
       }).catch(() => { if (alive) setFailed(true); });
     };
     load();
@@ -122,9 +129,10 @@ const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjec
     const all: ShelfEntry[] = [
       ...documents.map(document => ({ kind: 'document' as const, id: document.id, title: document.title || t('Sin título'), icon: 'notebook', updatedAt: document.updatedAt, pinned: document.pinned || document.favorite })),
       ...materials.map(material => ({ kind: 'material' as const, id: material.id, title: material.title || material.fileName, icon: MATERIAL_ICON[material.previewKind] ?? 'file', updatedAt: material.updatedAt, pinned: material.pinned || material.favorite })),
+      ...[...new Map(linkedNotes.map(link => [link.noteId, link.note])).values()].map(note => ({ kind: 'note' as const, id: note.id, title: note.title || t('Sin título'), icon: 'link', updatedAt: note.updatedAt, pinned: false })),
     ];
     return all.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));
-  }, [workspace, materials, subjectId]);
+  }, [workspace, materials, linkedNotes, subjectId]);
   const query = filter.trim().toLocaleLowerCase();
   const visible = (query ? entries.filter(entry => entry.title.toLocaleLowerCase().includes(query)) : entries).slice(0, query ? 50 : SHELF_LIMIT);
   const loading = !workspace || !materials;
@@ -146,7 +154,7 @@ const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjec
       {failed ? <p className="focus-rail-note" role="alert">{t('No se han podido cargar los materiales.')}</p>
         : loading ? <p className="focus-rail-note">{t('Cargando...')}</p>
         : visible.length === 0 ? <p className="focus-rail-note">{query ? t('Nada coincide con el filtro.') : subject ? t('Esta asignatura aún no tiene apuntes ni materiales.') : t('Aún no hay apuntes ni materiales.')}</p>
-        : visible.map(entry => <button type="button" key={`${entry.kind}:${entry.id}`} data-testid={`focus-rail-${entry.kind}-${entry.id}`} className="focus-rail-link" title={`${entry.kind === 'document' ? t('Apunte') : t('Material')} · ${entry.title}`} onClick={() => entry.kind === 'document' ? onOpenDocument(entry.id) : onOpenMaterial(entry.id)}>
+        : visible.map(entry => <button type="button" key={`${entry.kind}:${entry.id}`} data-testid={`focus-rail-${entry.kind}-${entry.id}`} className="focus-rail-link" title={`${entry.kind === 'document' ? t('Apunte') : entry.kind === 'note' ? t('Nota vinculada') : t('Material')} · ${entry.title}`} onClick={() => entry.kind === 'document' ? onOpenDocument(entry.id) : entry.kind === 'note' ? openWorkspaceNote(entry.id) : onOpenMaterial(entry.id)}>
             <Icon name={entry.icon} size={15} /><span className="focus-rail-label">{entry.title}</span>
           </button>)}
       {!loading && !failed && (subject ? entries.length > SHELF_LIMIT : true) && <button type="button" className="focus-rail-more" onClick={() => subject ? onOpenSubject(subject.id) : onOpenLibrary()}>{subject ? t('Ver toda la asignatura') : t('Ver todos los materiales')}<Icon name="chevronRight" size={12} /></button>}

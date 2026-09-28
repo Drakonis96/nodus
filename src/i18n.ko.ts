@@ -5,6 +5,7 @@ import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
+import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -114,6 +115,7 @@ export const KO: Record<string, string> = {
   ...GRAPH_HEALTH_TRANSLATIONS.ko,
   ...STUDY_SOURCE_TRANSLATIONS["ko"],
   ...STUDY_FOCUS_TRANSLATIONS["ko"],
+  ...STUDY_NOTE_LINKS_TRANSLATIONS["ko"],
   ...STUDY_IMPROVE_TRANSLATIONS.ko,
   ...WORKSPACE_TRANSLATIONS.ko,
   ...WORLDBUILDING_TRANSLATIONS.ko,
