@@ -116,7 +116,20 @@ try {
     const f = fixture();
     f.db.prepare('INSERT INTO study_focus_state (id, state_json) VALUES (1, ?)').run(JSON.stringify({ revision: 3, phase: 'work', status: 'ready', durationMs: 1500000, elapsedMs: 0, cycleBlocks: 2, sessionId: null, subjectId: null, recovered: false, preferences: { workMinutes: 30, breakMinutes: 5, longBreakMinutes: 15, dailyGoalMinutes: null } }));
     f.restart(); const state = f.service.snapshot();
-    assert.equal(state.task, null); assert.equal(state.cycleBlocks, 2); assert.equal(state.preferences.workMinutes, 30); assert.equal(state.preferences.sound, true); f.db.close();
+    assert.equal(state.task, null); assert.equal(state.cycleBlocks, 2); assert.equal(state.preferences.workMinutes, 30); assert.equal(state.preferences.sound, true);
+    assert.equal(state.preferences.enterOnStart, true); assert.deepEqual(state.preferences.layout, {}); f.db.close();
+  });
+  check('focus mode layout: validated, replaced as a whole, persisted, and never shared by reference', () => {
+    const f = fixture();
+    f.service.configure({ layout: { 'nav:studyReview': true, 'nav:browser': false, 'header:theme': false }, enterOnStart: false });
+    for (const bad of [null, [], 'x', { 'nav:studyReview': 'yes' }, { '../../etc': true }, { 'other:thing': true }, Object.fromEntries(Array.from({ length: 201 }, (_, i) => [`nav:v${i}`, true]))]) {
+      assert.throws(() => f.service.configure({ layout: bad }), /Valor inválido/);
+    }
+    assert.throws(() => f.service.configure({ enterOnStart: 'no' }), /Valor inválido/);
+    const leaked = f.service.snapshot().preferences.layout; leaked['nav:studyReview'] = false;
+    f.restart(); const prefs = f.service.snapshot().preferences;
+    assert.deepEqual(prefs.layout, { 'nav:studyReview': true, 'nav:browser': false, 'header:theme': false }); assert.equal(prefs.enterOnStart, false);
+    f.service.configure({ layout: {} }); f.restart(); assert.deepEqual(f.service.snapshot().preferences.layout, {}); f.db.close();
   });
   console.log(`${cases} focus integration cases passed (real SQLite).`);
 } finally { rmSync(temp, { recursive: true, force: true }); }

@@ -6,6 +6,10 @@ export interface FocusPreferences {
   longBreakMinutes: number;
   dailyGoalMinutes: number | null;
   sound: boolean;
+  /** Starting a work block also turns on the focus mode. */
+  enterOnStart: boolean;
+  /** What the focus mode shows, as overrides over {@link FOCUS_LAYOUT_DEFAULT_VISIBLE}. */
+  layout: Record<string, boolean>;
 }
 export interface FocusState {
   revision: number;
@@ -48,7 +52,41 @@ export const FOCUS_NOTIFICATION_COPY = {
 } as const;
 export const DEFAULT_FOCUS_PREFERENCES: FocusPreferences = {
   workMinutes: 25, breakMinutes: 5, longBreakMinutes: 15, dailyGoalMinutes: null, sound: true,
+  enterOnStart: true, layout: {},
 };
+
+/**
+ * Everything the focus mode can show or hide. Ids are `block:` (top of the focus
+ * rail), `nav:<view>` (a section in the rail) and `header:` (kept in the header).
+ * Only these are on until the student decides otherwise; every other section of the
+ * vault can be turned on from the focus mode settings.
+ */
+export const FOCUS_LAYOUT_DEFAULT_VISIBLE: ReadonlySet<string> = new Set([
+  'block:timer', 'block:subject', 'block:shelf',
+  'nav:studyCourses', 'nav:studyCalendar', 'nav:studySearch', 'nav:studyLibrary',
+  'nav:studyChat', 'nav:studyQuestions', 'nav:studyDeepResearch', 'nav:browser',
+  'header:media', 'header:commands', 'header:theme', 'header:queue',
+]);
+export const FOCUS_LAYOUT_BLOCKS = ['block:timer', 'block:subject', 'block:shelf'] as const;
+export const FOCUS_LAYOUT_HEADER = ['header:media', 'header:commands', 'header:theme', 'header:queue'] as const;
+const FOCUS_LAYOUT_ID = /^(?:block|nav|header):[A-Za-z0-9:_-]{1,80}$/;
+export const FOCUS_LAYOUT_MAX_ENTRIES = 200;
+
+export function focusLayoutVisible(layout: Record<string, boolean> | undefined, id: string): boolean {
+  return layout?.[id] ?? FOCUS_LAYOUT_DEFAULT_VISIBLE.has(id);
+}
+/** Keeps only well-formed ids with boolean values; anything else is dropped, not trusted. */
+export function sanitizeFocusLayout(value: unknown): Record<string, boolean> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > FOCUS_LAYOUT_MAX_ENTRIES) return null;
+  const layout: Record<string, boolean> = {};
+  for (const [id, visible] of entries) {
+    if (!FOCUS_LAYOUT_ID.test(id) || typeof visible !== 'boolean') return null;
+    layout[id] = visible;
+  }
+  return layout;
+}
 export const FOCUS_TASK_MAX_LENGTH = 160;
 /** Blank means no intention; overlong text is cut rather than rejected. */
 export function normalizeFocusTask(value: unknown): string | null {

@@ -1,7 +1,8 @@
 import { memo, useEffect, useMemo, useState } from 'react';
 import type { StudyDocument, StudyWorkspace } from '@shared/studyOrg';
 import type { StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/studyMaterials';
-import { openFocusTimer, useStudyFocus } from './StudyFocusContext';
+import { focusLayoutVisible } from '@shared/studyFocus';
+import { openFocusLayout, openFocusTimer, useStudyFocus, useStudyFocusLayout } from './StudyFocusContext';
 import { focusClock, focusRemaining, phaseName } from './FocusControls';
 import { STUDY_WORKSPACE_CHANGED, announceStudyWorkspaceChanged } from '../StudySidebar';
 import { Icon } from '../ui';
@@ -13,8 +14,9 @@ export interface FocusRailItem { key: string; label: string; icon: string; activ
 /**
  * What the Study vault leaves on screen in focus mode. The ordinary sidebar is
  * organized for finding things; this rail is organized for working: the block in
- * progress, the materials of the subject being studied, and every study section
- * one click away, so the mode never locks the student out of their own tools.
+ * progress, the materials of the subject being studied, and the study sections the
+ * student chose to keep (focus mode settings), so the mode never locks the student
+ * out of their own tools.
  */
 export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial, onOpenLibrary }: {
   items: FocusRailItem[];
@@ -24,6 +26,8 @@ export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial
   onOpenLibrary: () => void;
 }) {
   const focus = useStudyFocus();
+  const { layout } = useStudyFocusLayout();
+  const show = (id: string) => focusLayoutVisible(layout, id);
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('nodus.focusRailCollapsed') === '1'; } catch { return false; } });
   const toggle = () => setCollapsed(value => {
     try { localStorage.setItem('nodus.focusRailCollapsed', value ? '0' : '1'); } catch { /* the choice just is not remembered */ }
@@ -33,20 +37,23 @@ export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial
   const vaultId = focus?.snapshot?.vaultId;
   return <aside data-testid="focus-rail" className={`focus-rail ${collapsed ? 'is-collapsed' : ''}`} aria-label={t('Modo concentración')}>
     <div className="focus-rail-head">
-      <span className="focus-rail-title"><Icon name="focus" size={15} /><span>{t('Modo concentración')}</span></span>
-      <button type="button" className="focus-rail-icon-button" onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? t('Mostrar el panel de concentración') : t('Plegar el panel de concentración')} title={collapsed ? t('Mostrar el panel de concentración') : t('Plegar el panel de concentración')}><Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={14} /></button>
+      <span className="focus-rail-title"><Icon name="focus" size={15} /><span>{t('Concentración')}</span></span>
+      <span className="focus-rail-head-actions">
+        <button type="button" data-testid="focus-rail-settings" className="focus-rail-icon-button focus-rail-settings" onClick={openFocusLayout} aria-label={t('Personalizar el modo concentración')} title={t('Personalizar el modo concentración')}><Icon name="settings" size={14} /></button>
+        <button type="button" className="focus-rail-icon-button" onClick={toggle} aria-expanded={!collapsed} aria-label={collapsed ? t('Mostrar el panel de concentración') : t('Plegar el panel de concentración')} title={collapsed ? t('Mostrar el panel de concentración') : t('Plegar el panel de concentración')}><Icon name={collapsed ? 'chevronRight' : 'chevronLeft'} size={14} /></button>
+      </span>
     </div>
     <div className="focus-rail-scroll">
-      {state && <button type="button" data-testid="focus-rail-timer" className="focus-rail-timer" onClick={openFocusTimer} title={t('Temporizador de concentración')} aria-label={`${t('Temporizador de concentración')}: ${state.status === 'ready' ? t('A tu ritmo') : `${phaseName(state.phase)} · ${focusClock(focusRemaining(state))}`}`}>
+      {state && show('block:timer') && <button type="button" data-testid="focus-rail-timer" className="focus-rail-timer" onClick={openFocusTimer} title={t('Temporizador de concentración')} aria-label={`${t('Temporizador de concentración')}: ${state.status === 'ready' ? t('A tu ritmo') : `${phaseName(state.phase)} · ${focusClock(focusRemaining(state))}`}`}>
         <span className={`focus-dot ${state.status === 'running' ? 'active' : ''}`} />
         <span className="focus-rail-label">{state.status === 'ready' ? t('Iniciar un bloque') : state.status === 'paused' ? t('En pausa') : state.status === 'complete' ? t('Completado') : phaseName(state.phase)}</span>
         <strong>{focusClock(focusRemaining(state))}</strong>
       </button>}
-      {vaultId && <SubjectShelf key={vaultId} subjectId={state?.subjectId ?? null} task={state?.task ?? null} onOpenSubject={onOpenSubject} onOpenDocument={onOpenDocument} onOpenMaterial={onOpenMaterial} onOpenLibrary={onOpenLibrary} />}
-      <RailNav items={items} />
+      {vaultId && (show('block:subject') || show('block:shelf')) && <SubjectShelf key={vaultId} showSubject={show('block:subject')} showShelf={show('block:shelf')} subjectId={state?.subjectId ?? null} task={state?.task ?? null} onOpenSubject={onOpenSubject} onOpenDocument={onOpenDocument} onOpenMaterial={onOpenMaterial} onOpenLibrary={onOpenLibrary} />}
+      {items.length > 0 && <RailNav items={items} />}
     </div>
     <div className="focus-rail-foot">
-      <button type="button" data-testid="focus-exit" className="focus-rail-link focus-rail-exit" onClick={() => focus?.setReduced(false)} title={t('Salir del modo concentración')} aria-label={t('Salir del modo concentración')}><Icon name="minimize" size={15} /><span className="focus-rail-label">{t('Salir del modo concentración')}</span></button>
+      <button type="button" data-testid="focus-exit" className="focus-rail-link focus-rail-exit" onClick={() => void focus?.exitFocusMode()} title={t('Salir del modo concentración')} aria-label={t('Salir del modo concentración')}><Icon name="minimize" size={15} /><span className="focus-rail-label">{t('Salir del modo concentración')}</span></button>
     </div>
   </aside>;
 }
@@ -67,7 +74,8 @@ const MATERIAL_ICON: Record<StudyMaterialPreviewKind, string> = { pdf: 'fileText
 const SHELF_LIMIT = 8;
 
 /** Notes and materials of the block's subject (or the latest ones, with no subject). */
-const SubjectShelf = memo(function SubjectShelf({ subjectId, task, onOpenSubject, onOpenDocument, onOpenMaterial, onOpenLibrary }: {
+const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjectId, task, onOpenSubject, onOpenDocument, onOpenMaterial, onOpenLibrary }: {
+  showSubject: boolean; showShelf: boolean;
   subjectId: string | null; task: string | null;
   onOpenSubject: (subjectId: string) => void;
   onOpenDocument: (documentId: string) => void;
@@ -121,7 +129,7 @@ const SubjectShelf = memo(function SubjectShelf({ subjectId, task, onOpenSubject
   const visible = (query ? entries.filter(entry => entry.title.toLocaleLowerCase().includes(query)) : entries).slice(0, query ? 50 : SHELF_LIMIT);
   const loading = !workspace || !materials;
   return <>
-    <section className="focus-rail-section focus-rail-session" aria-label={t('Bloque actual')}>
+    {showSubject && <section className="focus-rail-section focus-rail-session" aria-label={t('Bloque actual')}>
       <h2 className="focus-rail-heading">{t('Asignatura')}</h2>
       {subject
         ? <button type="button" data-testid="focus-rail-subject" className="focus-rail-link focus-rail-subject" onClick={() => onOpenSubject(subject.id)} title={t('Abrir la asignatura')}>
@@ -131,8 +139,8 @@ const SubjectShelf = memo(function SubjectShelf({ subjectId, task, onOpenSubject
       {task && <p className="focus-rail-task" data-testid="focus-rail-task"><Icon name="target" size={13} /><span>{task}</span></p>}
       {subject && <button type="button" data-testid="focus-rail-new-note" className="focus-rail-link focus-rail-new" disabled={creating} onClick={() => void createNote(subject.id)}><Icon name="plus" size={15} /><span className="focus-rail-label">{t('Nuevo apunte')}</span></button>}
       {createError != null && <p className="focus-rail-note" role="alert">{errorText(createError)}</p>}
-    </section>
-    <section className="focus-rail-section focus-rail-shelf" aria-label={subject ? t('Apuntes y materiales de la asignatura') : t('Apuntes y materiales recientes')}>
+    </section>}
+    {showShelf && <section className="focus-rail-section focus-rail-shelf" aria-label={subject ? t('Apuntes y materiales de la asignatura') : t('Apuntes y materiales recientes')}>
       <h2 className="focus-rail-heading">{subject ? t('De esta asignatura') : t('Recientes')}</h2>
       {entries.length > SHELF_LIMIT && <input className="input focus-rail-filter" type="search" value={filter} onChange={event => setFilter(event.target.value)} placeholder={t('Filtrar apuntes y materiales')} aria-label={t('Filtrar apuntes y materiales')} />}
       {failed ? <p className="focus-rail-note" role="alert">{t('No se han podido cargar los materiales.')}</p>
@@ -142,6 +150,6 @@ const SubjectShelf = memo(function SubjectShelf({ subjectId, task, onOpenSubject
             <Icon name={entry.icon} size={15} /><span className="focus-rail-label">{entry.title}</span>
           </button>)}
       {!loading && !failed && (subject ? entries.length > SHELF_LIMIT : true) && <button type="button" className="focus-rail-more" onClick={() => subject ? onOpenSubject(subject.id) : onOpenLibrary()}>{subject ? t('Ver toda la asignatura') : t('Ver todos los materiales')}<Icon name="chevronRight" size={12} /></button>}
-    </section>
+    </section>}
   </>;
 });

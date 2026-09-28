@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useStudyFocus } from './StudyFocusContext';
+import { openFocusLayout, useStudyFocus } from './StudyFocusContext';
 import { FOCUS_TASK_MAX_LENGTH, type FocusPhase, type FocusPreferences, type FocusState } from '@shared/studyFocus';
 import type { StudySubject } from '@shared/studyOrg';
 import { STUDY_WORKSPACE_CHANGED } from '../StudySidebar';
@@ -51,6 +51,9 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
     setTask(state.task ?? '');
     // Re-seed only when the form appears or the stored choice changes, never while typing.
   }, [asksForBlock, state?.subjectId, state?.task, subjects, focus?.snapshot?.vaultId]);
+  // Optimistic: the box flips on click; the stored preference catches up a moment later.
+  const [enterDraft, setEnterDraft] = useState<boolean | null>(null);
+  useEffect(() => { setEnterDraft(null); }, [state?.preferences.enterOnStart]);
   if (!focus || !state) return <p role="status">{focus?.error ? errorText(focus.error) : t('Preparando concentración…')}</p>;
   const remaining = focusRemaining(state);
   const nextBreak = state.cycleBlocks % FOCUS_CYCLE_LENGTH === 0 ? t('Comenzar descanso largo') : t('Comenzar descanso');
@@ -58,6 +61,16 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
   const progress = ready ? 0 : Math.min(100, state.elapsedMs / state.durationMs * 100);
   const subjectName = subjects.find(item => item.id === state.subjectId)?.name;
   const start = () => void focus.act('start', asksForBlock ? { subjectId: subject || null, task } : undefined);
+  // While a block runs the box is the mode itself; otherwise it is the choice for the
+  // next start or resume (on by default). Either way the choice is remembered.
+  const live = state.status === 'running';
+  const modeChecked = focus.reduced || (!live && (enterDraft ?? state.preferences.enterOnStart !== false));
+  const toggleMode = (value: boolean) => {
+    setEnterDraft(value);
+    void focus.configure({ enterOnStart: value });
+    if (!value) focus.setReduced(false);
+    else if (live) focus.setReduced(true);
+  };
   return <div className={`focus-controls ${compact ? 'is-compact' : ''}`}>
     <div className="focus-eyebrow"><span className={`focus-dot ${state.status === 'running' ? 'active' : ''}`} />{phaseName(state.phase)} · {focusStatusLabel(state)}</div>
     <div className="focus-clock" role="timer" aria-label={tx('{phase}, tiempo restante {time}', { phase: phaseName(state.phase), time: focusClock(remaining) })}>{focusClock(remaining)}</div>
@@ -78,7 +91,8 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
       {state.status === 'paused' && <button className="btn btn-primary" onClick={() => void focus.act('resume')}><Icon name="play" size={15} />{t('Reanudar')}</button>}
       {!ready && <button className="btn btn-ghost" onClick={() => void focus.act('finish')}>{t('Finalizar sesión')}</button>}
     </div>
-    <label className="focus-toggle"><input type="checkbox" checked={focus.reduced} onChange={event => focus.setReduced(event.target.checked)} /><span>{t('Modo concentración')}<small className="focus-muted">{t('Despeja la pantalla y deja a mano tus materiales, con o sin temporizador.')}</small></span></label>
+    <label className="focus-toggle"><input type="checkbox" data-testid="focus-mode-toggle" checked={modeChecked} onChange={event => toggleMode(event.target.checked)} /><span>{t('Modo concentración')}<small className="focus-muted">{live || focus.reduced ? t('Despeja la pantalla y deja a mano tus materiales, con o sin temporizador.') : state.status === 'paused' ? t('Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.') : t('Se activa al iniciar el bloque: despeja la pantalla y deja a mano tus materiales.')}</small></span></label>
+    <button type="button" className="focus-customize" onClick={openFocusLayout}><Icon name="eye" size={13} />{t('Personalizar el modo concentración')}</button>
     {focus.error != null && <p role="alert" className="text-red-500 text-sm">{errorText(focus.error)}</p>}
     <details className="focus-settings"><summary>{t('Configurar temporizador')}</summary><div className="focus-duration-grid">
       <Minutes label={t('Trabajo')} field="workMinutes" preferences={state.preferences} save={focus.configure} />

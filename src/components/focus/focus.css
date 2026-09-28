@@ -1,5 +1,5 @@
-.focus-page, .focus-popover, .focus-rail { --focus-accent: var(--vault-accent, var(--a-500, #0f766e)); --focus-muted: var(--n-500, #737373); --focus-line: var(--n-200, #e5e5e5); --focus-panel: var(--n-50, #fafafa); color: var(--app-text); }
-.dark .focus-page, .dark .focus-popover, .dark .focus-rail { --focus-line: var(--n-800, #262626); --focus-panel: var(--n-900, #171717); --focus-muted: var(--n-400, #a3a3a3); }
+.focus-page, .focus-popover, .focus-rail, .focus-layout-dialog { --focus-accent: var(--vault-accent, var(--a-500, #0f766e)); --focus-muted: var(--n-500, #737373); --focus-line: var(--n-200, #e5e5e5); --focus-panel: var(--n-50, #fafafa); color: var(--app-text); }
+.dark .focus-page, .dark .focus-popover, .dark .focus-rail, .dark .focus-layout-dialog { --focus-line: var(--n-800, #262626); --focus-panel: var(--n-900, #171717); --focus-muted: var(--n-400, #a3a3a3); }
 .focus-page { padding: 30px; }
 .focus-page-inner { max-width: 1200px; margin: auto; display: grid; gap: 22px; }
 .focus-page-heading, .focus-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -87,8 +87,8 @@
 .focus-popover .focus-cycle { margin-bottom: 16px; }
 .focus-popover .focus-settings { margin-top: 16px; }
 .focus-notice { --focus-accent: var(--vault-accent, var(--a-500, #0f766e)); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 10px 22px; background: color-mix(in srgb, var(--vault-accent, var(--a-500, #0f766e)) 10%, var(--app-canvas)); font-size: 12px; }
-/* Focus mode keeps the timer, browser media, commands, theme, queue and a pending update. */
-[data-focus-reduced=true] [data-testid=header-actions] > :not([data-testid=browser-media-header-action]):not(.focus-header-actions):not([data-focus-keep]):not(:has([data-focus-keep])) { display: none; }
+/* Focus mode keeps the timer, its quick access, a pending update and the header items the student keeps. */
+[data-focus-reduced=true] [data-testid=header-actions] > :not(.focus-header-actions):not([data-focus-keep]):not(:has([data-focus-keep])) { display: none; }
 [data-focus-reduced=true] [data-testid=sidebar-header-toggle] { visibility: hidden; }
 [data-focus-reduced=true] [data-testid=sidebar-header-toggle] { width: 72px !important; }
 @media(max-width: 950px) { .focus-main-grid { grid-template-columns: 1fr; } .focus-timer-card { position: static; } .focus-controls:not(.is-compact) .focus-clock { font-size: 60px; margin: 18px 0; } .focus-page { padding: 20px; } }
@@ -159,3 +159,36 @@
 .focus-session-task { display: block; margin-top: 2px; font-size: 11px; color: var(--focus-muted); overflow-wrap: anywhere; }
 .focus-rail-new { color: var(--focus-accent); }
 .focus-rail-new:disabled { opacity: .55; cursor: progress; }
+.focus-customize { display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0 25px; font-size: 11.5px; color: var(--focus-accent); }
+.focus-customize:hover { text-decoration: underline; }
+.focus-rail-head-actions { display: flex; align-items: center; gap: 2px; }
+.focus-rail.is-collapsed .focus-rail-settings { display: none; }
+@media (max-width: 860px) { .focus-rail .focus-rail-settings { display: none; } }
+
+/* Focus mode settings and the exit question. */
+.focus-layout-dialog { width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); display: flex; flex-direction: column; border: 1px solid var(--focus-line); border-radius: 16px; background: var(--focus-panel); box-shadow: 0 24px 70px #0005; font-size: 13px; }
+.focus-layout-head { display: flex; justify-content: space-between; gap: 16px; padding: 20px 22px 12px; }
+.focus-layout-dialog h2 { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 600; }
+.focus-layout-dialog h2 svg { color: var(--focus-accent); }
+.focus-layout-head p, .focus-exit-dialog p { margin-top: 6px; font-size: 12.5px; line-height: 1.55; color: var(--focus-muted); }
+.focus-layout-body { min-height: 0; overflow-y: auto; padding: 4px 22px 16px; display: grid; gap: 16px; }
+.focus-layout-body fieldset { display: flex; flex-direction: column; gap: 2px; border-top: 1px solid var(--focus-line); padding-top: 10px; min-width: 0; }
+.focus-layout-body legend { padding-right: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--focus-muted); }
+.focus-layout-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 12px; }
+.focus-layout-option { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 6px 8px; border-radius: 7px; cursor: pointer; }
+.focus-layout-option:hover { background: color-mix(in srgb, var(--focus-accent) 8%, transparent); }
+.focus-layout-option input { flex-shrink: 0; width: 15px; height: 15px; accent-color: var(--focus-accent); }
+.focus-layout-option svg { flex-shrink: 0; opacity: .75; }
+.focus-layout-option span { min-width: 0; overflow-wrap: anywhere; }
+.focus-layout-start { align-items: flex-start; border: 1px solid var(--focus-line); border-radius: 10px; padding: 10px 12px; }
+.focus-layout-start small { display: block; margin-top: 2px; font-size: 11.5px; color: var(--focus-muted); }
+.focus-layout-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 22px 18px; border-top: 1px solid var(--focus-line); }
+.focus-layout-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.focus-layout-dialog .btn.btn-primary { background: color-mix(in srgb, var(--focus-accent) 45%, #000) !important; color: #fff !important; }
+.focus-exit-dialog { width: min(440px, calc(100vw - 32px)); padding: 22px; gap: 0; }
+.focus-exit-dialog .focus-layout-actions { margin-top: 18px; }
+@media (max-width: 560px) { .focus-layout-grid { grid-template-columns: 1fr; } }
+/* The header's quick access: the focus mode toggle and its settings, beside the theme. */
+.focus-quick { display: inline-flex; align-items: center; }
+.focus-quick .header-action[aria-pressed=true] { color: var(--vault-accent, var(--a-500, #0f766e)); background: color-mix(in srgb, var(--vault-accent, #0f766e) 14%, transparent); }
+.focus-quick .focus-quick-settings { min-width: 22px !important; padding-left: 3px; padding-right: 3px; }

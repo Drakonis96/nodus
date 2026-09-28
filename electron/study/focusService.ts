@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import { DEFAULT_FOCUS_PREFERENCES, focusDayKey, normalizeFocusTask, splitFocusInterval } from '../../shared/studyFocus';
+import { DEFAULT_FOCUS_PREFERENCES, focusDayKey, normalizeFocusTask, sanitizeFocusLayout, splitFocusInterval } from '../../shared/studyFocus';
 import type { FocusAction, FocusPreferences, FocusState, FocusStats } from '../../shared/studyFocus';
 
 /** Owns one vault connection. All transitions and interval writes are one transaction. */
@@ -17,7 +17,7 @@ export class FocusService {
       revision: 0, phase: 'work', status: 'ready', durationMs: 25 * 60000, elapsedMs: 0,
       cycleBlocks: 0, sessionId: null, subjectId: null, task: null, recovered: false,
       ...stored,
-      preferences: { ...DEFAULT_FOCUS_PREFERENCES, ...stored?.preferences },
+      preferences: { ...DEFAULT_FOCUS_PREFERENCES, ...stored?.preferences, layout: { ...stored?.preferences?.layout } },
     } as FocusState;
     if (this.state.status === 'running') {
       this.state.status = 'paused';
@@ -33,7 +33,7 @@ export class FocusService {
     this.db.prepare('INSERT INTO study_focus_state (id, state_json) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET state_json = excluded.state_json').run(JSON.stringify(this.state));
   }
   private delta() { return this.state.status === 'running' ? Math.min(this.state.durationMs - this.state.elapsedMs, Math.max(0, this.monotonic() - this.monoAnchor)) : 0; }
-  snapshot(): FocusState { return { ...this.state, preferences: { ...this.state.preferences }, elapsedMs: this.state.elapsedMs + this.delta() }; }
+  snapshot(): FocusState { return { ...this.state, preferences: { ...this.state.preferences, layout: { ...this.state.preferences.layout } }, elapsedMs: this.state.elapsedMs + this.delta() }; }
   /** Called every second; the clock, never the number of callbacks, determines elapsed time. */
   tick(force = false) {
     if (this.state.status !== 'running') return;
@@ -65,7 +65,7 @@ export class FocusService {
     if (ended) this.completed(this.snapshot());
   }
   configure(patch: Partial<FocusPreferences>) {
-    const next = { ...this.state.preferences };
+    const next = { ...this.state.preferences, layout: { ...this.state.preferences.layout } };
     for (const key of ['workMinutes', 'breakMinutes', 'longBreakMinutes', 'dailyGoalMinutes'] as const) {
       if (!(key in patch)) continue;
       const value = patch[key];
@@ -76,6 +76,16 @@ export class FocusService {
     if ('sound' in patch) {
       if (typeof patch.sound !== 'boolean') throw new Error('Preferencia de sonido inválida.');
       next.sound = patch.sound;
+    }
+    if ('enterOnStart' in patch) {
+      if (typeof patch.enterOnStart !== 'boolean') throw new Error('Valor inválido.');
+      next.enterOnStart = patch.enterOnStart;
+    }
+    if ('layout' in patch) {
+      // A full replacement, so "restore defaults" is simply an empty layout.
+      const layout = sanitizeFocusLayout(patch.layout);
+      if (!layout) throw new Error('Valor inválido.');
+      next.layout = layout;
     }
     const previous = this.state.preferences;
     this.state.preferences = next;

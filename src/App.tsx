@@ -1,4 +1,6 @@
-import { openFocusTimer, useStudyFocusActions, useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { FocusExitDialog, FocusLayoutDialog, type FocusSectionOption } from './components/focus/FocusDialogs';
+import { focusLayoutVisible } from '@shared/studyFocus';
 import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
 import { FocusRail, type FocusRailItem } from './components/focus/FocusRail';
 import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
@@ -71,7 +73,7 @@ import type {
   StudyMaterialNavigationTarget,
   View,
 } from './navigation';
-import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, orderedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
 import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
@@ -138,6 +140,7 @@ function HeaderAction({
   notificationsTrigger = false,
   queueTrigger = false,
   focusKeep = false,
+  pressed,
 }: {
   icon: string;
   label: string;
@@ -158,6 +161,8 @@ function HeaderAction({
   queueTrigger?: boolean;
   /** Still shown in the Study focus mode, which clears the rest of the rail. */
   focusKeep?: boolean;
+  /** For a toggle: whether it is on. */
+  pressed?: boolean;
 }) {
   const titleText = kbd ? `${title ?? label} · ${kbd}` : title ?? label;
   return (
@@ -168,6 +173,7 @@ function HeaderAction({
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
       data-queue-trigger={queueTrigger ? '' : undefined}
       data-focus-keep={focusKeep ? '' : undefined}
+      aria-pressed={pressed}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -189,6 +195,9 @@ function HeaderAction({
 export function App() {
   const focusReduced = useStudyFocusReduced();
   const focusActions = useStudyFocusActions();
+  const focusLayout = useStudyFocusLayout();
+  // In focus mode the header keeps only what the student chose; elsewhere nothing changes.
+  const focusKeeps = (id: string) => focusLayoutVisible(focusLayout.layout, id);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
@@ -792,19 +801,31 @@ export function App() {
     setStudyGraphTarget(null);
     setView(target);
   }, [setView]);
+  // Every section a Study vault has, in the saved order and whatever the sidebar hides:
+  // the focus mode keeps its own choice of what to show (see FocusLayoutDialog).
+  const focusSections = useMemo<Array<FocusSectionOption & { item: (typeof NAV_ITEMS)[number] }>>(() => {
+    if (!isEstudio) return [];
+    const dedicated = dedicatedVaultNavIds(activeVault?.type) ?? [];
+    return orderedNav(settings?.sidebarOrder ?? [])
+      .filter((n) => n.id === 'library' || (dedicated.includes(n.id) && isViewAllowedForVaultType(n.id, activeVault?.type)))
+      .map((n) => ({ key: n.id, label: t(navItemLabel(n, activeVault?.type)), icon: n.icon, item: n }));
+  }, [isEstudio, activeVault?.type, settings?.sidebarOrder, settings?.uiLanguage]);
   const focusRailItems = useMemo<FocusRailItem[]>(() => {
     if (!isEstudio || !focusReduced) return [];
-    const explore = navGroups.find((group) => group.id === 'explore')?.items ?? [];
-    const rest = navGroups.filter((group) => group.id !== 'explore').flatMap((group) => group.items);
-    // Notas is hidden from a Study sidebar by default, but working is what this mode is
-    // for: it stays out only when the student chose to hide it.
-    const notesItem = NAV_ITEMS.find((n) => n.id === 'notes');
-    const notesHiddenByChoice = Boolean(settings?.sidebarCustomized && settings.sidebarHidden?.includes('notes'));
-    const extra = notesItem && !notesHiddenByChoice && !rest.some((n) => n.id === 'notes') ? [notesItem] : [];
-    return [...explore, libraryItem, ...extra, ...rest].map((n): FocusRailItem => 'toolkitPage' in n
-      ? { key: n.id, label: t(n.label), icon: n.icon, active: view === 'toolkit' && toolkitPage === n.toolkitPage, open: () => { setToolkitPage(n.toolkitPage); setView('toolkit'); } }
-      : { key: n.id, label: t(navItemLabel(n, activeVault?.type)), icon: n.icon, active: view === n.id && (n.id !== 'toolkit' || toolkitPage === 'home'), open: () => { if (n.id === 'toolkit') setToolkitPage('home'); openStudySection(n.id); } });
-  }, [isEstudio, focusReduced, navGroups, libraryItem, view, toolkitPage, activeVault?.type, settings?.uiLanguage, settings?.sidebarCustomized, settings?.sidebarHidden, setView, openStudySection]);
+    return focusSections
+      .filter((section) => focusLayoutVisible(focusLayout.layout, `nav:${section.key}`))
+      .map(({ key, label, icon, item }): FocusRailItem => ({
+        key, label, icon,
+        active: view === item.id && (item.id !== 'toolkit' || toolkitPage === 'home'),
+        open: () => { if (item.id === 'toolkit') setToolkitPage('home'); openStudySection(item.id); },
+      }));
+  }, [isEstudio, focusReduced, focusSections, focusLayout, view, toolkitPage, openStudySection]);
+  // Leaving the mode lands on the Concentración page, where the paused block is.
+  useEffect(() => {
+    const show = () => openStudySection('studyFocus');
+    window.addEventListener(SHOW_FOCUS_PAGE_EVENT, show);
+    return () => window.removeEventListener(SHOW_FOCUS_PAGE_EVENT, show);
+  }, [openStudySection]);
   const openFocusSubject = useCallback((id: string) => { setStudyTarget({ kind: 'subject', id }); setView('studyCourses'); }, [setView]);
   const openFocusDocument = useCallback((id: string) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }, [setView]);
   const openFocusMaterial = useCallback((id: string) => { setStudyMaterialTarget({ id, pageNumber: null, slideNumber: null }); setView('studyLibrary'); }, [setView]);
@@ -1336,7 +1357,8 @@ export function App() {
     ];
     if (isEstudio && focusActions) {
       actions.unshift(
-        { id: 'act:focus-mode', label: focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración'), section: t('Acciones'), icon: 'focus', keywords: 'concentración concentracion focus pomodoro distracciones estudio', run: () => focusActions.setReduced(!focusReduced) },
+        { id: 'act:focus-mode', label: focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración'), section: t('Acciones'), icon: 'focus', keywords: 'concentración concentracion focus pomodoro distracciones estudio', run: () => { if (focusReduced) void focusActions.exitFocusMode(); else focusActions.setReduced(true); } },
+        { id: 'act:focus-layout', label: t('Personalizar el modo concentración'), section: t('Acciones'), icon: 'eye', keywords: 'concentración concentracion focus personalizar visibles ocultar secciones', run: openFocusLayout },
         { id: 'act:focus-timer', label: t('Temporizador de concentración'), section: t('Acciones'), icon: 'focus', keywords: 'pomodoro temporizador timer bloque descanso concentración', run: openFocusTimer },
       );
     }
@@ -1559,7 +1581,7 @@ export function App() {
             kbd={PALETTE_HINT}
             tone="text-neutral-400"
             onClick={() => setPaletteOpen(true)}
-            focusKeep
+            focusKeep={focusKeeps('header:commands')}
           />
           <HeaderAction
             icon="chat"
@@ -1610,7 +1632,7 @@ export function App() {
               )}
             </span>
           )}
-          <BrowserMediaHeaderAction onOpenTab={(tabId) => {
+          <BrowserMediaHeaderAction focusKeep={focusKeeps('header:media')} onOpenTab={(tabId) => {
             setView('browser');
             void window.nodus.activateBrowserTab(tabId);
           }} />
@@ -1640,8 +1662,27 @@ export function App() {
             title={isDark ? t('Cambiar a modo claro') : t('Cambiar a modo oscuro')}
             onClick={() => void toggleTheme()}
             dataTour="theme-toggle"
-            focusKeep
+            focusKeep={focusKeeps('header:theme')}
           />
+          {isEstudio && focusActions && (
+            <span className="focus-quick" data-testid="focus-quick-access">
+              <HeaderAction
+                icon="focus"
+                label={focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración')}
+                pressed={focusReduced}
+                dataTour="focus-mode"
+                onClick={() => { if (focusReduced) void focusActions.exitFocusMode(); else focusActions.setReduced(true); }}
+                focusKeep
+              />
+              <HeaderAction
+                icon="chevronDown"
+                label={t('Personalizar el modo concentración')}
+                tone="focus-quick-settings"
+                onClick={openFocusLayout}
+                focusKeep
+              />
+            </span>
+          )}
           {readyVersion && <HeaderAction
             icon="download"
             label={updateProgress?.status === 'backing-up' ? t('Protegiendo tus datos') : updateInstallBusy(updateProgress) ? t('Instalando actualización') : t('Actualización lista')}
@@ -1660,7 +1701,7 @@ export function App() {
               title={queueActivity.attention ? `${t('Cola y tareas')} · ${t('Error')}` : t('Cola y tareas')}
               queueTrigger
               onClick={(e) => toggleQueue(e.currentTarget)}
-              focusKeep
+              focusKeep={focusKeeps('header:queue')}
             />
             {(queueLive > 0 || queueActivity.attention) && (
               <span className={`header-action-badge ${queueActivity.attention ? '!bg-red-600 !text-white' : ''}`}>{queueActivity.attention && queueLive === 0 ? '!' : queueLive > 9 ? '9+' : queueLive}</span>
@@ -2084,6 +2125,8 @@ export function App() {
       <BrowserConnectorPairingRequestHost />
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
+      {isEstudio && <FocusLayoutDialog sections={focusSections} />}
+      {isEstudio && <FocusExitDialog />}
 
       <Suspense fallback={null}>
       {collectionsOpen && (
@@ -2335,7 +2378,7 @@ export function App() {
  * them away at the exact moment someone pauses is how a user loses the Play
  * button they were reaching for.
  */
-function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) => void }) {
+function BrowserMediaHeaderAction({ onOpenTab, focusKeep = true }: { onOpenTab: (tabId: string) => void; focusKeep?: boolean }) {
   const states = useBrowserMedia();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (states.length === 0) return null;
@@ -2344,6 +2387,7 @@ function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) =>
     <span data-testid="browser-media-header-action" className="relative inline-flex">
       <HeaderAction
         icon="volume"
+        focusKeep={focusKeep}
         label={t('Medios')}
         title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
         onClick={(event) => {
