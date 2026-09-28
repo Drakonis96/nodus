@@ -9,6 +9,10 @@ In Study and Teaching vaults, a Workspace note can be linked to any number of pl
 - **Materials.** The material viewer's "Notes" button opens a side panel with the linked notes. A note can be read there, opened in the Workspace for editing, unlinked, moved to the trash, or linked from the panel.
 - **Focus mode.** The focus rail's subject shelf includes the notes linked to the block's subject.
 
+## Workspace visible by default
+
+Study and Teaching vaults now show the Workspace in the sidebar by default, since notes are linked from there. Users can still hide it, and any sidebar customization they have saved is kept.
+
 ## Behaviour
 
 - Moving a note to the Workspace trash hides it from every linked place. Restoring it brings its links back. Trashing or archiving a course, subject, folder, topic or material hides only the links to it. Study trash actions never delete Workspace notes.

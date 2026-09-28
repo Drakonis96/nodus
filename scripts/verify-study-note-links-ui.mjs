@@ -61,11 +61,17 @@ try {
       return { course: course.id, other: other.id, biology: biology.id, chemistry: chemistry.id, block: block.id, unit: unit.id, material: imported.material.id, materialTitle: imported.material.title, note: note.id, outline: outline.id };
     }, { type, file, version: require('../package.json').version });
     console.log(`[ui] ${type}: seeded`);
-    // Study vaults hide the Workspace from the sidebar by default, so it is entered the way
-    // Research Chat's "Open note" enters it; the catalogue is its first tab.
+    // The catalogue comes from the sidebar, where the Workspace is visible by default in both
+    // vault types; a note opens the way Research Chat's "Open note" opens it.
     const openWorkspace = async ({ note = false } = {}) => {
-      await page.evaluate((id) => window.dispatchEvent(new CustomEvent('nodus:open-research-note', { detail: id })), ids.note);
-      if (!note) await page.getByTestId('workspace-tab-home').click();
+      if (note) {
+        await page.evaluate((id) => window.dispatchEvent(new CustomEvent('nodus:open-research-note', { detail: id })), ids.note);
+        return;
+      }
+      await page.locator('[data-tour="nav-notes"]').click();
+      // The tab strip exists only while a note is open.
+      if (await page.getByTestId('workspace-tab-home').count()) await page.getByTestId('workspace-tab-home').click();
+      await page.getByTestId('workspace-item-list').waitFor();
     };
     await page.reload();
     await page.waitForFunction(() => !!window.nodus);
