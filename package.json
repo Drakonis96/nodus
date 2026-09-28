@@ -39,6 +39,7 @@
     "site:social": "node scripts/build-social-image.mjs",
     "site:screenshots": "node scripts/build-site-screenshots.mjs",
     "site:artifact": "node scripts/build-pages-artifact.mjs",
+    "site:what-nodi": "node scripts/build-what-nodi.mjs",
     "site:build": "npm run blog:build && npm run site:artifact",
     "site:verify": "node --test scripts/test-site-*.mjs",
     "site:sitemap": "node scripts/build-sitemap.mjs",

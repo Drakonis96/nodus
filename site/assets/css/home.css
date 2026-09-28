@@ -121,7 +121,35 @@ body {
 .what-head .what-copy { max-width: 780px; }
 
 .what-nodi { margin: 0; }
-.what-nodi img { display: block; width: 100%; height: auto; }
+
+/* The figure is the app's own Nodi components — the galaxy orb, with the classic
+   character leaning out from behind its upper-left rim — composed into one SVG by
+   scripts/build-what-nodi.mjs, which also copies the component stylesheets to
+   what-nodi.css. What is left here are the composition rules, which live outside
+   those files and cannot be generated from them. */
+/* The orb's own frame, 320x340, is drawn for the app's companion: it leaves room
+   for the celebration burst and the satellites at their widest, none of which the
+   hero shows. Rather than crop that frame — its origin is what every one of the
+   component's transform-origins resolves against — the art is scaled up, and the
+   rings grow into the gutter the grid already leaves beside the copy. */
+.what-nodi-figure { display: block; width: 100%; height: auto; transform: scale(1.14); }
+/* That stylesheet sizes every .nodi-svg for the app's companion (height: 200px).
+   Here the character is a nested viewport in the orb's own units, so its box has
+   to match its viewBox or the character renders two thirds too small. */
+.what-nodi-char > svg { width: 270px; height: 300px; }
+/* In the app the orb rests on a pool of light. Here it floats in the page's own
+   starfield, so the pool goes: without a floor under it the ellipse reads as a
+   stray ring rather than a shadow. */
+.what-nodi-figure .ped-glow { display: none; }
+/* The two cloud arms are blurred ellipses (stdDeviation 10 and 14) that the
+   component turns through a full circle over a minute. A rotating blurred group
+   cannot reuse its cached filter raster, so those two are the only part of the
+   figure that is expensive every frame — and the hero paints the orb at five
+   times the area the app's companion covers. The arms hold their angle here;
+   the float, the rings, the satellites, the core and the constellation all keep
+   moving, and at 7.8°/s the turn is not something a reader can see. */
+.what-nodi-figure .neb-spin,
+.what-nodi-figure .neb-spin2 { animation: none; }
 
 @media (min-width: 900px) {
   .what-head {
