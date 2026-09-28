@@ -113,6 +113,32 @@ body {
   will-change: transform;
 }
 
+/* ============================================================ what nodus is */
+/* The mascot stands to the right of the headline. The copy keeps the reading
+   measure section heads have everywhere else, so the headline breaks on the same
+   words it always did and the art takes the width that was empty beside it. */
+.section-head.what-head { max-width: none; }
+.what-head .what-copy { max-width: 780px; }
+
+.what-nodi { margin: 0; }
+.what-nodi img { display: block; width: 100%; height: auto; }
+
+@media (min-width: 900px) {
+  .what-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 30%, 420px);
+    gap: clamp(28px, 4vw, 64px);
+    align-items: center;
+  }
+}
+
+/* On a phone there is no room to the right, so the mascot closes the section
+   instead: centred, and scaled to the window so it fills the band on a tablet
+   and stays decoration rather than a second headline on a phone. */
+@media (max-width: 899px) {
+  .what-nodi { width: clamp(180px, 44vw, 330px); margin: 36px auto 0; }
+}
+
 /* ============================================================ vault scenes */
 .scene { padding: clamp(56px, 7.5vw, 100px) 0; }
 .scene-inner {
