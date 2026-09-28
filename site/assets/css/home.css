@@ -527,7 +527,6 @@ select,
 .tool-cards {
   position: relative; margin-top: 20px;
   height: var(--stage-h, 340px);
-  perspective: 1500px;
   cursor: grab;
   touch-action: pan-y;
   outline-offset: 6px;
@@ -543,6 +542,11 @@ select,
   position: absolute; top: 0;
   left: calc(50% - var(--card-w, 320px) / 2);
   width: var(--card-w, 320px);
+  /* Every card in the row is the same height, so a longer description cannot make
+     one card taller than its neighbours; the ring measures the tallest and hands it
+     to all of them, and the tags and the link keep to the bottom. */
+  height: var(--stage-h, 340px);
+  display: flex; flex-direction: column;
   padding: 24px;
   /* The lit border is how the centred card reads as focused. */
   border-color: color-mix(in srgb, var(--tc) calc(var(--lit, 0) * 45%), var(--membrane));
@@ -550,13 +554,17 @@ select,
   z-index: var(--z, 1);
   pointer-events: var(--pe, auto);
   opacity: var(--alpha, 1);
-  transform:
-    translateX(calc(var(--d, 0) * var(--slot, 296px)))
-    scale(var(--scale, 1))
-    rotateY(calc(var(--d, 0) * -7deg));
+  /* Where the card stands comes from the ring, already solved: no rotation, so the
+     text stays crisp at every size. */
+  transform: translateX(var(--x, 0px)) scale(var(--scale, 1));
   transition: transform 0.5s var(--ease), opacity 0.4s var(--ease), border-color 0.4s var(--ease), box-shadow 0.4s var(--ease);
-  will-change: transform;
 }
+.tool-cards .tool-card .tags { margin-top: auto; }
+/* While a drag is in flight the cards follow the pointer directly; the settle after
+   it is what animates. */
+.tool-cards.is-dragging .tool-card { transition: none; }
+/* One frame, to measure the cards at their natural height. */
+.tool-cards.is-measuring .tool-card { height: auto !important; }
 @media (prefers-reduced-motion: reduce) {
   .tool-cards .tool-card { transition: none; }
 }
@@ -577,7 +585,7 @@ select,
 /* The projected slide is small here: the cover keeps its two columns but gives the
    text the room and the mascot what is left. */
 @media (max-width: 900px) {
-  .tool-cards { --slot: clamp(180px, 34vw, 260px); --card-w: clamp(216px, 46vw, 290px); }
+  .tool-cards { --card-w: clamp(216px, 46vw, 290px); }
 }
 @media (max-width: 560px) {
   /* A phone's "slide" is 300px wide, so the cover keeps its shape but drops to two
@@ -592,7 +600,7 @@ select,
   .slide-points li { font-size: 11px; padding-left: 14px; }
   .slide-points li:nth-child(3) { display: none; }
   .slide-nodi .nodi-svg { height: clamp(78px, 23vw, 104px); }
-  .tool-cards { --slot: clamp(150px, 40vw, 220px); --card-w: clamp(196px, 62vw, 260px); }
+  .tool-cards { --card-w: clamp(196px, 62vw, 260px); }
 }
 
 /* Under 400px the strapline no longer fits beside the mascot: the cover keeps the

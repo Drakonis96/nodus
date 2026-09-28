@@ -3,8 +3,8 @@ SPDX-FileCopyrightText: 2026 Jorge Pérez Burgueño and Nodus contributors
 SPDX-License-Identifier: AGPL-3.0-only
 
 Home page behaviour: the opening sequence, the PDF Presenter stage you can
-actually draw on, and the Toolkit row that scrolls sideways. The video gallery
-lives in the wiki (site/wiki/wiki.js).
+actually draw on, and the ring of Toolkit cards below it. The video gallery lives
+in the wiki (site/wiki/wiki.js).
 */
 (function () {
   'use strict';
@@ -183,12 +183,12 @@ lives in the wiki (site/wiki/wiki.js).
   }
 
   /* ------------------------------------------------------------ the tools ring */
-  /* The five tools are a ring: one card is in the middle, the two either side wait
-     behind it, and the row wraps, so stepping past the last card arrives at the
-     first. Every card carries `--d`, its signed distance to the middle, and
-     home.css turns that into the position, the size and how lit the card is.
-     Nothing turns on its own: a drag, a click on a waiting card, or an arrow key
-     while the ring has focus is what moves it. */
+  /* The five tools are a ring: one card sits in the middle, the ones either side
+     wait behind it, and the row wraps, so stepping past the last card arrives at
+     the first. One number drives all of it — `position`, the card the middle is on,
+     whole or halfway between two while a drag is in flight — and every card turns
+     that into where it stands, how big it is and how lit it is. Nothing turns on its
+     own: a drag, a click on a waiting card, the arrow keys, or a sideways wheel. */
   function tools() {
     const ring = document.querySelector('.tool-cards');
     if (!ring) return;
@@ -196,78 +196,138 @@ lives in the wiki (site/wiki/wiki.js).
     const cards = [...ring.querySelectorAll('.tool-card')];
     if (cards.length < 2) return;
 
-    // How far a card falls back and dims, by how far it is from the middle.
+    /* How far back a card stands, by how far it is from the middle. The air between
+       two cards is a constant the ring solves for, so a card that has shrunk still
+       keeps its distance: the row can never look like the cards drifted together. */
+    const GAP = 22;
     const LOOK = [
-      { scale: 1, alpha: 1, lit: 1, pe: 'auto', z: 30 },
-      { scale: 0.86, alpha: 0.62, lit: 0, pe: 'auto', z: 20 },
-      { scale: 0.74, alpha: 0.34, lit: 0, pe: 'auto', z: 10 },
+      { scale: 1, alpha: 1, lit: 1, z: 30 },
+      { scale: 0.86, alpha: 0.62, lit: 0, z: 20 },
+      { scale: 0.74, alpha: 0.34, lit: 0, z: 10 },
     ];
-    const BEHIND = { scale: 0.7, alpha: 0, lit: 0, pe: 'none', z: 1 };
+    const FADED = { scale: 0.72, alpha: 0, lit: 0, z: 1 };
+    const REACH = LOOK.length - 1;
 
-    let active = 0;
+    let position = 0;
+    let cardWidth = 0;
+    const offsets = new Array(LOOK.length).fill(0);
 
-    function place() {
+    const wrap = (value) => {
+      const n = cards.length;
+      let distance = value;
+      if (distance > n / 2) distance -= n;
+      if (distance < -n / 2) distance += n;
+      return distance;
+    };
+    const lerp = (from, to, t) => from + (to - from) * t;
+
+    /** Where a card stands and what it looks like, `distance` cards from the middle. */
+    function lookAt(distance) {
+      if (distance > REACH) return { ...FADED, x: offsets[REACH] + (distance - REACH) * GAP };
+      const low = Math.min(Math.floor(distance), REACH - 1);
+      const high = low + 1;
+      const t = distance - low;
+      return {
+        x: lerp(offsets[low], offsets[high], t),
+        scale: lerp(LOOK[low].scale, LOOK[high].scale, t),
+        alpha: lerp(LOOK[low].alpha, LOOK[high].alpha, t),
+        lit: lerp(LOOK[low].lit, LOOK[high].lit, t),
+        z: LOOK[Math.round(distance)]?.z ?? FADED.z,
+      };
+    }
+
+    /** Everything the ring shows comes from `position`: nothing else is remembered. */
+    function render() {
+      const middle = ((position % cards.length) + cards.length) % cards.length;
       cards.forEach((card, index) => {
-        // Circular distance: the nearest way round, not the line between them.
-        let distance = index - active;
-        if (distance > cards.length / 2) distance -= cards.length;
-        if (distance < -cards.length / 2) distance += cards.length;
-        const look = LOOK[Math.abs(distance)] || BEHIND;
-        card.style.setProperty('--d', String(distance));
-        card.style.setProperty('--scale', String(look.scale));
-        card.style.setProperty('--alpha', String(look.alpha));
-        card.style.setProperty('--lit', String(look.lit));
-        card.style.setProperty('--pe', look.pe);
-        card.style.setProperty('--z', String(look.z));
-        // The ring is as tall as its tallest card, whatever is in the middle.
-        card.setAttribute('aria-hidden', look.pe === 'none' ? 'true' : 'false');
-        card.tabIndex = distance === 0 ? 0 : -1;
+        const distance = wrap(index - middle);
+        const near = Math.abs(distance);
+        const look = lookAt(near);
+        card.style.setProperty('--x', `${(Math.sign(distance) * look.x).toFixed(1)}px`);
+        card.style.setProperty('--scale', look.scale.toFixed(3));
+        card.style.setProperty('--alpha', look.alpha.toFixed(3));
+        card.style.setProperty('--lit', look.lit.toFixed(3));
+        card.style.setProperty('--z', String(Math.round(look.z)));
+        const reachable = near <= REACH + 0.5;
+        card.style.setProperty('--pe', reachable ? 'auto' : 'none');
+        card.setAttribute('aria-hidden', reachable ? 'false' : 'true');
+        card.tabIndex = near < 0.5 ? 0 : -1;
       });
-      ring.style.setProperty('--stage-h', `${Math.max(...cards.map((card) => card.offsetHeight))}px`);
     }
 
-    function step(by) {
-      active = (active + by + cards.length) % cards.length;
-      place();
+    /** One card's worth of travel, which is what a drag is measured against. */
+    function stride() {
+      return Math.max(1, offsets[1] || cardWidth || 320);
     }
 
-    // Drag: a horizontal pull turns the ring, a tap on a waiting card brings it in.
-    let startX = 0;
-    let moved = 0;
+    function measure() {
+      cardWidth = cards[0].offsetWidth || 320;
+      offsets[0] = 0;
+      for (let level = 1; level < offsets.length; level++) {
+        // Half of each card, plus the air that has to survive every scale.
+        offsets[level] = offsets[level - 1]
+          + (cardWidth * LOOK[level - 1].scale) / 2 + GAP + (cardWidth * LOOK[level].scale) / 2;
+      }
+      // Every card is as tall as the tallest, so the row reads as one line.
+      ring.classList.add('is-measuring');
+      const tallest = Math.max(...cards.map((card) => card.offsetHeight));
+      ring.classList.remove('is-measuring');
+      ring.style.setProperty('--stage-h', `${tallest}px`);
+      render();
+    }
+
+    // Drag: the ring follows the pointer, the cards travel between each other, and
+    // letting go lands on the nearest one.
     let dragging = false;
+    let moved = 0;
+    let startX = 0;
+    let startPosition = 0;
 
     ring.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 && event.pointerType === 'mouse') return;
       dragging = true;
       moved = 0;
       startX = event.clientX;
+      startPosition = position;
     });
 
     ring.addEventListener('pointermove', (event) => {
       if (!dragging) return;
-      moved = Math.max(moved, Math.abs(event.clientX - startX));
-      if (moved <= 6 || ring.classList.contains('is-dragging')) return;
-      ring.classList.add('is-dragging');
-      // Capture only once this is a drag. Capturing on pointerdown retargets the
-      // click that ends a plain press to the ring itself, and the card under the
-      // pointer never hears it — which is a card you cannot click.
-      try { ring.setPointerCapture(event.pointerId); } catch { /* not captureable here */ }
+      const dx = event.clientX - startX;
+      moved = Math.max(moved, Math.abs(dx));
+      if (moved <= 6) return;
+      if (!ring.classList.contains('is-dragging')) {
+        ring.classList.add('is-dragging');
+        // Capture only once this is a drag. Capturing on pointerdown retargets the
+        // click that ends a plain press to the ring itself, and the card under the
+        // pointer never hears it — which is a card you cannot click.
+        try { ring.setPointerCapture(event.pointerId); } catch { /* not captureable here */ }
+      }
+      position = startPosition - dx / stride();
+      render();
     });
 
-    const settle = (event) => {
+    function settle() {
       if (!dragging) return;
       dragging = false;
       ring.classList.remove('is-dragging');
-      const dx = (event.clientX ?? startX) - startX;
-      // Far enough to be meant as a turn, and sideways rather than a scroll.
-      if (Math.abs(dx) < 40) return;
-      step(dx < 0 ? 1 : -1);
-    };
+      if (moved > 6) {
+        position = Math.round(position);
+        render();
+      }
+    }
     ring.addEventListener('pointerup', settle);
-    ring.addEventListener('pointercancel', () => { dragging = false; ring.classList.remove('is-dragging'); });
+    ring.addEventListener('pointercancel', settle);
 
-    // A click that ended a drag is not a click, and a card that is not in the
-    // middle takes the click as "bring me in" instead of following its link.
+    function turn(by) {
+      forgetWheel();
+      wheelBlocked = Date.now() + 400;
+      position = Math.round(position) + by;
+      render();
+    }
+
+    // A click that ended a drag is not a click, and a card that is not in the middle
+    // takes the click as "bring me in" instead of following its link.
     ring.addEventListener('click', (event) => {
       if (moved > 6) {
         event.preventDefault();
@@ -277,14 +337,11 @@ lives in the wiki (site/wiki/wiki.js).
       }
       const card = event.target.closest('.tool-card');
       if (!card) return;
-      const index = cards.indexOf(card);
-      if (index === active) return;
+      const away = wrap(cards.indexOf(card) - ((position % cards.length) + cards.length) % cards.length);
+      if (Math.abs(away) < 0.5) return;
       event.preventDefault();
       event.stopPropagation();
-      // Straight there, in one move, and deaf to the trackpad's tail for a moment.
-      forgetWheel();
-      wheelBlocked = Date.now() + 400;
-      step(index - active);
+      turn(away);
     }, true);
 
     ring.tabIndex = 0;
@@ -292,8 +349,8 @@ lives in the wiki (site/wiki/wiki.js).
     ring.setAttribute('aria-roledescription', 'carousel');
     if (!ring.hasAttribute('aria-label')) ring.setAttribute('aria-label', 'Nodus tools');
     ring.addEventListener('keydown', (event) => {
-      if (event.key === 'ArrowLeft') { event.preventDefault(); step(-1); }
-      else if (event.key === 'ArrowRight') { event.preventDefault(); step(1); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); turn(-1); }
+      else if (event.key === 'ArrowRight') { event.preventDefault(); turn(1); }
     });
 
     // One gesture, one card. A trackpad keeps sending events long after the fingers
@@ -324,11 +381,13 @@ lives in the wiki (site/wiki/wiki.js).
       // Turned once: the rest of this gesture is its tail, not a second turn.
       forgetWheel();
       wheelBlocked = Date.now() + WHEEL_QUIET;
-      step(by);
+      turn(by);
     }, { passive: false });
 
-    addEventListener('resize', place, { passive: true });
-    place();
+    addEventListener('resize', measure, { passive: true });
+    measure();
+    // The cards are as tall as their text, and the text is a webfont.
+    if (document.fonts?.ready) document.fonts.ready.then(measure).catch(() => {});
   }
 
   function boot() {
