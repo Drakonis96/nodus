@@ -5878,6 +5878,7 @@ html.theme-active.light .library-theme .text-indigo-100 { color: var(--a-700); }
 .research-preparation-mark rect { fill: #122032; }
 .research-preparation-content h2 { max-width: 460px; margin: 0 auto; font-size: clamp(27px, 4vw, 36px); line-height: 1.12; letter-spacing: -.035em; font-weight: 700; text-wrap: balance; }
 .research-preparation-description { margin: 19px auto 0; max-width: 460px; color: #bdc9dc; font-size: 15px; line-height: 1.65; text-wrap: pretty; }
+.research-preparation-description-follow { margin-top: 10px; }
 .research-preparation-question { margin-top: 25px; font-size: 15px; font-weight: 600; }
 .research-preparation-model-label { margin-top: 19px; color: #a5b4c8; font-size: 12px; }
 .research-preparation-model { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 100%; margin-top: 9px; padding: 9px 15px; border: 1px solid rgb(94 234 212 / .2); border-radius: 12px; background: rgb(45 212 191 / .06); color: #99f6e4; font-size: 12px; overflow-wrap: anywhere; }
