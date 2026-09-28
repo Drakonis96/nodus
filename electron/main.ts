@@ -1075,8 +1075,13 @@ app.whenReady().then(async () => {
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
   // global_id when its work is rescanned.
-  const prunedIdeas = pruneDormantIdeas();
-  if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
+  try {
+    const prunedIdeas = pruneDormantIdeas();
+    if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
+  } catch (error) {
+    // Maintenance must never keep the app from opening.
+    console.error(`[maintenance] dormant-idea prune failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
   setCopilotWindowProvider(() => mainWindow);
   setZoteroPluginWindowProvider(() => mainWindow);
   registerIpc(
