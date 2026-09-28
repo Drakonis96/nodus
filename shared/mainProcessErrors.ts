@@ -1119,6 +1119,20 @@ export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
   ko: "AI가 사용 가능한 기준을 반환하지 않았습니다. 다시 시도해 보세요.",
   ja: "AI は使用可能な基準を返しませんでした。もう一度やり直してください。", },
 
+  // ── AI: the complete study guide (Deep Research over selected materials) ────
+  'Ninguna de las fuentes seleccionadas tiene texto legible. Indexa o prepara los materiales e inténtalo de nuevo.': { en: 'None of the selected sources has readable text. Index or prepare the materials and try again.', fr: 'Aucune des sources sélectionnées n’a de texte lisible. Indexez ou préparez les documents, puis réessayez.', de: 'Keine der ausgewählten Quellen enthält lesbaren Text. Indizieren oder bereiten Sie die Materialien vor, und versuchen Sie es erneut.', pt: 'Nenhuma das fontes selecionadas tem texto legível. Indexe ou prepare os materiais e tente novamente.', 'pt-BR': 'Nenhuma das fontes selecionadas tem texto legível. Indexe ou prepare os materiais e tente novamente.', it: 'Nessuna delle fonti selezionate ha testo leggibile. Indicizza o prepara i materiali e riprova.', tr: 'Seçilen kaynakların hiçbirinde okunabilir metin yok. Materyalleri dizinleyin veya hazırlayın ve yeniden deneyin.' , "zh-CN": "所选来源均无可读文本。请为材料建立索引或先准备材料，然后重试。" ,
+  'zh-TW': "所選來源皆無可讀文字。請為材料建立索引或先準備材料，然後重試。",
+  ko: "선택한 출처에 읽을 수 있는 텍스트가 없습니다. 자료를 색인하거나 준비한 뒤 다시 시도하세요.",
+  ja: "選択した資料に読み取り可能なテキストがありません。資料を索引付けするか準備して、もう一度お試しください。", },
+  'La guía de estudio completa solo está disponible en vaults de Estudio.': { en: 'The complete study guide is only available in Study vaults.', fr: 'Le guide d’étude complet n’est disponible que dans les coffres d’étude.', de: 'Der vollständige Lernleitfaden ist nur in Lernarchiven verfügbar.', pt: 'O guia de estudo completo só está disponível em vaults de estudo.', 'pt-BR': 'O guia de estudo completo está disponível apenas em vaults de estudo.', it: 'La guida di studio completa è disponibile solo nei vault di studio.', tr: 'Tam çalışma kılavuzu yalnızca Çalışma kasalarında kullanılabilir.' , "zh-CN": "完整学习指南仅在“学习”资料库中可用。" ,
+  'zh-TW': "完整學習指南僅在「學習」資料庫中可用。",
+  ko: "전체 학습 가이드는 학습 보관함에서만 사용할 수 있습니다.",
+  ja: "完全学習ガイドは学習保管庫でのみ利用できます。", },
+  'Esta guía no tiene ficha de repaso.': { en: 'This guide has no review sheet.', fr: 'Ce guide n’a pas de fiche de révision.', de: 'Dieser Leitfaden hat kein Wiederholungsblatt.', pt: 'Este guia não tem ficha de revisão.', 'pt-BR': 'Este guia não tem ficha de revisão.', it: 'Questa guida non ha una scheda di ripasso.', tr: 'Bu kılavuzun tekrar sayfası yok.' , "zh-CN": "本指南没有复习卡。" ,
+  'zh-TW': "本指南沒有複習卡。",
+  ko: "이 가이드에는 복습 시트가 없습니다.",
+  ja: "このガイドには復習シートがありません。", },
+
   // ── AI: testimonies and Nodus Apps ──────────────────────────────────────────
   'Esta entrevista todavía no tiene transcripción.': { en: 'This interview does not have a transcript yet.', fr: 'Cet entretien n’a pas encore de transcription.', de: 'Für dieses Interview gibt es noch kein Transkript.', pt: 'Esta entrevista ainda não tem transcrição.', 'pt-BR': 'Esta entrevista ainda não tem transcrição.', it: 'Questa intervista non ha ancora una trascrizione.', tr: 'Bu görüşmenin henüz dökümü yok.' , "zh-CN": "此访谈尚无转录文本。" ,
   'zh-TW': "此訪談尚無轉錄文本。",
@@ -5050,4 +5064,12 @@ export const MAIN_PROCESS_ERROR_PATTERNS: { pattern: RegExp; translate: (...grou
   'zh-TW': `${command} 超時。`,}) },
   { pattern: /^No se pudo instalar un runtime de llama\.cpp utilizable\. (.+)$/, translate: (details) => ({ en: `No usable llama.cpp runtime could be installed. ${details}`, fr: `Aucun moteur llama.cpp utilisable n’a pu être installé. ${details}`, de: `Es konnte keine nutzbare llama.cpp-Laufzeit installiert werden. ${details}`, pt: `Não foi possível instalar um motor llama.cpp utilizável. ${details}`, 'pt-BR': `Não foi possível instalar um runtime llama.cpp utilizável. ${details}`, it: `Non è stato possibile installare un runtime llama.cpp utilizzabile. ${details}`, tr: `Kullanılabilir bir llama.cpp çalışma zamanı kurulamadı. ${details}` , 'zh-CN': `无法安装可用的 llama.cpp 运行时。${details}` ,
   'zh-TW': `無法安裝可用的 llama.cpp 執行時。${details}`,}) },
+
+  // The complete study guide fails a job whose extraction could not read more than a tenth
+  // of the source windows, and says how many. The counts are the whole point of the
+  // sentence, so they are captured and reused rather than collapsed into the generic line.
+  { pattern: /^No se pudieron leer (\d+) de (\d+) partes de las fuentes\. Vuelve a intentarlo: lo ya leído se reutilizará\.$/, translate: (failed, total) => ({ en: `Could not read ${failed} of ${total} parts of the sources. Try again: everything already read is reused.`, fr: `Impossible de lire ${failed} partie(s) sur ${total} des sources. Réessayez : ce qui a déjà été lu sera réutilisé.`, de: `${failed} von ${total} Teilen der Quellen konnten nicht gelesen werden. Versuchen Sie es erneut: bereits Gelesenes wird wiederverwendet.`, pt: `Não foi possível ler ${failed} de ${total} partes das fontes. Tente novamente: o que já foi lido será reutilizado.`, 'pt-BR': `Não foi possível ler ${failed} de ${total} partes das fontes. Tente novamente: o que já foi lido será reaproveitado.`, it: `Impossibile leggere ${failed} di ${total} parti delle fonti. Riprova: quanto già letto verrà riutilizzato.`, tr: `Kaynakların ${total} bölümünden ${failed} tanesi okunamadı. Yeniden deneyin: okunanlar yeniden kullanılacak.` , "zh-CN": `无法读取来源的 ${failed}/${total} 部分。请重试：已读取的内容会被复用。` ,
+  'zh-TW': `無法讀取來源的 ${failed}/${total} 部分。請重試：已讀取的內容會被重用。`,
+  ko: `출처 ${total}개 부분 중 ${failed}개를 읽지 못했습니다. 다시 시도하세요. 이미 읽은 내용은 재사용됩니다.`,
+  ja: `資料の ${total} 部分のうち ${failed} 部分を読み取れませんでした。もう一度お試しください。すでに読み取った内容は再利用されます。`,}) },
 ];
