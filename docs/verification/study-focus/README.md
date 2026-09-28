@@ -14,6 +14,8 @@ Implementación de escritorio por bóveda. Las capturas usan datos de ejemplo en
 - `08-focus-rail-notes.png`: el panel de concentración lleva a Notas (espacio de trabajo) sin salir del modo.
 - `09-focus-browser-media.png`: navegador abierto desde el panel y controles de medios en la cabecera.
 - `10-narrow-rail-dark.png`: en ventana estrecha el panel se pliega a iconos.
+- `11-focus-layout-dialog.png`: ajustes del modo concentración (qué bloques, secciones y elementos de cabecera se ven).
+- `12-focus-exit-question.png`: al salir del modo, el bloque queda en pausa y se pregunta si finalizar la sesión.
 
 ## Resultado
 
@@ -37,14 +39,15 @@ La suspensión se prueba emitiendo el evento de Electron; no se suspende física
 
 ## Modo concentración
 
-Sustituye la barra lateral por un panel propio en vez de esconder la navegación:
+La casilla «Modo concentración» está marcada por defecto: iniciar o reanudar un bloque de trabajo entra en el modo, y la elección se recuerda si se desmarca. El modo sustituye la barra lateral por un panel propio en vez de esconder la navegación:
 
-- el bloque en curso (reloj, asignatura y objetivo), que abre el temporizador;
-- los apuntes y materiales de la asignatura del bloque, o los más recientes sin asignatura, con filtro cuando son muchos y «Nuevo apunte» archivado en la asignatura;
-- todas las secciones de Estudio en el orden guardado por el usuario, además de Biblioteca y Notas (salvo que el usuario la haya ocultado expresamente);
+- arriba, el bloque en curso (reloj), la asignatura con su objetivo y «Nuevo apunte», y los apuntes y materiales de la asignatura (o los más recientes), con filtro cuando son muchos;
+- abajo, por defecto, Cursos y asignaturas, Calendario, Buscar, Materiales, Research chat, Banco de preguntas, Investigación y Browser;
 - la salida del modo. Se pliega a iconos y lo hace solo en ventanas estrechas.
 
-La cabecera conserva el temporizador, los controles de medios del navegador, la paleta de comandos, el tema, la cola de tareas y una actualización pendiente. La paleta ofrece «Entrar en modo concentración» y «Temporizador de concentración». Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
+Todo es configurable en «Personalizar el modo concentración» (desde el panel, desde la cabecera o desde la paleta): cada bloque superior, cualquier sección de la bóveda y los elementos que conserva la cabecera (controles de medios del navegador, paleta de comandos, tema y cola de tareas). Solo afecta al modo concentración; se guarda por bóveda con el resto de preferencias del temporizador y solo se almacenan las diferencias con los valores por defecto.
+
+En la cabecera de una bóveda de Estudio, junto al tema claro/oscuro, hay un acceso rápido para entrar o salir del modo y otro para sus ajustes. Salir del modo lleva a la página Concentración, pausa el bloque y, si hay una sesión abierta, pregunta si finalizarla o dejarla en pausa. Todo el texto pasa por `t()`/`tx()` y está traducido a los once idiomas; la prueba de escritorio recorre también la interfaz en inglés.
 
 ## Detalles de persistencia
 

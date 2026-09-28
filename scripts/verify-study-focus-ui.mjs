@@ -61,7 +61,24 @@ try {
   // Start using the UI, then navigate and minimize without losing the timer.
   await view().locator('select').first().selectOption(ids.subject.id);
   await view().getByLabel('Objetivo del bloque', { exact: true }).fill('Repasar el siglo XIX');
+  assert.equal(await view().getByTestId('focus-mode-toggle').isChecked(), true, 'focus mode is ticked by default');
   await view().getByRole('button', { name: 'Iniciar bloque', exact: true }).click();
+  // Starting a block enters the mode; leaving it pauses the block, lands on this page and asks.
+  await page.getByTestId('focus-rail').waitFor();
+  assert.equal(await page.getByTestId('resizable-sidebar').count(), 0);
+  await page.getByTestId('focus-rail').getByTestId('focus-rail-nav-studyCalendar').click();
+  await page.getByTestId('focus-exit').click();
+  await page.getByTestId('focus-exit-dialog').waitFor();
+  assert.equal(await page.locator('main').getAttribute('data-nodi-view'), 'studyFocus');
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'paused');
+  await page.getByTestId('focus-exit-keep').click();
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'paused');
+  // Still ticked for the resume; unticking it is remembered and keeps the mode off.
+  assert.equal(await view().getByTestId('focus-mode-toggle').isChecked(), true);
+  await view().getByTestId('focus-mode-toggle').uncheck();
+  await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
+  assert.equal(await page.getByTestId('focus-rail').count(), 0);
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.enterOnStart, false);
   const running = await page.evaluate(() => window.nodus.getStudyFocus());
   assert.equal(running.state.status, 'running'); assert.equal(running.state.subjectId, ids.subject.id);
   assert.equal(running.state.task, 'Repasar el siglo XIX');
@@ -139,9 +156,30 @@ try {
   assert.equal(await page.getByTestId('resizable-sidebar').count(), 0);
   const rail = page.getByTestId('focus-rail');
   await rail.getByTestId('focus-rail-subject').getByText('Historia contemporánea').waitFor();
-  for (const section of ['studyCourses', 'studyLibrary', 'studyQuestions', 'studyReview', 'studyChat', 'library', 'notes', 'browser', 'studyFocus']) {
-    assert.equal(await rail.getByTestId(`focus-rail-nav-${section}`).count(), 1, `focus rail reaches ${section}`);
-  }
+  const railSections = () => rail.locator('[data-testid^="focus-rail-nav-"]').evaluateAll(els => els.map(el => el.dataset.testid.replace('focus-rail-nav-', '')));
+  assert.deepEqual((await railSections()).sort(), ['browser', 'studyCalendar', 'studyChat', 'studyCourses', 'studyDeepResearch', 'studyLibrary', 'studyQuestions', 'studySearch']);
+  // Every other section, and each block and header item, is the student's choice.
+  await rail.getByTestId('focus-rail-settings').click();
+  const layoutDialog = page.getByTestId('focus-layout-dialog');
+  await layoutDialog.waitFor();
+  await layoutDialog.getByTestId('focus-layout-nav:notes').check();
+  await layoutDialog.getByTestId('focus-layout-nav:studyReview').check();
+  await layoutDialog.getByTestId('focus-layout-block:timer').uncheck();
+  await layoutDialog.getByTestId('focus-layout-header:theme').uncheck();
+  await page.screenshot({ path: path.join(shots, '11-focus-layout-dialog.png') });
+  await layoutDialog.getByTestId('focus-layout-done').click();
+  await rail.getByTestId('focus-rail-nav-notes').waitFor();
+  assert.equal(await rail.getByTestId('focus-rail-nav-studyReview').count(), 1);
+  assert.equal(await rail.getByTestId('focus-rail-timer').count(), 0);
+  assert.equal(await page.locator('[data-tour="theme-toggle"]').isVisible(), false, 'the theme toggle follows the choice');
+  const storedLayout = (await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout;
+  assert.deepEqual(storedLayout, { 'nav:notes': true, 'nav:studyReview': true, 'block:timer': false, 'header:theme': false });
+  // The header quick access opens the same settings; restoring brings the timer back.
+  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Personalizar el modo concentración', exact: true }).click();
+  await layoutDialog.getByTestId('focus-layout-block:timer').check();
+  await layoutDialog.getByTestId('focus-layout-header:theme').check();
+  await layoutDialog.getByTestId('focus-layout-done').click();
+  await rail.getByTestId('focus-rail-timer').waitFor();
   // The palette still opens the timer and leaves the mode.
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
   await page.getByPlaceholder('Ir a una sección o ejecutar una acción…').fill('Temporizador de concentración');
@@ -165,9 +203,18 @@ try {
   await page.screenshot({ path: path.join(shots, '08-focus-rail-notes.png') });
   await rail.getByTestId('focus-rail-nav-studyCourses').click();
   await page.getByRole('button', { name: 'El siglo XIX: cambios y continuidades', exact: false }).first().click();
-  await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).click();
+  await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).waitFor();
   await page.getByTestId('focus-exit').click();
-  assert.equal(await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).getAttribute('aria-pressed'), 'true');
+  await page.getByTestId('focus-exit-dialog').waitFor();
+  await page.screenshot({ path: path.join(shots, '12-focus-exit-question.png') });
+  await page.getByTestId('focus-exit-keep').click();
+  await page.getByTestId('resizable-sidebar').waitFor();
+  assert.equal(await page.locator('main').getAttribute('data-nodi-view'), 'studyFocus');
+  await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
+  await page.getByTestId('focus-rail').waitFor();
+  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Salir del modo concentración', exact: true }).click();
+  await page.getByTestId('focus-exit-keep').click();
+  await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
   await page.getByTestId('resizable-sidebar').waitFor();
   assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'running');
   // The native Browser remains playing, and both header popovers stay usable.
@@ -183,9 +230,8 @@ try {
     throw new Error('Audio fixture did not load');
   }, audioOrigin);
   await page.waitForFunction(async () => (await window.nodus.getBrowserMedia()).some(media => media.playing));
-  await page.getByTestId('focus-header').click();
-  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByLabel('Modo concentración', { exact: false }).check();
-  await page.keyboard.press('Escape');
+  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Entrar en modo concentración', exact: true }).click();
+  await page.getByTestId('focus-rail').waitFor();
   // The browser stays reachable from the rail, and its media controls stay in the header.
   await page.getByTestId('focus-rail').getByTestId('focus-rail-nav-browser').click();
   await page.waitForFunction(() => document.querySelector('main')?.getAttribute('data-nodi-view') === 'browser');
@@ -195,7 +241,9 @@ try {
   await page.getByTestId('browser-media-popover').waitFor();
   await page.screenshot({ path: path.join(shots, '09-focus-browser-media.png') });
   await page.keyboard.press('Escape');
-  await page.getByTestId('focus-exit').click();
+  await page.getByTestId('focus-quick-access').getByRole('button', { name: 'Salir del modo concentración', exact: true }).click();
+  await page.getByTestId('focus-exit-dialog').waitFor();
+  await page.getByTestId('focus-exit-keep').click();
   await page.getByTestId('resizable-sidebar').waitFor();
   assert.ok((await page.evaluate(() => window.nodus.getBrowserMedia())).some(media => media.playing));
   await page.evaluate(id => window.nodus.closeBrowserTab(id), audioTab);
@@ -203,11 +251,15 @@ try {
   await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en' }));
   await page.reload(); await page.locator('[data-tour="nav-studyFocus"]').click();
   await view().getByRole('heading', { name: 'Focus', exact: true }).waitFor();
-  await view().getByLabel('Focus mode', { exact: false }).check();
+  await view().getByRole('button', { name: 'Resume', exact: true }).click();
+  await page.getByTestId('focus-rail').waitFor();
   const englishRail = await page.getByTestId('focus-rail').innerText();
   assert.match(englishRail, /Exit focus mode/); assert.match(englishRail, /Question bank/);
   assert.doesNotMatch(englishRail, /Salir|Concentración|Estudiar|De esta asignatura/);
   await page.getByTestId('focus-exit').click();
+  await page.getByRole('alertdialog', { name: 'Do you want to end the session?' }).waitFor();
+  await page.getByTestId('focus-exit-keep').click();
+  await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
   await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es' }));
   // Dark and narrow windows.
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
@@ -216,10 +268,11 @@ try {
   await page.screenshot({ path: path.join(shots, '06-dashboard-dark.png') });
   await page.setViewportSize({ width: 780, height: 980 });
   await page.screenshot({ path: path.join(shots, '07-narrow-dark.png') });
-  await view().getByLabel('Modo concentración', { exact: false }).check();
+  await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
   assert.ok((await page.getByTestId('focus-rail').evaluate(el => el.getBoundingClientRect().width)) < 70, 'a narrow window folds the rail to icons');
   await page.screenshot({ path: path.join(shots, '10-narrow-rail-dark.png') });
   await page.getByTestId('focus-exit').click();
+  await page.getByTestId('focus-exit-keep').click();
   assert.equal(await view().evaluate(el => el.scrollWidth > el.clientWidth), false);
   // Axe checks the new feature's semantic surface, including chart alternatives.
   await page.evaluate(require('axe-core').source);
