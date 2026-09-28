@@ -31,7 +31,9 @@ const launch = async () => {
   app = await electron.launch({ executablePath: require('electron'), args: [root], env });
   page = await app.firstWindow(); page.setDefaultTimeout(30000);
   await page.addLocatorHandler(page.getByText('Todos los tutoriales, en Ajustes', { exact: true }), async () => { await page.getByRole('button', { name: 'Cerrar', exact: true }).click(); });
-  await page.addLocatorHandler(page.getByTestId('backup-health-banner'), async () => { await page.getByRole('button', { name: 'Ocultar aviso', exact: true }).click(); });
+  await page.addLocatorHandler(page.getByText('All the tutorials, in Settings', { exact: true }), async () => { await page.getByRole('button', { name: 'Close', exact: true }).click(); });
+  // By class, not by label: part of the run is in English.
+  await page.addLocatorHandler(page.getByTestId('backup-health-banner'), async () => { await page.getByTestId('backup-health-banner').locator('.backup-health-dismiss').click(); });
   page.on('pageerror', error => errors.push(error.message));
   await page.waitForFunction(() => !!window.nodus && !!document.getElementById('root')?.children.length);
   await page.setViewportSize({ width: 1440, height: 1180 });
@@ -58,9 +60,12 @@ try {
   await page.screenshot({ path: path.join(shots, '01-empty-light.png') });
   // Start using the UI, then navigate and minimize without losing the timer.
   await view().locator('select').first().selectOption(ids.subject.id);
+  await view().getByLabel('Objetivo del bloque', { exact: true }).fill('Repasar el siglo XIX');
   await view().getByRole('button', { name: 'Iniciar bloque', exact: true }).click();
   const running = await page.evaluate(() => window.nodus.getStudyFocus());
   assert.equal(running.state.status, 'running'); assert.equal(running.state.subjectId, ids.subject.id);
+  assert.equal(running.state.task, 'Repasar el siglo XIX');
+  await view().getByTestId('focus-current-block').getByText('Repasar el siglo XIX').waitFor();
   await page.locator('[data-tour="nav-studyCalendar"]').click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('index.html')).minimize());
   await page.waitForTimeout(1200);
@@ -126,21 +131,42 @@ try {
   await page.evaluate(require('axe-core').source);
   const lightA11y = await page.evaluate(async () => (await window.axe.run('[data-testid="study-focus-view"]')).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target) })));
   assert.deepEqual(lightA11y.filter(v => ['critical', 'serious'].includes(v.impact)), []);
-  // Reduced mode + palette navigation + restoration of the sidebar.
+  // Focus mode: the rail replaces the sidebar and keeps every study tool one click away.
+  await view().locator('select').first().selectOption(ids.subject.id);
   await view().getByRole('button', { name: 'Iniciar bloque', exact: true }).click();
-  await view().getByLabel('Reducir distracciones', { exact: false }).check();
+  await view().getByLabel('Modo concentración', { exact: false }).check();
   await page.waitForFunction(() => document.querySelector('[data-focus-reduced="true"]'));
   assert.equal(await page.getByTestId('resizable-sidebar').count(), 0);
-  await page.getByRole('button', { name: 'Navegar', exact: true }).click();
-  await page.getByPlaceholder('Ir a una sección o ejecutar una acción…').fill('Cursos y asignaturas');
+  const rail = page.getByTestId('focus-rail');
+  await rail.getByTestId('focus-rail-subject').getByText('Historia contemporánea').waitFor();
+  for (const section of ['studyCourses', 'studyLibrary', 'studyQuestions', 'studyReview', 'studyChat', 'library', 'notes', 'browser', 'studyFocus']) {
+    assert.equal(await rail.getByTestId(`focus-rail-nav-${section}`).count(), 1, `focus rail reaches ${section}`);
+  }
+  // The palette still opens the timer and leaves the mode.
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
+  await page.getByPlaceholder('Ir a una sección o ejecutar una acción…').fill('Temporizador de concentración');
   await page.keyboard.press('Enter');
-  await page.getByTestId(`study-browser-course-${ids.course.id}`).getByRole('button').first().click();
-  await page.getByTestId(`study-browser-subject-${ids.subject.id}`).getByRole('button').first().click();
-  await page.getByRole('button', { name: 'El siglo XIX: cambios y continuidades', exact: false }).first().click();
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).waitFor();
+  await page.keyboard.press('Escape');
+  await rail.getByTestId(`focus-rail-document-${ids.note.id}`).click();
   await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).waitFor();
   await page.screenshot({ path: path.join(shots, '05-editor-focus.png') });
+  // A new note is filed under the block's subject and opened in the editor.
+  await rail.getByTestId('focus-rail-new-note').click();
+  await page.waitForFunction(async subjectId => {
+    const workspace = await window.nodus.getStudyWorkspace();
+    return workspace.documents.some(document => document.title.startsWith('Apuntes · ') && workspace.placements.some(placement => placement.documentId === document.id && placement.subjectId === subjectId));
+  }, ids.subject.id);
+  await rail.getByText(/^Apuntes · /).first().waitFor();
+  await rail.getByTestId('focus-rail-nav-studyQuestions').click();
+  await page.waitForFunction(() => document.querySelector('main')?.getAttribute('data-nodi-view') === 'studyQuestions');
+  await rail.getByTestId('focus-rail-nav-notes').click();
+  await page.waitForFunction(() => document.querySelector('main')?.getAttribute('data-nodi-view') === 'notes');
+  await page.screenshot({ path: path.join(shots, '08-focus-rail-notes.png') });
+  await rail.getByTestId('focus-rail-nav-studyCourses').click();
+  await page.getByRole('button', { name: 'El siglo XIX: cambios y continuidades', exact: false }).first().click();
   await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).click();
-  await page.getByRole('button', { name: 'Salir de concentración', exact: true }).click();
+  await page.getByTestId('focus-exit').click();
   assert.equal(await page.getByRole('button', { name: 'Ocultar paneles', exact: true }).getAttribute('aria-pressed'), 'true');
   await page.getByTestId('resizable-sidebar').waitFor();
   assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'running');
@@ -158,16 +184,31 @@ try {
   }, audioOrigin);
   await page.waitForFunction(async () => (await window.nodus.getBrowserMedia()).some(media => media.playing));
   await page.getByTestId('focus-header').click();
-  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByLabel('Reducir distracciones', { exact: false }).check();
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).getByLabel('Modo concentración', { exact: false }).check();
   await page.keyboard.press('Escape');
+  // The browser stays reachable from the rail, and its media controls stay in the header.
+  await page.getByTestId('focus-rail').getByTestId('focus-rail-nav-browser').click();
+  await page.waitForFunction(() => document.querySelector('main')?.getAttribute('data-nodi-view') === 'browser');
   await page.getByTestId('browser-media-header-action').waitFor({ state: 'visible' });
   assert.ok((await page.evaluate(() => window.nodus.getBrowserMedia())).some(media => media.playing));
   await page.getByTestId('browser-media-header-action').getByRole('button', { name: 'Medios', exact: true }).click();
   await page.getByTestId('browser-media-popover').waitFor();
+  await page.screenshot({ path: path.join(shots, '09-focus-browser-media.png') });
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Salir de concentración', exact: true }).click();
+  await page.getByTestId('focus-exit').click();
+  await page.getByTestId('resizable-sidebar').waitFor();
   assert.ok((await page.evaluate(() => window.nodus.getBrowserMedia())).some(media => media.playing));
   await page.evaluate(id => window.nodus.closeBrowserTab(id), audioTab);
+  // Another interface language: the focus surfaces follow it.
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en' }));
+  await page.reload(); await page.locator('[data-tour="nav-studyFocus"]').click();
+  await view().getByRole('heading', { name: 'Focus', exact: true }).waitFor();
+  await view().getByLabel('Focus mode', { exact: false }).check();
+  const englishRail = await page.getByTestId('focus-rail').innerText();
+  assert.match(englishRail, /Exit focus mode/); assert.match(englishRail, /Question bank/);
+  assert.doesNotMatch(englishRail, /Salir|Concentración|Estudiar|De esta asignatura/);
+  await page.getByTestId('focus-exit').click();
+  await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'es' }));
   // Dark and narrow windows.
   await page.evaluate(() => window.nodus.updateSettings({ theme: 'dark' }));
   await page.reload(); await page.locator('[data-tour="nav-studyFocus"]').click();
@@ -175,6 +216,10 @@ try {
   await page.screenshot({ path: path.join(shots, '06-dashboard-dark.png') });
   await page.setViewportSize({ width: 780, height: 980 });
   await page.screenshot({ path: path.join(shots, '07-narrow-dark.png') });
+  await view().getByLabel('Modo concentración', { exact: false }).check();
+  assert.ok((await page.getByTestId('focus-rail').evaluate(el => el.getBoundingClientRect().width)) < 70, 'a narrow window folds the rail to icons');
+  await page.screenshot({ path: path.join(shots, '10-narrow-rail-dark.png') });
+  await page.getByTestId('focus-exit').click();
   assert.equal(await view().evaluate(el => el.scrollWidth > el.clientWidth), false);
   // Axe checks the new feature's semantic surface, including chart alternatives.
   await page.evaluate(require('axe-core').source);
