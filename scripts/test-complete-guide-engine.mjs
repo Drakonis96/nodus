@@ -79,7 +79,7 @@ function fakeModel(options = {}) {
       for (const passage of user.passages) {
         for (const sentence of sentences(passage.text)) {
           if (/relleno/.test(sentence)) continue;
-          const type = /se define|Definición/.test(sentence) ? 'definition' : /=|\$/.test(sentence) ? 'formula' : /Ejemplo/.test(sentence) ? 'example' : /Error/.test(sentence) ? 'mistake' : 'fact';
+          const type = options.figure?.test(sentence) ? 'figure' : /se define|Definición/.test(sentence) ? 'definition' : /=|\$/.test(sentence) ? 'formula' : /Ejemplo/.test(sentence) ? 'example' : /Error/.test(sentence) ? 'mistake' : 'fact';
           items.push({
             type, title: sentence.slice(0, 30), statement: sentence, importance: type === 'fact' ? 'support' : 'core',
             ...(type === 'formula' ? { latex: sentence.includes('PV') ? 'PV = nRT' : 'pH = -\\log[H_3O^+]', conditions: ['baja presión'] } : {}),
@@ -239,6 +239,29 @@ test('failed windows are reported as unread when rare, and fail the job when fre
   };
   await assert.rejects(core.runCompleteGuide(input(), memoryDeps(flaky)), /No se pudieron leer/);
   assert.ok(broken > 0);
+});
+
+test('figure items of materials become figure requests; a failing renderer only warns', async () => {
+  const requests = [];
+  const figures = async (list) => {
+    requests.push(...list);
+    return list.map((request) => ({ itemId: request.itemId, caption: request.caption, png: 'iVBORw0KGgo=', width: 600, height: 400, source: request.source, wholePage: false }));
+  };
+  const result = await core.runCompleteGuide(input(), memoryDeps(fakeModel({ figure: /Ejemplo resuelto|Resumen|Brønsted/ }), undefined, { figures }));
+  assert.ok(requests.length >= 1, 'a figure is requested');
+  assert.ok(requests.every((request) => request.materialId && request.source.startsWith('nodus://study/material/')), 'only materials have pictures');
+  assert.ok(requests.every((request) => request.page), 'requests carry the cited page');
+  assert.equal(result.counts.figures, requests.length);
+  assert.deepEqual(result.figures.map((figure) => figure.itemId), requests.map((request) => request.itemId));
+  for (const figure of result.figures) assert.ok(Array.isArray(result.figureSiblings[figure.itemId]));
+
+  const broken = await core.runCompleteGuide(input(), memoryDeps(fakeModel({ figure: /Ejemplo resuelto/ }), undefined, { figures: async () => { throw new Error('canvas missing'); } }));
+  assert.ok(broken.warnings.includes('figures_failed'));
+  assert.equal(broken.figures.length, 0);
+  assert.ok(broken.markdown.length > 500, 'the guide is still written');
+
+  const none = await core.runCompleteGuide(input(), memoryDeps(fakeModel(), undefined, { figures }));
+  assert.equal(none.counts.figures, 0, 'no figure items, no figures');
 });
 
 test('settlePool keeps siblings running when one task fails', async () => {

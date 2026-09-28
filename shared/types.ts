@@ -7667,6 +7667,8 @@ export interface DeepResearchReport {
   meta: DeepResearchMeta;
   /** Complete study guides: the evidence sidecar, stored locally once the draft is saved. */
   completeGuideArtifacts?: unknown;
+  /** Complete study guides: figures from the materials, seeded into the saved guide. */
+  completeGuideFigures?: { figures: import('./completeGuide/figures').CompleteGuideFigure[]; siblings: Record<string, string[]> };
 }
 
 export interface DeepResearchStreamHandlers {

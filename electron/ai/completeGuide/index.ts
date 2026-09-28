@@ -37,6 +37,7 @@ import { createUsageMeter, recordEstimatedUsage, withUsageMeter, type UsageMeter
 import { runCompleteGuide, type CompleteGuideDeps, type CompleteGuideProgress } from './core';
 import { COMPLETE_GUIDE_PROMPT_VERSION } from './prompts';
 import { snapshotCompleteGuideSelection } from './sources';
+import { extractCompleteGuideFigures } from './figures';
 
 interface FrozenRun { snapshot: CompleteGuideSnapshot; organization: StudySourceOrganization; snapshotAt: string }
 
@@ -131,6 +132,7 @@ export async function generateCompleteGuideReport(
       const removed = audit.claims.filter((claim) => claim.status !== 'supported' && !(claim.kind === 'nonfactual' && claim.failure !== 'nonfactual_with_content')).length;
       return { markdown: audit.markdown, removed };
     },
+    figures: (requests) => extractCompleteGuideFigures(requests, signal),
     conflicts: async (statements) => (await withUsageMeter(job, () => withoutDocumentVisualPlanning(() => findResearchConflicts(statements, model, signal))))
       .filter((conflict) => conflict.incompatible)
       .map((conflict) => ({ a: conflict.a, b: conflict.b, reason: conflict.reason })),
@@ -171,7 +173,7 @@ export async function generateCompleteGuideReport(
       items: result.counts.items, itemsUsed: result.counts.itemsUsed, blocks: result.counts.blocks, aiBlocks: result.counts.aiBlocks,
       windows: result.counts.windows, failedWindows: result.counts.failedWindows, auditedBlocks: result.counts.auditedBlocks,
       removedSentences: result.counts.removedSentences, repairedBlocks: result.counts.repairedBlocks, invalidLatex: result.counts.invalidLatex,
-      conflicts: result.counts.conflicts, cacheHits: result.counts.cacheHits,
+      conflicts: result.counts.conflicts, cacheHits: result.counts.cacheHits, figures: result.counts.figures,
     },
     usage: { calls: job.calls, inputTokens: job.inputTokens, outputTokens: job.outputTokens, usd: usd(job, model) },
     warnings: result.warnings,
@@ -227,6 +229,7 @@ export async function generateCompleteGuideReport(
   return {
     draft,
     meta: reportMeta,
+    ...(result.figures.length ? { completeGuideFigures: { figures: result.figures, siblings: result.figureSiblings } } : {}),
     completeGuideArtifacts: {
       runId,
       items: result.items,

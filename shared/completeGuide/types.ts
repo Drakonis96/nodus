@@ -179,6 +179,8 @@ export interface CompleteGuideDraftMeta {
   counts: {
     items: number; itemsUsed: number; blocks: number; aiBlocks: number; windows: number; failedWindows: number;
     auditedBlocks: number; removedSentences: number; repairedBlocks: number; invalidLatex: number; conflicts: number; cacheHits: number;
+    /** Figures taken from the materials (missing on guides from before figures). */
+    figures?: number;
   };
   usage: { calls: number; inputTokens: number; outputTokens: number; usd: number | null };
   warnings: string[];

@@ -12,7 +12,7 @@ import type {
   LibrarySourceBlock,
   LibrarySourceMap,
 } from '@shared/libraryTypes';
-import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
+import { openPdf, openPdfData, loadPdfjs } from '../extraction/pdfjsLoader';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
 import { cleanInlineText, dehyphenatingJoin } from '../extraction/textCleanup';
@@ -873,6 +873,68 @@ function groupImageTiles(placements: PdfImagePlacement[]): PdfImagePlacement[] {
     groups.push(merged);
   }
   return groups;
+}
+
+/**
+ * Complete study guides: the images placed on the given pages of a PDF held in memory,
+ * cropped at 2× like the Library's own figures. A page whose art is vector-only has no
+ * placed image; with `wholePageFallback` it is rendered whole instead.
+ */
+export async function extractPdfPageFigures(
+  data: Uint8Array,
+  pages: number[],
+  options: { wholePageFallback?: boolean; maxFigures?: number; signal?: AbortSignal } = {},
+): Promise<Array<{ page: number; png: Buffer; width: number; height: number; wholePage: boolean }>> {
+  const pdfjs = await loadPdfjs();
+  // pdfjs transfers (detaches) the buffer it is given: open a copy so the caller's bytes stay usable.
+  const pdf = await openPdfData(data.slice(), { forRendering: true });
+  const results: Array<{ page: number; png: Buffer; width: number; height: number; wholePage: boolean }> = [];
+  const seen = new Set<string>();
+  const { createCanvas } = await import('@napi-rs/canvas');
+  try {
+    for (const pageNumber of [...new Set(pages)].filter((value) => value >= 1 && value <= pdf.numPages)) {
+      abortIfNeeded(options.signal);
+      if (options.maxFigures && results.length >= options.maxFigures) break;
+      const page = await pdf.getPage(pageNumber);
+      const base = page.getViewport({ scale: 1 });
+      const pageArea = Math.max(1, base.width * base.height);
+      const operators = await page.getOperatorList();
+      const groups = groupImageTiles(placedImages(operators, pdfjs).filter((placement) => placement.pixels >= 5_000 && placementArea(placement) >= pageArea * 0.01))
+        .filter((group) => group.pixels >= 40_000 && placementArea(group) / pageArea <= 0.92);
+      const scale = 2;
+      const viewport = page.getViewport({ scale });
+      const rendered = await renderPdfPageCanvas(page, scale);
+      let found = false;
+      for (const group of groups) {
+        const corners = [
+          viewport.convertToViewportPoint(group.bbox[0], group.bbox[1]), viewport.convertToViewportPoint(group.bbox[2], group.bbox[1]),
+          viewport.convertToViewportPoint(group.bbox[0], group.bbox[3]), viewport.convertToViewportPoint(group.bbox[2], group.bbox[3]),
+        ];
+        const xs = corners.map(([x]: [number, number]) => x);
+        const ys = corners.map(([, y]: [number, number]) => y);
+        const x0 = Math.max(0, Math.floor(Math.min(...xs)));
+        const y0 = Math.max(0, Math.floor(Math.min(...ys)));
+        const x1 = Math.min(rendered.width, Math.ceil(Math.max(...xs)));
+        const y1 = Math.min(rendered.height, Math.ceil(Math.max(...ys)));
+        if (x1 - x0 < 48 || y1 - y0 < 48) continue;
+        const crop = createCanvas(x1 - x0, y1 - y0);
+        crop.getContext('2d').drawImage(rendered, x0, y0, x1 - x0, y1 - y0, 0, 0, x1 - x0, y1 - y0);
+        const png = crop.toBuffer('image/png');
+        const hash = sha256Buffer(png);
+        if (seen.has(hash)) continue;
+        seen.add(hash);
+        results.push({ page: pageNumber, png, width: x1 - x0, height: y1 - y0, wholePage: false });
+        found = true;
+      }
+      if (!found && options.wholePageFallback) {
+        results.push({ page: pageNumber, png: rendered.toBuffer('image/png'), width: rendered.width, height: rendered.height, wholePage: true });
+      }
+      page.cleanup?.();
+    }
+  } finally {
+    await pdf.destroy?.();
+  }
+  return results;
 }
 
 async function extractPdfAssets(pdf: any, folder: string, layouts: PageLayout[], scannedPages: Set<number>, signal?: AbortSignal): Promise<OutputBlock[]> {

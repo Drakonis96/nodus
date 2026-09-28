@@ -6,6 +6,7 @@ import { nodiText } from '@shared/nodiNotifications';
 import { openDbPath } from '../db/database';
 import { saveWritingWorkshopDraft } from '../db/writingDraftsRepo';
 import { deleteCompleteGuideRun, saveCompleteGuideArtifacts } from '../db/completeGuideRepo';
+import { seedCompleteGuideFigures } from './completeGuide/figures';
 import { applyDecorativeImageOption } from './decorativeImages';
 import { localizedForUi } from '../ipc/context';
 import { addNotification } from '../notifications';
@@ -117,6 +118,11 @@ export function ensureDeepResearchLane(): void {
           deleteCompleteGuideRun(report.draft.completeGuide.runId);
           // Kept out of the in-memory job (and MCP job payloads) once it is on disk.
           delete report.completeGuideArtifacts;
+          if (report.completeGuideFigures) {
+            const { figures, siblings } = report.completeGuideFigures;
+            if (seedCompleteGuideFigures(saved.id, figures, (itemId) => siblings[itemId] ?? [])) broadcast('documentVisuals:changed', { kind: 'deep-research', id: saved.id });
+            delete report.completeGuideFigures;
+          }
         } catch (error) {
           console.warn('[complete guide] evidence sidecar not stored', error);
         }

@@ -46,6 +46,7 @@ import {
   type SourceCoverage,
 } from '@shared/completeGuide/reference';
 import type { CompleteGuideStage } from '@shared/completeGuide/estimate';
+import { selectFigureRequests, type CompleteGuideFigure, type CompleteGuideFigureRequest } from '@shared/completeGuide/figures';
 import {
   CHEAT_SYSTEM,
   CONTINUE_SYSTEM,
@@ -84,6 +85,8 @@ export interface CompleteGuideDeps {
   /** Premise-based support audit; returns the text with unsupported sentences removed. */
   audit?(markdown: string, sources: ResearchAuditSource[]): Promise<{ markdown: string; removed: number }>;
   conflicts?(statements: string[]): Promise<Array<{ a: number; b: number; reason: string }>>;
+  /** Figures from the materials for the selected figure items (no model involved). */
+  figures?(requests: CompleteGuideFigureRequest[]): Promise<CompleteGuideFigure[]>;
   cacheGet<T>(key: string): T | null;
   cachePut(key: string, stage: string, value: unknown): void;
   checkpointGet<T>(stage: string, unit: string): T | null;
@@ -128,10 +131,13 @@ export interface CompleteGuideResult {
   counts: {
     windows: number; failedWindows: number; items: number; itemsUsed: number; blocks: number; aiBlocks: number;
     droppedUnsupported: number; auditedBlocks: number; removedSentences: number; repairedBlocks: number;
-    invalidLatex: number; conflicts: number; cacheHits: number;
+    invalidLatex: number; conflicts: number; cacheHits: number; figures: number;
   };
   syllabus: { overview: string; connections: Array<{ from: string; to: string; relation: string }> };
   warnings: string[];
+  /** Figures to seed into the saved guide, and for each figure item the items sharing its passage. */
+  figures: CompleteGuideFigure[];
+  figureSiblings: Record<string, string[]>;
 }
 
 const DEFAULT_WINDOWS = { reconChars: 60_000, extractChars: 22_000 };
@@ -188,7 +194,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const warnings: string[] = [];
   const counts: CompleteGuideResult['counts'] = {
     windows: 0, failedWindows: 0, items: 0, itemsUsed: 0, blocks: 0, aiBlocks: 0, droppedUnsupported: 0,
-    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0,
+    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0,
   };
   const guard = () => deps.checkpoint?.();
   const sourcesByKey = new Map(snapshot.sources.map((source) => [source.sourceKey, source]));
@@ -611,6 +617,22 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     }
   }
 
+  // Figures from the materials: chosen by anchored figure items, rendered without a model.
+  let figures: CompleteGuideFigure[] = [];
+  const figureSiblings: Record<string, string[]> = {};
+  if (deps.figures) {
+    const requests = selectFigureRequests(items, passagesById, sourcesByKey);
+    if (requests.length) {
+      guard();
+      figures = await deps.figures(requests).catch((error) => { if (isAbort(error)) throw error; warnings.push('figures_failed'); return []; });
+      for (const figure of figures) {
+        const passage = itemsById.get(figure.itemId)?.evidence[0]?.passageId;
+        figureSiblings[figure.itemId] = items.filter((item) => item.id !== figure.itemId && item.evidence.some((evidence) => evidence.passageId === passage)).map((item) => item.id);
+      }
+      counts.figures = figures.length;
+    }
+  }
+
   // ── Assembly ───────────────────────────────────────────────────────────────────
   const usedItems = new Set<string>();
   const parts: string[] = [];
@@ -696,5 +718,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     counts,
     syllabus,
     warnings,
+    figures,
+    figureSiblings,
   };
 }
