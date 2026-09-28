@@ -17,7 +17,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -71,6 +71,8 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Complete static Italian interface table; coverage prohibits runtime fallbacks. */
 export const IT: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.it,
   ...CALENDAR_SYNC_TRANSLATIONS["it"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["it"],
   // Nodus Tools catalogue
@@ -1832,7 +1834,7 @@ export const IT: Record<string, string> = {
   "Introduce la contraseña de la copia.": "Inserisci la password di backup.",
   "Se mostrará el tutorial.": "Verrà mostrato il tutorial.",
   "Se mostrará el tutorial avanzado.": "Verrà mostrato il tutorial avanzato.",
-  "Tutorial": "Esercitazione",
+  "Tutorial": "Tutorial",
   "Saltar": "Salta",
   "Atrás": "Indietro",
   "Ahora no": "Non ora",
@@ -2364,7 +2366,7 @@ export const IT: Record<string, string> = {
   "Analiza esta idea dentro del corpus y resume sus conexiones, tensiones y lecturas prioritarias.": "Analizzare questa idea all'interno del corpus e sintetizzarne le connessioni, le tensioni e le letture prioritarie.",
   "Ideas conectadas ({n})": "Idee connesse ({n})",
   "Idea conectada": "Idea connessa",
-  "Obras": "Funziona",
+  "Obras": "Opere",
   "Ver detalle completo": "Visualizza i dettagli completi",
   "Ver en grafo": "Visualizza nel grafico",
   "Más relevante": "Più rilevante",
@@ -2689,7 +2691,7 @@ export const IT: Record<string, string> = {
   "Taller de escritura": "Laboratorio di scrittura",
   "Recuperado por similitud semántica con esta sección.": "Recuperato per similarità semantica con questa sezione.",
   "Del grafo a un borrador con fuentes verificables.": "Dal grafico ad una bozza con fonti verificabili.",
-  "Deep Research": "Ricerca approfondita",
+  "Deep Research": "Deep Research",
   "Tu biblioteca de informes académicos, generados en cola y citando todo el corpus.": "La tua libreria di resoconti accademici, generati in coda e citando l'intero corpus.",
   "Nuevo informe": "Nuovo rapporto",
   "Buscar entre tus informes…": "Cerca nei tuoi rapporti…",
@@ -6443,7 +6445,7 @@ export const IT: Record<string, string> = {
   "Nodus no expone ninguna función de IA para calificar, perfilar o evaluar estudiantes. Los identificadores permiten minimizar nombres en usos locales y exportaciones.": "Nodus non espone alcuna funzione di IA per assegnare voti, profilare o valutare studenti. Gli identificatori consentono di ridurre al minimo i nomi negli usi locali e nelle esportazioni.",
   "La IA no recibe listas, notas ni respuestas del alumnado. Nodus no ofrece ninguna función de IA para calificar, perfilar o evaluar estudiantes; esas decisiones son siempre humanas y permanecen fuera del modelo.": "L’IA non riceve elenchi, voti o risposte degli studenti. Nodus non offre alcuna funzione di IA per assegnare voti, profilare o valutare studenti; queste decisioni sono sempre umane e restano fuori dal modello.",
   ...PROTECT_TRANSLATIONS.it,
-  ...SERVER_TRANSLATIONS.it,
+  ...SERVER_LOCALE_TRANSLATIONS.it,
   ...CLOUDFLARE_TRANSLATIONS.it,
   'Seleccionar o desplazar': 'Seleziona o scorri',
   'Editar o eliminar': 'Modifica o elimina',

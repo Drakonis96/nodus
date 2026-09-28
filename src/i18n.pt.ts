@@ -23,7 +23,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -76,6 +76,8 @@ import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch
 import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 export const PT: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS.pt,
   ...CALENDAR_SYNC_TRANSLATIONS["pt"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["pt"],
   // Nodus Tools catalogue
@@ -286,7 +288,7 @@ export const PT: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.pt,
   ...PROTECT_TRANSLATIONS.pt,
   ...TOOLKIT_APPS_TRANSLATIONS.pt,
-  ...SERVER_TRANSLATIONS.pt,
+  ...SERVER_LOCALE_TRANSLATIONS.pt,
   ...CLOUDFLARE_TRANSLATIONS.pt,
   ...TRANSLATE_TRANSLATIONS.pt,
   ...BROWSER_CONNECTOR_TRANSLATIONS.pt,
