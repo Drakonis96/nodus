@@ -44,6 +44,14 @@ const LEDGER_LIMIT_USD = 5;
 const CHAT_MODEL = 'deepseek-flash';
 const EMBEDDING_MODEL = 'baai/bge-m3';
 const PRICE = { input: 0.3, output: 1.2 };
+/** DeepSeek Flash thinks by default and its thinking tokens count against `max_tokens`, so
+ * the application adds an output allowance on top of the visible answer before it sends a
+ * call (electron/ai/thinkingEffort.ts#thinkingOutputAllowance: 8,192 at the low effort these
+ * structured passes run at, "a larger max_tokens is a ceiling, not a target"). Sending the
+ * bare bound instead made the claim audit's batches hit the cap on every call, and the audit
+ * answers truncation by bisecting the batch, so the campaign paid several times the calls the
+ * application pays for the same work and measured a cost no user would ever incur. */
+const DEEPSEEK_THINKING_ALLOWANCE = 8_192;
 if (!(limitUsd > 0 && limitUsd < LEDGER_LIMIT_USD)) throw new Error(`--limit-usd must be below the USD ${LEDGER_LIMIT_USD} authorization`);
 const keys = simulated ? { deepseek: 'simulated', openrouter: 'simulated' } : { deepseek: process.env.DEEPSEEK_API_KEY, openrouter: process.env.OPENROUTER_API_KEY };
 if (!keys.deepseek || !keys.openrouter) throw new Error('A real run needs DEEPSEEK_API_KEY and OPENROUTER_API_KEY (or pass --simulated)');
@@ -172,7 +180,7 @@ const proxy = await startResearchProviderProxy(root, simulated ? { dispatch: scr
 
 // ---------------------------------------------------------------- model client
 
-const metrics = { calls: [], stages: {} };
+const metrics = { calls: [], stages: {}, refusals: {} };
 let currentStage = 'verify';
 let currentRun = 'first';
 class BudgetExhausted extends Error { constructor() { super('budget_exhausted'); this.code = 'budget_exhausted'; } }
@@ -185,19 +193,43 @@ function parseJson(text) {
   const start = trimmed.search(/[[{]/);
   return JSON.parse(start > 0 ? trimmed.slice(start) : trimmed);
 }
+/** The application's client asks for `response_format: json_object` on every structured
+ * call and answers a refusal of the optional body by replaying the request once without
+ * it (aiClient's `optionalBody` + `replayRefusedOptionalFields`, with the same
+ * `rejectsOptionalTransportField` rule). DeepSeek answers that refusal — a 400 naming
+ * `response_format` — whenever the prompt does not contain the word "json", and the claim
+ * audit's prompt does not: without the replay every audit call dies, the guide's
+ * verification pass silently does nothing and the sentences it counts as removed are the
+ * whole block. A refusal was rejected before running, so it is never charged and the
+ * replay costs one round trip, not money. */
+const OPTIONAL_FIELD_REJECTION = /(?:unknown|unrecognized|unsupported|not supported|extra|invalid)\s+(?:field|parameter|argument)|response_format|reasoning_effort|include_reasoning|provider\.only|allow_fallbacks/i;
 async function chat({ system, user, maxTokens, temperature }, validate, stage = currentStage) {
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    guardBudget(maxTokens, system.length + user.length);
-    const started = performance.now();
-    const response = await fetch(`${proxy.url}/deepseek/chat/completions`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keys.deepseek}` },
-      body: JSON.stringify({ model: CHAT_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }], max_tokens: Math.min(32_768, Math.max(256, maxTokens)), temperature: temperature ?? 0, response_format: { type: 'json_object' } }),
+    let response;
+    let body;
+    const request = (jsonMode) => JSON.stringify({
+      model: CHAT_MODEL, messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      max_tokens: Math.min(32_768, Math.max(256, maxTokens) + DEEPSEEK_THINKING_ALLOWANCE), temperature: temperature ?? 0, ...(jsonMode ? { response_format: { type: 'json_object' } } : {}),
     });
-    const body = await response.json().catch(() => ({}));
-    const usage = body.usage ?? {};
-    const record = { run: currentRun, stage, status: response.status, inputTokens: usage.prompt_tokens ?? 0, outputTokens: usage.completion_tokens ?? 0, cachedTokens: usage.prompt_cache_hit_tokens ?? 0, ms: Math.round(performance.now() - started) };
-    record.usd = (record.inputTokens * PRICE.input + record.outputTokens * PRICE.output) / 1e6;
-    metrics.calls.push(record);
+    // One refused round trip, not a model retry: the second request carries no JSON mode.
+    for (let replays = 0; ; replays += 1) {
+      guardBudget(maxTokens, system.length + user.length);
+      const started = performance.now();
+      response = await fetch(`${proxy.url}/deepseek/chat/completions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${keys.deepseek}` },
+        body: request(replays === 0),
+      });
+      body = await response.json().catch(() => ({}));
+      const usage = body.usage ?? {};
+      const record = { run: currentRun, stage, status: response.status, inputTokens: usage.prompt_tokens ?? 0, outputTokens: usage.completion_tokens ?? 0, cachedTokens: usage.prompt_cache_hit_tokens ?? 0, ms: Math.round(performance.now() - started) };
+      record.usd = (record.inputTokens * PRICE.input + record.outputTokens * PRICE.output) / 1e6;
+      metrics.calls.push(record);
+      if (replays === 0 && (response.status === 400 || response.status === 422) && OPTIONAL_FIELD_REJECTION.test(JSON.stringify(body))) {
+        metrics.refusals[currentRun] = (metrics.refusals[currentRun] ?? 0) + 1;
+        continue;
+      }
+      break;
+    }
     if (!response.ok) {
       if (/research_cost|budget/i.test(JSON.stringify(body))) throw new BudgetExhausted();
       if (attempt === 0 && response.status >= 500) continue;
@@ -361,7 +393,7 @@ try {
     mode: simulated ? 'simulated' : 'real', models: { chat: CHAT_MODEL, embeddings: EMBEDDING_MODEL }, limitUsd, root,
     ledgerUsd: { before: startingLedgerUsd, after: ledgerUsd() },
     estimate: estimate && { usd: estimate.usd, calls: estimate.calls, stages: estimate.stages },
-    runs: { first: { stages: stageTotals('first'), counts: first?.counts, warnings: first?.warnings }, second: { stages: stageTotals('second'), counts: second?.counts } },
+    runs: { first: { stages: stageTotals('first'), counts: first?.counts, warnings: first?.warnings, refusals: metrics.refusals.first ?? 0 }, second: { stages: stageTotals('second'), counts: second?.counts, refusals: metrics.refusals.second ?? 0 } },
     coverage: first?.coverage.map((row) => ({ alias: row.source.alias, title: row.source.title, read: row.passagesRead, total: row.passagesTotal, itemsExtracted: row.itemsExtracted, itemsUsed: row.itemsUsed, unread: row.unreadRanges })),
     checks,
   }, null, 2));
@@ -426,6 +458,12 @@ function scriptedUpstream() {
       return Response.json({ object: 'list', data: body.input.map((text, index) => ({ object: 'embedding', index, embedding: vector(text) })), usage: { prompt_tokens: body.input.join(' ').length / 4 | 0 } });
     }
     const [system, user] = body.messages.map((message) => message.content);
+    // The provider's own JSON-mode contract, in DeepSeek's words: a prompt without the word
+    // "json" is refused when `response_format` asks for it. The free run therefore exercises
+    // the same refusal the paid one is replayed around.
+    if (body.response_format && !/\bjson\b/i.test(system)) {
+      return Response.json({ error: { message: "Prompt must contain the word 'json' in some form to use 'response_format' of type 'json_object'.", type: 'invalid_request_error', param: null, code: 'invalid_request_error' } }, { status: 400 });
+    }
     const content = JSON.stringify(answer(system, JSON.parse(user)));
     return Response.json({ id: 'scripted', object: 'chat.completion', model: body.model, choices: [{ index: 0, finish_reason: 'stop', message: { role: 'assistant', content } }],
       usage: { prompt_tokens: Math.ceil((system.length + user.length) / 3.6), completion_tokens: Math.ceil(content.length / 3.6) } });
