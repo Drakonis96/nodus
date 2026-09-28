@@ -53,6 +53,7 @@ await build({
       }}`);
       stub(/\.\.\/db\/documentProfilesRepo$/, 'profile-repo', `
         export function clearDocumentCheckpoints(id){for(const key of globalThis.__documentPipeline.checkpoints.keys())if(key.startsWith(id+':'))globalThis.__documentPipeline.checkpoints.delete(key)}
+        export function clearWorkDocumentCheckpoints(){}
         export function readDocumentCheckpoint(id,key,hash){return globalThis.__documentPipeline.checkpoints.get(id+':'+key+':'+hash)??null}
         export function saveDocumentCheckpoint(id,key,hash,payload){globalThis.__documentPipeline.checkpoints.set(id+':'+key+':'+hash,payload)}
         export function setDocumentProfileState(id,status,patch){globalThis.__documentPipeline.states.push({id,status,patch})}
