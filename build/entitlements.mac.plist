@@ -14,5 +14,8 @@
 	<!-- Presentation import and casting automate Keynote, PowerPoint or System Events. -->
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
+	<!-- EventKit calendar access is granted separately by the user. -->
+	<key>com.apple.security.personal-information.calendars</key>
+	<true/>
 </dict>
 </plist>

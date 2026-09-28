@@ -1,3 +1,4 @@
+import { registerStudyFocusIpc } from './ipc/studyFocus';
 import { scheduleManualIndex } from './ai/manualIdeaIndex';
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
 import { dialogTitle } from './dialogTitles';
@@ -120,6 +121,7 @@ import {
   interruptDecorativeImageGenerations,
 } from './ai/decorativeImages';
 import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
+import { repairGraphIntegrityOnce } from './db/graphIntegrityRepair';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import {
@@ -243,6 +245,7 @@ export function registerIpc(
   // imports. What remains below is everything not yet split out.
   registerProsopographyIpc(context);
   registerAcademicIpc(context);
+  registerStudyFocusIpc(context);
   registerChatHistoryIpc(context);
   registerLibraryIpc(context);
   registerBrowserIpc(context);
@@ -365,6 +368,7 @@ export function registerIpc(
     relocalizeWorldbuildingDemoData();
     reconcileAuthorLayerOnce();
     reconcileAuthorRolesOnce();
+    repairGraphIntegrityOnce();
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
@@ -853,6 +857,7 @@ export function registerIpc(
       getDb();
       reconcileAuthorLayerOnce();
       reconcileAuthorRolesOnce();
+      repairGraphIntegrityOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
       startNodusServerSync();

@@ -8,6 +8,7 @@ import { recommendStudyFocus, summarizeStudyPerformance } from '@shared/studySta
 import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from '@shared/studyPlanner';
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import { getDb } from './database';
+import { renderCalendarIcs } from '../calendar/ical';
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -208,13 +209,12 @@ export function startStudySession(input: { planBlockId?: string | null; subjectI
 export function finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): StudyStudySession { const timestamp=now();getDb().prepare('UPDATE study_study_sessions SET actual_seconds=?,interruptions=?,notes=?,ended_at=?,updated_at=? WHERE id=?').run(Math.max(0,input.actualSeconds),input.interruptions??0,input.notes?.trim()??'',timestamp,timestamp,id);return getStudyPlanner().sessions.find((item)=>item.id===id)!; }
 
 export function renderStudyPlannerIcs(snapshot = getStudyPlanner()): string {
-  const stamp=(value:string)=>new Date(value).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
-  const escape=(value:string)=>value.replace(/([,;\\])/g,'\\$1').replace(/\n/g,'\\n');
-  const entries=[...snapshot.events.map((item)=>({id:item.id,title:item.title,start:item.startsAt,end:item.endsAt,description:item.description||item.notes,url:item.url,reminderAt:item.reminderAt})),...snapshot.blocks.map((item)=>({id:item.id,title:item.title,start:item.startsAt,end:new Date(new Date(item.startsAt).getTime()+item.durationMinutes*60000).toISOString(),description:item.notes,url:'',reminderAt:null}))];
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Nodus//Study Calendar//ES','CALSCALE:GREGORIAN','X-WR-CALNAME:Nodus','X-WR-CALDESC:Calendario de Nodus',...entries.flatMap((item)=>{
-    const alarm=item.reminderAt?[`BEGIN:VALARM`,`TRIGGER;VALUE=DATE-TIME:${stamp(item.reminderAt)}`,'ACTION:DISPLAY',`DESCRIPTION:${escape(item.title)}`,'END:VALARM']:[];
-    return ['BEGIN:VEVENT',`UID:${item.id}@nodus`,`DTSTAMP:${stamp(now())}`,`DTSTART:${stamp(item.start)}`,`DTEND:${stamp(item.end??item.start)}`,`SUMMARY:${escape(item.title)}`,`DESCRIPTION:${escape(item.description)}`,...(item.url?[`URL:${escape(item.url)}`]:[]),...alarm,'END:VEVENT'];
-  }),'END:VCALENDAR'].join('\r\n');
+  return renderCalendarIcs([
+    ...snapshot.events.map((item) => ({ ...item, description: item.description || item.notes })),
+    ...snapshot.blocks.map((item) => ({ id: item.id, title: item.title, startsAt: item.startsAt,
+      endsAt: new Date(new Date(item.startsAt).getTime() + item.durationMinutes * 60000).toISOString(),
+      description: item.notes, url: '', allDay: false, reminderAt: null })),
+  ]);
 }
 
 export function renderStudyCalendarEventIcs(id: string): string {

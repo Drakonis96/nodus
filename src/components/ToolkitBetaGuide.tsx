@@ -8,6 +8,7 @@ import openCodeLogo from '../assets/brands/opencode.svg';
 import claudeLogo from '../assets/brands/claude.svg';
 import { Icon } from './ui';
 import { NodiAvatar } from './nodi/NodiAvatar';
+import { MODEL_GUIDANCE_COPY } from './modelGuidanceCopy';
 
 // This guide belongs to the 2.4.0 release, so its five-tool snapshot must not
 // change when newer Toolkit entries (such as Nodus Apps) are added later.
@@ -31,12 +32,14 @@ const COPY = {
     introBody: 'Las cinco herramientas están disponibles en beta. El procesamiento es local salvo las funciones que indiquen expresamente que usan un proveedor de IA.',
     toolSummaries: ['Documentos, PDF, imágenes y texto', 'Copias seguras y trazables', 'Traducción de texto y documentos', 'PDF como presentación', 'OCR asistido para casos difíciles'],
     originalFiles: 'Los archivos originales no se modifican. Nodus crea siempre una copia o un resultado nuevo.',
+    extractionEyebrow: 'Extracción de ideas',
     extractionTitle: 'Extracción: menos razonamiento, más precisión',
     extractionSummary: 'Para extraer ideas conviene un modelo directo, disciplinado y fiable con datos estructurados.',
     extractionBody: 'Evita los modelos razonadores en esta tarea. Están pensados para desarrollar análisis extensos y suelen responder de forma más larga y lenta, además de apartarse con mayor facilidad del formato estructurado que Nodus necesita.',
     gemmaBody: 'Es el modelo local integrado que superó las pruebas internas de extracción: 20 ejecuciones correctas de 20 sobre un artículo real de unas 7.000 palabras, sin fallos de formato.',
     graniteBody: 'Más ligera y solo texto, útil para conversación, resúmenes y perfiles. No se ofrece para extracción: en las pruebas end-to-end sus decisiones de fusión no cumplieron el contrato JSON en obras grandes.',
     gemmaNote: 'Gemma 4 E2B Q4 es pequeño frente a los grandes modelos remotos, pero se eligió por su fiabilidad específica en extracción, no por una comparación general de inteligencia.',
+    performanceEyebrow: 'Modelos locales',
     performanceTitle: 'La velocidad depende de tu equipo',
     performanceSummary: 'Los modelos locales usan tus recursos: CPU, memoria del sistema y, cuando está disponible, GPU y VRAM o memoria unificada.',
     performanceBody: 'Nodus organiza el trabajo, pero no puede convertir un equipo limitado en uno más rápido. En el modo estándar divide el texto en fragmentos de unas 1.800 palabras, con un pequeño solapamiento, y extrae las ideas progresivamente; no envía el artículo o capítulo completo en una sola petición.',
@@ -45,6 +48,7 @@ const COPY = {
     remoteSummary: 'Para extracción recomendamos modelos pequeños y rápidos, con el razonamiento desactivado.',
     remoteBody: 'Nodus solicita el razonamiento desactivado por defecto en las extracciones estructuradas. Así se reduce el tiempo, el texto innecesario y el riesgo de recibir una respuesta fuera del formato esperado.',
     remoteWarning: 'Los nombres, precios, límites y catálogos pueden cambiar. Comprueba siempre el proveedor antes de añadir saldo.',
+    subscriptionsEyebrow: 'Accesos oficiales',
     subscriptionsTitle: 'También puedes aprovechar algunas suscripciones',
     subscriptionsSummary: 'Nodus admite accesos oficiales o documentados sin convertir tu suscripción en una clave de API genérica.',
     chatgpt: 'Acceso oficial mediante Codex App Server. Consume la cuota o los créditos de Codex de tu plan de ChatGPT, no el saldo de la API de OpenAI.',
@@ -69,12 +73,14 @@ const COPY = {
     introBody: 'All five tools are available in beta. Processing is local unless a feature explicitly says it uses an AI provider.',
     toolSummaries: ['Documents, PDFs, images and text', 'Safe, traceable copies', 'Translate text and documents', 'Present a PDF', 'Assisted OCR for difficult scans'],
     originalFiles: 'Original files are never modified. Nodus always creates a copy or a new output.',
+    extractionEyebrow: 'Idea extraction',
     extractionTitle: 'Extraction: less reasoning, more precision',
     extractionSummary: 'Idea extraction benefits from a direct model that reliably returns structured data.',
     extractionBody: 'Avoid reasoning models for this task. They are designed to develop longer analyses, so they tend to be slower, more verbose and more likely to drift away from the structured format Nodus needs.',
     gemmaBody: 'The integrated local model that passed the internal extraction benchmark: 20 successful runs out of 20 on a real paper of about 7,000 words, with no format failures.',
     graniteBody: 'Lighter and text-only, useful for conversation, summaries and document profiles. It is not offered for extraction: in end-to-end testing its fusion decisions did not satisfy the JSON contract on large works.',
     gemmaNote: 'Gemma 4 E2B Q4 is small compared with leading remote models, but it was selected for its extraction reliability—not as a general measure of intelligence.',
+    performanceEyebrow: 'Local models',
     performanceTitle: 'Speed depends on your computer',
     performanceSummary: 'Local models use your CPU and system memory, plus GPU and VRAM—or unified memory—when available.',
     performanceBody: 'Nodus orchestrates the work, but it cannot make limited hardware run like a faster machine. In standard mode it splits text into chunks of about 1,800 words with a small overlap and extracts ideas progressively; it does not send a whole paper or chapter in one request.',
@@ -83,6 +89,7 @@ const COPY = {
     remoteSummary: 'For extraction, we recommend small, fast models with reasoning disabled.',
     remoteBody: 'Nodus requests reasoning off by default for structured extraction. This reduces latency, unnecessary output and the risk of receiving a response outside the expected format.',
     remoteWarning: 'Model names, prices, limits and catalogues can change. Always check the provider before adding credit.',
+    subscriptionsEyebrow: 'Official access',
     subscriptionsTitle: 'You can also use selected subscriptions',
     subscriptionsSummary: 'Nodus supports official or documented access without turning a subscription into a generic API key.',
     chatgpt: 'Official access through Codex App Server. It uses the Codex quota or credits in your ChatGPT plan, not OpenAI API credit.',
@@ -100,8 +107,12 @@ const COPY = {
   },
 } as const;
 
+/** Spanish and English carry the whole guide. Every other language translates the
+ * three model-guidance panels the essential tutorial reuses, layered over English. */
 export function toolkitBetaGuideCopy(language: GuideLanguage) {
-  return language === 'es' ? COPY.es : COPY.en;
+  if (language === 'es') return COPY.es;
+  const guidance = MODEL_GUIDANCE_COPY[language];
+  return guidance ? { ...COPY.en, ...guidance } : COPY.en;
 }
 
 function GuideNotice({ icon, children, warning = false }: { icon: string; children: ReactNode; warning?: boolean }) {

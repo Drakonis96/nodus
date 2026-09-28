@@ -53,6 +53,7 @@ test('macOS entitlements are an exact minimum set with no dangerous exceptions',
     'com.apple.security.cs.allow-jit',
     'com.apple.security.device.audio-input',
     'com.apple.security.device.camera',
+    'com.apple.security.personal-information.calendars',
   ]);
   assert.ok(Object.values(root).every((value) => value === true));
   assert.deepEqual(inherited, { 'com.apple.security.cs.allow-jit': true });
@@ -69,7 +70,14 @@ test('macOS entitlements are an exact minimum set with no dangerous exceptions',
   }
 
   const info = JSON.parse(read('package.json')).build.mac.extendInfo;
-  for (const key of ['NSAppleEventsUsageDescription', 'NSCameraUsageDescription', 'NSMicrophoneUsageDescription']) {
+  // Every privacy-scoped entitlement above needs its own user-facing explanation.
+  for (const key of [
+    'NSAppleEventsUsageDescription',
+    'NSCalendarsFullAccessUsageDescription',
+    'NSCalendarsUsageDescription',
+    'NSCameraUsageDescription',
+    'NSMicrophoneUsageDescription',
+  ]) {
     assert.equal(typeof info[key], 'string');
     assert.ok(info[key].trim().length > 0, `${key} has a user-facing explanation`);
   }

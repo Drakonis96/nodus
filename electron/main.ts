@@ -16,6 +16,7 @@ import { getDb, closeDb } from './db/database';
 import { documentIndexQueue } from './pipeline/documentIndexQueue';
 import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
+import { repairGraphIntegrityOnce } from './db/graphIntegrityRepair';
 import {
   maybeRunAutoBackup,
   maybeRunBackupCleanup,
@@ -53,6 +54,7 @@ import { seedWelcomeNotification } from './notifications';
 import { startRadarScheduler, stopRadarScheduler } from './radar/scheduler';
 import { refreshAnnouncements } from './announcements';
 import { startStudyCalendarReminders, stopStudyCalendarReminders } from './studyCalendarReminders';
+import { startAppleCalendarSync, stopAppleCalendarSync } from './calendar/appleCalendarSync';
 import { restorePersistedDockIcon } from './dockIcon';
 import { stopAllWhisperCpp } from './stt/whisperCpp';
 import { recoverLegacyApiKeys } from './secrets/legacySecretRecovery';
@@ -1041,6 +1043,23 @@ app.whenReady().then(async () => {
       callback({ requestHeaders: { ...details.requestHeaders, Referer: 'https://nodusresearch.com/' } });
     },
   );
+  // Third obstacle, the maps: OpenStreetMap's volunteer tile servers refuse a client
+  // they cannot identify, and the sanitized User-Agent above is exactly the shape their
+  // policy blocks, so every map in the app answered with "Access blocked" tiles. Naming
+  // Nodus, with a page to complain to, is what they ask for; scoped to the tile hosts,
+  // so nothing else sees a different agent or referer than it does today.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['*://*.tile.openstreetmap.org/*'] },
+    (details, callback) => {
+      callback({
+        requestHeaders: {
+          ...details.requestHeaders,
+          'User-Agent': `Nodus/${app.getVersion()} (+https://nodusresearch.com)`,
+          Referer: 'https://nodusresearch.com/',
+        },
+      });
+    },
+  );
   // Nodus Toolkit OCR caches its Tesseract language traineddata here (the one
   // opt-in network call), so downloads persist across sessions in userData.
   if (!process.env.NODUS_TESSDATA_CACHE) {
@@ -1070,11 +1089,17 @@ app.whenReady().then(async () => {
   registerLibraryProtocol();
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   reconcileAuthorRolesOnce(); // one-time: stop crediting volume editors as authors
+  repairGraphIntegrityOnce(); // one-time: drop links to deleted themes, put edge-only ideas back to sleep
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
   // global_id when its work is rescanned.
-  const prunedIdeas = pruneDormantIdeas();
-  if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
+  try {
+    const prunedIdeas = pruneDormantIdeas();
+    if (prunedIdeas > 0) console.log(`[maintenance] pruned ${prunedIdeas} long-dormant ideas`);
+  } catch (error) {
+    // Maintenance must never keep the app from opening.
+    console.error(`[maintenance] dormant-idea prune failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
   setCopilotWindowProvider(() => mainWindow);
   setZoteroPluginWindowProvider(() => mainWindow);
   registerIpc(
@@ -1213,6 +1238,7 @@ app.whenReady().then(async () => {
   seedWelcomeNotification();
   startRadarScheduler();
   startStudyCalendarReminders();
+  startAppleCalendarSync();
   applyMascotWindow();
   setupAutoUpdates();
   void reportInterruptedUpdateInstall();
@@ -1278,6 +1304,7 @@ app.on('before-quit', () => {
   stopDocumentaryPreparation();
   void stopResearchZotero();
   stopStudyCalendarReminders();
+  stopAppleCalendarSync();
   stopAllWhisperCpp();
   if (updateCheckTimer) clearInterval(updateCheckTimer);
   if (installUpdateTimer) clearTimeout(installUpdateTimer);

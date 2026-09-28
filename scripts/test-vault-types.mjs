@@ -291,9 +291,15 @@ test('academic hides only what an immature corpus cannot feed; estudio uses its 
     assert.ok(!vt.defaultHiddenViewsForType('academic').includes(kept), `${kept} stays visible in academic`);
   }
   const estudioHidden = vt.defaultHiddenViewsForType('estudio');
-  for (const hidden of ['search', 'library', 'graph', 'debate', 'deepResearch', 'writing', 'notes']) {
+  for (const hidden of ['search', 'library', 'graph', 'debate', 'deepResearch', 'writing']) {
     assert.ok(estudioHidden.includes(hidden), `${hidden} replaced by a study-specific surface`);
   }
+  // The Workspace is where notes are linked to courses, subjects and materials, so it is
+  // shown by default, as in docencia; a user who hides it keeps it hidden.
+  assert.ok(!estudioHidden.includes('notes'), 'the Workspace is visible by default in estudio');
+  assert.ok(vt.effectiveSidebarHidden(['notes'], true, 'estudio').includes('notes'), 'hiding it by hand is respected');
+  assert.ok(!vt.defaultHiddenViewsForType('docencia').includes('notes'), 'the Workspace is visible by default in docencia too');
+  assert.ok(vt.effectiveSidebarHidden(['notes'], true, 'docencia').includes('notes'), 'and hiding it there is respected as well');
   for (const kept of ['studyCourses', 'studySchedule', 'studySearch', 'studyLibrary', 'studyRecordings', 'studyChat', 'studyQuestions']) {
     assert.ok(!estudioHidden.includes(kept), `${kept} stays visible in estudio`);
   }
@@ -345,7 +351,7 @@ test('teaching reuses the study organisation and analysis surfaces but hides the
   // Teaching hides the same research/authoring universals the study mode hides.
   const hidden = vt.defaultHiddenViewsForType('docencia');
   assert.ok(!hidden.includes('studySearch'), 'teaching exposes the shared study search');
-  for (const h of ['search', 'library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch', 'notes']) {
+  for (const h of ['search', 'library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch']) {
     assert.ok(hidden.includes(h), `${h} hidden in docencia`);
   }
   assert.match(vt.vaultTypePromptPack('docencia'), /MODO DOCENCIA/);

@@ -1,3 +1,4 @@
+import type { StudyFocusApi } from './studyFocus';
 import type { SkillMarketplace } from './skillMarketplace';
 import type { InboxPluginSummary, InstalledPluginSummary } from '../skill-capabilities/contracts';
 import type { ChatSkill } from './chatSkills';
@@ -398,6 +399,7 @@ export type { StudySrsRating, StudySrsReviewResult, StudySrsState } from './stud
 export type { StudyPerformanceEvidence, StudyPerformanceSummary, StudyProgressDashboard, StudyProgressScope } from './studyStats';
 export type { StudyCalendarEvent, StudyCalendarEventInput, StudyCalendarEventType, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from './studyPlanner';
 export type { StudyAiTask, StudyAiUsage, StudyAiUsageSummary } from './studyAi';
+export type { StudyLinkedNoteSummary, StudyNoteLink, StudyNoteLinkFilter, StudyNoteLinkInput, StudyNoteLinkTargetKind } from './studyNoteLinks';
 export type {
   StudyImproveLength,
   StudyImproveLevel,
@@ -1226,6 +1228,74 @@ export interface ReprocessConnectionsResult {
   newThemes: number;
   /** Inferred idea↔idea relations added (0 when the relations option is off). */
   relationsAdded: number;
+}
+
+/**
+ * How a graph-integrity finding is resolved: `repairable` by the SQL repair, `rescan` only
+ * by analysing the listed works again, `info` needs nothing (expected or legacy state).
+ */
+export type GraphIntegrityCategory = 'repairable' | 'rescan' | 'info';
+
+export type GraphIntegrityCheckId =
+  | 'theme_links_missing_theme'
+  | 'work_themes_missing_theme'
+  | 'active_ideas_without_works'
+  | 'dormant_ideas_with_works'
+  | 'edges_missing_endpoint'
+  | 'orphan_edge_traces'
+  | 'rows_of_missing_works'
+  | 'unused_themes'
+  | 'rows_missing_idea'
+  | 'rows_missing_evidence'
+  | 'edges_of_missing_works'
+  | 'hidden_edges'
+  | 'legacy_gap_evidence'
+  | 'user_refs_missing_idea'
+  | 'stuck_document_jobs';
+
+export interface GraphIntegrityWork {
+  nodus_id: string;
+  title: string | null;
+}
+
+export interface GraphIntegrityCheck {
+  id: GraphIntegrityCheckId;
+  category: GraphIntegrityCategory;
+  count: number;
+  /** Works the finding belongs to, largest first (at most 50). */
+  works: Array<GraphIntegrityWork & { count: number }>;
+}
+
+export interface GraphIntegrityReport {
+  checks: GraphIntegrityCheck[];
+  /** Sum of the counts per category. */
+  totals: Record<GraphIntegrityCategory, number>;
+  /** Works a `rescan` finding names, deduplicated. */
+  rescanWorks: GraphIntegrityWork[];
+  /** Works whose idea theme links a repair removed and that can have their themes reassigned. */
+  pendingThemeWorks: GraphIntegrityWork[];
+  checkedAt: string;
+}
+
+export interface GraphIntegrityRepairCounts {
+  rowsOfMissingWorks: number;
+  danglingThemeLinks: number;
+  danglingWorkThemes: number;
+  wokenIdeas: number;
+  sleptIdeas: number;
+  danglingEdges: number;
+  orphanTraces: number;
+  prunedThemes: number;
+}
+
+export interface GraphIntegrityRepairResult {
+  counts: GraphIntegrityRepairCounts;
+  /** Works whose last deep analysis failed the integrity check. Listed, never requeued. */
+  integrityFailedWorks: GraphIntegrityWork[];
+  /** Consistent copy of the vault taken before a manual repair. */
+  backupPath?: string;
+  /** The audit right after the repair. */
+  report?: GraphIntegrityReport;
 }
 
 export interface Idea {
@@ -9184,7 +9254,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
+export interface NodusApi extends StudyFocusApi, ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

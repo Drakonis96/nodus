@@ -5,7 +5,7 @@ import path from 'node:path';
 export async function verifyResearchPreparationUi(page, root) {
   const existingCampaignIds = await page.evaluate(async () => (await window.nodus.getResearchPreparationProgress()).campaigns.map(campaign => campaign.id).sort());
   const dialog = page.getByTestId('research-preparation-welcome');
-  await dialog.getByText('Tus documentos también tienen respuestas.', { exact: true }).waitFor({ timeout: 45000 });
+  await dialog.getByText('Ahora Nodus indexa tus documentos automáticamente', { exact: true }).waitFor({ timeout: 45000 });
   assert.equal(await dialog.locator('section').count(), 0);
   assert.equal(await dialog.getByRole('checkbox').count(), 0);
   await dialog.getByRole('button', { name: 'No', exact: true }).click();

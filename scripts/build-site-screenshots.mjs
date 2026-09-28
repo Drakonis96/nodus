@@ -52,6 +52,29 @@ export const SITE_SHOTS = [
   { source: 'docs/screenshots/site/databases-record.png', target: 'databases-record.webp' },
   { source: 'docs/screenshots/site/databases-gallery.png', target: 'databases-gallery.webp' },
   { source: 'docs/screenshots/site/databases-board.png', target: 'databases-board.webp' },
+  // The five modes of "More ways to work with Nodus", captured from the app by
+  // scripts/capture-site-more-vaults.mjs. Genealogy carries five views rather than
+  // seven: the map's OpenStreetMap tiles are refused for this client, and the social
+  // graph, the Library and the search results are empty on the seeded demo.
+  { source: 'docs/screenshots/more/genealogy-tree.png', target: 'genealogy-tree.webp' },
+  { source: 'docs/screenshots/more/genealogy-persons.png', target: 'genealogy-persons.webp' },
+  { source: 'docs/screenshots/more/genealogy-archive.png', target: 'genealogy-archive.webp' },
+  { source: 'docs/screenshots/more/genealogy-map.png', target: 'genealogy-map.webp' },
+  { source: 'docs/screenshots/more/genealogy-timeline.png', target: 'genealogy-timeline.webp' },
+  { source: 'docs/screenshots/more/genealogy-deepResearch.png', target: 'genealogy-deep-research.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-characters.png', target: 'worldbuilding-characters.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-encyclopedia.png', target: 'worldbuilding-encyclopedia.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-places.png', target: 'worldbuilding-places.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-factions.png', target: 'worldbuilding-factions.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-cultures.png', target: 'worldbuilding-cultures.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-timeline.png', target: 'worldbuilding-timeline.webp' },
+  { source: 'docs/screenshots/more/worldbuilding-scenes.png', target: 'worldbuilding-scenes.webp' },
+  { source: 'docs/screenshots/more/primary-sources-archive.png', target: 'primary-sources-archive.webp' },
+  { source: 'docs/screenshots/more/primary-sources-timeline.png', target: 'primary-sources-timeline.webp' },
+  { source: 'docs/screenshots/more/testimony-testimonyInterviews.png', target: 'testimony-interviews.webp' },
+  { source: 'docs/screenshots/more/testimony-testimonyParticipants.png', target: 'testimony-participants.webp' },
+  { source: 'docs/screenshots/more/prosopography-prosopPersons.png', target: 'prosopography-persons.webp' },
+  { source: 'docs/screenshots/more/prosopography-prosopPopulation.png', target: 'prosopography-population.webp' },
 ];
 
 export async function buildSiteScreenshots({ root = repoRoot, quiet = false } = {}) {

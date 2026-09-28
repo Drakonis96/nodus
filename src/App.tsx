@@ -1,3 +1,8 @@
+import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, toggleFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { FocusExitDialog, FocusLayoutDialog, type FocusSectionOption } from './components/focus/FocusDialogs';
+import { focusLayoutVisible } from '@shared/studyFocus';
+import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
+import { FocusRail, type FocusRailItem } from './components/focus/FocusRail';
 import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { AppSettings, CorpusHealthBucketId, DatabaseSummary, NodiNotification, RecoveryStatus, ServerInboxEntry, SyncLogEntry, VaultSummary } from '@shared/types';
@@ -68,7 +73,7 @@ import type {
   StudyMaterialNavigationTarget,
   View,
 } from './navigation';
-import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, orderedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
 import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
@@ -134,6 +139,8 @@ function HeaderAction({
   inboxTrigger = false,
   notificationsTrigger = false,
   queueTrigger = false,
+  focusKeep = false,
+  pressed,
 }: {
   icon: string;
   label: string;
@@ -152,6 +159,10 @@ function HeaderAction({
   notificationsTrigger?: boolean;
   /** Same, for the queue panel. */
   queueTrigger?: boolean;
+  /** Still shown in the Study focus mode, which clears the rest of the rail. */
+  focusKeep?: boolean;
+  /** For a toggle: whether it is on. */
+  pressed?: boolean;
 }) {
   const titleText = kbd ? `${title ?? label} · ${kbd}` : title ?? label;
   return (
@@ -161,6 +172,8 @@ function HeaderAction({
       data-inbox-trigger={inboxTrigger ? '' : undefined}
       data-notifications-trigger={notificationsTrigger ? '' : undefined}
       data-queue-trigger={queueTrigger ? '' : undefined}
+      data-focus-keep={focusKeep ? '' : undefined}
+      aria-pressed={pressed}
       type="button"
       onClick={onClick}
       disabled={disabled}
@@ -180,6 +193,11 @@ function HeaderAction({
 }
 
 export function App() {
+  const focusReduced = useStudyFocusReduced();
+  const focusActions = useStudyFocusActions();
+  const focusLayout = useStudyFocusLayout();
+  // In focus mode the header keeps only what the student chose; elsewhere nothing changes.
+  const focusKeeps = (id: string) => focusLayoutVisible(focusLayout.layout, id);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [activeVault, setActiveVault] = useState<VaultSummary | null>(null);
@@ -774,6 +792,46 @@ export function App() {
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  // Focus mode swaps the sidebar for the focus rail. It offers the same sections in
+  // the same saved order (plus Biblioteca), so the mode clears the screen without
+  // taking a single study tool away.
+  const openStudySection = useCallback((target: View) => {
+    setStudyTarget(null);
+    if (target !== 'studyLibrary') setStudyMaterialTarget(null);
+    if (target !== 'studyRecordings') setStudyRecordingTarget(null);
+    setStudyGraphTarget(null);
+    setView(target);
+  }, [setView]);
+  // Every section a Study vault has, in the saved order and whatever the sidebar hides:
+  // the focus mode keeps its own choice of what to show (see FocusLayoutDialog).
+  const focusSections = useMemo<Array<FocusSectionOption & { item: (typeof NAV_ITEMS)[number] }>>(() => {
+    if (!isEstudio) return [];
+    const dedicated = dedicatedVaultNavIds(activeVault?.type) ?? [];
+    return orderedNav(settings?.sidebarOrder ?? [])
+      .filter((n) => n.id === 'library' || (dedicated.includes(n.id) && isViewAllowedForVaultType(n.id, activeVault?.type)))
+      .map((n) => ({ key: n.id, label: t(navItemLabel(n, activeVault?.type)), icon: n.icon, item: n }));
+  }, [isEstudio, activeVault?.type, settings?.sidebarOrder, settings?.uiLanguage]);
+  const focusRailItems = useMemo<FocusRailItem[]>(() => {
+    if (!isEstudio || !focusReduced) return [];
+    return focusSections
+      .filter((section) => focusLayoutVisible(focusLayout.layout, `nav:${section.key}`))
+      .map(({ key, label, icon, item }): FocusRailItem => ({
+        key, label, icon,
+        active: view === item.id && (item.id !== 'toolkit' || toolkitPage === 'home'),
+        open: () => { if (item.id === 'toolkit') setToolkitPage('home'); openStudySection(item.id); },
+      }));
+  }, [isEstudio, focusReduced, focusSections, focusLayout, view, toolkitPage, openStudySection]);
+  // Leaving the mode lands on the Concentración page, where the paused block is.
+  useEffect(() => {
+    const show = () => openStudySection('studyFocus');
+    window.addEventListener(SHOW_FOCUS_PAGE_EVENT, show);
+    return () => window.removeEventListener(SHOW_FOCUS_PAGE_EVENT, show);
+  }, [openStudySection]);
+  const openFocusSubject = useCallback((id: string) => { setStudyTarget({ kind: 'subject', id }); setView('studyCourses'); }, [setView]);
+  const openFocusDocument = useCallback((id: string) => { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }, [setView]);
+  const openFocusMaterial = useCallback((id: string) => { setStudyMaterialTarget({ id, pageNumber: null, slideNumber: null }); setView('studyLibrary'); }, [setView]);
+  const openFocusLibrary = useCallback(() => openStudySection('studyLibrary'), [openStudySection]);
+
   const reloadSettings = useCallback(async () => {
     if (!window.nodus) {
       setLoadError(t('El puente de Nodus (preload) no está disponible. La app no puede comunicarse con su backend.'));
@@ -1298,6 +1356,13 @@ export function App() {
         void window.nodus.updateSettings({ appTheme: next }).then(reloadSettings);
       } },
     ];
+    if (isEstudio && focusActions) {
+      actions.unshift(
+        { id: 'act:focus-mode', label: focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración'), section: t('Acciones'), icon: 'focus', keywords: 'concentración concentracion focus pomodoro distracciones estudio', run: () => { if (focusReduced) void focusActions.exitFocusMode(); else focusActions.setReduced(true); } },
+        { id: 'act:focus-layout', label: t('Personalizar el modo concentración'), section: t('Acciones'), icon: 'eye', keywords: 'concentración concentracion focus personalizar visibles ocultar secciones', run: openFocusLayout },
+        { id: 'act:focus-timer', label: t('Temporizador de concentración'), section: t('Acciones'), icon: 'focus', keywords: 'pomodoro temporizador timer bloque descanso concentración', run: openFocusTimer },
+      );
+    }
     if (isEstudio) {
       actions.unshift({ id: 'act:reading-focus', label: settings?.readingFocusMode ? t('Salir del modo lectura') : t('Entrar en modo lectura'), section: t('Acciones'), icon: 'book', keywords: 'lectura enfoque focus estudio', run: () => void window.nodus.updateSettings({ readingFocusMode: !settings?.readingFocusMode }).then(reloadSettings) });
     }
@@ -1308,7 +1373,7 @@ export function App() {
       );
     }
     return [...navCommands, ...actions];
-  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings, toggleVaults]);
+  }, [settings?.uiLanguage, settings?.reduceMotion, settings?.readingFocusMode, focusReduced, focusActions, activeVault?.type, isPrimarySources, isGenealogy, isDatabases, isEstudio, isDocencia, isWorldbuilding, isProsopography, isTestimonios, isDark, onSync, openAssistant, reloadSettings, toggleVaults]);
 
   // The startup sequence, as an ordered list of guards rather than a run of early
   // returns. It also sets this render's authoritative language, which is why it is
@@ -1426,6 +1491,7 @@ export function App() {
       className="h-full flex flex-col"
       style={{ '--vault-accent': dockColorForVaultType(activeVault?.type) } as React.CSSProperties}
       data-testid="app-shell"
+      data-focus-reduced={focusReduced}
       data-interface-scale={settings.interfaceScale}
       data-high-contrast={settings.highContrast ? 'true' : 'false'}
       data-reduce-motion={settings.reduceMotion ? 'true' : 'false'}
@@ -1504,6 +1570,9 @@ export function App() {
           </button>
         )}
 
+        {/* The focus counter takes the left half of the header (between the logo and the
+            centred badge), centred in it; the right rail only ever has the focus icon. */}
+        {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} />}
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
@@ -1517,6 +1586,7 @@ export function App() {
             kbd={PALETTE_HINT}
             tone="text-neutral-400"
             onClick={() => setPaletteOpen(true)}
+            focusKeep={focusKeeps('header:commands')}
           />
           <HeaderAction
             icon="chat"
@@ -1567,7 +1637,7 @@ export function App() {
               )}
             </span>
           )}
-          <BrowserMediaHeaderAction onOpenTab={(tabId) => {
+          <BrowserMediaHeaderAction focusKeep={focusKeeps('header:media')} onOpenTab={(tabId) => {
             setView('browser');
             void window.nodus.activateBrowserTab(tabId);
           }} />
@@ -1597,13 +1667,28 @@ export function App() {
             title={isDark ? t('Cambiar a modo claro') : t('Cambiar a modo oscuro')}
             onClick={() => void toggleTheme()}
             dataTour="theme-toggle"
+            focusKeep={focusKeeps('header:theme')}
           />
+          {isEstudio && focusActions && (
+            // The same panel as the timer chip: the mode toggle and its settings live inside.
+            <span className="focus-quick" data-testid="focus-quick-access" data-focus-timer-trigger="">
+              <HeaderAction
+                icon="focus"
+                label={t('Modo concentración')}
+                pressed={focusReduced}
+                dataTour="focus-mode"
+                onClick={toggleFocusTimer}
+                focusKeep
+              />
+            </span>
+          )}
           {readyVersion && <HeaderAction
             icon="download"
             label={updateProgress?.status === 'backing-up' ? t('Protegiendo tus datos') : updateInstallBusy(updateProgress) ? t('Instalando actualización') : t('Actualización lista')}
             title={t('Actualización lista')}
             showLabel
             onClick={() => setDeferredUpdate(null)}
+            focusKeep
           />}
           {/* Queue and task progress, moved here from the bottom strip: same dropdown
               treatment as the notification centre, with a live-work badge. */}
@@ -1615,6 +1700,7 @@ export function App() {
               title={queueActivity.attention ? `${t('Cola y tareas')} · ${t('Error')}` : t('Cola y tareas')}
               queueTrigger
               onClick={(e) => toggleQueue(e.currentTarget)}
+              focusKeep={focusKeeps('header:queue')}
             />
             {(queueLive > 0 || queueActivity.attention) && (
               <span className={`header-action-badge ${queueActivity.attention ? '!bg-red-600 !text-white' : ''}`}>{queueActivity.attention && queueLive === 0 ? '!' : queueLive > 9 ? '9+' : queueLive}</span>
@@ -1698,6 +1784,7 @@ export function App() {
         />
       </header>
 
+      {isEstudio && <FocusCompletionNotice />}
       {updateProgress && (showStartupProgress || (updateNoticeKey && deferredUpdate !== updateNoticeKey)) && <UpdateReadyNotice
         update={updateProgress}
         onUpdate={setUpdateProgress}
@@ -1722,7 +1809,16 @@ export function App() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
-        {!navCollapsed && (
+        {isEstudio && focusReduced && (
+          <FocusRail
+            items={focusRailItems}
+            onOpenSubject={openFocusSubject}
+            onOpenDocument={openFocusDocument}
+            onOpenMaterial={openFocusMaterial}
+            onOpenLibrary={openFocusLibrary}
+          />
+        )}
+        {!navCollapsed && !(isEstudio && focusReduced) && (
           <nav
             data-testid="resizable-sidebar"
             data-sidebar-compact={sidebarCompact ? 'true' : 'false'}
@@ -2028,6 +2124,8 @@ export function App() {
       <BrowserConnectorPairingRequestHost />
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
+      {isEstudio && <FocusLayoutDialog sections={focusSections} />}
+      {isEstudio && <FocusExitDialog />}
 
       <Suspense fallback={null}>
       {collectionsOpen && (
@@ -2266,7 +2364,7 @@ export function App() {
           <NodiStyleModal onChosen={async () => { await reloadSettings(); }} />
         )}
 
-      {!manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings={settings} />}
+      {!focusReduced && !manualWhatsNewOpen && startupGuidesSettled && <NodiMascot settings={settings} />}
     </div>
   );
 }
@@ -2279,7 +2377,7 @@ export function App() {
  * them away at the exact moment someone pauses is how a user loses the Play
  * button they were reaching for.
  */
-function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) => void }) {
+function BrowserMediaHeaderAction({ onOpenTab, focusKeep = true }: { onOpenTab: (tabId: string) => void; focusKeep?: boolean }) {
   const states = useBrowserMedia();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   if (states.length === 0) return null;
@@ -2288,6 +2386,7 @@ function BrowserMediaHeaderAction({ onOpenTab }: { onOpenTab: (tabId: string) =>
     <span data-testid="browser-media-header-action" className="relative inline-flex">
       <HeaderAction
         icon="volume"
+        focusKeep={focusKeep}
         label={t('Medios')}
         title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
         onClick={(event) => {

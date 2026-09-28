@@ -102,7 +102,7 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
     <div className="research-preparation-content">
       <div className="research-preparation-kicker">NODUS RESEARCH</div>
       <div className="research-preparation-mark" aria-hidden="true"><svg viewBox="0 0 80 72" fill="none"><rect x="13" y="7" width="43" height="54" rx="7" /><rect x="24" y="16" width="43" height="49" rx="7" /><path d="M35 30h21M35 39h21M35 48h12" /></svg></div>
-      <h2 id={titleId}>{t(confirmDecline ? '¿Dejar la indexación desactivada?' : request.manage ? 'Preparar fuentes' : 'Tus documentos también tienen respuestas.')}</h2>
+      <h2 id={titleId}>{t(confirmDecline ? '¿Dejar la indexación desactivada?' : request.manage ? 'Preparar fuentes' : 'Ahora Nodus indexa tus documentos automáticamente')}</h2>
       {confirmDecline ? <>
         <p id={descriptionId} className="research-preparation-description">{t('No se indexará tu biblioteca. Podrás activarlo manualmente desde Biblioteca → Indexar biblioteca.')}</p>
         <div className="research-preparation-actions">
@@ -110,7 +110,10 @@ function PreparationDialog({ request, onClose, onConfigure }: { request: Prepara
           <button className="btn btn-primary" disabled={busy} onClick={decline}>{t('Sí, dejar desactivado')}</button>
         </div>
       </> : !request.manage ? <>
-        <p id={descriptionId} className="research-preparation-description">{t('Ahora Nodus puede consultar el texto completo de tus documentos, además de sus Ideas extraídas.')}</p>
+        <div id={descriptionId}>
+          <p className="research-preparation-description">{t('Con solo indexarlos, el chat y Deep Research ya pueden responder a partir del texto completo de tus documentos.')}</p>
+          <p className="research-preparation-description research-preparation-description-follow">{t('Extraer ideas es un paso aparte y opcional. Añade una capa de conocimiento estructurado: ideas, temas y relaciones entre obras que forman tu grafo.')}</p>
+        </div>
         <p className="research-preparation-question">{t('¿Quieres indexar la biblioteca de esta bóveda?')}</p>
         {preview ? <>
           <p className="research-preparation-model-label">{t('Solo se utilizará tu modelo de embeddings:')}</p>

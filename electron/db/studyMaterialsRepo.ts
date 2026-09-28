@@ -25,6 +25,7 @@ import { EMPTY_STUDY_BIBLIOGRAPHY, STUDY_MATERIAL_EXTENSIONS, studyMaterialPrevi
 import { createStudyShortId, normalizeStudyName } from '@shared/studyOrg';
 import type { StudyPlacementInput } from '@shared/studyOrg';
 import { extractFromPath } from '../extraction/textExtractor';
+import { deleteStudyNoteLinksFor } from './studyNoteLinksRepo';
 import { getDb } from './database';
 import { createStudyDocument, resolveStudyMoveDestination } from './studyOrgRepo';
 import { encodeEmbedding } from './ideasRepo';
@@ -575,7 +576,10 @@ export function createStudyNoteFromMaterial(materialId: string, annotationId?: s
 
 export function setStudyMaterialLifecycle(id: string, action: 'archive' | 'restore' | 'trash' | 'recover' | 'delete'): void {
   materialRow(id); const timestamp = now();
-  if (action === 'delete') { getDb().prepare('DELETE FROM study_materials WHERE id = ?').run(id); return; }
+  if (action === 'delete') {
+    getDb().transaction(() => { deleteStudyNoteLinksFor('material_id', id); getDb().prepare('DELETE FROM study_materials WHERE id = ?').run(id); })();
+    return;
+  }
   const updates = action === 'archive' ? ['archived_at', timestamp] : action === 'restore' ? ['archived_at', null]
     : action === 'trash' ? ['deleted_at', timestamp] : ['deleted_at', null];
   getDb().prepare(`UPDATE study_materials SET ${updates[0]} = ?, updated_at = ? WHERE id = ?`).run(updates[1], timestamp, id);

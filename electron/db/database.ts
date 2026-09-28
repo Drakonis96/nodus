@@ -257,8 +257,15 @@ export function openDbPath(): string | null {
   return db ? db.name : null;
 }
 
+const beforeCloseListeners = new Set<() => void>();
+export function onBeforeDatabaseClose(listener: () => void): () => void {
+  beforeCloseListeners.add(listener);
+  return () => { beforeCloseListeners.delete(listener); };
+}
+
 export function closeDb(): void {
   if (db) {
+    for (const listener of beforeCloseListeners) listener();
     db.close();
     db = null;
   }

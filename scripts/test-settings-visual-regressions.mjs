@@ -42,4 +42,14 @@ const nodiOverride = settings.match(/<Row label=\{t\('Asistente Nodi'\)\}[^>]*>(
 assert.match(nodiOverride, /<ModelWithReasoning/);
 assert.equal(/\bmenu\b/.test(nodiOverride), true, 'the Nodi override must use the shared searchable picker');
 
+// Graph health lives in the Data tab, only in academic vaults, right above the danger zone,
+// and its panel defines light and dark surfaces.
+const graphHealth = settings.indexOf("activeVault?.type === 'academic' && visibleSettingsSection('data', 'Salud del grafo', GRAPH_HEALTH_KEYWORDS) && (");
+const dangerZone = settings.indexOf("{visibleSettingsSection('data', 'Zona de peligro'");
+assert.ok(graphHealth > 0 && dangerZone > graphHealth, 'the graph health card sits right above the danger zone, gated to academic vaults');
+assert.match(settings.slice(graphHealth, dangerZone), /<GraphHealthPanel manualMode=\{settings\.academicMode === 'manual'\} \/>/);
+assert.match(settings, /activeVault\?\.type === 'academic' && visibleSettingsSection\('data', 'Salud del grafo', GRAPH_HEALTH_KEYWORDS\),/, 'the section is counted for the settings search');
+const graphHealthPanel = await readFile(new URL('../src/components/GraphHealthPanel.tsx', import.meta.url), 'utf8');
+assert.match(graphHealthPanel, /border-amber-300 bg-amber-50[^"]*dark:border-amber-900\/60 dark:bg-amber-950\/20/, 'the pending-themes notice defines light and dark surfaces');
+
 console.log('settings visual regression checks passed');

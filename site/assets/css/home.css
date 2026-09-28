@@ -21,6 +21,23 @@ body {
    soon as its first frame exists. */
 #organism { transition-duration: 0.3s; }
 
+/* The home page reads as a surface, not a document: nothing on it is meant to be
+   selected and dragged around, exactly as the motto at the top is not. It lives in
+   this file because the homepage is the only page that loads it — every inner page
+   keeps its text selectable. Nothing is taken away here: the homepage has no field
+   to type in and no snippet to copy, and both would be let through anyway. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+select,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* ============================================================ hero */
 .hero {
   position: relative;
@@ -113,12 +130,74 @@ body {
   will-change: transform;
 }
 
-/* ============================================================ vault scenes */
-.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
-.scene-inner {
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-  gap: clamp(32px, 5vw, 72px); align-items: center;
+/* ============================================================ what nodus is */
+/* The mascot stands to the right of the headline. The copy keeps the reading
+   measure section heads have everywhere else, so the headline breaks on the same
+   words it always did and the art takes the width that was empty beside it. */
+.section-head.what-head { max-width: none; }
+.what-head .what-copy { max-width: 780px; }
+
+.what-nodi { margin: 0; }
+
+/* The figure is the app's own Nodi components — the galaxy orb, with the classic
+   character leaning out from behind its upper-left rim — composed into one SVG by
+   scripts/build-what-nodi.mjs, which also copies the component stylesheets to
+   what-nodi.css. What is left here are the composition rules, which live outside
+   those files and cannot be generated from them. */
+/* The orb's own frame, 320x340, is drawn for the app's companion: it leaves room
+   for the celebration burst and the satellites at their widest, none of which the
+   hero shows. Rather than crop that frame — its origin is what every one of the
+   component's transform-origins resolves against — the art is scaled up, and the
+   rings grow into the gutter the grid already leaves beside the copy. */
+.what-nodi-figure { display: block; width: 100%; height: auto; transform: scale(1.14); }
+/* That stylesheet sizes every .nodi-svg for the app's companion (height: 200px).
+   Here the character is a nested viewport in the orb's own units, so its box has
+   to match its viewBox or the character renders two thirds too small. */
+.what-nodi-char > svg { width: 270px; height: 300px; }
+/* In the app the orb rests on a pool of light. Here it floats in the page's own
+   starfield, so the pool goes: without a floor under it the ellipse reads as a
+   stray ring rather than a shadow. */
+.what-nodi-figure .ped-glow { display: none; }
+/* The two cloud arms are blurred ellipses (stdDeviation 10 and 14) that the
+   component turns through a full circle over a minute. A rotating blurred group
+   cannot reuse its cached filter raster, so those two are the only part of the
+   figure that is expensive every frame — and the hero paints the orb at five
+   times the area the app's companion covers. The arms hold their angle here;
+   the float, the rings, the satellites, the core and the constellation all keep
+   moving, and at 7.8°/s the turn is not something a reader can see. */
+.what-nodi-figure .neb-spin,
+.what-nodi-figure .neb-spin2 { animation: none; }
+
+@media (min-width: 900px) {
+  .what-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 30%, 420px);
+    gap: clamp(28px, 4vw, 64px);
+    align-items: center;
+  }
 }
+
+/* On a phone there is no room to the right, so the mascot closes the section
+   instead: centred, and scaled to the window so it fills the band on a tablet
+   and stays decoration rather than a second headline on a phone. */
+@media (max-width: 899px) {
+  .what-nodi { width: clamp(180px, 44vw, 330px); margin: 36px auto 0; }
+}
+
+/* ============================================================ vault scenes */
+/* The window and the copy beside it. Every app window on the home page — the four
+   vault scenes and the five modes further down — takes the wide column of this
+   same pair, so they come out one size at every width and the copy keeps the rest.
+   A scene puts the copy first; a flipped scene and the mode carousel put the
+   window first, and the copy moves to the right. */
+.scene-inner, .mode-body {
+  display: grid; align-items: center;
+  gap: clamp(32px, 5vw, 72px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+}
+.scene[data-flip] .scene-inner,
+.mode-body { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+.scene { padding: clamp(56px, 7.5vw, 100px) 0; }
 /* every other scene puts the visual first, so the eye zig-zags down the page */
 .scene[data-flip] .scene-copy { order: 2; }
 
@@ -231,6 +310,50 @@ body {
 .shot-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; opacity: 1; }
 .shot-arrow[hidden] { display: none; }
 
+/* The control in the window's own bar that opens the screenshot bigger. It keeps
+   to the top right, the corner a window control is looked for in, and is small
+   enough not to add height to the bar it lives in. */
+.frame-zoom {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 22px; height: 22px; margin: -6px 0 -6px auto; padding: 0; cursor: pointer;
+  border: 1px solid var(--membrane); border-radius: 7px;
+  background: rgba(255, 255, 255, 0.02); color: var(--ink-3);
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.frame-zoom svg { width: 12px; height: 12px; }
+.frame-zoom:hover {
+  color: var(--ink); border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.frame-zoom:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.frame-zoom[hidden] { display: none; }
+/* The pre-alpha tag crosses that corner of its window, so the button steps in. */
+.frame.has-ribbon .frame-zoom { margin-right: 54px; }
+
+/* ------------------------------------------------------------ the gallery view */
+/* The window on its own, over the blurred page: the same frame the visitor clicked,
+   a rank bigger, keeping its caption, its counter and its own arrows. */
+.shot-viewer {
+  position: fixed; inset: 0; z-index: 170;
+  display: none; place-items: center;
+  padding: clamp(18px, 4vw, 48px);
+  background: rgba(4, 3, 8, 0.82);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+.shot-viewer.open { display: grid; }
+/* Capped by the height as well as the width, so the whole window — bar, shot and
+   caption — is on screen without the viewer ever scrolling. */
+.shot-viewer-stage {
+  width: min(100%, 1080px, calc((100dvh - 190px) * 1.6));
+  animation: shot-in 0.34s var(--ease);
+}
+@keyframes shot-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } }
+.shot-viewer .frame { box-shadow: var(--shadow); }
+.shot-viewer .shot-arrow { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .shot-viewer-stage { animation: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shot { transition: none; }
 }
@@ -239,27 +362,124 @@ body {
   .shot-arrow { width: 32px; height: 32px; }
   .shot-arrow.prev { left: 8px; }
   .shot-arrow.next { right: 8px; }
+  /* A finger needs more of it than a cursor does, without the bar growing. */
+  .frame-zoom { width: 28px; height: 28px; margin-top: -9px; margin-bottom: -9px; }
+  .frame-zoom svg { width: 14px; height: 14px; }
 }
 
 /* ============================================================ more vaults */
-.more-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
-  gap: 16px; margin-top: 48px;
+/* Two carousels, one inside the other. The outer picks the mode — its tabs, plus a
+   pair of arrows for stepping through them — and the slide it shows carries that
+   mode's own window, with the mode's own screenshots inside and their own arrows
+   and counter. Nothing advances on its own: every change comes from an arrow, a
+   tab, an arrow key or a swipe. */
+.modes { margin-top: 48px; }
+.mode-nav {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: clamp(16px, 2.4vw, 26px);
 }
-.more-card { padding: 24px; }
-.more-card .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.more-card .pic {
+.mode-tabs {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  min-width: 0;
+}
+/* The outer arrows: the same circle the inner ones use, one rank up the hierarchy. */
+.mode-step {
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  flex: 0 0 auto; cursor: pointer;
+  border: 1px solid var(--membrane); border-radius: 50%;
+  background: rgba(255, 255, 255, 0.02); color: var(--ink-2);
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.mode-step:hover { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 55%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.mode-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mode-step svg { width: 15px; height: 15px; }
+.mode-tab {
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--membrane); background: rgba(255, 255, 255, 0.02);
+  color: var(--ink-2); font: 600 12.5px/1 var(--sans); letter-spacing: 0.01em;
+  transition: color 0.22s var(--ease), border-color 0.22s var(--ease), background 0.22s var(--ease);
+}
+.mode-tab:hover { color: var(--ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+.mode-tab[aria-current="true"] {
+  color: var(--ink); border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.mode-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The window takes the wide column and the mode is described at its right, the way
+   a vault scene is laid out — with the copy level with the top of the window, since
+   a mode says less than a vault does. The pair of columns itself is the one
+   declared with the scenes, so this window is exactly the width of the four above. */
+.mode-body { align-items: start; }
+/* The slides are <section>s, and the page pads every section by up to 148px: that
+   pushed the window down inside its own column while the copy stayed at the top,
+   which is the misalignment this class exists to undo. */
+.mode-slide { padding: 0; }
+.mode-slide[hidden] { display: none; }
+.mode-body .frame { margin: 0; }
+.mode-body .shot figcaption { font-size: 12px; }
+.mode-copy { min-width: 0; }
+.mode-info[hidden] { display: none; }
+.mode-info .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.mode-info .pic {
   display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
   border-radius: 11px; border: 1px solid color-mix(in srgb, var(--vc) 40%, transparent);
   background: color-mix(in srgb, var(--vc) 14%, transparent); color: var(--vc);
 }
-.more-card .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.more-card h3 { font-size: 17px; }
-.more-card p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.58; }
-.more-card .arrow-link { color: var(--vc); font-size: 13.5px; }
-.more-card:hover { border-color: color-mix(in srgb, var(--vc) 45%, transparent); }
-.more-card .tag-status { margin-left: auto; }
+.mode-info .pic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.mode-info h3 { font-size: 17px; }
+.mode-info p { margin: 0 0 16px; font-size: 14px; color: var(--ink-2); line-height: 1.58; }
+.mode-info .arrow-link { color: var(--vc); font-size: 13.5px; }
+/* The phase a mode is in, said in words: the ribbon alone would be hover-only. */
+.mode-info .mode-phase {
+  margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-m);
+  border: 1px dashed color-mix(in srgb, #fbbf24 45%, transparent);
+  background: rgba(251, 191, 36, 0.06);
+  font-size: 12.5px; color: var(--ink-2);
+}
+.mode-info .mode-phase b { color: var(--warn); text-transform: uppercase; letter-spacing: 0.06em; font-size: 11px; }
 
+/* ── the pre-alpha corner ───────────────────────────────────────────────────────
+   The three preliminary modes carry the diagonal ribbon on their own window, in the
+   same amber the app's own phase badge uses (src/components/vaultTypeUi.tsx). The
+   note behind it repeats what that badge says; the ribbon is focusable, so the note
+   is reachable without a mouse, and only the band takes pointer events. */
+.mode-ribbon {
+  position: absolute; top: 0; right: 0; width: 104px; height: 104px;
+  overflow: hidden; pointer-events: none; z-index: 3;
+}
+.mode-ribbon-band {
+  position: absolute; top: 22px; right: -30px; width: 132px;
+  padding: 4px 0; transform: rotate(45deg);
+  text-align: center; pointer-events: auto;
+  font: 700 9.5px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase;
+  color: #2a1c02; background: linear-gradient(180deg, #fcd34d, #f0a020);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.mode-ribbon:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: var(--r-l); }
+.mode-ribbon-tip {
+  position: absolute; top: 80px; right: 8px; width: 208px;
+  padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(251, 191, 36, 0.4); background: #171106; color: var(--ink-2);
+  font-size: 12px; line-height: 1.5;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  opacity: 0; visibility: hidden; transform: translateY(-6px);
+  transition: opacity 0.2s var(--ease), transform 0.2s var(--ease), visibility 0s linear 0.2s;
+}
+.mode-ribbon:hover .mode-ribbon-tip,
+.mode-ribbon:focus .mode-ribbon-tip { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+
+@media (max-width: 900px) {
+  /* The labels wrap while there is room for two rows; only below this width do
+     they become a row you have to scroll, which is what keeps every one of them
+     readable on a desktop window of any size. */
+  .mode-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .mode-tab { flex: 0 0 auto; }
+}
+@media (max-width: 560px) {
+  .mode-ribbon { width: 88px; height: 88px; }
+  .mode-ribbon-band { top: 18px; right: -34px; width: 128px; font-size: 9px; }
+}
 .roadmap-note {
   margin-top: 26px; padding: 16px 20px; border-radius: var(--r-m);
   border: 1px dashed var(--membrane); background: rgba(255, 255, 255, 0.02);
@@ -275,6 +495,14 @@ body {
   border: 1px solid var(--membrane); border-radius: var(--r-xl);
   background: linear-gradient(140deg, rgba(32, 22, 58, 0.88), rgba(12, 9, 22, 0.84));
 }
+/* The hero wears the same badge the tool cards do — it was the one entry in the
+   Toolkit without one. */
+.tool-hero .pic {
+  display: grid; place-items: center; width: 44px; height: 44px; margin-bottom: 16px;
+  border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent);
+}
+.tool-hero .pic svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .tool-hero h3 { font-size: clamp(22px, 2.6vw, 30px); margin-bottom: 14px; }
 .tool-hero p { margin: 0 0 20px; color: var(--ink-2); font-size: 15px; }
 .tool-pills { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -284,15 +512,32 @@ body {
 .stage-slide {
   position: relative; aspect-ratio: 16 / 10; overflow: hidden;
   border: 1px solid var(--membrane); border-radius: var(--r-m);
-  background: linear-gradient(160deg, #16122a, #0b0913);
-  display: grid; align-content: center; gap: 12px; padding: 26px;
+  /* The deck is projected, so the slide is black — the same black a room would see. */
+  background: #04050a;
   cursor: crosshair;
 }
-.stage-slide small { font: 700 9.5px var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-3); }
-.stage-slide strong { font-family: var(--serif); font-size: clamp(19px, 2.3vw, 27px); font-weight: 600; letter-spacing: -0.03em; }
-.stage-slide i { display: block; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.08); }
-.stage-slide i:nth-of-type(1) { width: 82%; }
-.stage-slide i:nth-of-type(2) { width: 64%; }
+/* The deck's one slide: Nodus's own cover, with the mascot standing beside it. It is
+   the single child the zoom tool scales, and deliberately short — what the stage is
+   for is the four tools underneath it. */
+.slide-deck {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
+  align-items: center; gap: 16px; padding: 28px 30px;
+}
+.slide-cover { display: grid; align-content: center; gap: 20px; min-width: 0; }
+.slide-brand { display: flex; align-items: center; gap: 13px; }
+.slide-mark { width: 36px; height: 36px; flex: 0 0 auto; }
+.slide-brand strong { display: block; font-family: var(--serif); font-size: clamp(21px, 2.5vw, 31px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; }
+.slide-brand small { display: block; margin-top: 3px; font: 700 9.5px var(--mono); letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-3); }
+.slide-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
+.slide-points li { position: relative; padding-left: 19px; font-size: clamp(12px, 1.05vw, 14.5px); line-height: 1.45; color: var(--ink-2); }
+.slide-points li::before {
+  content: ''; position: absolute; left: 0; top: 0.42em;
+  width: 7px; height: 7px; border-radius: 2px;
+  background: linear-gradient(135deg, #a78bfa, #7c3aed);
+}
+.slide-nodi { display: grid; place-items: end center; min-width: 0; }
+.slide-nodi .nodi-svg { height: clamp(112px, 13vw, 176px); width: auto; }
 .stage-page {
   position: absolute; right: 16px; bottom: 14px;
   font: 600 10.5px var(--mono); color: var(--ink-3);
@@ -332,11 +577,54 @@ body {
 }
 .stage-hint { margin-top: 10px; font-size: 12px; color: var(--ink-3); }
 
+/* The five tools turn around like a ring: one card sits in the middle, the ones
+   either side of it wait behind it, and the row wraps — past the last card comes
+   the first one again. home.js keeps `--d` (the signed distance to the middle) on
+   every card and this file reads it; nothing moves on its own. */
 .tool-cards {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 16px; margin-top: 20px;
+  position: relative; margin-top: 20px;
+  height: var(--stage-h, 340px);
+  cursor: grab;
+  touch-action: pan-y;
+  outline-offset: 6px;
+  /* The waiting cards are meant to run into the page's own margins, so the ring's
+     box is the viewport wide and the clip happens out there: wide enough for the
+     look, and no sideways scrollbar from cards nobody is looking at. */
+  margin-inline: calc(var(--gut, 24px) * -1);
+  overflow: hidden;
 }
-.tool-card { padding: 24px; }
+.tool-cards.is-dragging { cursor: grabbing; user-select: none; }
+.tool-cards.is-dragging .tool-card { transition: none; }
+.tool-cards .tool-card {
+  position: absolute; top: 0;
+  left: calc(50% - var(--card-w, 320px) / 2);
+  width: var(--card-w, 320px);
+  /* Every card in the row is the same height, so a longer description cannot make
+     one card taller than its neighbours; the ring measures the tallest and hands it
+     to all of them, and the tags and the link keep to the bottom. */
+  height: var(--stage-h, 340px);
+  display: flex; flex-direction: column;
+  padding: 24px;
+  /* The lit border is how the centred card reads as focused. */
+  border-color: color-mix(in srgb, var(--tc) calc(var(--lit, 0) * 45%), var(--membrane));
+  box-shadow: 0 18px 44px rgba(0, 0, 0, calc(var(--lit, 0) * 0.45));
+  z-index: var(--z, 1);
+  pointer-events: var(--pe, auto);
+  opacity: var(--alpha, 1);
+  /* Where the card stands comes from the ring, already solved: no rotation, so the
+     text stays crisp at every size. */
+  transform: translateX(var(--x, 0px)) scale(var(--scale, 1));
+  transition: transform 0.5s var(--ease), opacity 0.4s var(--ease), border-color 0.4s var(--ease), box-shadow 0.4s var(--ease);
+}
+.tool-cards .tool-card .tags { margin-top: auto; }
+/* While a drag is in flight the cards follow the pointer directly; the settle after
+   it is what animates. */
+.tool-cards.is-dragging .tool-card { transition: none; }
+/* One frame, to measure the cards at their natural height. */
+.tool-cards.is-measuring .tool-card { height: auto !important; }
+@media (prefers-reduced-motion: reduce) {
+  .tool-cards .tool-card { transition: none; }
+}
 .tool-card .pic {
   display: grid; place-items: center; width: 40px; height: 40px; margin-bottom: 15px;
   border-radius: 11px; border: 1px solid color-mix(in srgb, var(--tc) 40%, transparent);
@@ -350,6 +638,41 @@ body {
   padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600;
   background: rgba(255, 255, 255, 0.05); border: 1px solid var(--membrane); color: var(--ink-3);
 }
+
+/* The projected slide is small here: the cover keeps its two columns but gives the
+   text the room and the mascot what is left. */
+@media (max-width: 900px) {
+  .tool-cards { --card-w: clamp(216px, 46vw, 290px); }
+}
+@media (max-width: 560px) {
+  /* A phone's "slide" is 300px wide, so the cover keeps its shape but drops to two
+     points: three paragraphs of text behind a 9px note is not a deck, it is a
+     texture. The mascot keeps its corner. */
+  .slide-deck { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 16px 16px 20px; }
+  .slide-cover { gap: 12px; }
+  .slide-mark { width: 24px; height: 24px; }
+  .slide-brand strong { font-size: 19px; }
+  .slide-brand small { font-size: 8.5px; letter-spacing: 0.12em; }
+  .slide-points { gap: 7px; }
+  .slide-points li { font-size: 11px; padding-left: 14px; }
+  .slide-points li:nth-child(3) { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(78px, 23vw, 104px); }
+  .tool-cards { --card-w: clamp(196px, 62vw, 260px); }
+}
+
+/* Under 400px the strapline no longer fits beside the mascot: the cover keeps the
+   mark, the name and two points, which is as much slide as a phone can hold. */
+@media (max-width: 400px) {
+  .slide-brand small { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(62px, 20vw, 84px); }
+}
+
+/* 320px, the narrowest phone still out there: the cover keeps one point. */
+@media (max-width: 340px) {
+  .slide-points li:nth-child(2) { display: none; }
+  .slide-nodi .nodi-svg { height: clamp(52px, 17vw, 72px); }
+}
+
 
 /* ============================================================ how it works */
 .steps { counter-reset: step; margin-top: 56px; display: grid; gap: 0; }
@@ -398,7 +721,9 @@ body {
   /* minmax(0, 1fr), never a bare 1fr: a bare fr keeps an automatic minimum, so
      one wide child (a screenshot frame, a long label) pushes the whole column
      past the viewport and the page scrolls sideways */
-  .scene-inner { grid-template-columns: minmax(0, 1fr); }
+  /* The mode carousel folds here too, not at a width of its own: a window and its
+     copy are one pair everywhere on the page, so both stack at the same point. */
+  .scene-inner, .mode-body { grid-template-columns: minmax(0, 1fr); }
   .scene[data-flip] .scene-copy { order: 0; }
   .tool-hero { grid-template-columns: minmax(0, 1fr); }
 }

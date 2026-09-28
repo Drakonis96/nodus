@@ -32,6 +32,10 @@ import type { WorkspaceSnapshot } from '../app/viewSnapshots';
 import { useListPlacement } from '../listPlacement';
 import { t, tx } from '../i18n';
 import { ResearchNoteProvenancePanel } from '../components/ResearchNoteProvenancePanel';
+import { StudyNoteLinkDialog } from '../components/StudyNoteLinkDialog';
+import { announceStudyWorkspaceChanged, STUDY_WORKSPACE_CHANGED, type StudyNavigationTarget } from '../components/StudySidebar';
+import { studyNoteLinkLabel, studyNoteLinkTarget } from '@shared/studyNoteLinks';
+import type { StudyNoteLink, StudyWorkspace } from '@shared/types';
 
 const StudyEditor = lazy(() => import('../components/editor/StudyEditor').then((module) => ({ default: module.StudyEditor })));
 
@@ -266,6 +270,77 @@ function LibraryLinksPanel({
   );
 }
 
+/** Where a note is linked in a study or teaching vault, and the way to change it. */
+function StudyLinksPanel({
+  note,
+  links,
+  organization,
+  onOpenLocation,
+  onOpenMaterial,
+  onManage,
+  onChanged,
+}: {
+  note: Note;
+  links: StudyNoteLink[];
+  organization: StudyWorkspace | null;
+  onOpenLocation: (target: StudyNavigationTarget) => void;
+  onOpenMaterial: (id: string) => void;
+  onManage: () => void;
+  onChanged: () => Promise<unknown> | void;
+}) {
+  const mine = links.filter((link) => link.noteId === note.id);
+  return (
+    <div data-testid="workspace-study-links" className="border-t border-neutral-200 px-3 py-3 dark:border-neutral-800">
+      <div className="flex items-center gap-1">
+        <b className="min-w-0 flex-1 text-[10px] uppercase tracking-wider text-neutral-500">{t('Cursos y materiales vinculados')}</b>
+        <button
+          data-testid="workspace-add-study-link"
+          className="grid h-7 w-7 place-items-center rounded hover:bg-neutral-100 dark:hover:bg-neutral-900"
+          title={tx('Vincular {name} con cursos y materiales', { name: note.title })}
+          aria-label={tx('Vincular {name} con cursos y materiales', { name: note.title })}
+          onClick={onManage}
+        ><Icon name="graduation" size={13} /></button>
+      </div>
+      {mine.length === 0 && <p className="mt-1 text-[11px] leading-5 text-neutral-500">{t('Vincúlala a cursos, asignaturas, temas o materiales para verla también allí.')}</p>}
+      <ul className="mt-1 space-y-0.5">
+        {mine.map((link) => {
+          const label = studyNoteLinkLabel(link, organization) || t('Sin ubicación');
+          const target = studyNoteLinkTarget(link);
+          return (
+            <li key={link.id} className="group flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs hover:bg-neutral-100 dark:hover:bg-neutral-900">
+              <Icon name={link.materialId ? 'book' : 'graduation'} size={12} className="shrink-0 text-neutral-500" />
+              <button
+                className="min-w-0 flex-1 text-left hover:text-indigo-400"
+                title={label}
+                onClick={() => {
+                  if (!target) return;
+                  if (target.kind === 'material') onOpenMaterial(target.id);
+                  else onOpenLocation({ kind: target.kind, id: target.id });
+                }}
+              >
+                {/* The place itself first; the path that leads to it underneath. */}
+                <span className="block truncate">{link.materialId ? label : label.split(' / ').at(-1)}</span>
+                <span className="block truncate text-[10px] text-neutral-500">{link.materialId ? t('Material') : label.split(' / ').slice(0, -1).join(' / ')}</span>
+              </button>
+              <button
+                data-testid={`workspace-remove-study-link-${link.id}`}
+                className="grid h-6 w-6 shrink-0 place-items-center rounded text-neutral-500 opacity-0 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
+                title={t('Quitar vínculo')}
+                aria-label={tx('Quitar el vínculo con {name}', { name: label })}
+                onClick={async () => {
+                  await window.nodus.removeStudyNoteLinks([link.id]);
+                  announceStudyWorkspaceChanged();
+                  await onChanged();
+                }}
+              ><Icon name="x" size={11} /></button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // El árbol de colecciones
 // ─────────────────────────────────────────────────────────────────────────────
@@ -415,6 +490,7 @@ export function WorkspaceView({
   onOpenStudyMaterial,
   onOpenStudyRecording,
   onOpenWorldEntry,
+  studyLinks,
 }: {
   settings: AppSettings;
   /** Una nota que abrir al entrar (búsqueda global, Nodi); el nonce repite el gesto. */
@@ -432,9 +508,15 @@ export function WorkspaceView({
   onOpenStudyMaterial?: (id: string) => void;
   onOpenStudyRecording?: (id: string, timestamp?: number | null) => void;
   onOpenWorldEntry?: (kind: string, id: string) => void;
+  /** Study and teaching vaults: notes can be linked to courses, subjects, topics and materials. */
+  studyLinks?: { onOpenLocation: (target: StudyNavigationTarget) => void; onOpenMaterial: (id: string) => void };
 }) {
   const [tree, setTree] = useState<NotesTree>({ folders: [], notes: [] });
   const [links, setLinks] = useState<WorkspaceLibraryLink[]>([]);
+  const [studyNoteLinks, setStudyNoteLinks] = useState<StudyNoteLink[]>([]);
+  const [studyOrganization, setStudyOrganization] = useState<StudyWorkspace | null>(null);
+  const [linkingNote, setLinkingNote] = useState<Note | null>(null);
+  const studyLinksEnabled = Boolean(studyLinks);
   const [loading, setLoading] = useState(true);
   // Restored as initial values only. The expanded folders are part of the cut:
   // collapsing back to the root loses the reader's route to what they were reading
@@ -474,6 +556,29 @@ export function WorkspaceView({
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // The study side of the links reloads on its own: it changes from the study sections
+  // too (a note unlinked from a subject), not only from here.
+  const refreshStudyLinks = useCallback(async () => {
+    if (!studyLinksEnabled) return;
+    const [nextLinks, organization] = await Promise.all([
+      window.nodus.listStudyNoteLinks().catch(() => [] as StudyNoteLink[]),
+      window.nodus.getStudyWorkspace().catch(() => null),
+    ]);
+    setStudyNoteLinks(nextLinks);
+    setStudyOrganization(organization);
+  }, [studyLinksEnabled]);
+  useEffect(() => {
+    if (!studyLinksEnabled) return;
+    void refreshStudyLinks();
+    window.addEventListener(STUDY_WORKSPACE_CHANGED, refreshStudyLinks);
+    return () => window.removeEventListener(STUDY_WORKSPACE_CHANGED, refreshStudyLinks);
+  }, [refreshStudyLinks, studyLinksEnabled]);
+  const studyLinkCounts = useMemo(() => {
+    const counts = new Map<string, StudyNoteLink[]>();
+    for (const link of studyNoteLinks) counts.set(link.noteId, [...(counts.get(link.noteId) ?? []), link]);
+    return counts;
+  }, [studyNoteLinks]);
 
   useEffect(() => {
     if (!tagFilterOpen && !itemContextMenu) return;
@@ -753,6 +858,17 @@ export function WorkspaceView({
             </button>
           </div>
         )}
+        {studyLinks && (
+          <StudyLinksPanel
+            note={active}
+            links={studyNoteLinks}
+            organization={studyOrganization}
+            onOpenLocation={studyLinks.onOpenLocation}
+            onOpenMaterial={studyLinks.onOpenMaterial}
+            onManage={() => setLinkingNote(active)}
+            onChanged={refreshStudyLinks}
+          />
+        )}
         <LibraryLinksPanel ownerKind="note" ownerId={active.id} ownerLabel={active.title} links={links} onChanged={refresh} />
       </aside>
     </div>
@@ -975,6 +1091,7 @@ export function WorkspaceView({
             {visible.map((note) => {
               const kind = itemKind(note);
               const linkCount = links.filter((link) => link.ownerKind === 'note' && link.ownerId === note.id).length;
+              const studyLinksOfNote = studyLinkCounts.get(note.id) ?? [];
               return (
                 <div
                   key={note.id}
@@ -1006,6 +1123,7 @@ export function WorkspaceView({
                     {note.tags.slice(0, 3).map((tag) => <span key={tag} className="max-w-28 truncate rounded-full bg-neutral-900 px-2 py-1 text-[10px] text-neutral-400">{tag}</span>)}
                     {note.tags.length > 3 && <span className="text-[10px] text-neutral-600">+{note.tags.length - 3}</span>}
                     {linkCount > 0 && <span className="flex items-center gap-1 text-[10px] text-neutral-600" title={tx('{n} elemento(s) de biblioteca enlazado(s)', { n: linkCount })}><Icon name="link" size={10} />{linkCount}</span>}
+                    {studyLinksOfNote.length > 0 && <span data-testid={`workspace-item-study-links-${note.id}`} className="flex items-center gap-1 text-[10px] text-indigo-400/80" title={[tx('Vinculada en {n} sitio(s)', { n: studyLinksOfNote.length }), ...studyLinksOfNote.map((link) => studyNoteLinkLabel(link, studyOrganization))].filter(Boolean).join('\n')}><Icon name="graduation" size={10} />{studyLinksOfNote.length}</span>}
                   </span>
                   <span className="shrink-0 text-right text-[10px] tabular-nums text-neutral-600">{formatRelative(note.trashedAt ?? note.updatedAt)}</span>
                 </div>
@@ -1053,6 +1171,7 @@ export function WorkspaceView({
             <button role="menuitem" className="library-action-menu-item" onClick={() => { setSelected(new Set([contextNote.id])); setItemContextMenu(null); }}><Icon name="folder" /><span><b>{t('Mover a colección…')}</b><small>{t('Elige el destino en la barra de acciones')}</small></span></button>
             <button role="menuitem" className="library-action-menu-item" onClick={() => { setItemContextMenu(null); void duplicateNote(contextNote); }}><Icon name="copy" /><span><b>{t('Duplicar')}</b></span></button>
             <button role="menuitem" className="library-action-menu-item" onClick={() => { void navigator.clipboard.writeText(contextNote.title); setItemContextMenu(null); }}><Icon name="copy" /><span><b>{t('Copiar título')}</b></span></button>
+            {studyLinks && <button role="menuitem" data-testid="workspace-context-study-link" className="library-action-menu-item" onClick={() => { setLinkingNote(contextNote); setItemContextMenu(null); }}><Icon name="graduation" /><span><b>{t('Vincular con cursos y materiales…')}</b><small>{t('Cursos, asignaturas, temas o materiales')}</small></span></button>}
             <button role="menuitem" className="library-action-menu-item text-red-400" onClick={() => { setPendingNoteDelete(contextNote); setItemContextMenu(null); }}><Icon name="trash" /><span><b>{t('Enviar a la papelera')}</b></span></button>
           </>}
         </div>
@@ -1107,6 +1226,7 @@ export function WorkspaceView({
           }}
         />
       )}
+      {linkingNote && <StudyNoteLinkDialog noteId={linkingNote.id} noteTitle={linkingNote.title} onClose={() => setLinkingNote(null)} onChanged={() => void refreshStudyLinks()} />}
       {pendingNoteDelete && (
         <ConfirmModal
           title={t('Enviar a la papelera')}

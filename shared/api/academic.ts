@@ -16,6 +16,7 @@ import type { StudyFlashcard, StudyFlashcardBulkAction, StudyFlashcardExport, St
 import type { StudyInterchangeExportOptions, StudyInterchangeFormat, StudyInterchangeImportOptions, StudyInterchangeKind, StudyInterchangeSummary } from '../studyInterchange';
 import type { StudyProgressDashboard } from '../studyStats';
 import type { StudyCalendarEvent, StudyCalendarEventInput, StudyGoal, StudyPlan, StudyPlanBlock, StudyPlannerSnapshot, StudyStudySession } from '../studyPlanner';
+import type { AppleCalendarDestination, AppleCalendarSyncStatus } from '../appleCalendar';
 import type { StudyAiUsage, StudyAiUsageSummary } from '../studyAi';
 import type { StudySchedule } from '../studySchedule';
 import type {
@@ -157,6 +158,8 @@ import type {
   ReadingPathRequest,
   ReprocessConnectionsOptions,
   ReprocessConnectionsResult,
+  GraphIntegrityReport,
+  GraphIntegrityRepairResult,
   ReprocessProgress,
   ResearchChatRequest,
   ResearchChatResponse,
@@ -214,6 +217,9 @@ import type {
   WorkView,
   WorkspaceLibraryLink,
   WorkspaceLibraryLinkInput,
+  StudyNoteLink,
+  StudyNoteLinkFilter,
+  StudyNoteLinkInput,
   WorkspaceLinkOwnerKind,
   WritingWorkshopBrief,
   WritingWorkshopDraft,
@@ -615,12 +621,15 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   createStudyCalendarEvent(input: StudyCalendarEventInput): Promise<StudyCalendarEvent>;
   updateStudyCalendarEvent(id: string, input: StudyCalendarEventInput): Promise<StudyCalendarEvent>;
   deleteStudyCalendarEvent(id: string): Promise<void>;
-  addStudyCalendarEventToExternal(id: string, target: 'google' | 'icloud'): Promise<void>;
+  addStudyCalendarEventToExternal(id: string, target: 'google' | 'icloud' | 'outlook'): Promise<{ path: string } | null>;
+  getAppleCalendarSyncStatus(): Promise<AppleCalendarSyncStatus>;
+  listAppleCalendarDestinations(): Promise<AppleCalendarDestination[]>;
+  configureAppleCalendarSync(input: { enabled: boolean; calendarId?: string }): Promise<AppleCalendarSyncStatus>;
   createStudyGoal(input: { title: string; period?: StudyGoal['period']; targetValue?: number; unit?: string; startsAt?: string; endsAt?: string | null; subjectId?: string | null }): Promise<StudyGoal>;
   updateStudyPlannerItem(kind: 'block' | 'event' | 'goal', id: string, patch: Record<string, unknown>): Promise<void>;
   startStudySession(input: { planBlockId?: string | null; subjectId?: string | null; topicId?: string | null; mode?: string; plannedMinutes?: number }): Promise<StudyStudySession>;
   finishStudySession(id: string, input: { actualSeconds: number; interruptions?: number; notes?: string }): Promise<StudyStudySession>;
-  exportStudyPlannerIcs(): Promise<{ path: string } | null>;
+  exportStudyPlannerIcs(target?: 'outlook'): Promise<{ path: string } | null>;
   listStudyAiUsage(limit?: number): Promise<StudyAiUsage[]>;
   getStudyAiUsageSummary(): Promise<StudyAiUsageSummary>;
   clearStudyAiUsage(): Promise<void>;
@@ -662,6 +671,19 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
     model?: ModelRef | null,
     onProgress?: (p: ReprocessProgress) => void
   ): Promise<ReprocessConnectionsResult>;
+  /** Reassign idea themes only in the works whose links a graph repair removed (uses the model). */
+  reprocessRepairedThemeWorks(
+    model?: ModelRef | null,
+    onProgress?: (p: ReprocessProgress) => void
+  ): Promise<ReprocessConnectionsResult>;
+
+  // graph health
+  /** Read-only audit of the whole idea graph, with the works each finding belongs to. */
+  checkGraphIntegrity(): Promise<GraphIntegrityReport>;
+  /** Back up the vault, then repair every `repairable` finding. Refused while the analysis queue runs. */
+  repairGraphIntegrity(): Promise<GraphIntegrityRepairResult>;
+  /** Forget the works waiting for their idea themes to be reassigned. */
+  dismissRepairedThemeWorks(): Promise<GraphIntegrityReport>;
 
   // gaps + reading path
   getGaps(): Promise<GapAggregate[]>;
@@ -916,6 +938,12 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   createWorkspaceAnnotation(noteId: string, input: StudyAnnotationInput): Promise<StudyAnnotation>;
   updateWorkspaceAnnotation(id: string, patch: Partial<StudyAnnotationInput> & { resolved?: boolean }): Promise<StudyAnnotation | null>;
   deleteWorkspaceAnnotation(id: string): Promise<void>;
+  /** Live links of Workspace notes to study places; a note or place in the trash hides its links. */
+  listStudyNoteLinks(filter?: StudyNoteLinkFilter): Promise<StudyNoteLink[]>;
+  /** Links a note to a course, subject, folder, topic or material; linking twice returns the same link. */
+  addStudyNoteLink(input: StudyNoteLinkInput): Promise<StudyNoteLink>;
+  /** Unlinks only: the note stays in the Workspace. */
+  removeStudyNoteLinks(ids: string[]): Promise<void>;
   listWorkspaceLibraryLinks(ownerKind: WorkspaceLinkOwnerKind, ownerId: string): Promise<WorkspaceLibraryLink[]>;
   listAllWorkspaceLibraryLinks(): Promise<WorkspaceLibraryLink[]>;
   addWorkspaceLibraryLink(input: WorkspaceLibraryLinkInput): Promise<WorkspaceLibraryLink>;

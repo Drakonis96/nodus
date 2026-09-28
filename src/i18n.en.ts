@@ -1,9 +1,12 @@
 import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
+import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
+import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -17,7 +20,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -25,6 +28,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -74,6 +78,7 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
  * every non-Spanish interface language.
  */
 export const EN: Record<string, string> = {
+  ...CALENDAR_SYNC_TRANSLATIONS["en"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["en"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "Browse the web and save sources for your research.",
@@ -144,8 +149,11 @@ export const EN: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS.en,
   ...STUDY_BANK_TRANSLATIONS.en,
   ...TEACHING_ATTENDANCE_TRANSLATIONS.en,
+  ...GRAPH_HEALTH_TRANSLATIONS.en,
   ...STUDY_SOURCE_TRANSLATIONS["en"],
   ...COMPLETE_GUIDE_TRANSLATIONS["en"],
+  ...STUDY_FOCUS_TRANSLATIONS["en"],
+  ...STUDY_NOTE_LINKS_TRANSLATIONS["en"],
   ...STUDY_IMPROVE_TRANSLATIONS.en,
   ...WORKSPACE_TRANSLATIONS.en,
   "Lo que cuenta el mapa": "What the map tells you",
@@ -284,7 +292,7 @@ export const EN: Record<string, string> = {
   ...AI_OCR_TRANSLATIONS.en,
   ...PROTECT_TRANSLATIONS.en,
   ...TOOLKIT_APPS_TRANSLATIONS.en,
-  ...SERVER_TRANSLATIONS.en,
+  ...SERVER_LOCALE_TRANSLATIONS.en,
   ...CLOUDFLARE_TRANSLATIONS.en,
   ...TRANSLATE_TRANSLATIONS.en,
   ...BROWSER_CONNECTOR_TRANSLATIONS.en,

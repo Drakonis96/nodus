@@ -8,6 +8,8 @@
  */
 export const NODI_NOTIFICATION_TRANSLATIONS = {
   en: {
+    'Se ha reparado el grafo': 'The graph has been repaired',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} work(s) lost the themes of some ideas to a bug in earlier versions. You can reassign them in Main themes or in Settings.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Your companion node. Click me to open chat, notifications and help.',
     'Cola de análisis completada': 'Analysis queue completed',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} tasks completed. The vault knowledge is up to date.',
@@ -38,6 +40,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Reminder shown late. It was scheduled for {when}. {detail}',
   },
   fr: {
+    'Se ha reparado el grafo': 'Le graphe a été réparé',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} œuvre(s) ont perdu les thèmes de certaines idées à cause d’un bogue des versions précédentes. Vous pouvez les réattribuer dans Thèmes principaux ou dans les Réglages.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Votre nœud compagnon. Cliquez sur moi pour ouvrir le chat, les notifications et l’aide.',
     'Cola de análisis completada': 'File d’analyse terminée',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} tâches terminées. Les connaissances du vault sont à jour.',
@@ -68,6 +72,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Rappel affiché en retard. Il était prévu pour le {when}. {detail}',
   },
   de: {
+    'Se ha reparado el grafo': 'Der Graph wurde repariert',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} Werk(e) haben durch einen Fehler früherer Versionen die Themen einiger Ideen verloren. Du kannst sie unter Hauptthemen oder in den Einstellungen neu zuweisen.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Dein Begleitknoten. Klicke auf mich, um Chat, Benachrichtigungen und Hilfe zu öffnen.',
     'Cola de análisis completada': 'Analysewarteschlange abgeschlossen',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} Aufgaben abgeschlossen. Der Wissensstand des Vaults ist aktuell.',
@@ -98,6 +104,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Erinnerung verspätet angezeigt. Geplant war {when}. {detail}',
   },
   pt: {
+    'Se ha reparado el grafo': 'O grafo foi reparado',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} obra(s) perderam os temas de algumas ideias devido a um erro de versões anteriores. Podes reatribuí-los em Temas principais ou nas Definições.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'O teu nodo companheiro. Clica em mim para abrir o chat, as notificações e a ajuda.',
     'Cola de análisis completada': 'Fila de análise concluída',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} tarefas concluídas. O conhecimento do vault está atualizado.',
@@ -128,6 +136,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Aviso mostrado com atraso. Estava previsto para {when}. {detail}',
   },
   'pt-BR': {
+    'Se ha reparado el grafo': 'O grafo foi reparado',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} obra(s) perderam os temas de algumas ideias por causa de um erro de versões anteriores. Você pode reatribuí-los em Temas principais ou nas Configurações.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Seu nodo companheiro. Clique em mim para abrir o chat, as notificações e a ajuda.',
     'Cola de análisis completada': 'Fila de análise concluída',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} tarefas concluídas. O conhecimento do vault está atualizado.',
@@ -158,6 +168,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Aviso exibido com atraso. Estava previsto para {when}. {detail}',
   },
   it: {
+    'Se ha reparado el grafo': 'Il grafo è stato riparato',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} opera/e hanno perso i temi di alcune idee a causa di un errore delle versioni precedenti. Puoi riassegnarli in Temi principali o nelle Impostazioni.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Il tuo nodo compagno. Fai clic su di me per aprire la chat, le notifiche e la guida.',
     'Cola de análisis completada': 'Coda di analisi completata',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} attività completate. La conoscenza del vault è aggiornata.',
@@ -188,6 +200,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Promemoria mostrato in ritardo. Era previsto per il {when}. {detail}',
   },
   tr: {
+    'Se ha reparado el grafo': 'Grafik onarıldı',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '{works} eser, önceki sürümlerdeki bir hata nedeniyle bazı fikirlerin temalarını kaybetti. Bunları Ana temalar bölümünde veya Ayarlar’da yeniden atayabilirsiniz.',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': 'Size eşlik eden düğümüm. Sohbeti, bildirimleri ve yardımı açmak için bana tıklayın.',
     'Cola de análisis completada': 'Analiz kuyruğu tamamlandı',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '{done} görev tamamlandı. Kasanın bilgi tabanı güncel.',
@@ -218,6 +232,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': 'Hatırlatma geç gösterildi. {when} için planlanmıştı. {detail}',
   },
   'zh-CN': {
+    'Se ha reparado el grafo': '图谱已修复',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '由于早期版本的一个错误，{works} 部作品中部分观点的主题丢失了。你可以在“主要主题”或“设置”中重新分配。',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': '你的陪伴节点。点击我即可打开聊天、通知和帮助。',
     'Cola de análisis completada': '分析队列已完成',
     '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '已完成 {done} 项任务。资料库知识已更新。',
@@ -248,14 +264,16 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': '提示延迟显示。原定于 {when}。{detail}',
   },
   'zh-TW': {
+    'Se ha reparado el grafo': '圖譜已修復',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '由於早期版本的一個錯誤，{works} 部作品中部分觀點的主題遺失了。你可以在「主要主題」或「設定」中重新指派。',
     'Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.': '你的陪伴節點。點選我即可開啟聊天、通知和幫助。',
     'Cola de análisis completada': '分析佇列已完成',
-    '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '已完成 {done} 項任務。資料庫知識已更新。',
+    '{done} tareas completadas. El conocimiento de la bóveda está actualizado.': '已完成 {done} 項任務。知識庫知識已更新。',
     'La cola de análisis ha terminado con incidencias': '分析佇列已完成，但存在問題',
     '{done} tareas completadas y {failed} con errores.': '已完成 {done} 項任務，{failed} 項失敗。',
     'El postprocesado del grafo está pendiente': '圖譜後處理待處理',
     'Error: {error}': '錯誤：{error}',
-    'Nuevas conexiones en tu bóveda': '你的資料庫中有新連線',
+    'Nuevas conexiones en tu bóveda': '你的知識庫中有新連線',
     '{relations} relaciones y {themes} temas nuevos detectados.': '檢測到 {relations} 個關係和 {themes} 個新主題。',
     'Nodus Radar ha encontrado novedades': 'Nodus Radar 發現了新動態',
     'Actualizaciones de investigación listas para revisar: {count}.': '有 {count} 項研究更新待檢視。',
@@ -278,6 +296,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     'Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}': '提示延遲顯示。原定於 {when}。{detail}',
   },
   ko: {
+    'Se ha reparado el grafo': '그래프를 복구했습니다',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '이전 버전의 오류로 {works}개 작품에서 일부 아이디어의 주제가 사라졌습니다. 주요 주제 또는 설정에서 다시 지정할 수 있습니다.',
     "Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.": "컴패니언 노드. 채팅, 알림, 도움말을 열려면 나를 클릭하세요.",
     "Cola de análisis completada": "분석 대기열 완료",
     "{done} tareas completadas. El conocimiento de la bóveda está actualizado.": "{done} 작업이 완료되었습니다. Vault 지식이 최신 상태입니다.",
@@ -308,6 +328,8 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     "Aviso mostrado con retraso. Estaba previsto para el {when}. {detail}": "알림이 늦게 표시되었습니다. {when}에 예정되어 있었습니다. {detail}",
   },
   ja: {
+    'Se ha reparado el grafo': 'グラフを修復しました',
+    '{works} obra(s) perdieron los temas de algunas ideas por un fallo de versiones anteriores. Puedes reasignarlos en Temas principales o en Ajustes.': '以前のバージョンの不具合により、{works} 件の作品で一部のアイデアのテーマが失われました。主要テーマまたは設定で再割り当てできます。',
     "Tu nodo acompañante. Haz clic en mí para abrir el chat, tus notificaciones y la ayuda.": "コンパニオンノード。私をクリックすると、チャット、通知、ヘルプが開きます。",
     "Cola de análisis completada": "分析キューが完了しました",
     "{done} tareas completadas. El conocimiento de la bóveda está actualizado.": "{done} 個のタスクが完了しました。 Vault に関する知識は最新です。",
@@ -315,7 +337,7 @@ export const NODI_NOTIFICATION_TRANSLATIONS = {
     "{done} tareas completadas y {failed} con errores.": "{done} 個のタスクが完了しましたが、{failed} 個は失敗しました。",
     "El postprocesado del grafo está pendiente": "グラフの後処理は保留中です",
     "Error: {error}": "エラー: {error}",
-    "Nuevas conexiones en tu bóveda": "ボールト内の新しい接続",
+    "Nuevas conexiones en tu bóveda": "Vault内の新しい接続",
     "{relations} relaciones y {themes} temas nuevos detectados.": "{relations} 個の関係と {themes} 個の新しいテーマが検出されました。",
     "Nodus Radar ha encontrado novedades": "Nodus Radar が新しいアップデートを発見しました",
     "Actualizaciones de investigación listas para revisar: {count}.": "研究の更新をレビューする準備ができています: {count}。",

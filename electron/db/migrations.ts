@@ -1,3 +1,5 @@
+import { STUDY_FOCUS_SQL, ensureStudyFocusTaskColumn } from './studyFocusSchema';
+import { STUDY_NOTE_LINKS_SQL } from './studyNoteLinksSchema';
 import type Database from 'better-sqlite3';
 import { createHash } from 'node:crypto';
 import { migrateWorkspaceContent } from './workspaceMigration';
@@ -158,7 +160,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 194;
+export const SCHEMA_VERSION = 197;
 
 export const migrations: Migration[] = [
   {
@@ -9533,12 +9535,16 @@ export const migrations: Migration[] = [
       addColumnIfMissing(db, table, 'instructions', "TEXT NOT NULL DEFAULT ''");
     }
   } },
+  { version: 194, up: STUDY_FOCUS_SQL },
+  { version: 195, up: 'SELECT 1;', after: ensureStudyFocusTaskColumn },
+  // Workspace notes linked to courses, subjects, folders, topics and materials.
+  { version: 196, up: STUDY_NOTE_LINKS_SQL },
   // Complete study guide (Study Deep Research mode). Machine-local working state:
   // the frozen reading snapshot and per-pass checkpoints of a run (so a re-queued job
   // resumes), a content-addressed cache of reading passes (so "another version" does
   // not re-read unchanged sources), and each saved guide's evidence sidecar. The
   // saved Markdown is self-sufficient; none of these rows is synced.
-  { version: 194, up: /* sql */ `
+  { version: 197, up: /* sql */ `
     CREATE TABLE IF NOT EXISTS complete_guide_runs (
       run_id       TEXT PRIMARY KEY,
       stage        TEXT NOT NULL DEFAULT 'snapshot',

@@ -1,9 +1,12 @@
 import { RESEARCH_CHAT_HISTORY_TRANSLATIONS } from './i18n.researchChatHistory';
 import { RESEARCH_ACTIVITY_TRANSLATIONS } from './i18n.researchActivity';
 import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
+import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
+import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
+import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
@@ -17,7 +20,7 @@ import { STELLAR_GRAPH_TRANSLATIONS } from './i18n.stellarGraph';
 import { PROTECT_TRANSLATIONS } from './i18n.protect';
 import { AI_OCR_TRANSLATIONS } from './i18n.aiOcr';
 import { TOOLKIT_APPS_TRANSLATIONS } from './i18n.toolkitApps';
-import { SERVER_TRANSLATIONS } from './i18n.server';
+import { SERVER_ENGLISH_FALLBACKS, SERVER_LOCALE_TRANSLATIONS } from './i18n.server';
 import { CLOUDFLARE_TRANSLATIONS } from './i18n.cloudflare';
 import { TRANSLATE_TRANSLATIONS } from './i18n.translate';
 import { BROWSER_CONNECTOR_TRANSLATIONS } from './i18n.browserConnector';
@@ -25,6 +28,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -76,6 +80,9 @@ import { ACADEMIC_TOUR_TRANSLATIONS } from './i18n.academicTour';
 
 /** Simplified Chinese UI table. Keys are the Spanish source strings (see i18n.ts). */
 export const ZH_CN: Record<string, string> = {
+  // First, so every entry below wins: the server's English-only keys.
+  ...SERVER_ENGLISH_FALLBACKS['zh-CN'],
+  ...CALENDAR_SYNC_TRANSLATIONS["zh-CN"],
   ...ACADEMIC_MANUAL_TRANSLATIONS["zh-CN"],
   // Nodus Tools catalogue
   "Navega por la web y guarda fuentes para tu investigación.": "浏览网页并保存研究资料。",
@@ -141,14 +148,17 @@ export const ZH_CN: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
   ...STUDY_BANK_TRANSLATIONS['zh-CN'],
   ...TEACHING_ATTENDANCE_TRANSLATIONS['zh-CN'],
+  ...GRAPH_HEALTH_TRANSLATIONS['zh-CN'],
   ...STUDY_SOURCE_TRANSLATIONS["zh-CN"],
   ...COMPLETE_GUIDE_TRANSLATIONS["zh-CN"],
+  ...STUDY_FOCUS_TRANSLATIONS["zh-CN"],
+  ...STUDY_NOTE_LINKS_TRANSLATIONS["zh-CN"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-CN'],
   ...WORKSPACE_TRANSLATIONS['zh-CN'],
   ...AI_OCR_TRANSLATIONS['zh-CN'],
   ...PROTECT_TRANSLATIONS['zh-CN'],
   ...TOOLKIT_APPS_TRANSLATIONS['zh-CN'],
-  ...SERVER_TRANSLATIONS['zh-CN'],
+  ...SERVER_LOCALE_TRANSLATIONS['zh-CN'],
   ...CLOUDFLARE_TRANSLATIONS['zh-CN'],
   ...TRANSLATE_TRANSLATIONS['zh-CN'],
   ...BROWSER_CONNECTOR_TRANSLATIONS['zh-CN'],
@@ -3901,7 +3911,7 @@ export const ZH_CN: Record<string, string> = {
   "Titular": "标题",
   "Publicación": "出版物",
   "Editor / marca": "出版商 / 品牌",
-  "Material": "材质",
+  "Material": "资料",
   "Inscripción": "铭文",
   "Estado de conservación": "保存状况",
   "Figura de protección": "保护等级",

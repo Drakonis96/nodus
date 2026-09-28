@@ -154,7 +154,7 @@ export const WORLD_CHAT_TRANSLATIONS = {
     keepFocus: 'Önceki odağı koru',
     keepFocusHelp: 'Bir kaydı yeniden adlandırmayan takip soruları için kullanışlıdır.',
     search: 'Kayıtlarda ara…',
-    grounding: 'Yanıtlar vault kayıtlarına dayanır. Referanslar özgün bölümlerini açar ve sohbet kanonu asla değiştirmez.',
+    grounding: 'Yanıtlar kasa kayıtlarına dayanır. Referanslar özgün bölümlerini açar ve sohbet kanonu asla değiştirmez.',
   }),
   'zh-CN': map({
     open: '打开世界聊天',
@@ -192,7 +192,7 @@ export const WORLD_CHAT_TRANSLATIONS = {
     keepFocus: '保持之前的焦點',
     keepFocusHelp: '適用於未再次提及某一條目的後續問題。',
     search: '搜尋條目…',
-    grounding: '回答以資料庫條目為依據。引用會開啟其原始章節，聊天絕不會更改設定。',
+    grounding: '回答以知識庫條目為依據。引用會開啟其原始章節，聊天絕不會更改設定。',
   }),
   ko: map({
     open: "오픈월드 채팅",
