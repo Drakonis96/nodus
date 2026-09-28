@@ -21,6 +21,23 @@ body {
    soon as its first frame exists. */
 #organism { transition-duration: 0.3s; }
 
+/* The home page reads as a surface, not a document: nothing on it is meant to be
+   selected and dragged around, exactly as the motto at the top is not. It lives in
+   this file because the homepage is the only page that loads it — every inner page
+   keeps its text selectable. Nothing is taken away here: the homepage has no field
+   to type in and no snippet to copy, and both would be let through anyway. */
+body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+input,
+textarea,
+select,
+[contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* ============================================================ hero */
 .hero {
   position: relative;

@@ -278,6 +278,15 @@ test('the home page opens with the mark forming, and can never strand a visitor'
   assert.doesNotMatch(script, /engine\.pulse\(innerWidth/, 'the completed mark flows away instead of exploding outward');
   assert.match(read('assets/js/organism.js'), /dataset\.formation === 'on' && openingIsArmed/, 'mobile and unarmed visits never assemble a hidden N');
   assert.match(css, /\.hero \{[\s\S]*?-webkit-user-select: none;[\s\S]*?user-select: none;/, 'visible hero copy cannot be accidentally selected');
+  // And neither can the rest of the page: the whole homepage is a surface, not a
+  // document. The rule lives in home.css, which only the homepage loads, so inner
+  // pages keep their text selectable — and the escape hatch for a field is there
+  // for whenever the homepage grows one.
+  assert.match(css, /body \{\s*-webkit-user-select: none;\s*user-select: none;\s*\}/, 'nothing on the home page can be selected');
+  assert.match(css, /input,\s*textarea,\s*select,\s*\[contenteditable\] \{\s*-webkit-user-select: text;\s*user-select: text;\s*\}/, 'a field would still take text');
+  for (const page of ['research/index.html', 'faq/index.html', 'contribute/index.html']) {
+    assert.doesNotMatch(read(page), /home\.css/, `${page} does not turn the rule on for itself`);
+  }
 
   // three separately masked lines, one per beat of the motto
   assert.equal((home.match(/<span class="line"><i>/g) ?? []).length, 3, 'the motto is three animated lines');
