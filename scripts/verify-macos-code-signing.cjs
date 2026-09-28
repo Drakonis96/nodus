@@ -14,6 +14,7 @@ const ROOT_ENTITLEMENTS = new Set([
   'com.apple.security.cs.allow-jit',
   'com.apple.security.device.audio-input',
   'com.apple.security.device.camera',
+  'com.apple.security.personal-information.calendars',
 ]);
 const CHILD_ENTITLEMENTS = new Set(['com.apple.security.cs.allow-jit']);
 const CODE_BUNDLE_EXTENSIONS = new Set([
