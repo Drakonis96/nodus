@@ -24,8 +24,56 @@ try {
   );
 
   const { RELEASE_NOTES, releaseNotesForMajor, compareVersions } = await import(pathToFileURL(bundlePath).href);
-  const release560 = RELEASE_NOTES[0];
-  assert.equal(release560.version, '5.6.0');
+
+  // 5.7.0 turns the academic vault into a layered corpus (documentary index and
+  // notebooks, the three context switches, web search in the chat), checks
+  // synthesis routes against the IUPAC name, draws dated historical maps, adds the
+  // graph health check and repair, remembers the thinking level per model, fixes
+  // the Claude transports, the replayed history, the native menus and the
+  // translations, offers every language in the first-run guide, brings focus
+  // sessions, linked Workspace notes and the calendar export to Study and
+  // Teaching, extends chat history to the other surfaces, dresses the tooltips,
+  // lets the Atlas filter hold several values, brings the browser favicons back
+  // and adds attendance to Teaching groups.
+  const release570 = RELEASE_NOTES[0];
+  assert.equal(release570.version, '5.7.0');
+  assert.equal(release570.date, '2026-09-28');
+  assert.equal(release570.highlights.length, 21);
+  assert.deepEqual(release570.highlights.map(h => h.scope), [
+    'academic', 'academic', 'academic', 'academic', 'academic', 'academic', 'academic',
+    'ai', 'ai', 'ai',
+    'languages', 'languages', 'languages',
+    'estudio', 'estudio', 'estudio',
+    'general', 'general',
+    'browser', 'browser',
+    'docencia',
+  ]);
+  for (const lang of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']) {
+    for (const h of release570.highlights) {
+      assert.ok(h[lang]?.trim().length > 30, `5.7.0 missing ${lang} translation`);
+      if (lang !== 'en') assert.notEqual(h[lang], h.en, `5.7.0 ${lang} fell back to English`);
+      assert.doesNotMatch(h[lang], /[;—]/, `5.7.0 ${lang} must use simple sentences`);
+    }
+  }
+  for (const phrase of [
+    /prepare your works to query their full text/, /Research notebooks group the sources of a conversation/,
+    /three switches: Ideas, Documents and Web search/, /uses a search engine bundled with the application/,
+    /systematic IUPAC name as the reference/, /Historical maps are drawn with the divisions of the period/,
+    /Graph health in academic vaults/, /thinking level is remembered per model/,
+    /Conversations with Claude models no longer fail/, /only the text the model wrote/,
+    /Native menus follow the interface language/, /Text that appeared in English although a translation existed/,
+    /first-run guide offers every interface language/, /focus sessions in blocks/,
+    /Workspace notes can be linked to courses/, /exports one event or the whole calendar to Outlook/,
+    /history organisation reaches the databases and worldbuilding vaults/,
+    /help text of interface elements is shown in a layer of Nodus's own/,
+    /each filter now holds several values at once/, /Tabs and bookmarks in Nodus Browser show each site's icon again/,
+    /every group has two tabs: Students and Attendance/,
+  ]) {
+    assert.ok(release570.highlights.some(h => phrase.test(h.en)), `5.7.0 missing ${phrase}`);
+  }
+
+  const release560 = RELEASE_NOTES.find(note => note.version === '5.6.0');
+  assert.equal(release560?.version, '5.6.0');
   assert.equal(release560.date, '2026-09-20');
   assert.equal(release560.highlights.length, 12);
   assert.deepEqual(release560.highlights.map(h => h.scope), [
@@ -166,7 +214,7 @@ try {
 
   assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
   const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-  assert.equal(release560.version, packageVersion);
+  assert.equal(release570.version, packageVersion);
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
