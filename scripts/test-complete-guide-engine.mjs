@@ -116,6 +116,11 @@ function fakeModel(options = {}) {
         blocks.push({ kind: 'formula', itemIds: [ids[0]], markdown: 'Fórmula rota: $\\frac{a}{$' });
         blocks.push({ kind: 'selfcheck', itemIds: [ids[0]], question: '¿Qué es la presión?', answer: 'Fuerza por unidad de superficie.' });
         blocks.push({ kind: 'mistake', itemIds: [ids[0]], markdown: 'Confundir masa y peso.' });
+        if (user.webEvidence?.length) {
+          blocks.push({ kind: 'web', itemIds: [ids[0]], webPassageIds: [user.webEvidence[0].id], markdown: 'Los globos aerostáticos aplican esta idea. INVENTADO: vuelan a 999 km.' });
+          blocks.push({ kind: 'web', itemIds: [ids[0]], webPassageIds: ['web:ffffffffffff'], markdown: 'Un pasaje que nunca se registró.' });
+          blocks.push({ kind: 'web', itemIds: [ids[0]], markdown: 'Sin pasajes web.' });
+        }
       }
       return { blocks };
     }
@@ -262,6 +267,51 @@ test('figure items of materials become figure requests; a failing renderer only 
 
   const none = await core.runCompleteGuide(input(), memoryDeps(fakeModel(), undefined, { figures }));
   assert.equal(none.counts.figures, 0, 'no figure items, no figures');
+});
+
+test('the optional web complement is one search per chapter, labelled, audited and cited apart', async () => {
+  const requests = [];
+  const web = async (request) => {
+    requests.push(request);
+    const n = requests.length;
+    return [
+      { id: `web:${String(n).repeat(16)}`, title: `Globos (${request.unit})`, site: 'ejemplo.org', url: `https://ejemplo.org/globos-${n}?a=(1)`, text: 'Los globos aerostáticos aplican esta idea al calentar el aire.' },
+      { id: 'not-a-web-id', title: 'x', site: 'x', url: 'https://x.org', text: 'x' },
+    ];
+  };
+  const webConfig = { ...config, webText: true };
+  const stores = { cache: new Map(), checkpoints: new Map() };
+  const result = await core.runCompleteGuide(input({ config: webConfig }), memoryDeps(fakeModel(), stores, { web }));
+  assert.equal(requests.length, 2, 'one web step per chapter');
+  assert.ok(requests[0].unit === 'Tema 1 · Gases' && requests[0].sections.length >= 1);
+  assert.ok(result.counts.webBlocks >= 1);
+  assert.match(result.markdown, /> \[!web\] Fuentes web/);
+  assert.match(result.markdown, /\[W1 · ejemplo\.org\]\(nodus:\/\/passage\/web%3A1{16}\)/);
+  assert.ok(!result.markdown.includes('Un pasaje que nunca se registró') && !result.markdown.includes('Sin pasajes web'), 'web blocks need recorded passages');
+  assert.ok(!result.markdown.includes('999 km'), 'web blocks are audited against their passages');
+  const webSection = result.markdown.split('## Fuentes web\n')[1];
+  assert.ok(webSection, 'a final web sources section');
+  assert.match(webSection, /\*\*W1\*\* — \[Globos \(Tema 1 · Gases\)\]\(https:\/\/ejemplo\.org\/globos-1\?a=%281%29\) · ejemplo\.org/);
+  assert.deepEqual(result.webSources.map((page) => page.alias), ['W1', 'W2']);
+  for (const block of result.chapters.flatMap((chapter) => chapter.sections.flatMap((section) => section.blocks))) {
+    if (block.provenance === 'web') assert.ok(block.webPassageIds.length && block.webPassageIds.every((id) => id.startsWith('web:')));
+  }
+  const webCallouts = result.markdown.match(/^> \[!web\][^\n]*(?:\n>[^\n]*)*/gm) ?? [];
+  assert.ok(webCallouts.length && webCallouts.every((part) => !part.includes('nodus://study') && part.includes('no procede de tus materiales')), 'web blocks never cite materials and are labelled');
+
+  const again = await core.runCompleteGuide(input({ config: webConfig }), memoryDeps(fakeModel(), stores, { web }));
+  assert.equal(requests.length, 2, 'the web step is checkpointed');
+  assert.equal(again.counts.webBlocks, result.counts.webBlocks);
+
+  const off = await core.runCompleteGuide(input(), memoryDeps(fakeModel(), undefined, { web }));
+  assert.equal(requests.length, 2, 'off by default');
+  assert.equal(off.counts.webBlocks, 0);
+  assert.ok(!off.markdown.includes('## Fuentes web'));
+
+  const down = await core.runCompleteGuide(input({ config: webConfig }), memoryDeps(fakeModel(), undefined, { web: async () => { throw new Error('searxng down'); } }));
+  assert.ok(down.warnings.includes('web_unavailable'));
+  assert.equal(down.counts.webBlocks, 0);
+  assert.ok(down.markdown.length > 500);
 });
 
 test('settlePool keeps siblings running when one task fails', async () => {

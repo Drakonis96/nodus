@@ -38,6 +38,7 @@ import { runCompleteGuide, type CompleteGuideDeps, type CompleteGuideProgress } 
 import { COMPLETE_GUIDE_PROMPT_VERSION } from './prompts';
 import { snapshotCompleteGuideSelection } from './sources';
 import { extractCompleteGuideFigures } from './figures';
+import { ResearchWebGrant } from '../researchWebStep';
 
 interface FrozenRun { snapshot: CompleteGuideSnapshot; organization: StudySourceOrganization; snapshotAt: string }
 
@@ -133,6 +134,18 @@ export async function generateCompleteGuideReport(
       return { markdown: audit.markdown, removed };
     },
     figures: (requests) => extractCompleteGuideFigures(requests, signal),
+    // One fast web step per chapter; its passages are recorded like Research Chat's
+    // so `nodus://passage/web:<sha>` citations open them in the reader.
+    ...(config.webText ? {
+      web: async ({ unit, sections, terms }) => {
+        checkBudget();
+        const question = `${unit}${terms.length ? `: ${terms.join(', ')}` : ''}`.slice(0, 600);
+        const grant = new ResearchWebGrant('auto', 'fast', question, signal, model, 12_000);
+        const outcome = await withUsageMeter(job, () => grant.search([unit, ...terms.slice(0, 2).map((term) => `${unit} ${term}`)], 'expand', 'supervisor', sections.join(' | ')));
+        if (!outcome || outcome.reason === 'unavailable') throw new Error('web_unavailable');
+        return [...grant.evidence.values()].map(({ id, item }) => ({ id, title: item.title, site: item.siteName ?? item.domain, url: item.url, text: item.text, retrievedAt: item.retrievedAt }));
+      },
+    } satisfies Partial<CompleteGuideDeps> : {}),
     conflicts: async (statements) => (await withUsageMeter(job, () => withoutDocumentVisualPlanning(() => findResearchConflicts(statements, model, signal))))
       .filter((conflict) => conflict.incompatible)
       .map((conflict) => ({ a: conflict.a, b: conflict.b, reason: conflict.reason })),
@@ -174,6 +187,7 @@ export async function generateCompleteGuideReport(
       windows: result.counts.windows, failedWindows: result.counts.failedWindows, auditedBlocks: result.counts.auditedBlocks,
       removedSentences: result.counts.removedSentences, repairedBlocks: result.counts.repairedBlocks, invalidLatex: result.counts.invalidLatex,
       conflicts: result.counts.conflicts, cacheHits: result.counts.cacheHits, figures: result.counts.figures,
+      ...(config.webText ? { webBlocks: result.counts.webBlocks } : {}),
     },
     usage: { calls: job.calls, inputTokens: job.inputTokens, outputTokens: job.outputTokens, usd: usd(job, model) },
     warnings: result.warnings,

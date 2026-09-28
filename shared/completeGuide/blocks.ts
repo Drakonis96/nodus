@@ -48,6 +48,7 @@ export function sanitizeModelMarkdown(value: string): string {
   return value
     .replace(/<\/?[a-z][^>]*>/gi, '')
     .replace(/\[[^\]]*\]\((?:nodus|file|javascript):[^)]*\)/gi, '')
+    .replace(/\[(?:[ADGKW]\d+(?:\.\d+)?(?:\s*[,;·]\s*[^\]]{0,30})?)\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\(https?:[^)]*\)/gi, '$1')
     .replace(/\bhttps?:\/\/\S+/gi, '')
     .replace(/^\s*>?\s*\[!\w[\w-]*\][^\n]*$/gim, '')
@@ -82,7 +83,7 @@ function normalizeTable(raw: unknown): CompleteGuideTable | null {
 
 export function normalizeWrittenBlocks(
   raw: unknown,
-  options: { validItemIds: ReadonlySet<string>; items: ReadonlyMap<string, CompleteGuideItem>; aiExamples: boolean },
+  options: { validItemIds: ReadonlySet<string>; items: ReadonlyMap<string, CompleteGuideItem>; aiExamples: boolean; webIds?: ReadonlySet<string> },
 ): WrittenBlocksResult {
   const dropped = { unsupported: 0, aiDisabled: 0, malformed: 0 };
   const blocks: CompleteGuideBlock[] = [];
@@ -90,11 +91,19 @@ export function normalizeWrittenBlocks(
   for (const entry of list) {
     if (!entry || typeof entry !== 'object') { dropped.malformed += 1; continue; }
     const input = entry as Record<string, unknown>;
-    const kind: CompleteGuideBlockKind = KINDS.has(String(input.kind)) && input.kind !== 'web' ? input.kind as CompleteGuideBlockKind : 'explanation';
+    const kind: CompleteGuideBlockKind = KINDS.has(String(input.kind)) ? input.kind as CompleteGuideBlockKind : 'explanation';
     const itemIds = [...new Set((Array.isArray(input.itemIds) ? input.itemIds : []).map(String).map((id) => id.trim().toUpperCase()).filter((id) => options.validItemIds.has(id)))];
     const title = typeof input.title === 'string' ? sanitizeModelMarkdown(input.title).replace(/\n/g, ' ').slice(0, 160) : '';
     const markdown = typeof input.markdown === 'string' ? sanitizeModelMarkdown(input.markdown).slice(0, 8_000) : '';
     const base = { kind, itemIds, ...(title ? { title } : {}) };
+    if (kind === 'web') {
+      // Only passages actually recorded for this guide; a web block never cites materials.
+      const webPassageIds = [...new Set((Array.isArray(input.webPassageIds) ? input.webPassageIds : []).map(String).map((id) => id.trim()).filter((id) => options.webIds?.has(id)))];
+      if (!markdown) { dropped.malformed += 1; continue; }
+      if (!webPassageIds.length) { dropped.unsupported += 1; continue; }
+      blocks.push({ ...base, provenance: 'web', markdown, webPassageIds });
+      continue;
+    }
     if (kind === 'ai_example' || kind === 'ai_analogy') {
       if (!options.aiExamples) { dropped.aiDisabled += 1; continue; }
       if (!markdown) { dropped.malformed += 1; continue; }

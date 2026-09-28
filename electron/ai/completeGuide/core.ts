@@ -87,6 +87,8 @@ export interface CompleteGuideDeps {
   conflicts?(statements: string[]): Promise<Array<{ a: number; b: number; reason: string }>>;
   /** Figures from the materials for the selected figure items (no model involved). */
   figures?(requests: CompleteGuideFigureRequest[]): Promise<CompleteGuideFigure[]>;
+  /** Optional web complement: recorded web passages for one chapter (config.webText). */
+  web?(request: CompleteGuideWebRequest): Promise<CompleteGuideWebPassage[]>;
   cacheGet<T>(key: string): T | null;
   cachePut(key: string, stage: string, value: unknown): void;
   checkpointGet<T>(stage: string, unit: string): T | null;
@@ -96,6 +98,11 @@ export interface CompleteGuideDeps {
   /** Throws (e.g. budget exhausted, cancelled) to stop cleanly between calls. */
   checkpoint?(): void;
 }
+
+export interface CompleteGuideWebRequest { unit: string; sections: string[]; terms: string[] }
+
+/** A recorded web passage (`web:<sha>`), cited as `nodus://passage/web:<sha>`. */
+export interface CompleteGuideWebPassage { id: string; title: string; site: string; url: string; text: string; retrievedAt?: string }
 
 export interface CompleteGuideInput {
   config: CompleteGuideConfig;
@@ -131,13 +138,15 @@ export interface CompleteGuideResult {
   counts: {
     windows: number; failedWindows: number; items: number; itemsUsed: number; blocks: number; aiBlocks: number;
     droppedUnsupported: number; auditedBlocks: number; removedSentences: number; repairedBlocks: number;
-    invalidLatex: number; conflicts: number; cacheHits: number; figures: number;
+    invalidLatex: number; conflicts: number; cacheHits: number; figures: number; webBlocks: number;
   };
   syllabus: { overview: string; connections: Array<{ from: string; to: string; relation: string }> };
   warnings: string[];
   /** Figures to seed into the saved guide, and for each figure item the items sharing its passage. */
   figures: CompleteGuideFigure[];
   figureSiblings: Record<string, string[]>;
+  /** Web pages cited by the guide, in the order of their W aliases. */
+  webSources: Array<{ alias: string; title: string; site: string; url: string; passageIds: string[] }>;
 }
 
 const DEFAULT_WINDOWS = { reconChars: 60_000, extractChars: 22_000 };
@@ -194,7 +203,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const warnings: string[] = [];
   const counts: CompleteGuideResult['counts'] = {
     windows: 0, failedWindows: 0, items: 0, itemsUsed: 0, blocks: 0, aiBlocks: 0, droppedUnsupported: 0,
-    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0,
+    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0, webBlocks: 0,
   };
   const guard = () => deps.checkpoint?.();
   const sourcesByKey = new Map(snapshot.sources.map((source) => [source.sourceKey, source]));
@@ -397,6 +406,29 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     deps.progress?.({ stage: 'plan', done: ++planDone, total: chaptersWithItems.length, detail: chapter.title });
   }
 
+  // ── Optional web complement: one search per chapter, labelled and cited apart ───
+  const webByUnit = new Map<string, CompleteGuideWebPassage[]>();
+  const webById = new Map<string, CompleteGuideWebPassage>();
+  if (config.webText && deps.web) {
+    let webFailed = false;
+    for (const plan of plans) {
+      if (!plan.sections.length) continue;
+      let passages = deps.checkpointGet<CompleteGuideWebPassage[]>('web', plan.unitKey);
+      if (!passages) {
+        guard();
+        const terms = items.filter((item) => item.unitKey === plan.unitKey && item.importance === 'core').map((item) => item.title).slice(0, 8);
+        passages = await deps.web({ unit: plan.title, sections: plan.sections.map((section) => section.title).slice(0, 12), terms })
+          .then((list) => list.filter((passage) => passage && /^web:[a-f0-9]{8,}$/.test(passage.id) && passage.text?.trim() && /^https?:\/\//.test(passage.url)).slice(0, 8))
+          .catch((error) => { if (isAbort(error)) throw error; webFailed = true; return null; });
+        if (!passages) continue;
+        deps.checkpointPut('web', plan.unitKey, passages);
+      }
+      webByUnit.set(plan.unitKey, passages);
+      for (const passage of passages) webById.set(passage.id, passage);
+    }
+    if (webFailed) warnings.push('web_unavailable');
+  }
+
   // ── Pass 5 + 6: write and verify every section ─────────────────────────────────
   const sectionTasks = plans.flatMap((plan) => plan.sections.map((section, index) => ({ plan, section, index })));
   let writeDone = 0;
@@ -405,6 +437,15 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     if (stored) return stored;
     const sectionItems = section.itemIds.map((id) => itemsById.get(id)!).filter(Boolean);
     const validItemIds = new Set(sectionItems.map((item) => item.id));
+    const web = webByUnit.get(plan.unitKey) ?? [];
+    const webIds = new Set(web.map((passage) => passage.id));
+    let webBudget = 8_000;
+    const webEvidence = web.flatMap((passage) => {
+      if (webBudget <= 0) return [];
+      const text = passage.text.slice(0, Math.min(2_500, webBudget));
+      webBudget -= text.length;
+      return [{ id: passage.id, title: passage.title, site: passage.site, text }];
+    });
     const evidencePassages = (list: CompleteGuideItem[]) => {
       const ids = [...new Set(list.flatMap((item) => item.evidence.map((evidence) => evidence.passageId)))].sort((a, b) => (passageOrder.get(a) ?? 0) - (passageOrder.get(b) ?? 0));
       let budget = 18_000;
@@ -433,9 +474,9 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     guard();
     const first = await deps.json<{ blocks: unknown[] }>({
       stage: 'write', system: WRITE_SYSTEM, maxTokens: 12_000, temperature: 0.3, validate: validWrittenBlocks,
-      user: JSON.stringify({ ...context, items: itemPayload(sectionItems), evidencePassages: evidencePassages(sectionItems) }),
+      user: JSON.stringify({ ...context, items: itemPayload(sectionItems), evidencePassages: evidencePassages(sectionItems), ...(webEvidence.length ? { webEvidence } : {}) }),
     });
-    const normalized = normalizeWrittenBlocks(first, { validItemIds, items: itemsById, aiExamples: config.aiExamples });
+    const normalized = normalizeWrittenBlocks(first, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
     const blocks = normalized.blocks;
     counts.droppedUnsupported += normalized.dropped.unsupported;
     // Coverage-driven continuation: re-prompt with the items still uncovered.
@@ -448,7 +489,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
         stage: 'write', system: CONTINUE_SYSTEM, maxTokens: 8_000, temperature: 0.3, validate: validWrittenBlocks,
         user: JSON.stringify({ ...context, writtenSoFar: blocks.map((block) => block.markdown || block.question || '').join('\n\n').slice(-6_000), items: itemPayload(missing), evidencePassages: evidencePassages(missing) }),
       }).catch((error) => { if (isAbort(error)) throw error; return { blocks: [] }; });
-      const extra = normalizeWrittenBlocks(more, { validItemIds, items: itemsById, aiExamples: config.aiExamples });
+      const extra = normalizeWrittenBlocks(more, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
       counts.droppedUnsupported += extra.dropped.unsupported;
       if (!extra.blocks.length) break;
       blocks.push(...extra.blocks);
@@ -468,7 +509,12 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     return verified;
   };
 
-  const auditSources = (block: CompleteGuideBlock): ResearchAuditSource[] => block.itemIds.flatMap((id) => {
+  const auditSources = (block: CompleteGuideBlock): ResearchAuditSource[] => block.provenance === 'web'
+    ? (block.webPassageIds ?? []).flatMap((id) => {
+      const passage = webById.get(id);
+      return passage ? [{ id, label: passage.title, citation: passage.url, text: passage.text.slice(0, 4_000) }] : [];
+    })
+    : block.itemIds.flatMap((id) => {
     const item = itemsById.get(id);
     if (!item) return [];
     const passages = item.evidence.map((evidence) => passagesById.get(evidence.passageId)?.text ?? '').join('\n').slice(0, 3_000);
@@ -512,7 +558,8 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     if (!deps.audit) return blocks;
     const targets = blocks
       .map((block, index) => ({ block, index }))
-      .filter(({ block }) => block.provenance === 'materials' && block.markdown && (config.verification === 'exhaustive' || !numbersSupported(block)));
+      // Web blocks are always audited against their own passages.
+      .filter(({ block }) => block.markdown && (block.provenance === 'web' || (block.provenance === 'materials' && (config.verification === 'exhaustive' || !numbersSupported(block)))));
     await settlePool(targets, concurrency.verify, async ({ block }) => {
       guard();
       const sources = auditSources(block);
@@ -635,6 +682,20 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
 
   // ── Assembly ───────────────────────────────────────────────────────────────────
   const usedItems = new Set<string>();
+  // Web pages get W aliases in order of first citation; several passages of a page share one.
+  const webPages = new Map<string, CompleteGuideResult['webSources'][number]>();
+  const citeWeb = (id: string): string | null => {
+    const passage = webById.get(id);
+    if (!passage) return null;
+    let page = webPages.get(passage.url);
+    if (!page) {
+      page = { alias: `W${webPages.size + 1}`, title: passage.title, site: passage.site, url: passage.url, passageIds: [] };
+      webPages.set(passage.url, page);
+    }
+    if (!page.passageIds.includes(id)) page.passageIds.push(id);
+    const site = passage.site.replace(/[[\]]/g, '').trim();
+    return `[${page.alias}${site ? ` · ${site}` : ''}](nodus://passage/${encodeURIComponent(id)})`;
+  };
   const parts: string[] = [];
   parts.push(`## ${labels.howToUse}\n\n${labels.howToUseBody}`);
   if (syllabus.overview || syllabus.connections.length) {
@@ -652,12 +713,13 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     for (const section of chapter.sections) {
       chapterParts.push(`### ${section.title}`);
       for (const block of section.blocks) {
-        const rendered = renderBlock(block, { labels, cite }, block.kind === 'selfcheck' ? ++selfCheckNumber : undefined);
+        const rendered = renderBlock(block, { labels, cite, citeWeb }, block.kind === 'selfcheck' ? ++selfCheckNumber : undefined);
         chapterParts.push(rendered.markdown);
         if (rendered.answer) answers.push(rendered.answer);
         counts.blocks += 1;
         if (block.provenance === 'ai') counts.aiBlocks += 1;
-        if (block.provenance !== 'ai') block.itemIds.forEach((id) => usedItems.add(id));
+        if (block.provenance === 'web') counts.webBlocks += 1;
+        if (block.provenance === 'materials' || block.provenance === 'derived') block.itemIds.forEach((id) => usedItems.add(id));
       }
     }
     if (answers.length) chapterParts.push(`**${labels.selfCheckAnswers}**\n\n${answers.join('\n\n')}`);
@@ -696,6 +758,11 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const indexed = new Set(index.map((entry) => entry.source.sourceKey));
   const sourceIndex = [...index, ...snapshot.sources.filter((source) => !indexed.has(source.sourceKey)).map((source) => ({ source, ranges: '' }))];
   parts.push(`## ${labels.sourceIndex}\n\n${renderSourceIndex(sourceIndex)}`);
+  const webSources = [...webPages.values()];
+  if (webSources.length) {
+    const escape = (value: string) => value.replace(/[[\]]/g, '').trim();
+    parts.push(`## ${labels.webSources}\n\n*${labels.webNote}*\n\n${webSources.map((page) => `- **${page.alias}** — [${escape(page.title) || page.url}](${page.url.replace(/[()\s]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`)})${page.site ? ` · ${escape(page.site)}` : ''}`).join('\n')}`);
+  }
 
   const limitations: string[] = [];
   for (const row of coverage) {
@@ -712,7 +779,10 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     cheatSheetMarkdown: cheatSheet ? `# ${labels.reviewSheet}\n\n${cheatSheet}` : '',
     chapters,
     items,
-    bibliography: sourceIndex.map(({ source, ranges }) => `${source.alias} — ${source.title}${ranges ? ` (${ranges})` : ''}`),
+    bibliography: [
+      ...sourceIndex.map(({ source, ranges }) => `${source.alias} — ${source.title}${ranges ? ` (${ranges})` : ''}`),
+      ...webSources.map((page) => `${page.alias} — ${page.title} (${page.url})`),
+    ],
     limitations,
     coverage,
     counts,
@@ -720,5 +790,6 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     warnings,
     figures,
     figureSiblings,
+    webSources,
   };
 }

@@ -79,10 +79,16 @@ test('model markdown loses links, callout markers, headings and pseudo-citations
     { kind: 'selfcheck', itemIds: ['K0001'], question: '¿Q?', answer: '' },
     { kind: 'web', itemIds: ['K0001'], markdown: 'Pretends to be web.' },
   ] }, { validItemIds: new Set(['K0001', 'K0002']), items: itemMap, aiExamples: true });
-  assert.deepEqual(result.blocks.map((block) => `${block.kind}:${block.provenance}`), ['definition:materials', 'ai_example:ai', 'mistake:materials', 'mistake:ai', 'table:materials', 'explanation:materials']);
+  // A block that claims to be web without recorded passages is dropped, never relabelled as material.
+  assert.deepEqual(result.blocks.map((block) => `${block.kind}:${block.provenance}`), ['definition:materials', 'ai_example:ai', 'mistake:materials', 'mistake:ai', 'table:materials']);
   assert.deepEqual(result.blocks[0].itemIds, ['K0001']);
   assert.deepEqual(result.blocks[4].table, { headers: ['A', 'B\\|C'], rows: [['1', '2']] });
-  assert.deepEqual(result.dropped, { unsupported: 1, aiDisabled: 0, malformed: 1 });
+  assert.deepEqual(result.dropped, { unsupported: 2, aiDisabled: 0, malformed: 1 });
+  const web = blocks.normalizeWrittenBlocks({ blocks: [{ kind: 'web', itemIds: ['K0001'], webPassageIds: ['web:abc123abc123', 'web:unknown'], markdown: 'Contexto [W1](https://x.test).' }] },
+    { validItemIds: new Set(['K0001']), items: itemMap, aiExamples: true, webIds: new Set(['web:abc123abc123']) });
+  assert.deepEqual(web.blocks.map((block) => [block.provenance, block.webPassageIds, block.markdown]), [['web', ['web:abc123abc123'], 'Contexto.']]);
+  const webRendered = blocks.renderBlock(web.blocks[0], { labels, cite: () => ['[A1](nodus://study/material/m)'], citeWeb: (id) => `[W1 · x.test](nodus://passage/${encodeURIComponent(id)})` }).markdown;
+  assert.equal(webRendered, '> [!web] Fuentes web\n> Contexto.\n>\n> *Fuente web: no procede de tus materiales.*\n>\n> [W1 · x.test](nodus://passage/web%3Aabc123abc123)');
   const strict = blocks.normalizeWrittenBlocks({ blocks: [{ kind: 'ai_analogy', itemIds: [], markdown: 'x' }, { kind: 'mistake', itemIds: ['K0001'], markdown: 'y' }] }, { validItemIds: new Set(['K0001']), items: itemMap, aiExamples: false });
   assert.equal(strict.blocks.length, 0);
   assert.equal(strict.dropped.aiDisabled, 2);

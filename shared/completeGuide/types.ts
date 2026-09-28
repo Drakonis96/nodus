@@ -181,6 +181,8 @@ export interface CompleteGuideDraftMeta {
     auditedBlocks: number; removedSentences: number; repairedBlocks: number; invalidLatex: number; conflicts: number; cacheHits: number;
     /** Figures taken from the materials (missing on guides from before figures). */
     figures?: number;
+    /** Labelled web blocks (only when the web complement was enabled). */
+    webBlocks?: number;
   };
   usage: { calls: number; inputTokens: number; outputTokens: number; usd: number | null };
   warnings: string[];

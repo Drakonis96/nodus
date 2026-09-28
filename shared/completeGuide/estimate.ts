@@ -113,7 +113,9 @@ export function estimateCompleteGuide(input: CompleteGuideEstimateInput): Comple
     { stage: 'verify', calls: sections * 3 + auditCalls, inputTokens: sections * 3 * 8_000 + auditCalls * 3_500, outputTokens: Math.round(sentences * 12 + auditCalls * 1_800) },
     { stage: 'finalize', calls: units + 4, inputTokens: (units + 4) * 6_000, outputTokens: (units + 4) * 1_500 },
   ];
-  if (input.webText) stages.push({ stage: 'web', calls: sections * 5, inputTokens: sections * 5 * 6_000, outputTokens: sections * 5 * 800 });
+  // One web step per chapter (plan, pick, rate: ~6 calls), web passages in each writer
+  // call and one audit of the web blocks per section.
+  if (input.webText) stages.push({ stage: 'web', calls: units * 6 + sections, inputTokens: units * 6 * 3_000 + sections * 6_000, outputTokens: units * 6 * 500 + sections * 1_500 });
   stages.push({ stage: 'embed', calls: Math.ceil(items / 64), inputTokens: items * 40, outputTokens: 0 });
 
   const chatStages = stages.filter((stage) => stage.stage !== 'embed');
