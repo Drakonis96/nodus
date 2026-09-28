@@ -43,7 +43,9 @@ const TUTORIAL_LANGUAGES: Array<{ code: TutorialLanguage; label: string; flag: s
   { code: 'pt', label: 'Português', flag: 'linear-gradient(90deg, #046a38 0 42%, #da291c 42%)' },
   { code: 'pt-BR', label: 'Português do Brasil', flag: 'radial-gradient(circle, #002776 0 18%, transparent 19%), linear-gradient(145deg, transparent 34%, #ffdf00 35% 65%, transparent 66%), linear-gradient(#009c3b, #009c3b)' },
   { code: 'zh-CN', label: '简体中文', flag: 'linear-gradient(#de2910, #de2910)' },
+  { code: 'zh-TW', label: '繁體中文', flag: 'conic-gradient(from 90deg at 50% 50%, #fe0000 0 50%, #000095 50% 75%, #fe0000 75%)' },
   { code: 'ja', label: '日本語', flag: 'radial-gradient(circle, #bc002d 0 27%, transparent 28%), linear-gradient(#f4f4f4, #f4f4f4)' },
+  { code: 'ko', label: '한국어', flag: 'radial-gradient(circle, transparent 0 27%, #f4f4f4 28%), linear-gradient(#cd2e3a 50%, #0047a0 50%)' },
   { code: 'ru', label: 'Русский', flag: 'linear-gradient(#fff 0 33%, #0039a6 33% 66%, #d52b1e 66%)' },
   { code: 'uk', label: 'Українська', flag: 'linear-gradient(#0057b7 0 50%, #ffd700 50%)' },
 ];
@@ -61,18 +63,17 @@ function Tip({ children, warning = false }: { children: ReactNode; warning?: boo
  * five-tool snapshot to new users. */
 function ModelGuidanceSlides(language: TutorialLanguage): Slide[] {
   const c = toolkitBetaGuideCopy(language);
-  const es = language === 'es';
   return [
     {
-      eyebrow: es ? 'Extracción de ideas' : 'Idea extraction', title: c.extractionTitle, icon: 'bulb', nodi: 'thinking', summary: c.extractionSummary,
+      eyebrow: c.extractionEyebrow, title: c.extractionTitle, icon: 'bulb', nodi: 'thinking', summary: c.extractionSummary,
       content: <IdeaExtractionPanel language={language} />,
     },
     {
-      eyebrow: es ? 'Modelos locales' : 'Local models', title: c.performanceTitle, icon: 'clock', nodi: 'thinking', summary: c.performanceSummary,
+      eyebrow: c.performanceEyebrow, title: c.performanceTitle, icon: 'clock', nodi: 'thinking', summary: c.performanceSummary,
       content: <LocalPerformancePanel language={language} />,
     },
     {
-      eyebrow: es ? 'Accesos oficiales' : 'Official access', title: c.subscriptionsTitle, icon: 'key', nodi: 'connecting', summary: c.subscriptionsSummary,
+      eyebrow: c.subscriptionsEyebrow, title: c.subscriptionsTitle, icon: 'key', nodi: 'connecting', summary: c.subscriptionsSummary,
       content: <SubscriptionAccessPanel language={language} />,
     },
   ];
@@ -90,11 +91,15 @@ function SpanishSlides(): Slide[] {
       summary: 'Una bóveda es un espacio de trabajo independiente que mantiene juntos los materiales de un mismo proyecto.',
       content: <><div className="tutorial-vault-grid">
         <div><b>Académica</b><span>Bibliografía, ideas, autores, relaciones, investigación y escritura.</span></div>
-        <div><b>Estudio</b><span>Cursos, asignaturas, apuntes, materiales y grabaciones.</span></div>
-        <div><b>Genealogía</b><span>Personas, parentescos, cronología y evidencias familiares.</span></div>
+        <div><b>Fuentes primarias</b><span>Documentos de archivo, transcripciones y crítica de fuentes.</span></div>
+        <div><b>Testimonios</b><span>Entrevistas, participantes, transcripciones e historia oral.</span></div>
         <div><b>Bases de datos</b><span>Tablas, relaciones entre datos, búsquedas y análisis.</span></div>
-        <div><b>Fuentes primarias</b><span>Documentación de archivo y análisis de fuentes. Llegará en una versión futura.</span></div>
-      </div><p>Puedes crear varias bóvedas y cambiar entre ellas. Se añadirán nuevos tipos a medida que evolucione Nodus.</p></>,
+        <div><b>Docencia</b><span>Cursos, horarios, materiales, evaluación y clases.</span></div>
+        <div><b>Estudio</b><span>Cursos, asignaturas, apuntes, materiales y repasos.</span></div>
+        <div><b>Genealogía</b><span>Personas, parentescos, cronología y evidencias familiares.</span></div>
+        <div><b>Prosopografía</b><span>Poblaciones históricas, observaciones, cohortes y redes.</span></div>
+        <div><b>Worldbuilding</b><span>Mundos de ficción: personajes, lugares, reglas y manuscritos.</span></div>
+      </div><p>Puedes crear varias bóvedas y cambiar entre ellas. Los tipos más recientes muestran su fase (beta, alfa o pre-alfa) al crearlos, para que sepas cuáles están listos para trabajo real.</p></>,
     },
     {
       eyebrow: 'Concepto 2', title: 'Tres tipos de ayuda', icon: 'layers', nodi: 'connecting',
@@ -163,7 +168,7 @@ function SpanishSlides(): Slide[] {
 function EnglishSlides(): Slide[] {
   return [
     { eyebrow: 'Start here', title: 'Welcome to Nodus', icon: 'network', nodi: 'waving', summary: 'A local workspace that turns scattered material into connected, reusable knowledge.', content: <><p>Nodus brings documents, notes, data and sources into separate workspaces. It can then search, connect and use them as context for study, research, writing or AI conversations.</p><Tip>Nodus is <b>local-first</b>: your vault and indexes live on your device. Content leaves it only when you choose a remote AI feature and provider.</Tip></> },
-    { eyebrow: 'Concept 1', title: 'What is a vault?', icon: 'archive', nodi: 'discovering', summary: 'A vault is an isolated workspace with its own material, organization and indexes.', content: <><div className="tutorial-vault-grid"><div><b>Academic</b><span>Literature, ideas, authors, knowledge graph, research and writing.</span></div><div><b>Study</b><span>Courses, subjects, notes, learning material and recordings.</span></div><div><b>Genealogy</b><span>People, kinship, timelines and family evidence.</span></div><div><b>Databases</b><span>Structured tables, relations, queries and analysis.</span></div><div><b>Primary sources</b><span>Archives and source criticism; coming in a future version.</span></div></div><p>You can create several vaults and switch between them. More types will be added as Nodus evolves.</p></> },
+    { eyebrow: 'Concept 1', title: 'What is a vault?', icon: 'archive', nodi: 'discovering', summary: 'A vault is an isolated workspace with its own material, organization and indexes.', content: <><div className="tutorial-vault-grid"><div><b>Academic</b><span>Literature, ideas, authors, knowledge graph, research and writing.</span></div><div><b>Primary sources</b><span>Archival documents, transcriptions and source criticism.</span></div><div><b>Testimonies</b><span>Interviews, participants, transcripts and oral history.</span></div><div><b>Databases</b><span>Structured tables, relations, queries and analysis.</span></div><div><b>Teaching</b><span>Courses, timetables, materials, assessment and classes.</span></div><div><b>Study</b><span>Courses, subjects, notes, learning material and review.</span></div><div><b>Genealogy</b><span>People, kinship, timelines and family evidence.</span></div><div><b>Prosopography</b><span>Historical populations, observations, cohorts and networks.</span></div><div><b>Worldbuilding</b><span>Fictional worlds: characters, places, rules and manuscripts.</span></div></div><p>You can create several vaults and switch between them. Newer types show their phase (beta, alpha or pre-alpha) when you create them, so you know which ones are ready for real work.</p></> },
     { eyebrow: 'Concept 2', title: 'Three model families', icon: 'layers', nodi: 'connecting', summary: 'Conversational AI, embeddings and speech models perform different jobs.', content: <div className="tutorial-three-columns"><div><Icon name="chat" /><b>Generative AI</b><span>Writes, summarizes, explains, classifies and chats. Some models also understand images.</span></div><div><Icon name="network" /><b>Embeddings</b><span>Turn text into vectors for semantic search and relations. They do not write answers.</span></div><div><Icon name="microphone" /><b>Speech</b><span>Speech-to-text transcribes audio; text-to-speech produces playable narration.</span></div></div> },
     { eyebrow: 'AI without an API', title: 'Integrated local models', icon: 'settings', nodi: 'thinking', summary: 'Nodus can download and run models prepared for the app; they are not bundled with the installer.', content: <><p>Small quantized local models let you try chat, summaries, ideas and image input without per-use fees or sending text to an AI provider. They are generally less capable and slower than leading remote models.</p><Tip>Memory needs depend on model size, quantization and context. A GPU with more <b>VRAM</b> speeds up inference, but some models can use CPU and system RAM—or unified memory on Apple Silicon—more slowly.</Tip><p>Download and manage them in <b>Settings → AI Models</b>. Downloads are optional, and removing a model does not remove your documents.</p></> },
     { eyebrow: 'Remote AI', title: 'What is an API key?', icon: 'key', nodi: 'discovering', summary: 'A secret credential that lets Nodus request work from a provider on your behalf.', content: <><ol className="tutorial-steps"><li>Create an account with the provider.</li><li>Open its API keys page and generate a key.</li><li>Paste it into <b>Settings → Providers</b>, test it and select a model.</li></ol><Tip warning><b>Never share or publish an API key.</b> Usage, limits and billing can be attached to it. Nodus uses the operating system's secure storage when available.</Tip><div className="tutorial-links"><ExternalLink href="https://openrouter.ai/settings/keys">OpenRouter keys</ExternalLink><ExternalLink href="https://console.groq.com/keys">Groq keys</ExternalLink><ExternalLink href="https://cloud.cerebras.ai/">Cerebras keys</ExternalLink><ExternalLink href="https://aistudio.google.com/app/apikey">Gemini keys</ExternalLink><ExternalLink href="https://platform.openai.com/api-keys">OpenAI keys</ExternalLink></div></> },
@@ -183,7 +188,7 @@ function EnglishSlides(): Slide[] {
 const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlide[]> = {
   fr: [
     { eyebrow: 'Commencez ici', title: 'Bienvenue dans Nodus', summary: 'Un espace local pour réunir et relier vos contenus.', body: 'Nodus rassemble documents, notes, données et sources dans des espaces séparés. Vous pouvez les rechercher, découvrir des liens et les utiliser pour étudier, faire de la recherche ou écrire.', tip: 'Vos espaces restent sur votre appareil. Le contenu ne le quitte que lorsque vous choisissez un service externe.', icon: 'network' },
-    { eyebrow: 'Concept 1', title: 'Qu’est-ce qu’un coffre ?', summary: 'Un coffre est un espace indépendant consacré à un projet.', body: 'Les coffres peuvent servir au travail universitaire, aux études, à la généalogie ou aux bases de données. Chaque coffre conserve ses propres contenus, son organisation et ses recherches.', icon: 'archive' },
+    { eyebrow: 'Concept 1', title: 'Qu’est-ce qu’un coffre ?', summary: 'Un coffre est un espace indépendant consacré à un projet.', body: 'Nodus propose neuf types de coffre : académique, sources primaires, témoignages, bases de données, enseignement, étude, généalogie, prosopographie et worldbuilding. Chaque coffre conserve ses propres contenus, son organisation et ses index. Les types les plus récents affichent leur phase (bêta, alpha ou pré-alpha) lors de la création.', icon: 'archive' },
     { eyebrow: 'Concept 2', title: 'Trois formes d’aide', summary: 'L’écriture, la recherche par sens et la voix utilisent des outils différents.', body: 'Les modèles de conversation rédigent et expliquent. Les embeddings trouvent des passages de sens proche. Les modèles vocaux transcrivent un enregistrement ou lisent un texte à voix haute.', icon: 'layers' },
     { eyebrow: 'Sans service externe', title: 'Des modèles sur votre appareil', summary: 'Nodus peut télécharger des modèles préparés pour fonctionner localement.', body: 'Ils permettent de discuter, résumer et comprendre des images sans envoyer vos contenus à une autre entreprise. Le téléchargement reste facultatif et les modèles plus grands demandent davantage de mémoire.', icon: 'settings' },
     { eyebrow: 'Services externes', title: 'Connecter un fournisseur', summary: 'Les services en ligne utilisent une clé personnelle.', body: 'Créez une clé dans le service choisi, copiez-la dans Réglages puis vérifiez la connexion. Une clé API ressemble à un mot de passe.', tip: 'Ne partagez jamais cette clé. Son utilisation peut consommer votre solde ou vos limites.', icon: 'key' },
@@ -198,7 +203,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   tr: [
     { eyebrow: 'Buradan başlayın', title: 'Nodus’a hoş geldiniz', summary: 'İçeriklerinizi bir araya getiren ve ilişkilendiren yerel bir çalışma alanı.', body: 'Nodus belgeleri, notları, verileri ve kaynakları ayrı alanlarda toplar. Bunlarda arama yapabilir, bağlantılar keşfedebilir ve çalışma, araştırma ya da yazma sırasında kullanabilirsiniz.', tip: 'Çalışma alanlarınız cihazınızda kalır. İçerik yalnızca harici bir hizmet seçtiğinizde dışarı çıkar.', icon: 'network' },
-    { eyebrow: 'Kavram 1', title: 'Kasa nedir?', summary: 'Kasa, tek bir proje için bağımsız bir çalışma alanıdır.', body: 'Akademik çalışma, ders çalışma, soy araştırması ve veritabanları için farklı kasalar oluşturabilirsiniz. Her kasa kendi içeriğini, düzenini ve aramalarını korur.', icon: 'archive' },
+    { eyebrow: 'Kavram 1', title: 'Kasa nedir?', summary: 'Kasa, tek bir proje için bağımsız bir çalışma alanıdır.', body: 'Nodus dokuz kasa türü sunar: akademik, birincil kaynaklar, tanıklıklar, veritabanları, öğretim, ders çalışma, soy araştırması, prosopografi ve dünya kurgusu (worldbuilding). Her kasa kendi içeriğini, düzenini ve dizinlerini korur. Yeni türler oluşturulurken aşamalarını (beta, alfa veya ön alfa) gösterir.', icon: 'archive' },
     { eyebrow: 'Kavram 2', title: 'Üç farklı yardım türü', summary: 'Yazma, anlam araması ve ses için farklı araçlar kullanılır.', body: 'Konuşma modelleri yazar ve açıklar. Embedding modelleri anlamca yakın parçaları bulur. Ses modelleri kayıtları yazıya çevirir veya metni seslendirir.', icon: 'layers' },
     { eyebrow: 'Harici hizmet olmadan', title: 'Cihazınızda çalışan modeller', summary: 'Nodus yerel kullanım için hazırlanmış modelleri indirebilir.', body: 'Bu modeller içerikleri başka bir şirkete göndermeden sohbet, özet ve görüntü anlama işlerini yapabilir. İndirme isteğe bağlıdır ve büyük modeller daha fazla bellek ister.', icon: 'settings' },
     { eyebrow: 'Harici hizmetler', title: 'Bir sağlayıcı bağlayın', summary: 'İnternet hizmetleri kişisel bir erişim anahtarı kullanır.', body: 'Seçtiğiniz hizmette bir anahtar oluşturun, Ayarlar bölümüne yapıştırın ve bağlantıyı sınayın. API anahtarı bir parola gibidir.', tip: 'Anahtarınızı paylaşmayın. Başkaları bakiyenizi veya kullanım sınırlarınızı tüketebilir.', icon: 'key' },
@@ -213,7 +218,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   de: [
     { eyebrow: 'Hier beginnen', title: 'Willkommen bei Nodus', summary: 'Ein lokaler Arbeitsbereich, der Ihre Inhalte sammelt und verbindet.', body: 'Nodus organisiert Dokumente, Notizen, Daten und Quellen in getrennten Bereichen. Sie können darin suchen, Zusammenhänge entdecken und sie beim Lernen, Forschen oder Schreiben verwenden.', tip: 'Ihre Arbeitsbereiche bleiben auf Ihrem Gerät. Inhalte verlassen es nur, wenn Sie einen externen Dienst wählen.', icon: 'network' },
-    { eyebrow: 'Begriff 1', title: 'Was ist ein Vault?', summary: 'Ein Vault ist ein unabhängiger Arbeitsbereich für ein Projekt.', body: 'Sie können Vaults für akademische Arbeit, Studium, Genealogie und Datenbanken anlegen. Jeder Vault besitzt eigene Inhalte, Ordnung und Suchindizes.', icon: 'archive' },
+    { eyebrow: 'Begriff 1', title: 'Was ist ein Vault?', summary: 'Ein Vault ist ein unabhängiger Arbeitsbereich für ein Projekt.', body: 'Nodus bietet neun Vault-Typen: akademisch, Primärquellen, Zeugnisse, Datenbanken, Lehre, Lernen, Genealogie, Prosopografie und Worldbuilding. Jeder Vault besitzt eigene Inhalte, Ordnung und Suchindizes. Neuere Typen zeigen beim Anlegen ihre Phase an (Beta, Alpha oder Pre-Alpha).', icon: 'archive' },
     { eyebrow: 'Begriff 2', title: 'Drei Arten von Unterstützung', summary: 'Schreiben, Bedeutungssuche und Sprache nutzen unterschiedliche Werkzeuge.', body: 'Dialogmodelle schreiben und erklären. Embeddings finden inhaltlich ähnliche Textstellen. Sprachmodelle wandeln Aufnahmen in Text um oder lesen Texte vor.', icon: 'layers' },
     { eyebrow: 'Ohne externen Dienst', title: 'Modelle auf Ihrem Gerät', summary: 'Nodus kann Modelle für die lokale Nutzung herunterladen.', body: 'Damit können Sie chatten, zusammenfassen und Bilder verstehen, ohne Inhalte an ein anderes Unternehmen zu senden. Der Download ist freiwillig. Größere Modelle benötigen mehr Speicher.', icon: 'settings' },
     { eyebrow: 'Externe Dienste', title: 'Einen Anbieter verbinden', summary: 'Onlinedienste benötigen einen persönlichen Zugangsschlüssel.', body: 'Erstellen Sie beim gewählten Dienst einen Schlüssel, tragen Sie ihn unter Einstellungen ein und testen Sie die Verbindung. Ein API-Schlüssel ist wie ein Passwort.', tip: 'Teilen Sie den Schlüssel niemals. Andere könnten Ihr Guthaben oder Ihre Limits verwenden.', icon: 'key' },
@@ -228,7 +233,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   it: [
     { eyebrow: 'Inizia qui', title: 'Benvenuto in Nodus', summary: 'Uno spazio locale che riunisce e collega i tuoi contenuti.', body: 'Nodus organizza documenti, note, dati e fonti in spazi separati. Puoi cercare, scoprire collegamenti e usare i contenuti per studiare, fare ricerca o scrivere.', tip: 'Gli spazi restano sul tuo dispositivo. Il contenuto esce solo quando scegli un servizio esterno.', icon: 'network' },
-    { eyebrow: 'Concetto 1', title: 'Che cos’è un vault?', summary: 'Un vault è uno spazio indipendente dedicato a un progetto.', body: 'Puoi creare vault per attività accademiche, studio, genealogia e database. Ogni vault conserva contenuti, organizzazione e indici propri.', icon: 'archive' },
+    { eyebrow: 'Concetto 1', title: 'Che cos’è un vault?', summary: 'Un vault è uno spazio indipendente dedicato a un progetto.', body: 'Nodus offre nove tipi di vault: accademico, fonti primarie, testimonianze, database, insegnamento, studio, genealogia, prosopografia e worldbuilding. Ogni vault conserva contenuti, organizzazione e indici propri. I tipi più recenti indicano la loro fase (beta, alfa o pre-alfa) al momento della creazione.', icon: 'archive' },
     { eyebrow: 'Concetto 2', title: 'Tre tipi di aiuto', summary: 'Scrittura, ricerca per significato e voce usano strumenti diversi.', body: 'I modelli conversazionali scrivono e spiegano. Gli embedding trovano brani con significato simile. I modelli vocali trascrivono registrazioni o leggono testi ad alta voce.', icon: 'layers' },
     { eyebrow: 'Senza servizi esterni', title: 'Modelli sul tuo dispositivo', summary: 'Nodus può scaricare modelli preparati per l’uso locale.', body: 'Permettono di conversare, riassumere e comprendere immagini senza inviare contenuti a un’altra azienda. Il download è facoltativo e i modelli grandi richiedono più memoria.', icon: 'settings' },
     { eyebrow: 'Servizi esterni', title: 'Collega un fornitore', summary: 'I servizi online usano una chiave di accesso personale.', body: 'Crea una chiave nel servizio scelto, inseriscila nelle Impostazioni e verifica la connessione. Una chiave API è simile a una password.', tip: 'Non condividerla. Altre persone potrebbero consumare il tuo credito o i tuoi limiti.', icon: 'key' },
@@ -243,7 +248,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   pt: [
     { eyebrow: 'Comece aqui', title: 'Bem-vindo ao Nodus', summary: 'Um espaço local que reúne e relaciona os seus conteúdos.', body: 'O Nodus organiza documentos, notas, dados e fontes em espaços separados. Pode pesquisar, descobrir relações e usar os conteúdos para estudar, investigar ou escrever.', tip: 'Os espaços ficam no seu dispositivo. O conteúdo só sai quando escolhe um serviço externo.', icon: 'network' },
-    { eyebrow: 'Conceito 1', title: 'O que é um cofre?', summary: 'Um cofre é um espaço independente dedicado a um projeto.', body: 'Pode criar cofres para trabalho académico, estudo, genealogia e bases de dados. Cada cofre mantém os seus próprios conteúdos, organização e índices.', icon: 'archive' },
+    { eyebrow: 'Conceito 1', title: 'O que é um cofre?', summary: 'Um cofre é um espaço independente dedicado a um projeto.', body: 'O Nodus oferece nove tipos de cofre: académico, fontes primárias, testemunhos, bases de dados, ensino, estudo, genealogia, prosopografia e worldbuilding. Cada cofre mantém os seus próprios conteúdos, organização e índices. Os tipos mais recentes indicam a sua fase (beta, alfa ou pré-alfa) quando são criados.', icon: 'archive' },
     { eyebrow: 'Conceito 2', title: 'Três tipos de ajuda', summary: 'Escrita, pesquisa por significado e voz usam ferramentas diferentes.', body: 'Os modelos de conversa escrevem e explicam. Os embeddings encontram trechos com significado semelhante. Os modelos de voz transcrevem gravações ou leem textos em voz alta.', icon: 'layers' },
     { eyebrow: 'Sem serviços externos', title: 'Modelos no seu dispositivo', summary: 'O Nodus pode descarregar modelos preparados para utilização local.', body: 'Permitem conversar, resumir e compreender imagens sem enviar conteúdos para outra empresa. O download é opcional e os modelos maiores precisam de mais memória.', icon: 'settings' },
     { eyebrow: 'Serviços externos', title: 'Ligue um fornecedor', summary: 'Os serviços online usam uma chave de acesso pessoal.', body: 'Crie uma chave no serviço escolhido, coloque-a nas Definições e teste a ligação. Uma chave API é semelhante a uma palavra-passe.', tip: 'Nunca partilhe a chave. Outras pessoas podem consumir o seu saldo ou limites.', icon: 'key' },
@@ -258,7 +263,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   'pt-BR': [
     { eyebrow: 'Comece aqui', title: 'Boas-vindas ao Nodus', summary: 'Um espaço local para reunir e conectar seus conteúdos.', body: 'O Nodus organiza documentos, notas, dados e fontes em espaços separados. Você pode pesquisar, descobrir relações e usar tudo isso para estudar, pesquisar ou escrever.', tip: 'Seus espaços ficam no seu dispositivo. O conteúdo só sai quando você escolhe um serviço externo.', icon: 'network' },
-    { eyebrow: 'Conceito 1', title: 'O que é um cofre?', summary: 'Um cofre é um espaço independente dedicado a um projeto.', body: 'Você pode criar cofres para trabalho acadêmico, estudos, genealogia e bancos de dados. Cada cofre mantém conteúdos, organização e índices próprios.', icon: 'archive' },
+    { eyebrow: 'Conceito 1', title: 'O que é um cofre?', summary: 'Um cofre é um espaço independente dedicado a um projeto.', body: 'O Nodus oferece nove tipos de cofre: acadêmico, fontes primárias, depoimentos, bancos de dados, ensino, estudo, genealogia, prosopografia e worldbuilding. Cada cofre mantém conteúdos, organização e índices próprios. Os tipos mais recentes mostram sua fase (beta, alfa ou pré-alfa) quando são criados.', icon: 'archive' },
     { eyebrow: 'Conceito 2', title: 'Três tipos de ajuda', summary: 'Escrita, busca por significado e voz usam ferramentas diferentes.', body: 'Os modelos de conversa escrevem e explicam. Os embeddings encontram trechos com sentido parecido. Os modelos de voz transcrevem gravações ou leem textos em voz alta.', icon: 'layers' },
     { eyebrow: 'Sem serviços externos', title: 'Modelos no seu dispositivo', summary: 'O Nodus pode baixar modelos preparados para uso local.', body: 'Eles permitem conversar, resumir e compreender imagens sem enviar conteúdo para outra empresa. O download é opcional e modelos maiores exigem mais memória.', icon: 'settings' },
     { eyebrow: 'Serviços externos', title: 'Conecte um provedor', summary: 'Serviços online usam uma chave pessoal de acesso.', body: 'Crie uma chave no serviço escolhido, cole em Configurações e teste a conexão. Uma chave de API funciona como uma senha.', tip: 'Nunca compartilhe a chave. Outras pessoas podem consumir seu saldo ou seus limites.', icon: 'key' },
@@ -273,7 +278,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   zh: [
     { eyebrow: '从这里开始', title: '欢迎使用 Nodus', summary: '一个在本机整理并连接资料的工作空间。', body: 'Nodus 将文档、笔记、数据和来源保存在不同空间中。你可以搜索内容、发现联系，并在学习、研究或写作时使用它们。', tip: '工作空间保存在你的设备上。只有主动选择外部服务时，内容才会离开设备。', icon: 'network' },
-    { eyebrow: '概念一', title: '什么是资料库？', summary: '资料库是为一个项目建立的独立工作空间。', body: '你可以为学术研究、课程学习、家谱和数据库建立不同资料库。每个资料库都有自己的内容、结构和索引。', icon: 'archive' },
+    { eyebrow: '概念一', title: '什么是资料库？', summary: '资料库是为一个项目建立的独立工作空间。', body: '资料库共有九种类型：学术研究、原始资料、口述证词、数据库、教学、学习、家谱、群体传记（prosopography）和世界观构建（worldbuilding）。每个资料库都有自己的内容、结构和索引。较新的类型在创建时会标明所处阶段（Beta、Alpha 或 Pre-Alpha）。', icon: 'archive' },
     { eyebrow: '概念二', title: '三种不同的帮助', summary: '写作、语义搜索和语音使用不同工具。', body: '对话模型负责写作和解释。嵌入模型寻找含义相近的段落。语音模型把录音转成文字，也可以朗读文字。', icon: 'layers' },
     { eyebrow: '无需外部服务', title: '在设备上运行的模型', summary: 'Nodus 可以下载为本地运行准备的模型。', body: '这些模型可以聊天、总结和理解图片，无需把内容发送给其他公司。下载是可选的，较大的模型需要更多内存。', icon: 'settings' },
     { eyebrow: '外部服务', title: '连接服务提供商', summary: '在线服务需要个人访问密钥。', body: '在所选服务中创建密钥，将它填入设置并测试连接。API 密钥类似密码。', tip: '不要分享密钥，其他人可能消耗你的余额或使用额度。', icon: 'key' },
@@ -288,7 +293,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   'zh-CN': [
     { eyebrow: '从这里开始', title: '欢迎使用 Nodus', summary: '一个在本机整理并连接资料的工作空间。', body: 'Nodus 将文档、笔记、数据和来源保存在不同空间中。你可以搜索内容、发现联系，并在学习、研究或写作时使用它们。', tip: '工作空间保存在你的设备上。只有主动选择外部服务时，内容才会离开设备。', icon: 'network' },
-    { eyebrow: '概念一', title: '什么是资料库？', summary: '资料库是为一个项目建立的独立工作空间。', body: '你可以为学术研究、课程学习、家谱和数据库建立不同资料库。每个资料库都有自己的内容、结构和索引。', icon: 'archive' },
+    { eyebrow: '概念一', title: '什么是资料库？', summary: '资料库是为一个项目建立的独立工作空间。', body: '资料库共有九种类型：学术研究、原始资料、口述证词、数据库、教学、学习、家谱、群体传记（prosopography）和世界观构建（worldbuilding）。每个资料库都有自己的内容、结构和索引。较新的类型在创建时会标明所处阶段（Beta、Alpha 或 Pre-Alpha）。', icon: 'archive' },
     { eyebrow: '概念二', title: '三种不同的帮助', summary: '写作、语义搜索和语音使用不同工具。', body: '对话模型负责写作和解释。嵌入模型寻找含义相近的段落。语音模型把录音转成文字，也可以朗读文字。', icon: 'layers' },
     { eyebrow: '无需外部服务', title: '在设备上运行的模型', summary: 'Nodus 可以下载为本地运行准备的模型。', body: '这些模型可以聊天、总结和理解图片，无需把内容发送给其他公司。下载是可选的，较大的模型需要更多内存。', icon: 'settings' },
     { eyebrow: '外部服务', title: '连接服务提供商', summary: '在线服务需要个人访问密钥。', body: '在所选服务中创建密钥，将它填入设置并测试连接。API 密钥类似密码。', tip: '不要分享密钥，其他人可能消耗你的余额或使用额度。', icon: 'key' },
@@ -302,23 +307,23 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
     { eyebrow: '你的助手', title: '认识 Nodi', summary: 'Nodi 集成了聊天、通知和帮助，并且完全可以关闭。', body: 'Nodi 可以把文档、当前页面、当前资料库或全部资料库作为上下文。在“设置 → 界面 → Nodi 吉祥物”中，你可以关闭 Nodi、选择聊天模型、让它始终显示在其他应用上方，并管理不同资料库的配饰。', icon: 'star' },
   ],
   'zh-TW': [
-    { eyebrow: '從這裡開始', title: '歡迎使用 Nodus', summary: '一個在本機整理並連線資料的工作空間。', body: 'Nodus 將文件、筆記、資料和來源儲存在不同空間中。你可以搜尋內容、發現聯絡，並在學習、研究或寫作時使用它們。', tip: '工作空間儲存在你的裝置上。只有主動選擇外部服務時，內容才會離開裝置。', icon: 'network' },
-    { eyebrow: '概念一', title: '什麼是資料庫？', summary: '資料庫是為一個專案建立的獨立工作空間。', body: '你可以為學術研究、課程學習、家譜和資料庫建立不同資料庫。每個資料庫都有自己的內容、結構和索引。', icon: 'archive' },
-    { eyebrow: '概念二', title: '三種不同的幫助', summary: '寫作、語義搜尋和語音使用不同工具。', body: '對話模型負責寫作和解釋。嵌入模型尋找含義相近的段落。語音模型把錄音轉成文字，也可以朗讀文字。', icon: 'layers' },
-    { eyebrow: '無需外部服務', title: '在裝置上執行的模型', summary: 'Nodus 可以下載為本地執行準備的模型。', body: '這些模型可以聊天、總結和理解圖片，無需把內容傳送給其他公司。下載是可選的，較大的模型需要更多記憶體。', icon: 'settings' },
-    { eyebrow: '外部服務', title: '連線服務提供商', summary: '線上服務需要個人訪問金鑰。', body: '在所選服務中建立金鑰，將它填入設定並測試連線。API 金鑰類似密碼。', tip: '不要分享金鑰，其他人可能消耗你的餘額或使用額度。', icon: 'key' },
-    { eyebrow: '免費開始', title: '免費選項也有限制', summary: '免費並不代表無限使用。', body: 'OpenRouter、Groq、Cerebras 和 Gemini 提供部分免費選項。可用模型、限制和條件可能變化。', icon: 'star' },
-    { eyebrow: '控制成本', title: '瞭解價格', summary: '費用主要取決於傳送和生成的文字量。', body: '短請求通常費用很低。長文件、長回答、推理和附加功能會增加費用。', tip: '請檢視服務商的最新價格並設定預算。', icon: 'chartBar' },
-    { eyebrow: '概念三', title: '尋找相關想法', summary: '即使措辭不同，Nodus 也能找到含義相近的文字。', body: '文本會被分成片段並轉換為稱作嵌入的數字表示。RAG（檢索增強生成）先檢索相關資訊，再把它作為上下文交給生成模型。在 Nodus 中，嵌入會選出資料庫裡與問題最接近的段落和想法；聊天、研究與寫作功能可利用這些內容，依據你的來源生成回答，而不必每次傳送整個資料庫。請始終核對引用來源。', tip: '更換嵌入模型後，需要重新處理資料。', icon: 'network' },
-    { eyebrow: '準備搜尋', title: '選擇多語言模型', summary: '模型應當適合文件所使用的語言。', body: 'Nodus 本地提供 BGE-M3、GTE Multilingual 和 Multilingual E5，也可以通過網路使用 OpenAI text-embedding-3。', icon: 'languages' },
-    { eyebrow: 'AI 圖片', title: '建立和理解圖片', summary: '分析圖片和生成新圖片是兩項不同任務。', body: '你可以讓模型描述照片或圖表。連線相容服務後，Nodus 也能根據文字描述生成新的插圖。', tip: '請檢查結果。生成圖片可能包含錯誤，也可能產生費用。', icon: 'image' },
-    { eyebrow: '內建音訊', title: '轉寫與朗讀', summary: '把語音轉成文字，也把文字轉成語音。', body: 'Nodus 可以轉寫課程、訪談和語音筆記，也能朗讀文件。請始終檢查轉寫結果。', icon: 'microphone' },
-    { eyebrow: '安全開始', title: '第一次設定', summary: '先用少量資料測試，確認結果後再擴充套件。', body: '建立資料庫，匯入少量內容，選擇模型並檢查結果。確認回答依據你的來源，同時定期備份。', icon: 'check' },
-    { eyebrow: '你的助手', title: '認識 Nodi', summary: 'Nodi 集成了聊天、通知和幫助，並且完全可以關閉。', body: 'Nodi 可以把文件、當前頁面、當前資料庫或全部資料庫作為上下文。在“設定 → 介面 → Nodi 吉祥物”中，你可以關閉 Nodi、選擇聊天模型、讓它始終顯示在其他應用上方，並管理不同資料庫的配飾。', icon: 'star' },
+    { eyebrow: '從這裡開始', title: '歡迎使用 Nodus', summary: '一個在本機整理並連結資料的工作空間。', body: 'Nodus 將文件、筆記、數據和來源分別放在不同的空間中。你可以搜尋內容、發現關聯，並在學習、研究或寫作時運用它們。', tip: '工作空間儲存在你的裝置上。只有在你主動選擇外部服務時，內容才會離開裝置。', icon: 'network' },
+    { eyebrow: '概念一', title: '什麼是知識庫？', summary: '知識庫是為一個專案建立的獨立工作空間。', body: '知識庫共有九種類型：學術研究、原始史料、口述證詞、資料庫、教學、學習、家譜、群體傳記（prosopography）和世界觀建構（worldbuilding）。每個知識庫都有自己的內容、結構和索引。較新的類型在建立時會標示所處階段（Beta、Alpha 或 Pre-Alpha）。', icon: 'archive' },
+    { eyebrow: '概念二', title: '三種不同的協助', summary: '寫作、語意搜尋和語音使用不同的工具。', body: '對話模型負責撰寫和解釋。嵌入模型尋找意思相近的段落。語音模型把錄音轉成文字，也能朗讀文字。', icon: 'layers' },
+    { eyebrow: '不需外部服務', title: '在你的裝置上執行的模型', summary: 'Nodus 可以下載專為本機執行準備的模型。', body: '這些模型可以聊天、摘要和理解圖片，不必把內容傳送給其他公司。下載為選用項目，較大的模型需要更多記憶體。', icon: 'settings' },
+    { eyebrow: '外部服務', title: '連接服務供應商', summary: '線上服務需要個人存取金鑰。', body: '在所選服務中建立金鑰，貼到設定中並測試連線。API 金鑰就像密碼一樣。', tip: '請勿分享金鑰，其他人可能會用掉你的餘額或使用額度。', icon: 'key' },
+    { eyebrow: '免費開始', title: '免費方案也有限制', summary: '免費不代表無限使用。', body: 'OpenRouter、Groq、Cerebras 和 Gemini 提供部分免費選項。可用模型、限制和條款都可能變動。', icon: 'star' },
+    { eyebrow: '控制成本', title: '了解價格', summary: '費用主要取決於傳送和產生的文字量。', body: '簡短的請求通常費用很低。長文件、長回答、推理和額外功能會提高費用。', tip: '請查看供應商的最新價格並設定預算。', icon: 'chartBar' },
+    { eyebrow: '概念三', title: '尋找相關想法', summary: '即使用詞不同，Nodus 也能找到意思相近的文字。', body: '文字會被切分成片段，並轉換成稱為嵌入（embedding）的數值表示。RAG（檢索增強生成）會先檢索相關資訊，再把它作為上下文交給生成模型。在 Nodus 中，嵌入會從知識庫中選出與問題最接近的段落和想法；聊天、研究與寫作功能可以利用這些內容，根據你的來源產生回答，而不必每次都傳送整個語料。請務必核對引用來源。', tip: '更換嵌入模型後，需要重新處理你的資料。', icon: 'network' },
+    { eyebrow: '準備搜尋', title: '選擇多語言模型', summary: '模型應該適合文件所使用的語言。', body: 'Nodus 在本機提供 BGE-M3、GTE Multilingual 和 Multilingual E5，也可以透過網路使用 OpenAI text-embedding-3。', icon: 'languages' },
+    { eyebrow: 'AI 圖片', title: '建立與理解圖片', summary: '分析圖片和產生新圖片是兩種不同的任務。', body: '你可以請模型描述照片或圖表。連接相容的服務後，Nodus 也能根據你的文字描述產生新的插圖。', tip: '請檢查結果。產生的圖片可能有錯誤，也可能需要付費。', icon: 'image' },
+    { eyebrow: '內建音訊', title: '轉錄與朗讀', summary: '把語音轉成文字，也把文字轉成語音。', body: 'Nodus 可以轉錄課程、訪談和語音筆記，也能朗讀文件。請務必檢查轉錄結果。', icon: 'microphone' },
+    { eyebrow: '安全起步', title: '第一次設定', summary: '先用少量資料測試，確認結果後再擴大範圍。', body: '建立知識庫、匯入少量內容、選擇模型並檢查結果。確認回答以你的來源為依據，並定期備份。', icon: 'check' },
+    { eyebrow: '你的夥伴', title: '認識 Nodi', summary: 'Nodi 整合了聊天、通知和說明，而且可以完全關閉。', body: 'Nodi 可以把說明文件、目前畫面、目前的知識庫或所有知識庫當作上下文。在「設定 → 介面 → Nodi 吉祥物」中，你可以關閉 Nodi、選擇它的聊天模型、讓它顯示在其他應用程式上方，並管理各知識庫的配件。', icon: 'star' },
   ],
   ja: [
     { eyebrow: 'ここから開始', title: 'Nodusへようこそ', summary: '資料を集めて関連付けるローカルな作業空間です。', body: 'Nodusは文書、ノート、データ、資料を別々の空間に整理します。検索や関連の発見を行い、学習、研究、執筆に利用できます。', tip: '作業空間は端末に保存されます。外部サービスを選んだ場合だけ内容が端末の外へ送られます。', icon: 'network' },
-    { eyebrow: '概念1', title: 'Vaultとは？', summary: 'Vaultは一つのプロジェクトのための独立した作業空間です。', body: '学術研究、学習、系譜、データベース向けに別々のVaultを作成できます。それぞれが独自の内容、整理方法、索引を持ちます。', icon: 'archive' },
+    { eyebrow: '概念1', title: 'Vaultとは？', summary: 'Vaultは一つのプロジェクトのための独立した作業空間です。', body: 'Vaultには9つの種類があります：学術、一次資料、証言、データベース、教育、学習、系譜、プロソポグラフィー、世界構築。各Vaultは独自の資料、整理方法、索引を持ちます。新しい種類は作成時に開発段階（ベータ、アルファ、プレアルファ）を表示します。', icon: 'archive' },
     { eyebrow: '概念2', title: '三つの支援方法', summary: '文章、意味検索、音声には異なる道具を使います。', body: '会話モデルは文章を書き説明します。Embeddingは意味の近い箇所を探します。音声モデルは録音を文字にし、文章を読み上げます。', icon: 'layers' },
     { eyebrow: '外部サービスなし', title: '端末で動くモデル', summary: 'Nodusはローカル実行用のモデルをダウンロードできます。', body: '内容を他社へ送らずに会話、要約、画像理解を行えます。ダウンロードは任意で、大きいモデルほど多くのメモリが必要です。', icon: 'settings' },
     { eyebrow: '外部サービス', title: 'プロバイダーを接続', summary: 'オンラインサービスには個人用のアクセスキーが必要です。', body: '利用するサービスでキーを作成し、設定に貼り付けて接続を確認します。APIキーはパスワードに似ています。', tip: 'キーを共有しないでください。残高や利用上限を他人に使われる可能性があります。', icon: 'key' },
@@ -332,106 +337,23 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
     { eyebrow: 'あなたの相棒', title: 'Nodiを紹介します', summary: 'Nodiはチャット、通知、ヘルプをまとめた機能で、いつでも無効にできます。', body: 'Nodiはドキュメント、現在の画面、使用中のVault、またはすべてのVaultを文脈として利用できます。「設定 → インターフェース → Nodiマスコット」で無効化、チャットモデル、常に手前に表示する設定、Vaultごとのアクセサリーを変更できます。', icon: 'star' },
   ],
   ko: [
-    {
-      eyebrow: '여기에서 시작',
-      title: 'Nodus에 오신 것을 환영합니다',
-      summary: '자료를 모아 연관시키는 로컬 작업 공간입니다.',
-      body: 'Nodus는 문서, 노트, 데이터 및 자료를 별도의 공간으로 구성합니다. 검색 및 관련 발견을 실시하고 학습, 연구, 쓰기에 이용할 수 있습니다.',
-      tip: '작업 공간은 터미널에 저장됩니다. 외부 서비스를 선택한 경우에만 내용이 단말기 밖으로 전송됩니다.',
-      icon: '네트워크',
-    },
-    {
-      eyebrow: '개념 1',
-      title: 'Vault란?',
-      summary: 'Vault는 하나의 프로젝트에 대한 독립적인 작업 공간입니다.',
-      body: '학술 연구, 학습, 계보 및 데이터베이스에 대해 별도의 Vault를 만들 수 있습니다. 각각은 자신의 내용, 정리 방법, 색인을 가지고 있습니다.',
-      icon: '아카이브',
-    },
-    {
-      eyebrow: '개념 2',
-      title: '세 가지 지원 방법',
-      summary: '문장, 의미 검색, 음성에는 다른 도구를 사용합니다.',
-      body: '대화 모델은 문장을 작성하고 설명합니다. Embedding은 의미가 가까운 부분을 찾습니다. 음성 모델은 녹음을 문자로 하고 문장을 읽습니다.',
-      icon: '레이어',
-    },
-    {
-      eyebrow: '외부 서비스 없음',
-      title: '단말기에서 움직이는 모델',
-      summary: 'Nodus는 로컬 실행을 위한 모델을 다운로드할 수 있습니다.',
-      body: '내용을 타사에 보내지 않고 대화, 요약, 이미지 이해를 할 수 있습니다. 다운로드는 선택 사항이며 큰 모델만큼 많은 메모리가 필요합니다.',
-      icon: '설정',
-    },
-    {
-      eyebrow: '외부 서비스',
-      title: '공급자 연결',
-      summary: '온라인 서비스에는 개인 액세스 키가 필요합니다.',
-      body: '사용하는 서비스에서 키를 만들고 설정에 붙여넣어 연결을 확인합니다. API 키는 비밀번호와 유사합니다.',
-      tip: '키를 공유하지 마십시오. 잔액이나 이용 상한을 타인에게 사용할 가능성이 있습니다.',
-      icon: '키',
-    },
-    {
-      eyebrow: '무료로 시작',
-      title: '무료 플랜에도 제한이 있습니다.',
-      summary: '무료는 무제한이라는 의미는 아닙니다.',
-      body: 'OpenRouter, Groq, Cerebras, Gemini에는 일부 무료 옵션이 있습니다. 모델, 제한, 조건은 다를 수 있습니다.',
-      icon: 'star',
-    },
-    {
-      eyebrow: '비용 관리',
-      title: '요금 이해',
-      summary: '비용은 주로 송수신하는 문장량에 의해 결정됩니다.',
-      body: '짧은 요청은 보통 저렴합니다. 긴 문서, 답변, 추론 및 추가 기능은 비용을 증가시킵니다.',
-      tip: '최신 요금을 확인하고 예산을 설정하세요.',
-      icon: 'chartBar',
-    },
-    {
-      eyebrow: '개념 3',
-      title: '관련 아이디어 찾기',
-      summary: '단어가 다르더라도 의미가 가까운 문장을 찾을 수 있습니다.',
-      body: '문장을 작은 부분으로 나누고 Embedding이라는 숫자 표현으로 변환합니다. RAG(검색 확장 생성)는 먼저 관련 정보를 검색하고 생성 모델의 컨텍스트로 전달합니다. Nodus에서는 Embedding이 질문에 가장 가까운 Vault 내의 장소와 생각을 선택하고 채팅, 연구, 쓰기 기능이 자료 전체를 매회 보내지 않고 출처에 기초한 답변에 이용할 수 있습니다. 참조원은 반드시 확인해 주십시오.',
-      tip: 'Embedding 모델을 변경하면 자료를 재처리해야 합니다.',
-      icon: '네트워크',
-    },
-    {
-      eyebrow: '검색 준비',
-      title: '다국어 모델 선택',
-      summary: '문서 언어에 맞는 모델을 선택합니다.',
-      body: 'Nodus는 BGE-M3, GTE Multilingual, Multilingual E5를 로컬로 제공합니다. OpenAI text-embedding-3도 사용할 수 있습니다.',
-      icon: 'languages',
-    },
-    {
-      eyebrow: 'AI 이미지',
-      title: '이미지 만들기 및 이해',
-      summary: '이미지 분석과 새로운 이미지 생성은 별도의 작업입니다.',
-      body: '사진 및 그래프 설명을 요청할 수 있습니다. 대응 서비스를 접속하면, 설명문으로부터 새로운 일러스트도 생성할 수 있습니다.',
-      tip: '결과를 확인하십시오. 생성된 이미지에는 오류가 포함되어 비용이 많이 들 수 있습니다.',
-      icon: '이미지',
-    },
-    {
-      eyebrow: '음성 기능',
-      title: '편지와 읽음',
-      summary: '음성을 문자로, 문자를 음성으로 만듭니다.',
-      body: '수업, 인터뷰, 음성 메모를 듣고 문서를 읽을 수 있습니다. 문자 발생은 반드시 확인하십시오.',
-      icon: '마이크로폰',
-    },
-    {
-      eyebrow: '안전하게 시작',
-      title: '첫 번째 설정',
-      summary: '소량의 자료로 시작하여 결과를 확인한 후 펼칩니다.',
-      body: 'Vault를 만들고 소량의 자료를 캡처하고 모델을 선택하여 결과를 확인합니다. 답변이 자료를 기반으로 하는지 확인하고 백업을 만듭니다.',
-      icon: 'check',
-    },
-    {
-      eyebrow: '당신의 친구',
-      title: 'Nodi 소개',
-      summary: 'Nodi는 채팅, 알림 및 도움말을 결합하여 언제든지 사용 중지할 수 있습니다.',
-      body: 'Nodi는 문서, 현재 화면, 사용중인 Vault 또는 모든 Vault를 컨텍스트로 사용할 수 있습니다. 설정 → 인터페이스 → Nodi 마스코트에서 비활성화, 채팅 모델, 항상 앞에 표시되는 설정, Vault 별 액세서리를 변경할 수 있습니다.',
-      icon: 'star',
-    },
+    { eyebrow: '여기서 시작하세요', title: 'Nodus에 오신 것을 환영합니다', summary: '자료를 모으고 서로 연결해 주는 로컬 작업 공간입니다.', body: 'Nodus는 문서, 노트, 데이터, 출처를 서로 분리된 공간에 정리합니다. 그 안에서 검색하고, 연관성을 발견하고, 공부나 연구, 글쓰기에 활용할 수 있습니다.', tip: '작업 공간은 사용자의 기기에 저장됩니다. 외부 서비스를 직접 선택할 때만 내용이 기기 밖으로 전송됩니다.', icon: 'network' },
+    { eyebrow: '개념 1', title: 'Vault란?', summary: 'Vault는 하나의 프로젝트를 위한 독립된 작업 공간입니다.', body: 'Vault에는 아홉 가지 유형이 있습니다. 학술, 1차 사료, 증언, 데이터베이스, 교육, 학습, 계보, 프로소포그래피(인물 집단 연구), 세계관 구축(worldbuilding)입니다. 각 Vault는 고유한 자료, 구성, 색인을 갖습니다. 새로 추가된 유형은 만들 때 개발 단계(베타, 알파, 프리알파)를 표시합니다.', icon: 'archive' },
+    { eyebrow: '개념 2', title: '세 가지 도움', summary: '글쓰기, 의미 검색, 음성에는 서로 다른 도구가 쓰입니다.', body: '대화 모델은 글을 쓰고 설명합니다. 임베딩 모델은 의미가 비슷한 구절을 찾습니다. 음성 모델은 녹음을 텍스트로 바꾸거나 텍스트를 소리 내어 읽어 줍니다.', icon: 'layers' },
+    { eyebrow: '외부 서비스 없이', title: '내 기기에서 실행되는 모델', summary: 'Nodus는 로컬 실행용으로 준비된 모델을 내려받을 수 있습니다.', body: '이 모델로 내용을 다른 회사에 보내지 않고도 대화, 요약, 이미지 이해를 할 수 있습니다. 다운로드는 선택 사항이며, 큰 모델일수록 더 많은 메모리가 필요합니다.', icon: 'settings' },
+    { eyebrow: '외부 서비스', title: '공급자 연결하기', summary: '온라인 서비스는 개인 접근 키를 사용합니다.', body: '사용할 서비스에서 키를 만들고 설정에 붙여 넣은 뒤 연결을 확인하세요. API 키는 비밀번호와 같습니다.', tip: '키를 절대 공유하지 마세요. 다른 사람이 잔액이나 사용 한도를 소진할 수 있습니다.', icon: 'key' },
+    { eyebrow: '무료로 시작하기', title: '무료 옵션에도 한도가 있습니다', summary: '무료라고 해서 무제한은 아닙니다.', body: 'OpenRouter, Groq, Cerebras, Gemini는 일부 무료 옵션을 제공합니다. 사용 가능한 모델, 한도, 조건은 바뀔 수 있습니다.', icon: 'star' },
+    { eyebrow: '비용 관리', title: '요금 이해하기', summary: '비용은 주로 주고받는 텍스트의 양에 따라 달라집니다.', body: '짧은 요청은 보통 저렴합니다. 긴 문서, 긴 답변, 추론, 추가 기능은 비용을 높입니다.', tip: '공급자의 최신 요금을 확인하고 예산을 정해 두세요.', icon: 'chartBar' },
+    { eyebrow: '개념 3', title: '관련 아이디어 찾기', summary: '단어가 달라도 의미가 비슷한 텍스트를 찾을 수 있습니다.', body: '텍스트를 구절로 나눈 뒤 임베딩이라는 수치 표현으로 바꿉니다. RAG(검색 증강 생성)는 먼저 관련 정보를 찾고, 그 정보를 생성 모델에 맥락으로 제공합니다. Nodus에서는 임베딩이 질문과 가장 가까운 Vault의 구절과 아이디어를 고르고, 채팅·연구·글쓰기 기능은 매번 전체 자료를 보내지 않고도 이를 활용해 출처에 근거한 답변을 만듭니다. 항상 출처를 확인하세요.', tip: '임베딩 모델을 바꾸면 자료를 다시 처리해야 합니다.', icon: 'network' },
+    { eyebrow: '검색 준비', title: '다국어 모델 선택하기', summary: '문서에 쓰인 언어에 맞는 모델을 고르세요.', body: 'Nodus는 BGE-M3, GTE Multilingual, Multilingual E5를 로컬로 제공합니다. 인터넷을 통해 OpenAI text-embedding-3 모델도 사용할 수 있습니다.', icon: 'languages' },
+    { eyebrow: 'AI 이미지', title: '이미지 만들기와 이해하기', summary: '이미지를 분석하는 일과 새 이미지를 만드는 일은 서로 다른 작업입니다.', body: '사진이나 그래프의 설명을 요청할 수 있습니다. 호환되는 서비스를 연결하면 Nodus가 설명을 바탕으로 새 그림을 만들 수도 있습니다.', tip: '결과를 꼭 확인하세요. 생성된 이미지에는 오류가 있을 수 있고 비용이 들 수 있습니다.', icon: 'image' },
+    { eyebrow: '내장 오디오', title: '받아쓰기와 듣기', summary: '음성을 텍스트로, 텍스트를 음성으로 바꿉니다.', body: 'Nodus는 강의, 인터뷰, 음성 메모를 텍스트로 받아 적고 문서를 소리 내어 읽어 줄 수 있습니다. 받아 적은 내용은 항상 검토하세요.', icon: 'microphone' },
+    { eyebrow: '안전한 시작', title: '첫 설정', summary: '적은 자료로 시작하고 결과를 확인한 뒤 넓혀 가세요.', body: 'Vault를 만들고, 자료를 조금 가져오고, 모델을 고른 다음 결과를 확인하세요. 답변이 내 출처에 근거하는지 확인하고 백업을 만들어 두세요.', icon: 'check' },
+    { eyebrow: '당신의 동반자', title: 'Nodi를 소개합니다', summary: 'Nodi는 채팅, 알림, 도움말을 한곳에 모은 동반자이며 언제든 끌 수 있습니다.', body: 'Nodi는 문서, 현재 화면, 활성 Vault 또는 모든 Vault를 맥락으로 사용할 수 있습니다. 설정 → 인터페이스 → Nodi 마스코트에서 Nodi를 끄거나, 채팅 모델을 고르거나, 다른 앱 위에 항상 표시하거나, Vault별 액세서리를 관리할 수 있습니다.', icon: 'star' },
   ],
   ru: [
     { eyebrow: 'Начните здесь', title: 'Добро пожаловать в Nodus', summary: 'Локальное пространство для сбора и связывания материалов.', body: 'Nodus хранит документы, заметки, данные и источники в отдельных пространствах. Вы можете искать, находить связи и использовать материалы для учёбы, исследований и письма.', tip: 'Пространства остаются на вашем устройстве. Данные покидают его только при выборе внешнего сервиса.', icon: 'network' },
-    { eyebrow: 'Понятие 1', title: 'Что такое хранилище?', summary: 'Хранилище — независимое пространство для одного проекта.', body: 'Можно создавать хранилища для науки, учёбы, генеалогии и баз данных. У каждого свои материалы, структура и индексы.', icon: 'archive' },
+    { eyebrow: 'Понятие 1', title: 'Что такое хранилище?', summary: 'Хранилище — независимое пространство для одного проекта.', body: 'В Nodus девять типов хранилищ: академическое, первичные источники, свидетельства, базы данных, преподавание, учёба, генеалогия, просопография и worldbuilding. У каждого хранилища свои материалы, структура и индексы. Новые типы при создании показывают свою стадию (бета, альфа или пре-альфа).', icon: 'archive' },
     { eyebrow: 'Понятие 2', title: 'Три вида помощи', summary: 'Для текста, смыслового поиска и речи используются разные инструменты.', body: 'Диалоговые модели пишут и объясняют. Эмбеддинги находят близкие по смыслу фрагменты. Речевые модели расшифровывают записи и озвучивают текст.', icon: 'layers' },
     { eyebrow: 'Без внешних сервисов', title: 'Модели на вашем устройстве', summary: 'Nodus может загружать модели для локальной работы.', body: 'Они позволяют общаться, делать сводки и понимать изображения без отправки материалов другой компании. Загрузка необязательна, крупным моделям нужно больше памяти.', icon: 'settings' },
     { eyebrow: 'Внешние сервисы', title: 'Подключение провайдера', summary: 'Онлайн-сервисы используют личный ключ доступа.', body: 'Создайте ключ у выбранного сервиса, вставьте его в настройках и проверьте соединение. Ключ API похож на пароль.', tip: 'Не передавайте ключ другим людям. Они могут потратить ваш баланс или лимиты.', icon: 'key' },
@@ -446,7 +368,7 @@ const COMPACT_SLIDES: Record<Exclude<TutorialLanguage, 'es' | 'en'>, CompactSlid
   ],
   uk: [
     { eyebrow: 'Почніть тут', title: 'Ласкаво просимо до Nodus', summary: 'Локальний простір для збирання та поєднання матеріалів.', body: 'Nodus зберігає документи, нотатки, дані й джерела в окремих просторах. Ви можете шукати, знаходити зв’язки та використовувати матеріали для навчання, досліджень і письма.', tip: 'Простори залишаються на вашому пристрої. Дані залишають його лише після вибору зовнішнього сервісу.', icon: 'network' },
-    { eyebrow: 'Поняття 1', title: 'Що таке сховище?', summary: 'Сховище — незалежний робочий простір для одного проєкту.', body: 'Можна створювати сховища для науки, навчання, генеалогії та баз даних. Кожне має власні матеріали, структуру й індекси.', icon: 'archive' },
+    { eyebrow: 'Поняття 1', title: 'Що таке сховище?', summary: 'Сховище — незалежний робочий простір для одного проєкту.', body: 'У Nodus дев’ять типів сховищ: академічне, першоджерела, свідчення, бази даних, викладання, навчання, генеалогія, просопографія та worldbuilding. Кожне сховище має власні матеріали, структуру й індекси. Новіші типи під час створення показують свою стадію (бета, альфа або пре-альфа).', icon: 'archive' },
     { eyebrow: 'Поняття 2', title: 'Три види допомоги', summary: 'Для тексту, пошуку за змістом і мовлення застосовуються різні інструменти.', body: 'Діалогові моделі пишуть і пояснюють. Ембеддинги знаходять близькі за змістом уривки. Мовні моделі розшифровують записи й озвучують текст.', icon: 'layers' },
     { eyebrow: 'Без зовнішніх сервісів', title: 'Моделі на вашому пристрої', summary: 'Nodus може завантажувати моделі для локальної роботи.', body: 'Вони дають змогу спілкуватися, створювати підсумки й розуміти зображення без надсилання матеріалів іншій компанії. Завантаження необов’язкове.', icon: 'settings' },
     { eyebrow: 'Зовнішні сервіси', title: 'Підключення постачальника', summary: 'Онлайн-сервіси використовують особистий ключ доступу.', body: 'Створіть ключ у вибраному сервісі, вставте його в налаштуваннях і перевірте з’єднання. Ключ API схожий на пароль.', tip: 'Не передавайте ключ іншим. Вони можуть витратити ваш баланс або ліміти.', icon: 'key' },
@@ -498,24 +420,9 @@ export function BasicsTutorial({ language, onLanguageChosen, onNodiStyleChosen, 
     'pt-BR': { guide: 'GUIA ESSENCIAL', skip: 'Pular tutorial', back: 'Anterior', next: 'Próximo', finish: 'Começar a usar o Nodus', pace: 'Use as setas para avançar no seu ritmo', hello: 'Olá! Eu sou o Nodi.', done: 'Agora você já conhece o essencial.', nodiTitle: 'Com qual Nodi você fica?', nodiLede: 'O Nodi vai te acompanhar pelo app e guiar este tutorial. Você pode mudar quando quiser nas configurações.', nodiClassic: 'Nodi clássico', nodiClassicBody: 'O personagem, com seus gestos e trajes conforme o cofre.', nodiOrb: 'Nodi orbe', nodiOrbBody: 'Uma esfera de vidro, mais sóbria, com a cor do seu cofre.' },
     zh: { guide: '基础指南', skip: '跳过教程', back: '上一步', next: '下一步', finish: '开始使用 Nodus', pace: '使用箭头按自己的节奏浏览', hello: '你好！我是 Nodi。', done: '你已经掌握基础知识了。', nodiTitle: '你想要哪个 Nodi？', nodiLede: 'Nodi 会在应用中陪伴你，并引导这份教程。之后可以随时在设置中更改。', nodiClassic: '经典 Nodi', nodiClassicBody: '原本的角色，有动作，也会随资料库换装。', nodiOrb: '光球 Nodi', nodiOrbBody: '更沉稳的玻璃球，会染上你资料库的颜色。' },
     'zh-CN': { guide: '基础指南', skip: '跳过教程', back: '上一步', next: '下一步', finish: '开始使用 Nodus', pace: '使用箭头按自己的节奏浏览', hello: '你好！我是 Nodi。', done: '你已经掌握基础知识了。', nodiTitle: '你想要哪个 Nodi？', nodiLede: 'Nodi 会在应用中陪伴你，并引导这份教程。之后可以随时在设置中更改。', nodiClassic: '经典 Nodi', nodiClassicBody: '原本的角色，有动作，也会随资料库换装。', nodiOrb: '光球 Nodi', nodiOrbBody: '更沉稳的玻璃球，会染上你资料库的颜色。' },
-    'zh-TW': { guide: '基礎指南', skip: '跳過教程', back: '上一步', next: '下一步', finish: '開始使用 Nodus', pace: '使用箭頭按自己的節奏瀏覽', hello: '你好！我是 Nodi。', done: '你已經掌握基礎知識了。', nodiTitle: '你想要哪個 Nodi？', nodiLede: 'Nodi 會在應用中陪伴你，並引導這份教程。之後可以隨時在設定中更改。', nodiClassic: '經典 Nodi', nodiClassicBody: '原本的角色，有動作，也會隨資料庫換裝。', nodiOrb: '光球 Nodi', nodiOrbBody: '更沉穩的玻璃球，會染上你資料庫的顏色。' },
+    'zh-TW': { guide: '基礎指南', skip: '跳過教學', back: '上一步', next: '下一步', finish: '開始使用 Nodus', pace: '使用方向鍵，依自己的步調瀏覽', hello: '你好！我是 Nodi。', done: '你已經掌握基礎了。', nodiTitle: '你想要哪一個 Nodi？', nodiLede: 'Nodi 會在應用程式中陪伴你，並帶你看完這份教學。之後隨時可以在設定中更改。', nodiClassic: '經典 Nodi', nodiClassicBody: '原本的角色，有各種動作，也會隨知識庫換裝。', nodiOrb: '光球 Nodi', nodiOrbBody: '更沉穩的玻璃球，會染上你知識庫的顏色。' },
     ja: { guide: '基本ガイド', skip: 'チュートリアルをスキップ', back: '戻る', next: '次へ', finish: 'Nodusを使い始める', pace: '矢印で自分のペースで進めます', hello: 'こんにちは！Nodiです。', done: '基本はこれで完了です。', nodiTitle: 'どちらのNodiにしますか？', nodiLede: 'Nodiがアプリの中で寄り添い、このガイドを案内します。設定でいつでも変更できます。', nodiClassic: 'クラシックNodi', nodiClassicBody: 'おなじみのキャラクター。しぐさとVaultごとの衣装つき。', nodiOrb: 'オーブNodi', nodiOrbBody: '落ち着いたガラスの球体。Vaultの色に染まります。' },
-    ko: {
-      guide: '필수 가이드',
-      skip: '튜토리얼 건너뛰기',
-      back: '뒤로',
-      next: '다음',
-      finish: 'Nodus 사용 시작',
-      pace: '화살표를 사용하여 원하는 속도로 이동하세요.',
-      hello: '안녕! 저는 Nodi입니다.',
-      done: '당신은 필수품을 가지고 있습니다.',
-      nodiTitle: '어떤 Nodi를 원하시나요?',
-      nodiLede: 'Nodi는 앱 전체에서 여러분과 함께하고 이 튜토리얼을 안내할 것입니다. 설정에서 언제든지 변경할 수 있습니다.',
-      nodiClassic: '클래식 Nodi',
-      nodiClassicBody: '제스처와 볼트별 의상을 갖춘 캐릭터입니다.',
-      nodiOrb: '오브 Nodi',
-      nodiOrbBody: '금고의 색상으로 착색된 차분한 유리구입니다.',
-    },
+    ko: { guide: '필수 가이드', skip: '튜토리얼 건너뛰기', back: '이전', next: '다음', finish: 'Nodus 시작하기', pace: '화살표로 원하는 속도에 맞춰 넘겨 보세요', hello: '안녕하세요! 저는 Nodi예요.', done: '이제 기본은 모두 익혔어요.', nodiTitle: '어떤 Nodi와 함께할까요?', nodiLede: 'Nodi가 앱 곳곳에서 함께하며 이 튜토리얼을 안내합니다. 설정에서 언제든 바꿀 수 있습니다.', nodiClassic: '클래식 Nodi', nodiClassicBody: '몸짓과 Vault별 의상을 갖춘 캐릭터입니다.', nodiOrb: '오브 Nodi', nodiOrbBody: 'Vault 색으로 물드는 차분한 유리 구체입니다.' },
     ru: { guide: 'ОСНОВНОЕ РУКОВОДСТВО', skip: 'Пропустить обучение', back: 'Назад', next: 'Далее', finish: 'Начать работу с Nodus', pace: 'Используйте стрелки и двигайтесь в своём темпе', hello: 'Привет! Я Ноди.', done: 'Теперь вы знаете основы.', nodiTitle: 'Какой Ноди вам ближе?', nodiLede: 'Ноди будет сопровождать вас в приложении и в этом руководстве. Это можно изменить в настройках.', nodiClassic: 'Классический Ноди', nodiClassicBody: 'Персонаж с жестами и нарядами по типу хранилища.', nodiOrb: 'Ноди-сфера', nodiOrbBody: 'Более строгая стеклянная сфера цвета вашего хранилища.' },
     uk: { guide: 'ОСНОВНИЙ ПОСІБНИК', skip: 'Пропустити навчання', back: 'Назад', next: 'Далі', finish: 'Почати роботу з Nodus', pace: 'Використовуйте стрілки та рухайтеся у своєму темпі', hello: 'Привіт! Я Ноді.', done: 'Тепер ви знаєте основи.', nodiTitle: 'Який Ноді вам ближчий?', nodiLede: 'Ноді супроводжуватиме вас у застосунку та в цьому посібнику. Це можна змінити в налаштуваннях.', nodiClassic: 'Класичний Ноді', nodiClassicBody: 'Персонаж із жестами та вбранням за типом сховища.', nodiOrb: 'Ноді-сфера', nodiOrbBody: 'Стриманіша скляна сфера у кольорі вашого сховища.' },
   }[activeLanguage];

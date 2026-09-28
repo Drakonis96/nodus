@@ -126,9 +126,9 @@ test('embeds go to the no-cookie host, in the tutorial language', () => {
 test('every language the cinematic guide offers has full video copy', async () => {
   const tutorial = await read('src/views/BasicsTutorial.tsx');
   // The languages are declared once, in the guide's own picker. Read them from there so
-  // adding a thirteenth language fails here instead of silently serving it English.
+  // adding a fifteenth language fails here instead of silently serving it English.
   const codes = [...tutorial.matchAll(/\{ code: '([\w-]+)', label:/g)].map((match) => match[1]);
-  assert.equal(codes.length, 12, `the guide offers twelve languages, found ${codes.length}`);
+  assert.equal(codes.length, 14, `the guide offers fourteen languages, found ${codes.length}`);
 
   const spanish = catalogue.tutorialVideoCopy('es');
   for (const code of codes) {

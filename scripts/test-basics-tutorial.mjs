@@ -44,7 +44,8 @@ test('essential tutorial is global, seen-once, skippable with confirmation and r
   assert.match(css, /place-items: center/);
   assert.match(css, /\.tutorial-language-option/);
   assert.match(css, /\.tutorial-language-card > \.nodi-svg,\s*\.tutorial-language-card > \.nodi-orb\s*\{[^}]*margin-inline: auto/s, 'classic and orbital Nodi are both centred on the language screen');
-  assert.match(css, /grid-template-columns: repeat\(auto-fit, 145px\)/);
+  assert.match(css, /\.tutorial-language-grid \{[^}]*flex-wrap: wrap;[^}]*justify-content: center/s, 'a short last row of languages stays centred');
+  assert.match(css, /\.tutorial-language-grid > \.tutorial-language-option \{ flex: 0 0 145px; \}/);
   assert.match(css, /height: 3\.5rem/);
   assert.match(css, /width: 100%/);
   assert.match(css, /var\(--tutorial-flag\)/);
@@ -89,11 +90,11 @@ test('essential tutorial teaches the complete novice AI and Nodus foundation in 
   assert.doesNotMatch(spanish, /local-first|VRAM|cuantizaci[oó]n|inferencia|Speech-to-text|Text-to-speech/);
   for (const language of ['fr', 'tr', 'de', 'it', 'pt', 'zh', 'ja', 'ru', 'uk']) assert.match(tutorial, new RegExp(`${language}: \\[`));
   assert.match(tutorial, /'pt-BR': \[/);
-  for (const code of ['es', 'en', 'fr', 'tr', 'de', 'it', 'pt', 'pt-BR', 'zh-CN', 'ja', 'ru', 'uk']) {
+  for (const code of ['es', 'en', 'fr', 'tr', 'de', 'it', 'pt', 'pt-BR', 'zh-CN', 'zh-TW', 'ja', 'ko', 'ru', 'uk']) {
     assert.match(tutorial, new RegExp(`code: '${code}'`));
   }
-  for (const label of ['Português do Brasil', '简体中文', '日本語', 'Русский', 'Українська']) assert.match(tutorial, new RegExp(label));
-  for (const nodiTitle of ['Conoce a Nodi', 'Meet Nodi', 'Découvrez Nodi', 'Nodi ile tanışın', 'Lernen Sie Nodi kennen', 'Conosci Nodi', 'Conheça o Nodi', '认识 Nodi', 'Nodiを紹介します', 'Познакомьтесь с Nodi', 'Познайомтеся з Nodi']) {
+  for (const label of ['Português do Brasil', '简体中文', '繁體中文', '日本語', '한국어', 'Русский', 'Українська']) assert.match(tutorial, new RegExp(label));
+  for (const nodiTitle of ['Conoce a Nodi', 'Meet Nodi', 'Découvrez Nodi', 'Nodi ile tanışın', 'Lernen Sie Nodi kennen', 'Conosci Nodi', 'Conheça o Nodi', '认识 Nodi', '認識 Nodi', 'Nodiを紹介します', 'Nodi를 소개합니다', 'Познакомьтесь с Nodi', 'Познайомтеся з Nodi']) {
     assert.match(tutorial, new RegExp(nodiTitle));
   }
   assert.match(tutorial, /data-testid="basics-tutorial-language"/);
@@ -134,4 +135,37 @@ test('study analysis exposes chat, review and the question bank without obsolete
   // locked or expanded into a second level of navigation.
   assert.match(app, /group\.items\.map\(\(n\) => navButton\(n\)\)/);
   assert.doesNotMatch(app, /toolkitSubNav/);
+});
+
+test('every tutorial language gets a complete, renderable deck in its own language', async () => {
+  const [tutorial, ui, guidance, vaultTypes] = await Promise.all([
+    read('src/views/BasicsTutorial.tsx'),
+    read('src/components/ui.tsx'),
+    read('src/components/modelGuidanceCopy.ts'),
+    read('shared/vaultTypes.ts'),
+  ]);
+  const iconBlock = ui.slice(ui.indexOf('const ICON_PATHS'), ui.indexOf('export const ICON_NAMES'));
+  const icons = new Set([...iconBlock.matchAll(/^\s{2}([A-Za-z0-9]+):/gm)].map((match) => match[1]));
+  // An icon name the table does not know renders nothing, silently: the Korean deck
+  // once shipped with its icon names translated.
+  for (const [, icon] of tutorial.matchAll(/icon: '([^']+)'/g)) assert.ok(icons.has(icon), `icon '${icon}' exists`);
+
+  // The three model-guidance slides used to fall back to English mid-deck.
+  const compact = tutorial.slice(tutorial.indexOf('const COMPACT_SLIDES'), tutorial.indexOf('function CompactSlides'));
+  const compactLanguages = [...compact.matchAll(/^ {2}'?([a-zA-Z-]+)'?: \[/gm)].map((match) => match[1]);
+  assert.ok(compactLanguages.length >= 13);
+  for (const language of compactLanguages) {
+    assert.match(guidance, new RegExp(`^ {2}'?${language}'?: `, 'm'), `${language} translates the model-guidance slides`);
+    const block = compact.slice(compact.search(new RegExp(`^ {2}'?${language}'?: \\[`, 'm')));
+    assert.equal((block.slice(0, block.indexOf('\n  ],')).match(/eyebrow:/g) ?? []).length, 13, `${language} keeps thirteen core slides`);
+  }
+
+  // The vault slide names every type a new vault can be created as, in both full decks.
+  const available = [...vaultTypes.matchAll(/id: '([a-z_]+)',\s*available: (true|PRIMARY_SOURCES_RELEASE_ENABLED)/g)].map((match) => match[1]);
+  assert.equal(available.length, 9);
+  const spanish = tutorial.slice(tutorial.indexOf('function SpanishSlides'), tutorial.indexOf('function EnglishSlides'));
+  const english = tutorial.slice(tutorial.indexOf('function EnglishSlides'), tutorial.indexOf('const COMPACT_SLIDES'));
+  assert.equal((spanish.match(/tutorial-vault-grid">[\s\S]*?<\/div><p>/)[0].match(/<b>/g) ?? []).length, available.length);
+  assert.equal((english.match(/tutorial-vault-grid">[\s\S]*?<\/div><p>/)[0].match(/<b>/g) ?? []).length, available.length);
+  assert.doesNotMatch(tutorial, /Llegará en una versión futura|coming in a future version/);
 });

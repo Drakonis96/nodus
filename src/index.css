@@ -1326,13 +1326,16 @@ html.theme-active.light .nodus-tooltip { border-color: var(--theme-border-light)
   color: #a3a3a3;
 }
 
+/* Fourteen languages do not fill rows of four: wrap instead of a grid so the last,
+   shorter row sits centred under the others rather than hanging off the left. */
 .tutorial-language-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, 145px);
+  display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 0.65rem;
   margin-top: 1.5rem;
 }
+.tutorial-language-grid > .tutorial-language-option { flex: 0 0 145px; }
 
 /* The first-vault chooser must remain a single, glanceable decision: the entire form
    and its primary action fit in the window instead of hiding the action in a nested
@@ -5559,7 +5562,9 @@ html.theme-active .whats-new-scope-tooltip { border-color: var(--wn-border); col
 .tutorial-vault-grid, .tutorial-price-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .tutorial-vault-grid > div, .tutorial-price-grid > div { display: grid; gap: 3px; border: 1px solid rgb(255 255 255 / .09); border-radius: 12px; padding: 12px; background: rgb(0 0 0 / .12); }
 .tutorial-vault-grid span, .tutorial-price-grid span { color: #a8a29e; font-size: 12px; line-height: 1.45; }
-.tutorial-vault-grid > div:last-child { grid-column: 1 / -1; }
+/* Nine vault types: three even rows on a wide card, two columns with the ninth
+   spanning the row once the card narrows. */
+.tutorial-vault-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .tutorial-three-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .tutorial-three-columns > div { display: flex; min-height: 130px; flex-direction: column; gap: 8px; border: 1px solid rgb(255 255 255 / .09); border-radius: 14px; padding: 15px; background: rgb(0 0 0 / .12); }
 .tutorial-three-columns svg { color: #5eead4; }
@@ -5579,6 +5584,8 @@ html.theme-active .whats-new-scope-tooltip { border-color: var(--wn-border); col
   .tutorial-card { max-height: calc(100vh - 190px); }
   .tutorial-three-columns { grid-template-columns: 1fr; }
   .tutorial-three-columns > div { min-height: 0; }
+  .tutorial-vault-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tutorial-vault-grid > div:last-child { grid-column: 1 / -1; }
   .tutorial-footer > span { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .tutorial-aurora { animation: none; } }
