@@ -1,6 +1,7 @@
 import { isManualAcademic } from '../ai/academicMode';
 import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
+import { pruneOrphanThemesIn } from './graphIntegrity';
 import { v4 as uuid } from 'uuid';
 import type { ManagedTheme, Theme } from '@shared/types';
 import { COMPASS_THEME_ALIASES } from '../compass/compassVocabulary';
@@ -67,19 +68,9 @@ export function setWorkThemes(nodusId: string, labels: string[]): void {
       const theme_id = getOrCreateTheme(normalizeThemeLabel(label));
       db.prepare('INSERT OR IGNORE INTO work_themes (nodus_id, theme_id) VALUES (?, ?)').run(nodusId, theme_id);
     }
-    // No global prune here. This runs per-work, from deepScan.ts and lightScan.ts,
-    // inside THAT work's own transaction, at a point where this work's own idea-level
-    // theme links (idea_theme_links) may not be rewritten yet (deepScan.ts calls this
-    // via unionWorkThemes BEFORE its per-idea setIdeaThemeLinks loop). A "delete any
-    // theme nothing anywhere currently references" sweep run at that moment can delete
-    // a theme a DIFFERENT, unrelated work's committed idea_theme_links row still needs —
-    // getOrCreateTheme silently mints a fresh theme_id for the scanning work's own
-    // re-add, so its own data stays consistent, but the other work is left holding a
-    // theme_id that no longer exists (found via scripts/audit-graph-integrity.mjs: 1,005
-    // such dangling references across 60 works on a real vault). Orphan-theme cleanup
-    // belongs only where it can see a complete, already-finished picture: reprocessConnections()
-    // calls pruneOrphanThemes() explicitly, once, after every idea/work it touches in a
-    // pass has already been rewritten — that call is unaffected by removing this one.
+    // No orphan prune here: callers write their per-idea links after this, in the
+    // same transaction (deepScan.ts via unionWorkThemes), so they call
+    // pruneOrphanThemes() once the whole replacement is written.
   });
   tx();
 }
@@ -176,12 +167,14 @@ export function replaceIdeaThemeLinks(
   tx();
 }
 
-/** Drop themes that are neither pinned nor referenced by any work. */
+/**
+ * Drop themes that are neither pinned nor referenced by any work or idea link. Call it at
+ * the end of the transaction that rewrote theme links, when nothing is left half-written.
+ */
 export function pruneOrphanThemes(): void {
-  getDb()
-    .prepare('DELETE FROM themes WHERE pinned = 0 AND theme_id NOT IN (SELECT DISTINCT theme_id FROM work_themes) AND theme_id NOT IN (SELECT DISTINCT theme_id FROM idea_theme_links)')
-    .run();
+  pruneOrphanThemesIn(getDb());
 }
+
 
 /** Every theme label currently known — the curated universe used when scans are locked. */
 export function listThemeLabels(): string[] {

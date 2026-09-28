@@ -1,11 +1,10 @@
 // Stable idea identity across rescans. Drives the REAL ideasRepo functions
 // (createIdea, upsertOccurrence, purgeDeepData, findSimilarIdeas,
-// allIdeaCandidates, pruneDormantIdeas, reviveIdea) against a scratch DB and
+// allIdeaCandidates, pruneDormantIdeas, isActiveIdea) against a scratch DB and
 // proves the dormancy lifecycle: a rescan no longer deletes work-only ideas —
-// it puts them to sleep, fusion can re-match them (same global_id) for a merge
-// OR a link, re-attachment (occurrence or edge) revives them, and only
-// long-dormant ideas get pruned. Runs under Electron-as-Node so better-sqlite3
-// matches the app ABI.
+// it puts them to sleep, fusion can re-match them (same global_id), only a new
+// occurrence revives them (an edge never does), and only long-dormant ideas get
+// pruned. Runs under Electron-as-Node so better-sqlite3 matches the app ABI.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm, readFile, writeFile } from 'node:fs/promises';
@@ -112,13 +111,11 @@ try {
   );
   assert.doesNotThrow(() => repo.assertDeepDataIntegrity('w1'), 'a complete replacement passes the post-commit audit');
 
-  // ── 4b. A fusion LINK (not a merge) into a dormant idea must revive it too ─
-  // findSimilarIdeas(..., { includeDormant: true }) lets fusion match a dormant idea
-  // for a "variant_of"/"refines"/"contradicts" edge, not just a "same_as" merge. A
-  // link adds no occurrence for the target (the new idea, not the old one, is what
-  // this work actually contains), so nothing else revives it — applyFusionPlan must,
-  // the same way upsertOccurrence does for a merge. Reproduces the "edges→active
-  // ideas" failure seen scanning real books once dormant candidates entered the mix.
+  // ── 4b. A new edge into a dormant idea still fails the write-time audit ──
+  // Fusion plans are decided before the rescan purges its work, so a link target can
+  // be asleep by the time the plan is applied. The audit must keep rejecting an edge
+  // into it: fusion drops such a link instead of writing it (applyFusionLink, covered
+  // end to end by test-deep-rescan-dormant-link.mjs). Nothing here revives the target.
   const dormant = repo.createIdea({ type: 'claim', label: 'Dormida', statement: 'y', embedding: [0, 0, 1] });
   repo.upsertOccurrence(dormant.global_id, 'w4a', 'principal', '', 0.8);
   repo.purgeDeepData('w4a');
@@ -126,57 +123,51 @@ try {
     db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(dormant.global_id).orphaned_at,
     'link target starts dormant, as it would be mid-scan'
   );
+  assert.equal(repo.isActiveIdea(dormant.global_id), false, 'isActiveIdea sees it asleep');
+  assert.equal(repo.isActiveIdea(originalId), true, 'isActiveIdea sees an idea a work holds');
+  assert.equal(repo.isActiveIdea('no-such-idea'), false, 'isActiveIdea is false for a missing idea');
   db.prepare("INSERT INTO edges VALUES ('e-link', ?, ?, 'variant_of', 'inferred', 0.7, 'w4b')").run(originalId, dormant.global_id);
   assert.throws(
     () => repo.assertDeepDataIntegrity('w4b'),
     /edges→active ideas: 1/,
-    'an edge into a still-dormant idea fails the audit, same as the real bug'
+    'an edge into a still-dormant idea fails the audit'
   );
-  repo.reviveIdea(dormant.global_id);
-  assert.equal(
-    db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(dormant.global_id).orphaned_at,
-    null,
-    'reviveIdea clears dormancy for a link target, exactly as applyFusionPlan now does'
-  );
-  assert.doesNotThrow(() => repo.assertDeepDataIntegrity('w4b'), 'the audit passes once the link target is revived');
-  // Self-contained: step 5 below counts edges/ideas globally, so this scratch link
-  // and its dormant target must not linger past what this step is proving.
   db.prepare("DELETE FROM edges WHERE id = 'e-link'").run();
-  db.prepare("DELETE FROM idea_occurrences WHERE global_id = ?").run(dormant.global_id);
-  db.prepare("DELETE FROM ideas WHERE global_id = ?").run(dormant.global_id);
+  assert.doesNotThrow(() => repo.assertDeepDataIntegrity('w4b'), 'without that edge the pass is clean');
 
-  // ── 4c. A revival must survive an UNRELATED work's later purge ─────────────
-  // purgeDeepData's dormancy sweep is global — it runs on every rescan, for
-  // every idea in the library, not just the work being purged. Reproduces the
-  // real failure seen scanning actual books: book A links to a dormant idea
-  // and revives it (4b's mechanism), but book B's rescan minutes later — with
-  // no relation to book A — dormant-flags that same idea again the moment it
-  // finds zero occurrences, because the sweep never looked at edges. That
-  // silently invalidates book A's already-completed, already-audited data with
-  // no error raised anywhere, until book A happens to be rescanned itself.
+  // ── 4c. Edges never keep an idea awake; they only hide while it sleeps ───
+  // Book A links to an idea that book B holds. When B's rescan no longer contains it,
+  // the idea goes to sleep even though A's edge points at it: the edge stays in
+  // `edges` (visible_edges hides it) and returns if a scan re-attaches the idea. A's
+  // own rescan deletes A's edges before its audit, so A never fails because of B.
   const linked = repo.createIdea({ type: 'claim', label: 'Enlazada', statement: 'z', embedding: [1, 1, 0] });
   repo.upsertOccurrence(linked.global_id, 'w4c-owner', 'principal', '', 0.8);
-  repo.purgeDeepData('w4c-owner'); // its only occurrence is gone; nothing keeps it alive yet
   db.prepare("INSERT INTO edges VALUES ('e-cross', ?, ?, 'variant_of', 'inferred', 0.7, 'w4c-linker')").run(originalId, linked.global_id);
-  repo.reviveIdea(linked.global_id); // what applyFusionPlan does for a cross-work link
-  assert.equal(
+  repo.purgeDeepData('w4c-owner'); // book B's rescan: its only occurrence is gone
+  assert.ok(
     db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(linked.global_id).orphaned_at,
-    null,
-    'revived by a link from a different work (book A)'
+    "another work's edge does not keep an idea no work holds awake"
   );
-  repo.purgeDeepData('w4c-some-unrelated-work'); // book B's rescan — no relation to the idea above
   assert.equal(
-    db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(linked.global_id).orphaned_at,
-    null,
-    "an unrelated work's purge must not undo a revival a live edge still depends on"
+    db.prepare("SELECT COUNT(*) AS n FROM edges WHERE id = 'e-cross'").get().n,
+    1,
+    "book A's edge stays in place, hidden while its target sleeps"
   );
+  repo.purgeDeepData('w4c-linker'); // book A's own rescan starts by dropping its edges
   assert.doesNotThrow(
     () => repo.assertDeepDataIntegrity('w4c-linker'),
-    "the linking work (book A) stays valid after book B's unrelated purge"
+    "book A's rescan is not failed by the idea book B dropped"
   );
-  db.prepare("DELETE FROM edges WHERE id = 'e-cross'").run();
+  repo.upsertOccurrence(linked.global_id, 'w4c-owner', 'principal', '', 0.8);
+  assert.equal(
+    db.prepare('SELECT orphaned_at FROM ideas WHERE global_id = ?').get(linked.global_id).orphaned_at,
+    null,
+    'an occurrence (a work holding it again) is what wakes it'
+  );
   db.prepare("DELETE FROM idea_occurrences WHERE global_id = ?").run(linked.global_id);
   db.prepare("DELETE FROM ideas WHERE global_id = ?").run(linked.global_id);
+  db.prepare("DELETE FROM idea_occurrences WHERE global_id = ?").run(dormant.global_id);
+  db.prepare("DELETE FROM ideas WHERE global_id = ?").run(dormant.global_id);
 
   assert.throws(() => db.transaction(() => {
     db.prepare("INSERT INTO gaps (id, nodus_id, related_idea) VALUES ('broken-gap', 'w1', 'missing-idea')").run();

@@ -24,6 +24,7 @@ import { WORLD_CHAT_TRANSLATIONS } from './i18n.worldChat';
 import { STUDY_SYNONYM_TRANSLATIONS } from './i18n.studySynonyms';
 import { STUDY_BANK_TRANSLATIONS } from './i18n.studyBank';
 import { TEACHING_ATTENDANCE_TRANSLATIONS } from './i18n.teachingAttendance';
+import { GRAPH_HEALTH_TRANSLATIONS } from './i18n.graphHealth';
 import { STUDY_IMPROVE_TRANSLATIONS } from './i18n.studyImprove';
 import { WORKSPACE_TRANSLATIONS } from './i18n.workspace';
 import { WORLDBUILDING_TRANSLATIONS } from './i18n.worldbuilding';
@@ -140,6 +141,7 @@ export const ZH_CN: Record<string, string> = {
   ...STUDY_SYNONYM_TRANSLATIONS['zh-CN'],
   ...STUDY_BANK_TRANSLATIONS['zh-CN'],
   ...TEACHING_ATTENDANCE_TRANSLATIONS['zh-CN'],
+  ...GRAPH_HEALTH_TRANSLATIONS['zh-CN'],
   ...STUDY_SOURCE_TRANSLATIONS["zh-CN"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-CN'],
   ...WORKSPACE_TRANSLATIONS['zh-CN'],

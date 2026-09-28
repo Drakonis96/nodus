@@ -535,6 +535,18 @@ export const academicApi: AcademicApi = {
       ipcRenderer.removeListener('themes:reprocess:progress', listener);
     }
   },
+  reprocessRepairedThemeWorks: async (model, onProgress) => {
+    const listener = (_e: unknown, p: ReprocessProgress) => onProgress?.(p);
+    ipcRenderer.on('themes:reprocess:progress', listener);
+    try {
+      return await ipcRenderer.invoke('themes:reprocessRepairedWorks', model);
+    } finally {
+      ipcRenderer.removeListener('themes:reprocess:progress', listener);
+    }
+  },
+  checkGraphIntegrity: () => ipcRenderer.invoke('graph:integrity:check'),
+  repairGraphIntegrity: () => ipcRenderer.invoke('graph:integrity:repair'),
+  dismissRepairedThemeWorks: () => ipcRenderer.invoke('graph:integrity:dismissThemeWorks'),
 
   getGaps: () => ipcRenderer.invoke('gaps:aggregate'),
   getGapsPage: (offset, limit) => ipcRenderer.invoke('gaps:listPage', offset, limit),

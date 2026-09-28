@@ -120,6 +120,7 @@ import {
   interruptDecorativeImageGenerations,
 } from './ai/decorativeImages';
 import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
+import { repairGraphIntegrityOnce } from './db/graphIntegrityRepair';
 import { getSyncLog } from './db/syncRepo';
 import { fullSync, startRealtimeSync, stopRealtimeSync } from './sync/syncService';
 import {
@@ -365,6 +366,7 @@ export function registerIpc(
     relocalizeWorldbuildingDemoData();
     reconcileAuthorLayerOnce();
     reconcileAuthorRolesOnce();
+    repairGraphIntegrityOnce();
 
     const settings = getSettings();
     if (settings.syncMode === 'realtime') startRealtimeSync();
@@ -853,6 +855,7 @@ export function registerIpc(
       getDb();
       reconcileAuthorLayerOnce();
       reconcileAuthorRolesOnce();
+      repairGraphIntegrityOnce();
       const settings = getSettings();
       if (settings.syncMode === 'realtime') startRealtimeSync();
       startNodusServerSync();

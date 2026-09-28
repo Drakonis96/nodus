@@ -1,5 +1,6 @@
 import { manualIdeaVisible } from './manualIdeaVisibility';
 import { getDb } from './database';
+import { MANUAL_IDEA_REFS_SQL, sleepIdeasWithoutWorks, userIdeaReferencesSql } from './ideaDormancy';
 import { scanSimilar } from './vectorScan';
 import { v4 as uuid } from 'uuid';
 import { embeddingTextForIdea, embeddingTextHash } from './ideaEmbeddingText';
@@ -501,16 +502,19 @@ export function embeddedIdeaCount(): number {
 }
 
 /**
- * Restore a dormant idea to active status. `findSimilarIdeas(..., { includeDormant: true })`
- * deliberately surfaces dormant ideas as fusion candidates so a rescan can re-attach an old
- * concept, but a dormant idea is only "referenced again" once something in the live graph
- * actually points at it — either a new occurrence (a work discusses it) or a new edge (a work
- * relates something to it). Any caller that gives a dormant idea a fresh reference must call
- * this, or the idea stays orphaned while the graph now claims it is active — exactly the state
- * `assertDeepDataIntegrity`'s `edges→active ideas` check exists to catch.
+ * Restore a dormant idea to active status. An idea is active exactly while some work holds
+ * an occurrence of it (or a note owns it as a manual idea), so the only caller is
+ * `upsertOccurrence`. An edge is not a reason to wake an idea: edges that other works hold
+ * into a dormant idea stay in `edges`, and `visible_edges` hides them until a scan
+ * re-attaches the idea.
  */
 export function reviveIdea(globalId: string): void {
   getDb().prepare('UPDATE ideas SET orphaned_at = NULL WHERE global_id = ? AND orphaned_at IS NOT NULL').run(globalId);
+}
+
+/** True when the idea exists and is not dormant. Skips the embedding BLOB `getIdea` decodes. */
+export function isActiveIdea(globalId: string): boolean {
+  return Boolean(getDb().prepare('SELECT 1 FROM ideas WHERE global_id = ? AND orphaned_at IS NULL').get(globalId));
 }
 
 export function upsertOccurrence(
@@ -742,31 +746,11 @@ export function purgeDeepData(nodusId: string): void {
     // occurrences / orphaned_at filters), remains a fusion candidate, and is
     // revived by upsertOccurrence the moment any scan re-attaches it. Manual
     // ideas are never flagged: they are owned by a note and may legitimately
-    // have no works linked yet.
-    //
-    // This sweep is global — it runs for every purge, not just this work's own
-    // data — so it must also spare an idea that some OTHER work still has a
-    // live edge into. A fusion "link" (as opposed to a merge) attaches no
-    // occurrence for its target; applyFusionPlan's reviveIdea() call clears
-    // orphaned_at for that work's own scan, but without this exclusion the very
-    // next unrelated purge anywhere in the library re-flags the same idea
-    // dormant the moment it has zero occurrences, silently invalidating the
-    // linking work's edges (assertDeepDataIntegrity would then fail if that
-    // work were ever rescanned, with no error raised in the meantime). This
-    // scan's own edges into/out of this idea were already deleted above (the
-    // `DELETE FROM edges WHERE source_work = ?` two statements up), so this
-    // only protects references genuinely held by a *different* work.
-    db.prepare(
-      `UPDATE ideas SET orphaned_at = ?
-        WHERE orphaned_at IS NULL
-          AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
-          AND global_id NOT IN (
-            SELECT json_extract(source_json, '$.ref') FROM notes
-             WHERE json_extract(source_json, '$.note') = 'manual-idea'
-          )
-          AND global_id NOT IN (SELECT from_id FROM edges)
-          AND global_id NOT IN (SELECT to_id FROM edges)`
-    ).run(new Date().toISOString());
+    // have no works linked yet. Edges do not keep an idea awake either: the
+    // ones other works hold into it stay in `edges`, `visible_edges` hides them
+    // while it sleeps, and they reappear when a scan re-attaches it. Those
+    // works' rescans delete their own edges first, so nothing fails meanwhile.
+    sleepIdeasWithoutWorks(db, new Date().toISOString());
     db.prepare(
       `DELETE FROM edges
        WHERE from_id NOT IN (SELECT global_id FROM ideas)
@@ -839,8 +823,10 @@ export function assertDeepDataIntegrity(nodusId: string): void {
  * Delete ideas that have been dormant (no occurrences) longer than maxAgeDays.
  * Runs at startup as maintenance: recent dormancy is a revival opportunity —
  * fusion re-matches the idea on the next rescan and keeps its global_id —
- * while long-dormant ideas are genuinely gone from the corpus. Returns the
- * number of pruned ideas.
+ * while long-dormant ideas are genuinely gone from the corpus. An idea that
+ * user content still points at (a chapter, a database relation, a coverage
+ * link, an edge verdict…) is kept asleep instead, so the reference keeps
+ * resolving. Returns the number of pruned ideas.
  */
 export function pruneDormantIdeas(maxAgeDays = 30): number {
   const db = getDb();
@@ -852,11 +838,9 @@ export function pruneDormantIdeas(maxAgeDays = 30): number {
         `DELETE FROM ideas
           WHERE orphaned_at IS NOT NULL
             AND orphaned_at < ?
-            AND global_id NOT IN (SELECT DISTINCT global_id FROM idea_occurrences)
-            AND global_id NOT IN (
-              SELECT json_extract(source_json, '$.ref') FROM notes
-               WHERE json_extract(source_json, '$.note') = 'manual-idea'
-            )`
+            AND NOT EXISTS (SELECT 1 FROM idea_occurrences io WHERE io.global_id = ideas.global_id)
+            AND global_id NOT IN (${MANUAL_IDEA_REFS_SQL})
+            AND global_id NOT IN (${userIdeaReferencesSql(db)})`
       )
       .run(cutoff);
     pruned = result.changes;

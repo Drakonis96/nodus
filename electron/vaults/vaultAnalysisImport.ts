@@ -5,6 +5,8 @@ import type { LibraryAnalysisReuseComponent } from '@shared/libraryTypes';
 import type { AppSettings, VaultAnalysisReuseKind, VaultAnalysisReuseResult, VaultAnalysisReuseWorkResult, Work } from '@shared/types';
 import { getDb } from '../db/database';
 import { runMigrations } from '../db/migrations';
+import { sleepIdeasWithoutWorks, wakeIdeasWithWorks } from '../db/ideaDormancy';
+import { pruneOrphanThemesIn } from '../db/graphIntegrity';
 import { getActiveVault, getVault, listVaults } from './vaultRegistry';
 import { getSettings } from '../db/settingsRepo';
 import { ANALYSIS_PIPELINES, analysisModelFingerprint } from '../db/libraryAnalysisProvenance';
@@ -701,11 +703,22 @@ function importMatch(
       if (options.signal?.aborted) throw new Error('LIBRARY_REUSE_CANCELED');
       clearReusableTargetRows(targetDb, target.nodus_id, imported);
       if (imported.includes('themes')) copyThemes(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
-      if (imported.includes('ideas')) copyDeepAnalysis(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
-      else if (imported.includes('ideaEmbeddings')) copyIdeaEmbeddings(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
+      if (imported.includes('ideas')) {
+        copyDeepAnalysis(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
+        // The same rule a rescan applies: an idea this work now holds is awake. It may
+        // already have existed here asleep, and INSERT OR IGNORE left that row as it was.
+        // The sleep pass only matters if the target ever held ideas of its own, which
+        // reuse refuses today; it keeps the invariant if that rule ever loosens.
+        const now = new Date().toISOString();
+        const importedIdeas = (targetDb.prepare('SELECT global_id FROM idea_occurrences WHERE nodus_id = ?').all(target.nodus_id) as Array<{ global_id: string }>)
+          .map((row) => row.global_id);
+        wakeIdeasWithWorks(targetDb, importedIdeas);
+        sleepIdeasWithoutWorks(targetDb, now);
+      } else if (imported.includes('ideaEmbeddings')) copyIdeaEmbeddings(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       if (imported.includes('summary')) copySummary(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
       if (imported.includes('passages')) copyPassages(targetDb, match.work.nodus_id, target.nodus_id, tableRows, imported.includes('ideaEmbeddings'));
       if (imported.includes('documentProfile')) copyDocumentProfile(targetDb, match.work.nodus_id, target.nodus_id, tableRows);
+      if (imported.includes('themes') || imported.includes('ideas')) pruneOrphanThemesIn(targetDb);
       // Checkpoints describe an in-flight operation, not a reusable result.
       updateWorkStatus(targetDb, match.work, target.nodus_id, imported);
       copyProvenance(targetDb, match.work.nodus_id, target.nodus_id, match.vaultId, imported, tableRows);

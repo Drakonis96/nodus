@@ -39,6 +39,7 @@ import { BrowserSettings } from './settings/BrowserSettings';
 import { LegalDocModal } from '../components/LegalDocModal';
 import { LEGAL_DOCS, type LegalDocId } from '../legalDocs';
 import { confirm } from '../components/feedback';
+import { GraphHealthPanel } from '../components/GraphHealthPanel';
 import { Icon } from '../components/ui';
 import { ThemeColourPicker } from '../components/ThemeColourPicker';
 import { ThemePalettePicker } from '../components/ThemePalettePicker';
@@ -112,6 +113,8 @@ function themeDraftFrom(theme?: CustomAppTheme): Omit<CustomAppTheme, 'id'> {
 }
 
 type SettingsTabId = 'providers' | 'models' | 'library' | 'extraction' | 'interface' | 'integrations' | 'browser' | 'server' | 'system' | 'data' | 'about' | 'updates';
+
+const GRAPH_HEALTH_KEYWORDS = 'salud grafo integridad comprobar reparar ideas temas relaciones huérfanas zombis graph health integrity repair';
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
@@ -988,6 +991,7 @@ export function Settings({
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
     visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas'),
+    activeVault?.type === 'academic' && visibleSettingsSection('data', 'Salud del grafo', GRAPH_HEALTH_KEYWORDS),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
     visibleSettingsSection('about', 'Acerca de Nodus Research', 'proyecto independiente codigo abierto open source gratuito privacidad privacy rgpd gdpr datos alumnado licencia roadmap hoja de ruta futuro redes sociales social reddit youtube comunidad'),
     visibleSettingsSection('updates', 'Actualizaciones y novedades', 'actualizaciones update version novedades ultimos cambios latest changes changelog buscar instalar reiniciar avisos anuncios encuestas noticias beta testers prerelease canal estable'),
@@ -3490,6 +3494,10 @@ export function Settings({
               {t('El OCR es local pero descarga los datos de idioma de Tesseract la primera vez. Desactivado por defecto.')}
             </p>
           </Section>
+      )}
+
+      {activeVault?.type === 'academic' && visibleSettingsSection('data', 'Salud del grafo', GRAPH_HEALTH_KEYWORDS) && (
+        <GraphHealthPanel manualMode={settings.academicMode === 'manual'} />
       )}
 
       {visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos') && (

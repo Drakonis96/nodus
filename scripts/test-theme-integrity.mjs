@@ -1,9 +1,8 @@
-// setWorkThemes must not run a global "delete anything nothing currently references"
-// sweep, since it runs mid-transaction, per-work, from deepScan.ts (via unionWorkThemes)
-// and lightScan.ts — at a point where THIS work's own idea-level theme links
-// (idea_theme_links) may already be cleared (purgeDeepData) but not yet rewritten. A
-// theme used only by this work looks globally unreferenced at that exact moment, even
-// though it is about to be re-added a few lines later in the same transaction.
+// Theme cleanup runs once, at the end of the transaction that rewrote a work's theme
+// links, not inside setWorkThemes. deepScan.ts calls setWorkThemes (via unionWorkThemes)
+// before it writes the work's per-idea links, and lightScan.ts / reprocessConnections.ts
+// prune after their own writes. These cases pin both halves: setWorkThemes leaves themes
+// alone, and pruneOrphanThemes removes exactly the themes nothing references any more.
 //
 // Drives the REAL themesRepo functions (getOrCreateTheme, setWorkThemes,
 // pruneOrphanThemes) against a scratch DB. Runs under Electron-as-Node so
@@ -62,14 +61,11 @@ try {
   globalThis.__themeIntegrityTestDb = db;
   const repo = await import(pathToFileURL(repoModule).href);
 
-  // ── 1. A per-idea theme, not part of the work-level label cap, mid-relink ───────
-  // Simulates deepScan.ts's exact sequence for work W: purgeDeepData already cleared
-  // W's idea_theme_links (so a granular, idea-only theme has zero current references),
-  // then unionWorkThemes -> setWorkThemes runs with the work-level top-N labels
-  // (capped, e.g. 4) — BEFORE the per-idea loop re-adds each idea's own, possibly much
-  // more specific, theme a few lines later in the SAME transaction. A theme that isn't
-  // among those top-N labels (most per-idea themes aren't) looks globally unreferenced
-  // at that exact moment even though it's about to be restored.
+  // ── 1. setWorkThemes does not prune mid-transaction ───────────────────────────────
+  // In deepScan.ts, purgeDeepData has already cleared the work's idea links when
+  // unionWorkThemes -> setWorkThemes runs; the per-idea links are written afterwards in
+  // the same transaction. A theme with no reference at that moment must survive, so
+  // it keeps its theme_id instead of being deleted and minted again.
   const themeId = repo.getOrCreateTheme('Enzyme kinetics');
   assert.ok(db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(themeId), 'theme created');
   // (work W's idea_theme_links for 'Enzyme kinetics' were already deleted by
@@ -86,8 +82,8 @@ try {
   );
 
   // ── 2. A theme another, untouched work's idea_theme_links still needs ────────────
-  // Passes even before the fix (the other work's row protects it structurally), kept
-  // as a sanity check that removing the embedded sweep doesn't change this case.
+  // Another work's idea link protects the theme; an unrelated setWorkThemes and the
+  // prune both have to leave it alone.
   const sharedTheme = repo.getOrCreateTheme('Peptide stability');
   db.prepare("INSERT INTO idea_theme_links VALUES ('w-other', 'idea-other', ?, 0.8, 'explicit')").run(sharedTheme);
   repo.setWorkThemes('w2', []); // w2 has nothing to do with this theme at all
@@ -95,11 +91,12 @@ try {
     db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(sharedTheme),
     "an unrelated work's setWorkThemes call must never touch a theme it has nothing to do with"
   );
+  repo.pruneOrphanThemes();
+  assert.ok(db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(sharedTheme), 'the prune spares a theme an idea link uses');
 
   // ── 3. Cleanup still happens — just in the right place ───────────────────────────
-  // Genuinely orphaned themes (nothing anywhere references them) are still removable —
-  // reprocessConnections.ts's own explicit pruneOrphanThemes() call, run once after a
-  // complete pass, is unaffected by removing setWorkThemes's embedded sweep.
+  // A theme nothing references is removed by the explicit prune the writers call at
+  // the end (deepScan.ts, lightScan.ts, reprocessConnections.ts); a pinned one is not.
   const trulyOrphan = repo.getOrCreateTheme('Unused label');
   repo.pruneOrphanThemes();
   assert.equal(
@@ -113,8 +110,29 @@ try {
   repo.pruneOrphanThemes();
   assert.ok(db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(pinned), 'a pinned theme survives pruning');
 
+  // ── 4. End-of-transaction prune after a work's themes change ─────────────────────
+  // A light rescan replaces w3's broad themes. The theme only the old assignment used
+  // goes; a theme an idea link still uses stays even though no work lists it.
+  repo.setWorkThemes('w3', ['Old broad theme', 'Kept broad theme']);
+  const oldBroad = repo.getOrCreateTheme('Old broad theme');
+  const ideaOnly = repo.getOrCreateTheme('Idea-level theme');
+  db.prepare("INSERT INTO idea_theme_links VALUES ('w3', 'idea-w3', ?, 0.8, 'explicit')").run(ideaOnly);
+  repo.setWorkThemes('w3', ['Kept broad theme', 'New broad theme']);
+  assert.ok(
+    db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(oldBroad),
+    'setWorkThemes itself still leaves the old theme in place'
+  );
+  repo.pruneOrphanThemes();
+  assert.equal(db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(oldBroad), undefined, 'the theme nothing references is pruned');
+  assert.ok(db.prepare('SELECT 1 FROM themes WHERE theme_id = ?').get(ideaOnly), 'a theme only an idea link uses survives');
+  assert.equal(
+    db.prepare('SELECT COUNT(*) AS n FROM idea_theme_links itl LEFT JOIN themes t ON t.theme_id = itl.theme_id WHERE t.theme_id IS NULL').get().n,
+    0,
+    'no idea link is left pointing at a deleted theme'
+  );
+
   db.close();
-  console.log('theme integrity (setWorkThemes no longer prunes globally) test passed');
+  console.log('theme integrity (prune once, at the end of the write) test passed');
 } finally {
   await rm(root, { recursive: true, force: true });
 }
