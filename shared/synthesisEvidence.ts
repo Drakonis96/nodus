@@ -207,6 +207,110 @@ export function synthesisRetrievalQuery(question: string, evidence: SynthesisEvi
   return query || question;
 }
 
+/** What a passage must say to count as a textbook account of a reaction class: every pattern in
+ *  `all` must match, and none in `not`. Retrieval alone is a keyword or embedding match, so a
+ *  page on the enzyme that decarboxylates L-DOPA was offered for heating a malonic acid, and a
+ *  page on lead tetraacetate for a Beckmann rearrangement. A class not listed needs its own
+ *  name's first word. */
+const CLASS_RELEVANCE: Record<string, { all: RegExp[]; not?: RegExp[] }> = {
+  'enolate alkylation (malonic or acetoacetic ester synthesis)': { all: [/malonic|acetoacetic|enolate/i, /alkylat/i] },
+  'intramolecular aldol condensation (Robinson annulation)': { all: [/robinson annulation|aldol/i] },
+  'amide hydrolysis (deprotection of an acetamide)': { all: [/hydroly/i, /amide/i] },
+  'diazonium salt substitution (Sandmeyer)': { all: [/sandmeyer|diazonium/i] },
+  'Kolbe-Schmitt carboxylation of a phenol': { all: [/kolbe/i] },
+  'nitro group reduction to amine': { all: [/nitro|nitrat/i, /reduc|hydrogenat/i, /amine|aniline/i] },
+  'aromatic nitration': { all: [/nitrat/i] },
+  'Fischer esterification': { all: [/esterif/i] },
+  'acylation of an alcohol or phenol': { all: [/acylat|acetylat|esterif/i] },
+  'amide formation by acylation of an amine': { all: [/amide/i, /amine|ammonia/i, /acid chloride|acyl chloride|acylat|anhydride/i] },
+  'ester hydrolysis': { all: [/hydroly|saponif/i, /ester/i] },
+  'nitrile hydrolysis': { all: [/nitrile/i, /hydroly/i] },
+  'acid chloride formation with thionyl chloride': { all: [/thionyl chloride|SOCl\s*2/i, /acid chloride|acyl chloride|carboxylic acid/i] },
+  'oxidation to a carboxylic acid': { all: [/oxidi[sz]|oxidation/i, /carboxylic acid/i] },
+  'oxidation of an alcohol': { all: [/oxidi[sz]|oxidation/i, /alcohol/i] },
+  'benzylic oxidation': { all: [/benzylic/i, /oxidi[sz]|oxidation/i] },
+  'reduction of a carbonyl compound': { all: [/reduc/i, /aldehyde|ketone|carbonyl/i] },
+  'Suzuki cross-coupling': { all: [/suzuki/i] },
+  'nucleophilic aromatic substitution': { all: [/nucleophilic aromatic substitution|S\s*N\s*Ar/i] },
+  'Friedel-Crafts acylation': { all: [/friedel.crafts/i] },
+  'halogenation': { all: [/halogenat|brominat|chlorinat/i] },
+  'conversion of an alcohol to an alkyl halide': { all: [/alcohol/i, /halide|PBr3|SOCl2|HBr|HCl/i] },
+  'SN2 alkylation': { all: [/S\s*_?N\s*_?2|nucleophilic substitution/i] },
+  'Grignard reaction': { all: [/grignard/i] },
+  'Wittig reaction': { all: [/wittig/i] },
+  'partial hydrogenation of an alkyne': { all: [/alkyne|lindlar/i, /hydrogenat/i] },
+  'hydrogenation of an alkene': { all: [/hydrogenat/i, /alkene|double bond/i] },
+  'Michael addition': { all: [/michael/i] },
+  'alkylation of an acetylide': { all: [/acetylide/i] },
+  'benzoin condensation': { all: [/benzoin/i] },
+  'benzilic acid rearrangement': { all: [/benzilic/i] },
+  'oxime formation': { all: [/oxime/i] },
+  'Beckmann rearrangement': { all: [/beckmann/i] },
+  decarboxylation: { all: [/decarboxylat/i], not: [/decarboxylase|pyridoxal|enzym|\bPLP\b|L-?DOPA/i] },
+  chlorosulfonation: { all: [/chlorosulfon/i] },
+  'sulfonamide formation': { all: [/sulfonamide/i] },
+  'Diels-Alder cycloaddition': { all: [/diels.alder/i] },
+};
+
+function classRule(name: string): { all: RegExp[]; not?: RegExp[] } {
+  const rule = CLASS_RELEVANCE[name];
+  if (rule) return rule;
+  const word = name.split(/[\s(]+/).find((item) => item.length > 3);
+  return { all: word ? [new RegExp(word.slice(0, Math.max(5, word.length - 3)).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')] : [] };
+}
+
+/** Where in a passage the reaction class is discussed: the offset of the first stretch of about
+ *  two sentences that names every term the class needs, or -1 when none does (or an excluded
+ *  term appears anywhere). */
+function relevantOffset(name: string, flat: string): number {
+  const rule = classRule(name);
+  if ((rule.not ?? []).some((pattern) => pattern.test(flat))) return -1;
+  // The terms must appear together: a page that mentions an acid chloride in one paragraph and a
+  // reduction in another is not about either reaction.
+  for (let start = 0; start < Math.max(1, flat.length); start += RELEVANCE_STEP) {
+    const window = flat.slice(start, start + RELEVANCE_WINDOW);
+    if (!rule.all.every((pattern) => pattern.test(window))) continue;
+    // Where the discussion starts: the earliest required term in the window.
+    const first = Math.min(...rule.all.map((pattern) => window.search(pattern)).filter((at) => at >= 0), 0 + window.length);
+    return start + (Number.isFinite(first) ? first : 0);
+  }
+  return -1;
+}
+
+/** Whether a passage is a textbook account of the reaction class. */
+export function passageFitsClass(name: string, text: string): boolean {
+  return relevantOffset(name, text.replace(/\s+/g, ' ')) >= 0;
+}
+
+/** The excerpt to quote for a reaction class: the stretch that discusses it, from a sentence
+ *  start, not the passage's first characters (often the tail of an unrelated paragraph). */
+export function relevantExcerpt(name: string, text: string, chars: number): string {
+  const flat = text.replace(/\s+/g, ' ').trim();
+  let start = Math.max(0, relevantOffset(name, flat));
+  if (start > 0) {
+    // Back to the start of that sentence, when it began not long before.
+    const before = flat.slice(Math.max(0, start - 200), start);
+    const boundary = Math.max(before.lastIndexOf('. '), before.lastIndexOf('? '), before.lastIndexOf('! '));
+    start = boundary >= 0 ? start - before.length + boundary + 2 : start;
+  }
+  const body = flat.slice(start);
+  const cut = body.length > chars ? `${body.slice(0, chars).replace(/\s+\S*$/, '')}…` : body;
+  return start > 0 ? `…${cut}` : cut;
+}
+const RELEVANCE_WINDOW = 300;
+const RELEVANCE_STEP = 100;
+
+/** Whether a passage found for a query fits it: a reaction-class query must pass that class's
+ *  relevance rule; the target query ("<name> synthesis") must name the target. */
+export function passageFitsQuery(query: string, text: string): boolean {
+  for (const name of [...Object.keys(CLASS_QUERIES), ...Object.keys(CLASS_RELEVANCE)]) {
+    if (textbookQueryForClass(name) === query) return passageFitsClass(name, text);
+  }
+  const target = /^(.+) synthesis$/.exec(query)?.[1];
+  if (target) return text.toLowerCase().includes(target.toLowerCase());
+  return true;
+}
+
 /** A back-of-book index or a reference list: mostly page numbers, no chemistry to read. */
 export function isIndexLikePassage(text: string): boolean {
   const words = text.split(/\s+/).filter(Boolean).length;

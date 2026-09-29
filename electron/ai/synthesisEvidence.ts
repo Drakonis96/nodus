@@ -7,6 +7,7 @@ import {
   isIndexLikePassage,
   isSynthesisEvidenceWork,
   normalizeDisconnections,
+  passageFitsQuery,
   secondLevelTargets,
   synthesisEvidenceQueries,
   type EvidencePassage,
@@ -127,7 +128,7 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
     let taken = 0;
     for (const { hit } of [...scores.values()].sort((a, b) => b.score - a.score)) {
       if (taken >= perQuery || chosen.size >= MAX_PASSAGES) break;
-      if (chosen.has(hit.passage_id) || isIndexLikePassage(hit.text)) continue;
+      if (chosen.has(hit.passage_id) || isIndexLikePassage(hit.text) || !passageFitsQuery(query, hit.text)) continue;
       const text = hit.text.replace(/\s+/g, ' ').trim();
       chosen.set(hit.passage_id, {
         text: text.length > PASSAGE_CHARS ? `${text.slice(0, PASSAGE_CHARS)}…` : text,

@@ -44,7 +44,7 @@ import {
   type StepSupport,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
-import { findStartingSmiles, textbookQueryForClass } from '@shared/synthesisEvidence';
+import { findStartingSmiles, relevantExcerpt, textbookQueryForClass } from '@shared/synthesisEvidence';
 import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
@@ -641,7 +641,7 @@ async function buildStepSupport(
     for (const passage of found) {
       const name = names.find((item) => textbookQueryForClass(item) === passage.retrievedFor);
       if (!name) continue;
-      const excerpt = passage.text.length > EXCERPT_CHARS ? `${passage.text.slice(0, EXCERPT_CHARS).replace(/\s+\S*$/, '')}…` : passage.text;
+      const excerpt = relevantExcerpt(name, passage.text, EXCERPT_CHARS);
       for (const step of byClass.get(name) ?? []) {
         support.set(step, { ...support.get(step), passage: { title: passage.work.title, location: passage.location, citation: passage.citation, excerpt, about: name } });
       }

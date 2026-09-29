@@ -121,3 +121,23 @@ test('a route correction keeps Chemistry Studio and gets chemistry-focused corpu
   assert.match(skills, /export function capabilityChatSkills\(capability: string\)/);
   assert.match(skills, /skillActive\(skill\) && runnable\(skill\) && \(skill\.capabilities \?\? \[\]\)\.includes\(capability\)/, 'a skill the user disabled is not brought back');
 });
+
+test('a textbook passage must actually discuss the reaction class, and is quoted where it does', () => {
+  const { passageFitsClass, passageFitsQuery, relevantExcerpt } = evidence;
+  // Suite critiques: an enzyme page offered for a thermal decarboxylation.
+  const enzyme = 'Pyridoxine (vitamin B 6) is the cofactor for l-aromatic amino acid decarboxylase. In high doses, vitamin B 6 can reverse the therapeutic effects of l-DOPA by increasing its decarboxylation.';
+  assert.equal(passageFitsClass('decarboxylation', enzyme), false);
+  assert.equal(passageFitsClass('decarboxylation', 'On heating, a malonic acid loses CO2: decarboxylation of the β-diacid gives a substituted acetic acid.'), true);
+  // Terms far apart do not count: an acid chloride here, a reduction 600 characters later.
+  const apart = `Thionyl chloride is a reagent. ${'Filler text about something else entirely. '.repeat(15)} The carboxylic acid was reduced.`;
+  assert.equal(passageFitsClass('acid chloride formation with thionyl chloride', apart), false);
+  const together = `${'The previous problem asked about Grignard reagents. '.repeat(6)}Subsequent reaction with thionyl chloride results in the conversion of the carboxylic acid to the desired acid chloride.`;
+  assert.equal(passageFitsClass('acid chloride formation with thionyl chloride', together), true);
+  // The excerpt opens on the sentence that discusses the class, not the passage's first words.
+  assert.match(relevantExcerpt('acid chloride formation with thionyl chloride', together, 120), /^…Subsequent reaction with thionyl chloride/);
+  assert.equal(passageFitsClass('nitro group reduction to amine', 'Arylamines are prepared by nitration of an aromatic ring followed by reduction.'), true);
+  // Queries map back to their class; the target query needs the target named.
+  assert.equal(passageFitsQuery('Beckmann rearrangement', 'Entry 10 uses the Pb(OAc)4 conditions for an herbicide intermediate.'), false);
+  assert.equal(passageFitsQuery('malonic ester synthesis acetoacetic ester synthesis', 'The malonic ester synthesis alkylates the enolate of diethyl malonate.'), true);
+  assert.equal(passageFitsQuery('caprolactam synthesis', 'Nylon 6 is made by ring-opening polymerisation.'), false);
+});
