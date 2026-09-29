@@ -21,6 +21,7 @@ import {
   formatRouteCheckUnavailable,
   formatStructureAudit,
   formatUnresolvedNameClarification,
+  implyRacemicTarget,
   normalizeMoleculeDossier,
   normalizeReactionPrecedent,
   normalizeRouteAudit,
@@ -741,7 +742,8 @@ export async function appendRouteReportAndDrawings(
   const compile = compileProvider();
   const { runner, dispose } = chemistryRunner(options);
   try {
-    const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
+    const checked = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
+    const audit = checked ? implyRacemicTarget(checked, options.target) : checked;
     if (!audit) return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable('the chemistry package returned no route audit')}\n`;
     // The index lookup runs alongside the review and the drawings; it is skipped entirely
     // when the package has no such tool or the index has not been downloaded.

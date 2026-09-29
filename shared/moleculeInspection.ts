@@ -1617,6 +1617,21 @@ function labelledStepLines(labels: RouteSpeciesLabel[][], step: RouteStepAudit):
 /** Why a step's own equation needs correcting, or null when it passes on its own terms. */
 /** Why a step fails the route check, or null when it passes. The one verdict every part of the
  *  report uses — the FAIL lines, the drawings and the correction prompts — so they never disagree. */
+/** A request that gives its target without stereochemistry asks for the racemate (or does not
+ *  care): a step whose only unspecified stereocentres are in that target is racemic by the
+ *  request, not a failure to declare it. Intermediates, and a target requested with stereo,
+ *  are still held to naming their stereoisomer. Marks such steps racemic in place. */
+export function implyRacemicTarget(audit: RouteAudit, requestedTarget: string | null | undefined): RouteAudit {
+  const target = audit.target?.canonicalSmiles;
+  if (!requestedTarget || /[@/\\]/.test(requestedTarget) || !target) return audit;
+  for (const step of audit.steps) {
+    if (step.racemic || !(step.unspecifiedStereocentres > 0)) continue;
+    const open = (step.products ?? []).filter((product) => product.unspecifiedStereocentres > 0);
+    if (open.length && open.every((product) => product.canonicalSmiles === target)) step.racemic = true;
+  }
+  return audit;
+}
+
 export function routeStepFailure(step: RouteStepAudit): string | null {
   if (step.nameProblems?.length) return step.nameProblems.join('; ');
   if (!step.ok) return step.error ?? 'could not be parsed';
