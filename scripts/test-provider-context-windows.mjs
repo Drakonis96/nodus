@@ -33,3 +33,9 @@ test('the research budget reads the documented window before its fallback', asyn
   const body = source.slice(source.indexOf('export async function researchModelContextWindow'));
   assert.ok(body.indexOf('documentedContextWindow(model.provider, model.model)') < body.indexOf('tokens: 32768'));
 });
+
+test('Claude models on Anthropic get at least a 200K window; other providers are untouched', () => {
+  assert.equal(documentedContextWindow('anthropic', 'claude-opus-5-5'), 200_000);
+  assert.equal(documentedContextWindow('anthropic', 'claude-haiku-4-5-20251001'), 200_000);
+  assert.equal(documentedContextWindow('openrouter', 'anthropic/claude-opus-5-5'), null);
+});

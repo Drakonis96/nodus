@@ -525,10 +525,11 @@ async function listAnthropic(key: string | null, signal?: AbortSignal): Promise<
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, signal,
   });
   if (!res.ok) throw new Error(`Anthropic /models HTTP ${res.status}`);
-  const data = (await res.json()) as { data?: { id: string; display_name?: string;
+  const data = (await res.json()) as { data?: { id: string; display_name?: string; max_input_tokens?: number;
     capabilities?: { effort?: { supported?: boolean } & Partial<Record<'low' | 'medium' | 'high' | 'xhigh' | 'max', { supported?: boolean }>> };
   }[] };
   return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name,
+    ...(typeof m.max_input_tokens === 'number' && m.max_input_tokens > 0 ? { contextLength: m.max_input_tokens } : {}),
     researchReasoningLevels: m.capabilities?.effort?.supported === true
       ? (['low', 'medium', 'high', 'xhigh', 'max'] as const).filter(level => m.capabilities?.effort?.[level]?.supported === true) : [],
   })).sort(byId);

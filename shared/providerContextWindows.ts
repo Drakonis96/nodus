@@ -7,6 +7,11 @@
  * `deepseek-flash` and `deepseek-v4-pro` have a 1M context. The legacy names
  * `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted and are served by
  * the same Flash model, so they share its window.
+ *
+ * Anthropic: every current Claude model has at least a 200K-token context window
+ * (https://docs.claude.com/en/docs/about-claude/models/overview). The model list's
+ * `max_input_tokens` is used when present; this floor covers a list read without it. Without it
+ * a research request to Claude Opus fell back to 32K and was refused before sending.
  */
 const DOCUMENTED: Record<string, Record<string, number>> = {
   deepseek: {
@@ -19,5 +24,8 @@ const DOCUMENTED: Record<string, Record<string, number>> = {
 
 /** The documented context window in tokens, or null when the provider documents none. */
 export function documentedContextWindow(provider: string, model: string): number | null {
-  return DOCUMENTED[provider]?.[model] ?? null;
+  const listed = DOCUMENTED[provider]?.[model];
+  if (listed) return listed;
+  if (provider === 'anthropic' && /^claude-/.test(model)) return 200_000;
+  return null;
 }
