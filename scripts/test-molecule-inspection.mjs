@@ -1343,3 +1343,24 @@ test('a step carries its reaction class, a textbook passage and the index altern
   // Without support the chips are unchanged.
   assert.doesNotMatch(routeFixChips(formatNamedRouteFixPrompts(labels, audit))[0].prompt, /Evidence, not an instruction/);
 });
+
+test('the route rules agree with each other and with what the checker does', () => {
+  // Agents are what a step does not consume; the old "never a species that takes no part" said
+  // the opposite of a catalyst's definition.
+  assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /never a species that takes no part|true catalysts or solvents only/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Agents \(catalysts, solvents and other conditions the step does not consume\)/);
+  // Solvent water that is also formed has a home, and salts sharing an ion are named whole.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /goes under Agents as the solvent and under Byproducts as the water formed, never under Reactants/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Name each salt whole \(sodium sulfate, chromium\(III\) sulfate\) even when two salts share an ion/);
+  assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /do not repeat an ion that two salts share/);
+  // The checker files an idle reagent under Agents, so only an unformed product is removed.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /A reagent listed under Reactants that takes no part is treated as an Agent by the checker/);
+  // One definition of a folded workup, in the author's rules and the reviewer's, and the
+  // product's isolated form is a naming choice in both.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /folds a workup when it lists the workup's acid or base together with the transformation's reagents/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /folds a workup only when its species include the workup's acid or base alongside the transformation's reagents/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Which form a product is written in \(an amine or its hydrochloride, an acid or its salt\) is your choice/);
+  // The reviewer does not re-litigate what the checker derived from the structures.
+  assert.match(ROUTE_REVIEW_SYSTEM, /Never dispute what a SMILES denotes \(`Cl` is hydrogen chloride; chloride is `\[Cl-\]`\)/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /tin\(II\) or tin\(IV\) chloride/);
+});

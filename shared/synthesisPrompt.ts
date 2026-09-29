@@ -12,7 +12,7 @@ const HEAD = [
   '1. Number every step. For each step write the reagents and conditions in prose, then list EVERY species',
   '   under these four labels, each label on its own line:',
   '   «Reactants:» (species consumed), «Products:» (the intended products), «Byproducts:» (every other',
-  '   species on the product side), and «Agents:» (true catalysts or solvents only). For example:',
+  '   species on the product side), and «Agents:» (catalysts, solvents and conditions not consumed). For example:',
   '     Reactants: ethanoic acid; sodium hydroxide',
   '     Products: sodium ethanoate',
   '     Byproducts: water',
