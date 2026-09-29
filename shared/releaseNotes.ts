@@ -14,6 +14,7 @@ import { RELEASE_5_4_4_HIGHLIGHTS } from './releaseNotes544';
 import { RELEASE_5_4_5_HIGHLIGHTS } from './releaseNotes545';
 import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 import { RELEASE_5_7_0_HIGHLIGHTS } from './releaseNotes570';
+import { RELEASE_5_7_2_HIGHLIGHTS } from './releaseNotes572';
 import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
@@ -2985,6 +2986,16 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  // 5.7.2 turns Research Chat into an agent that plans the turn and looks up the
+  // catalogue, stops a question from freezing the window, speeds up document
+  // preparation, keeps library records and citations on the right passage, scopes
+  // re-embedding to the ideas that changed and rebuilds the Linux packages on
+  // Ubuntu 22.04 so they start on older glibc.
+  {
+    version: '5.7.2',
+    date: '2026-09-29',
+    highlights: RELEASE_5_7_2_HIGHLIGHTS,
+  },
   // 5.7.1 fixes the indexing welcome, whose «Yes, start» button stayed disabled while
   // every unindexed PDF was inspected. Its What's New modal is the 5.7.0 one, unchanged.
   {
