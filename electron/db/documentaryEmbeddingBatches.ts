@@ -54,6 +54,18 @@ export class DocumentaryEmbeddingBatches {
       this.db.prepare("UPDATE documentary_embedding_attempts SET state='complete',updated_at=? WHERE id=?").run(Date.now(), id);
     }).immediate();
   }
+  /** Once its vectors are published the working copy is never read again. */
+  discard(operation: string): void {
+    this.db.prepare('DELETE FROM documentary_embedding_chunks WHERE operation=?').run(operation);
+  }
+  /** Working copies left behind by operations that finished before discard() existed,
+   * a batch at a time; returns whether any remain. */
+  discardFinished(limit = 400): boolean {
+    if (!this.db.prepare("SELECT 1 FROM sqlite_master WHERE name='documentary_requests'").get()) return false;
+    const removed = this.db.prepare(`DELETE FROM documentary_embedding_chunks WHERE rowid IN (SELECT c.rowid FROM documentary_embedding_chunks c
+      JOIN documentary_requests r ON r.document_id=c.operation WHERE r.state='complete' LIMIT ?)`).run(limit).changes;
+    return removed === limit;
+  }
   uncertain(id: string): void {
     this.db.prepare("UPDATE documentary_embedding_attempts SET state='unknown',updated_at=? WHERE id=? AND state='requested'").run(Date.now(), id);
   }

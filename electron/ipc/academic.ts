@@ -69,6 +69,7 @@ import type {
   QueueKind,
   ReadingPathRequest,
   ReprocessConnectionsOptions,
+  ReprocessConnectionsResult,
   ResearchChatRequest,
   ResearchContextSelection,
   RqDecomposeRequest,
@@ -261,7 +262,7 @@ import {
   runDeepResearchJob,
 } from '../ai/deepResearchQueue';
 import { reprocessConnections } from '../ai/reprocessConnections';
-import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
+import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses, refreshRethemedIdeaEmbeddings } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
 import { getScopedLegacyPassageDetail } from '../citations/scopedLegacyCitations';
 import { getWebPassageDetail } from '../db/researchWebRepo';
@@ -1604,12 +1605,18 @@ export function registerAcademicIpc(context: IpcContext): void {
     themes.deleteTheme(themeId);
     return themes.listManagedThemes();
   });
+  // A re-themed idea's vector is stale (it embeds its theme labels): refresh just those
+  // in the background and keep the id list out of the IPC answer.
+  const refreshRethemed = ({ rethemedIdeaIds = [], ...result }: ReprocessConnectionsResult) => {
+    void refreshRethemedIdeaEmbeddings(rethemedIdeaIds).catch(() => undefined);
+    return result;
+  };
   h('themes:reprocess', async (e, options: ReprocessConnectionsOptions, model?: ModelRef | null) =>
     // Re-group the already-extracted ideas under the curated/existing themes (and
     // optionally re-trace idea↔idea relations) with the model. No document re-reading.
-    reprocessConnections(options ?? { relations: false }, model, (p) => {
+    refreshRethemed(await reprocessConnections(options ?? { relations: false }, model, (p) => {
       e.sender.send('themes:reprocess:progress', p);
-    })
+    }))
   );
   // Reassign idea themes only in the works whose links a graph repair removed. The
   // channel name keeps the `themes:reprocess` prefix so Manual mode blocks it like the
@@ -1621,7 +1628,7 @@ export function registerAcademicIpc(context: IpcContext): void {
       e.sender.send('themes:reprocess:progress', p);
     });
     dismissPendingThemeWorks();
-    return result;
+    return refreshRethemed(result);
   });
 
   // Graph health (Settings › Data): read-only audit, on-demand repair, pending themes.
@@ -1711,19 +1718,22 @@ export function registerAcademicIpc(context: IpcContext): void {
     try { return await new ResearchCorpusRun(scope, notebook?.settings ?? RETRIEVAL_PRESETS.balanced, controller.signal).readDocument(input.documentId, input.operation); }
     finally { release(); }
   });
+  // A one-time store compaction holds the write lock for tens of seconds; preparation
+  // actions wait for it instead of failing on a locked database.
+  const afterDocumentaryMaintenance = <T>(work: () => T | Promise<T>) => documentaryPreparation.documentaryMaintenanceSettled().then(work);
   h('research:preparation:policy', async () => preparationExperience.getResearchPreparationPolicy());
-  h('research:preparation:policy:set', async (_e, input) => preparationExperience.setResearchPreparationPolicy(input));
-  h('research:preparation:preview', async (_e, input) => preparationExperience.previewResearchPreparation(input));
-  h('research:preparation:campaign:start', async (_e, input) => preparationExperience.startResearchPreparationCampaign(input));
+  h('research:preparation:policy:set', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.setResearchPreparationPolicy(input)));
+  h('research:preparation:preview', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.previewResearchPreparation(input)));
+  h('research:preparation:campaign:start', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.startResearchPreparationCampaign(input)));
   h('research:preparation:progress', async () => preparationExperience.getResearchPreparationProgress());
-  h('research:preparation:campaign:control', async (_e, input) => preparationExperience.controlResearchPreparationCampaign(input));
-  h('research:preparation:control', async (_e, action) => preparationExperience.controlAllResearchPreparation(action));
+  h('research:preparation:campaign:control', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.controlResearchPreparationCampaign(input)));
+  h('research:preparation:control', async (_e, action) => afterDocumentaryMaintenance(() => preparationExperience.controlAllResearchPreparation(action)));
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
-  h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
-  h('research:preparation:index', async (_e, input) => preparationExperience.indexResearchWorks(input));
-  h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));
-  h('research:preparation:enabled', async (_e, enabled: boolean) => documentaryPreparation.setResearchPreparationEnabled(enabled));
-  h('research:preparation:paused', async (_e, paused: boolean) => documentaryPreparation.setResearchPreparationPaused(paused));
+  h('research:preparation:start', async (_e, ids: string[]) => afterDocumentaryMaintenance(() => documentaryPreparation.prepareResearchDocuments(ids)));
+  h('research:preparation:index', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.indexResearchWorks(input)));
+  h('research:preparation:cancel', async (_e, ids: string[]) => afterDocumentaryMaintenance(() => documentaryPreparation.cancelResearchDocuments(ids)));
+  h('research:preparation:enabled', async (_e, enabled: boolean) => afterDocumentaryMaintenance(() => documentaryPreparation.setResearchPreparationEnabled(enabled)));
+  h('research:preparation:paused', async (_e, paused: boolean) => afterDocumentaryMaintenance(() => documentaryPreparation.setResearchPreparationPaused(paused)));
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
     // Track the in-flight stream so `research:chatStream:cancel` can abort it. On

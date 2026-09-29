@@ -23,6 +23,18 @@ export function embeddingTextForIdea(input: {
   return parts.join('\n');
 }
 
+/**
+ * The theme labels an idea is embedded with, as SQL over an `ideas i` row. The pipeline,
+ * the readiness filters and the reprocess pass must read the very same string (label
+ * order included), or a theme rewrite that changes the embedded text goes unnoticed.
+ */
+export const IDEA_EMBEDDING_THEME_LABELS_SQL = `COALESCE((
+  SELECT GROUP_CONCAT(DISTINCT t.label)
+  FROM idea_theme_links it
+  JOIN themes t ON t.theme_id = it.theme_id
+  WHERE it.global_id = i.global_id
+), '')`;
+
 export function embeddingTextHash(text: string): string {
   return crypto.createHash('sha1').update(text.replace(/\s+/g, ' ').trim()).digest('hex');
 }

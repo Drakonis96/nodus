@@ -55,7 +55,10 @@ try {
   for (let i = 0; i < 100 && store.db.prepare("SELECT COUNT(*) n FROM documentary_requests WHERE state='complete'").get().n < 2; i++) {
     await new Promise(resolve => setImmediate(resolve));
   }
-  assert.deepEqual(seen, [[first.id, 'First source'], [second.id, 'Second source']]);
+  // Two preparation lanes: the second vault's source is prepared while the first is held,
+  // each under its own owner and connection.
+  assert.deepEqual([...seen].sort((a, b) => a[1].localeCompare(b[1])), [[first.id, 'First source'], [second.id, 'Second source']]);
+  assert.deepEqual(seen[0], [second.id, 'Second source'], 'a held source does not block the next one');
   assert.equal(store.db.prepare("SELECT COUNT(*) n FROM documentary_requests WHERE state='complete'").get().n, 2);
   assert.equal(store.db.prepare('SELECT COUNT(*) n FROM documentary_revisions WHERE lexical_ready=1 AND embedding_ready=0').get().n, 2);
   assert.equal(registry.getActiveVault().id, nonAcademic.id);

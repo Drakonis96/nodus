@@ -20,6 +20,7 @@ function checkLabel(id: GraphIntegrityCheckId): string {
     case 'dormant_ideas_with_works': return t('Ideas ocultas que alguna obra contiene');
     case 'active_ideas_without_works': return t('Ideas visibles que ninguna obra contiene');
     case 'edges_missing_endpoint': return t('Relaciones con una idea que ya no existe');
+    case 'self_loop_edges': return t('Relaciones de una idea consigo misma');
     case 'orphan_edge_traces': return t('Trazas de relaciones borradas');
     case 'unused_themes': return t('Temas sin uso');
     case 'rows_missing_idea': return t('Análisis que apuntan a ideas desaparecidas');

@@ -75,7 +75,15 @@ export async function extractLibraryItemInWorker(input: LibraryWorkerExtractionI
     input.signal?.addEventListener('abort', cancel, { once: true });
     worker.on('message', (message: any) => {
       if (message?.kind === 'progress') {
-        input.onProgress?.(message.progress);
+        // A busy renderer keeps reporting pages until it is terminated. Once the work is
+        // cancelled or settled nobody is listening; a callback that fails (a pause or a
+        // lost lease) stops the extraction instead of escaping as an uncaught exception.
+        if (settled || input.signal?.aborted) return;
+        try {
+          input.onProgress?.(message.progress);
+        } catch (error) {
+          finish(error instanceof Error ? error : new Error(String(error)));
+        }
         return;
       }
       if (message?.kind === 'remote-ocr') {

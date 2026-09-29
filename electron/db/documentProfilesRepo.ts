@@ -807,11 +807,20 @@ export function enqueueDocumentIndexJob(input: {
     ).run(input.priority ?? 0, new Date().toISOString(), active.job_id);
     return jobRow({ ...active, priority: Math.max(Number(active.priority), input.priority ?? 0) });
   }
+  // Only an interrupted attempt that nothing has superseded is resumable: once a later
+  // job completed, the failed one's partial work describes an older profile.
   const resumable = getDb().prepare(
-    `SELECT job_id,campaign_id FROM document_index_jobs
-      WHERE vault_id=? AND nodus_id=? AND status IN ('cancelled','failed')
-      ORDER BY updated_at DESC LIMIT 1`
-  ).get(input.vaultId, input.nodusId) as { job_id: string; campaign_id: string | null } | undefined;
+    `SELECT j.job_id,j.campaign_id,j.generator_model_json FROM document_index_jobs j
+      WHERE j.vault_id=? AND j.nodus_id=? AND j.status IN ('cancelled','failed')
+        AND NOT EXISTS (SELECT 1 FROM document_index_jobs k
+                         WHERE k.vault_id=j.vault_id AND k.nodus_id=j.nodus_id
+                           AND k.status='completed' AND k.updated_at>j.updated_at)
+      ORDER BY j.updated_at DESC LIMIT 1`
+  ).get(input.vaultId, input.nodusId) as { job_id: string; campaign_id: string | null; generator_model_json: string | null } | undefined;
+  // Checkpoint keys hash the evidence text only, not the model, so partial results carry
+  // over only to a job that runs with the same generator.
+  const newGenerator = input.generatorModel ? JSON.stringify(input.generatorModel) : null;
+  const inheritsCheckpoints = resumable != null && resumable.generator_model_json === newGenerator;
   ensureDocumentProfileState(input.nodusId);
   if (resumable && resumable.campaign_id && resumable.campaign_id === (input.campaignId ?? null)) {
     const now = new Date().toISOString();
@@ -847,7 +856,7 @@ export function enqueueDocumentIndexJob(input: {
       input.reason, input.generatorModel ? JSON.stringify(input.generatorModel) : null,
       input.auditorModel ? JSON.stringify(input.auditorModel) : null, now, now
     );
-    if (resumable) getDb().prepare(
+    if (resumable && inheritsCheckpoints) getDb().prepare(
       `INSERT OR IGNORE INTO document_index_checkpoints(job_id,checkpoint_key,content_hash,payload_json,updated_at)
        SELECT ?,checkpoint_key,content_hash,payload_json,? FROM document_index_checkpoints WHERE job_id=?`
     ).run(jobId, now, resumable.job_id);
@@ -1051,6 +1060,17 @@ export function readDocumentCheckpoint<T>(jobId: string, key: string, contentHas
 
 export function clearDocumentCheckpoints(jobId: string): void {
   getDb().prepare('DELETE FROM document_index_checkpoints WHERE job_id=?').run(jobId);
+}
+
+/**
+ * A published profile makes every earlier job's checkpoints for the work obsolete.
+ * Clearing only the finishing job left a failed predecessor's checkpoints behind, and
+ * the next enqueue copied them into a fresh job.
+ */
+export function clearWorkDocumentCheckpoints(nodusId: string): void {
+  getDb().prepare(
+    'DELETE FROM document_index_checkpoints WHERE job_id IN (SELECT job_id FROM document_index_jobs WHERE nodus_id=?)'
+  ).run(nodusId);
 }
 
 export function setDocumentCampaignStatus(campaignId: string, status: DocumentIndexCampaign['status']): void {

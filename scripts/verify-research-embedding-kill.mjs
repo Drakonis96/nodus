@@ -69,7 +69,7 @@ try {
   const repeated = documentInputs.length - new Set(documentInputs).size;
   report.store = { passages, inputsBeforeKill: inputsAtKill, inputsTotal: documentInputs.length, reembeddedInputs: repeated,
     attempts: sql('SELECT state,COUNT(*) n FROM documentary_embedding_attempts GROUP BY state'), requests: sql("SELECT state,attempts,error FROM documentary_requests"),
-    vectorsMissing: sql('SELECT COUNT(*) n FROM documentary_passages p JOIN documentary_revisions r ON r.index_key=p.index_key WHERE r.embedding_ready=1 AND p.vector_json IS NULL')[0].n };
+    vectorsMissing: sql('SELECT COUNT(*) n FROM documentary_passages p JOIN documentary_revisions r ON r.index_key=p.index_key WHERE r.embedding_ready=1 AND p.vector IS NULL AND p.vector_json IS NULL')[0].n };
   assert.equal(report.store.vectorsMissing, 0, 'every published vector passage has its vector');
   assert.ok(report.store.requests.every(row => row.state !== 'running'), 'no request keeps a dead lease');
   // Only batches outstanding at the kill may be sent twice (their outcome was unknown).

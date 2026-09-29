@@ -1,5 +1,14 @@
 /** Shared, deterministic cleanup for extracted prose. Keep source/page markers
  * outside this function so provenance tokens can never be rewritten. */
+/**
+ * PDF text layers occasionally carry U+0000. SQLite's length(), substr() and FTS snippets
+ * stop at it, so a citable passage reads truncated. A space keeps every offset (page
+ * markers, quote offsets) where it was. Both extractors apply it before anything is stored.
+ */
+export function replaceNulCharacters(value: string): string {
+  return value.includes('\u0000') ? value.replaceAll('\u0000', ' ') : value;
+}
+
 export function cleanInlineText(value: string): string {
   return value
     .normalize('NFC')

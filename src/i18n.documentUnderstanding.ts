@@ -74,6 +74,7 @@ const KEYS = [
   'Algunas secciones se publicaron como extractos literales',
   'La auditoría de esas secciones no aprobó ninguna síntesis, así que sus resúmenes son citas del original.',
   'Secciones sin síntesis: {n} de {total}',
+  'Ficha documental fallida',
 ] as const;
 
 function table(values: readonly string[]): Record<string, string> {
@@ -115,6 +116,7 @@ const en = table([
   'Some sections were published as literal extracts',
   'The audit of those sections approved no synthesis, so their summaries are quotes from the original.',
   'Sections without a synthesis: {n} of {total}',
+  'Document profile failed',
 ]);
 
 const fr = table([
@@ -151,6 +153,7 @@ const fr = table([
   'Certaines sections ont été publiées sous forme d’extraits littéraux',
   'L’audit de ces sections n’a approuvé aucune synthèse : leurs résumés sont des citations de l’original.',
   'Sections sans synthèse : {n} sur {total}',
+  'Échec de la fiche documentaire',
 ]);
 
 const de = table([
@@ -187,6 +190,7 @@ const de = table([
   'Einige Abschnitte wurden als wörtliche Auszüge veröffentlicht',
   'Die Prüfung dieser Abschnitte hat keine Synthese freigegeben; ihre Zusammenfassungen sind Zitate aus dem Original.',
   'Abschnitte ohne Synthese: {n} von {total}',
+  'Dokumentprofil fehlgeschlagen',
 ]);
 
 const pt = table([
@@ -223,6 +227,7 @@ const pt = table([
   'Algumas secções foram publicadas como extratos literais',
   'A auditoria dessas secções não aprovou qualquer síntese, pelo que os seus resumos são citações do original.',
   'Secções sem síntese: {n} de {total}',
+  'Falha na ficha documental',
 ]);
 
 const ptBR = table([
@@ -259,6 +264,7 @@ const ptBR = table([
   'Algumas seções foram publicadas como extratos literais',
   'A auditoria dessas seções não aprovou nenhuma síntese, então seus resumos são citações do original.',
   'Seções sem síntese: {n} de {total}',
+  'Falha na ficha documental',
 ]);
 
 const it = table([
@@ -295,6 +301,7 @@ const it = table([
   'Alcune sezioni sono state pubblicate come estratti letterali',
   'L’audit di quelle sezioni non ha approvato alcuna sintesi, quindi i loro riepiloghi sono citazioni dell’originale.',
   'Sezioni senza sintesi: {n} di {total}',
+  'Scheda documentale non riuscita',
 ]);
 
 const tr = table([
@@ -331,6 +338,7 @@ const tr = table([
   'Bazı bölümler birebir alıntı olarak yayımlandı',
   'Bu bölümlerin denetimi hiçbir sentezi onaylamadı, bu nedenle özetleri özgün metinden alıntıdır.',
   'Sentezsiz bölümler: {total} bölümün {n} tanesi',
+  'Belge profili başarısız oldu',
 ]);
 
 const zhCN = table([
@@ -367,6 +375,7 @@ const zhCN = table([
   '部分章节以逐字摘录形式发布',
   '这些章节的审核未通过任何综述，因此其摘要为原文引用。',
   '无综述章节：{total} 中之 {n}',
+  '文献档案生成失败',
 ]);
 
 const zhTW = table([
@@ -403,6 +412,7 @@ const zhTW = table([
   '部分章節以逐字摘錄形式釋出',
   '這些章節的稽核未通過任何綜述，因此其摘要為原文引用。',
   '無綜述章節：{total} 中之 {n}',
+  '文獻檔案產生失敗',
 ]);
 
 export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': ptBR, it, tr, 'zh-CN': zhCN ,
@@ -483,6 +493,7 @@ export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': pt
     "일부 섹션은 문자 그대로 발췌하여 출판되었습니다.",
     "해당 섹션에 대한 감사에서는 합성을 승인하지 않았으므로 요약은 원본에서 인용한 것입니다.",
     "합성이 없는 섹션: {n} of {total}",
+    "문서 프로필 생성 실패",
   ]),
   ja: table([
     "Vault内の完全な作品の階層的で監査された理解",
@@ -560,4 +571,5 @@ export const DOCUMENT_UNDERSTANDING_TRANSLATIONS = { en, fr, de, pt, 'pt-BR': pt
     "一部のセクションは文字通りの抜粋として公開されました",
     "これらのセクションの監査では合成が認められなかったため、その概要はオリジナルからの引用となっています。",
     "合成のないセクション: {n}/{total}",
+    "文書プロファイルの作成に失敗しました",
   ]), } as const;

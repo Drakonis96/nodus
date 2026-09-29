@@ -21,7 +21,7 @@ import { getExtractionCache, upsertExtractionCache } from '../db/extractionCache
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { libraryMarkdownWithPageMarkers, readDocumentarySourceMap } from '../library/librarySourcePages';
-import { cleanExtractedText } from './textCleanup';
+import { cleanExtractedText, replaceNulCharacters } from './textCleanup';
 import type { PipelineLogReasonId } from '@shared/pipelineLogMessages';
 import { logPipelineWarning } from '../logging/pipelineLogCore';
 
@@ -134,14 +134,14 @@ function sourceMarkedText(text: string, marker: string): string {
   return /\[\[src:/i.test(replaced) ? replaced : `[[src:${marker}]]\n${replaced}`;
 }
 
-function combineSegments(segments: ExtractedTextSegment[], notes: string | null, hadTextAttachment: boolean): ExtractedDoc {
+export function combineSegments(segments: ExtractedTextSegment[], notes: string | null, hadTextAttachment: boolean): ExtractedDoc {
   const unique: ExtractedTextSegment[] = [];
   const hashes = new Set<string>();
   for (const segment of segments) {
     if (hashes.has(segment.contentHash)) continue;
     hashes.add(segment.contentHash);
     const marker = `s${unique.length + 1}`;
-    unique.push({ ...segment, marker });
+    unique.push({ ...segment, text: replaceNulCharacters(segment.text), marker });
   }
   const text = unique.map((segment) => sourceMarkedText(segment.text, segment.marker)).join('\n\n');
   return {

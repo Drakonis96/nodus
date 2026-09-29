@@ -14,6 +14,7 @@
 // uses, so the hash SQL compares against is the one the app itself would compute.
 import type { WorkReadiness } from '@shared/types';
 import { currentEmbeddingConfig } from './ideasRepo';
+import { IDEA_EMBEDDING_THEME_LABELS_SQL } from './ideaEmbeddingText';
 
 type Readiness = Exclude<WorkReadiness, 'running'>;
 
@@ -50,12 +51,7 @@ const IDEA_EMBEDDING_CURRENT = `(
   AND i.embedding_dim = length(i.embedding) / 4
   AND i.embedding_text_hash = idea_embedding_text_hash(
     i.type, i.label, i.statement,
-    COALESCE((
-      SELECT GROUP_CONCAT(DISTINCT t.label)
-      FROM idea_theme_links it
-      JOIN themes t ON t.theme_id = it.theme_id
-      WHERE it.global_id = i.global_id
-    ), '')
+    ${IDEA_EMBEDDING_THEME_LABELS_SQL}
   )
 )`;
 

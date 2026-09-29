@@ -53,6 +53,7 @@ await build({
       }}`);
       stub(/\.\.\/db\/documentProfilesRepo$/, 'profile-repo', `
         export function clearDocumentCheckpoints(id){for(const key of globalThis.__documentPipeline.checkpoints.keys())if(key.startsWith(id+':'))globalThis.__documentPipeline.checkpoints.delete(key)}
+        export function clearWorkDocumentCheckpoints(){}
         export function readDocumentCheckpoint(id,key,hash){return globalThis.__documentPipeline.checkpoints.get(id+':'+key+':'+hash)??null}
         export function saveDocumentCheckpoint(id,key,hash,payload){globalThis.__documentPipeline.checkpoints.set(id+':'+key+':'+hash,payload)}
         export function setDocumentProfileState(id,status,patch){globalThis.__documentPipeline.states.push({id,status,patch})}
@@ -410,6 +411,39 @@ test('stop after passages are prepared preserves the previously published passag
   assert.equal(embeddingCall, 2, 'the stop happens after the replacement passages were fully prepared');
   assert.deepEqual(globalThis.__documentPipeline.passages, previous);
   assert.equal(globalThis.__documentPipeline.published, null);
+});
+
+test('a checkpoint is reused only by the models that wrote it', async () => {
+  // Keyed by the evidence alone, a job resumed with another generator (the same-campaign
+  // resume switches models in place) reused the previous model's section analyses.
+  const work = {
+    nodus_id:'w1',zotero_key:'Z1',zotero_version:1,title:'Modernización',authors_json:'["Autora"]',year:2024,
+    item_type:'book',doi:null,read_tag:0,manual_deep:0,deep_trigger:null,source_type:'markdown',light_status:'done',
+    light_at:null,light_hash:null,deep_status:'done',deep_at:null,deep_hash:null,summary_status:'none',summary_at:null,
+    summary_hash:null,archived:0,notes:null,
+  };
+  globalThis.__documentPipeline.text = `# Introducción\n[[p. 1]]\nLa obra plantea su problema.\n## Desarrollo\n[[p. 2]]\nEl proceso avanzó de manera desigual entre las regiones.\n${'Desarrollo histórico completo. '.repeat(100)}`;
+  const sectionCalls = async (generatorModel) => {
+    const controller = new AbortController();
+    const start = globalThis.__documentPipeline.promptChars.length;
+    // Stop at the first embedding after the document audit: every section is analysed (or
+    // resumed from a checkpoint) by then, and the run leaves its checkpoints behind.
+    globalThis.__documentPipeline.onEmbed = () => {
+      if (globalThis.__documentPipeline.promptChars.slice(start).some((call) => call.kind === 'documentAudit')) controller.abort(new Error('DOCUMENT_INDEX_CANCELLED'));
+    };
+    const before = globalThis.__documentPipeline.promptChars.filter((call) => call.kind === 'section').length;
+    await assert.rejects(pipeline.runDocumentProfileScan(work, {
+      jobId:'job-model-keyed',generatorModel,auditorModel:null,signal:controller.signal,onProgress() {},
+    }), /DOCUMENT_INDEX_CANCELLED/);
+    globalThis.__documentPipeline.onEmbed = null;
+    return globalThis.__documentPipeline.promptChars.filter((call) => call.kind === 'section').length - before;
+  };
+  const modelA = { provider:'openrouter', model:'stub/synthesis' };
+  const modelB = { provider:'openrouter', model:'stub/other' };
+  const first = await sectionCalls(modelA);
+  assert.ok(first > 0, 'the first run analyses its sections');
+  assert.equal(await sectionCalls(modelB), first, 'another generator analyses every section again');
+  assert.equal(await sectionCalls(modelA), 0, 'the same generator resumes from its own checkpoints');
 });
 
 test('repeated section-auditor rejection degrades to literal extracts instead of publishing disputed prose', async () => {

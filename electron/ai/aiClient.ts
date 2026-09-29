@@ -110,6 +110,12 @@ function concurrencyPolicy(descriptor: AiRequestDescriptor) {
   if (descriptor.provider === 'nodus') {
     return { mode: 'automatic' as const, initial: 1, maximum: getNodusLocalSafeSlots(descriptor.model), manualLimit };
   }
+  // Embedding batches are idempotent and metered apart from chat. Serial requests left
+  // document indexing waiting on one round trip at a time; the first 429 still halves
+  // the limit and holds it there, and any chat request on the account clamps it to 1.
+  if (descriptor.requestClass === 'embedding' && descriptor.provider !== 'ollama' && descriptor.provider !== 'lmstudio') {
+    return { mode: 'automatic' as const, initial: 2, maximum: 4, manualLimit };
+  }
   if (descriptor.provider === 'ollama' || descriptor.provider === 'lmstudio') {
     return { mode: 'automatic' as const, initial: 1, maximum: 1, manualLimit };
   }

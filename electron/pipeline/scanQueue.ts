@@ -498,8 +498,10 @@ class ScanQueue {
     this.pendingIndexWorks.clear();
     let settledSuccessfully = false;
     try {
-      if (ids.length > 0) await this.autoReprocessConnections(ids);
-      else this.deepSinceReprocess = false;
+      if (ids.length > 0) {
+        const rethemed = await this.autoReprocessConnections(ids);
+        await this.refreshStaleIdeaEmbeddings(rethemed);
+      } else this.deepSinceReprocess = false;
       this.maintenanceError = null;
       if (this.bridgeAfterDrain) {
         this.bridgeAfterDrain = false;
@@ -570,8 +572,8 @@ class ScanQueue {
    * Automatically re-run connection reprocessing (themes + inter-work idea
    * relations) after a batch of deep scans completes. Runs once per drain cycle.
    */
-  private async autoReprocessConnections(nodusIds: string[]): Promise<void> {
-    if (this.reprocessing) return;
+  private async autoReprocessConnections(nodusIds: string[]): Promise<string[]> {
+    if (this.reprocessing) return [];
     this.reprocessing = true;
     try {
       const result = await reprocessConnections({ relations: true, nodusIds }, null, (progress) => {
@@ -587,8 +589,31 @@ class ScanQueue {
         });
       }
       this.deepSinceReprocess = false;
+      return result.rethemedIdeaIds ?? [];
     } finally {
       this.reprocessing = false;
+    }
+  }
+
+  /**
+   * Re-embed ideas whose theme links the reprocess pass just rewrote. An idea's
+   * embedding text includes its theme labels, so the per-work embeddings from
+   * chainAfterDeep go stale the moment reprocessConnections re-themes them — and
+   * not only in the scanned works: fused ideas shared with other works change too.
+   * Only the re-themed ideas: a library-wide pass would also re-embed every idea an
+   * earlier embedding model produced. Runs before bridge discovery so bridges compare
+   * fresh vectors. Non-fatal: the pipeline logs its own failure and the "Incomplete"
+   * filter still shows the stale works, whereas failing here would make the retry
+   * redo the whole model-driven reprocess pass.
+   */
+  private async refreshStaleIdeaEmbeddings(ideaIds: readonly string[]): Promise<void> {
+    if (!ideaIds.length || !this.embeddingConfigured()) return;
+    this.maintenanceDetail = 'Actualizando el índice de ideas…';
+    this.emit();
+    try {
+      await startEmbedding(undefined, { ideaIds });
+    } catch {
+      // Already logged by the embedding pipeline.
     }
   }
 
