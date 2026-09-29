@@ -18,7 +18,7 @@ import { clearDeepQueued, setDeepPending, setDeepResult, setResolvedTextState, s
 import { failedSummaryWorks, pendingSummaryWorks } from '../db/workSummariesRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
-import { startEmbedding } from '../ai/embeddingPipeline';
+import { embeddingIndexConfigured, refreshRethemedIdeaEmbeddings, startEmbedding } from '../ai/embeddingPipeline';
 import { startPassageEmbedding } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
@@ -499,8 +499,8 @@ class ScanQueue {
     let settledSuccessfully = false;
     try {
       if (ids.length > 0) {
-        await this.autoReprocessConnections(ids);
-        await this.refreshStaleIdeaEmbeddings();
+        const rethemed = await this.autoReprocessConnections(ids);
+        await this.refreshStaleIdeaEmbeddings(rethemed);
       } else this.deepSinceReprocess = false;
       this.maintenanceError = null;
       if (this.bridgeAfterDrain) {
@@ -572,8 +572,8 @@ class ScanQueue {
    * Automatically re-run connection reprocessing (themes + inter-work idea
    * relations) after a batch of deep scans completes. Runs once per drain cycle.
    */
-  private async autoReprocessConnections(nodusIds: string[]): Promise<void> {
-    if (this.reprocessing) return;
+  private async autoReprocessConnections(nodusIds: string[]): Promise<string[]> {
+    if (this.reprocessing) return [];
     this.reprocessing = true;
     try {
       const result = await reprocessConnections({ relations: true, nodusIds }, null, (progress) => {
@@ -589,6 +589,7 @@ class ScanQueue {
         });
       }
       this.deepSinceReprocess = false;
+      return result.rethemedIdeaIds ?? [];
     } finally {
       this.reprocessing = false;
     }
@@ -599,18 +600,18 @@ class ScanQueue {
    * embedding text includes its theme labels, so the per-work embeddings from
    * chainAfterDeep go stale the moment reprocessConnections re-themes them — and
    * not only in the scanned works: fused ideas shared with other works change too.
-   * Library-wide on purpose; startEmbedding only re-embeds ideas whose text hash no
-   * longer matches, so current works cost a hash check. Runs before bridge discovery
-   * so bridges compare fresh vectors. Non-fatal: the pipeline logs its own failure and
-   * the "Incomplete" filter still shows the stale works, whereas failing here would
-   * make the retry redo the whole model-driven reprocess pass.
+   * Only the re-themed ideas: a library-wide pass would also re-embed every idea an
+   * earlier embedding model produced. Runs before bridge discovery so bridges compare
+   * fresh vectors. Non-fatal: the pipeline logs its own failure and the "Incomplete"
+   * filter still shows the stale works, whereas failing here would make the retry
+   * redo the whole model-driven reprocess pass.
    */
-  private async refreshStaleIdeaEmbeddings(): Promise<void> {
-    if (!this.embeddingConfigured()) return;
+  private async refreshStaleIdeaEmbeddings(ideaIds: readonly string[]): Promise<void> {
+    if (!ideaIds.length || !this.embeddingConfigured()) return;
     this.maintenanceDetail = 'Actualizando el índice de ideas…';
     this.emit();
     try {
-      await startEmbedding();
+      await refreshRethemedIdeaEmbeddings(ideaIds);
     } catch {
       // Already logged by the embedding pipeline.
     }
@@ -618,11 +619,7 @@ class ScanQueue {
 
   /** True when an embedding provider + model are configured for indexing. */
   private embeddingConfigured(): boolean {
-    const settings = getSettings();
-    return settings.embeddingProvider === 'nodus'
-      || settings.embeddingProvider === 'ollama'
-      || settings.embeddingProvider === 'lmstudio'
-      || settings.providerKeys[settings.embeddingProvider] === true;
+    return embeddingIndexConfigured();
   }
 
   /** Enqueue semantic bridge discovery once indexing is done, if configured. */

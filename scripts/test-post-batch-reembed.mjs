@@ -1,5 +1,5 @@
-// Verifies that the post-batch graph maintenance refreshes idea embeddings after it
-// re-themes ideas.
+// Verifies that the post-batch graph maintenance refreshes the embeddings of the ideas
+// it re-themes, and only those.
 //
 // An idea's embedding text includes its theme labels. chainAfterDeep embeds each work
 // right after its deep scan, but reprocessConnections runs later (once the queue
@@ -7,10 +7,12 @@
 // idea they share with other works. Without a second pass, every freshly scanned book
 // was left mostly "stale" in the semantic index. This checks:
 //
-//   1. The order: per-work embed → reprocess → library-wide embed → bridge discovery.
+//   1. The order: per-work embed → reprocess → refresh of the re-themed ideas → bridge
+//      discovery. Never a library-wide pass: it would also re-embed every idea an older
+//      embedding model produced, a paid rebuild of the whole library.
 //   2. A failing refresh does not fail the maintenance pass (a retry would redo the
 //      whole model-driven reprocess) and bridge discovery still runs.
-//   3. Without an embedding provider there is no refresh at all.
+//   3. Without an embedding provider, or with nothing re-themed, there is no refresh.
 //
 // Part of the suite (`node --test scripts/test-*.mjs`): exit code 0 means the order
 // holds, 1 lists what broke.
@@ -43,7 +45,7 @@ async function bundleScanQueue(name) {
     [/\.\.\/ai\/reprocessConnections$/, 'reprocess', `
       export async function reprocessConnections(options) {
         globalThis.__reembedProbe.calls.push({ step: 'reprocess', ids: options.nodusIds });
-        return { relationsAdded: 0, newThemes: 0 };
+        return { relationsAdded: 0, newThemes: 0, rethemedIdeaIds: globalThis.__reembedProbe.rethemed };
       }
     `],
     [/\.\.\/db\/themesRepo$/, 'themes', `export function listThemeLabels() { return []; }`],
@@ -60,10 +62,16 @@ async function bundleScanQueue(name) {
     `],
     [/\.\.\/ai\/embeddingPipeline$/, 'embeddings', `
       export async function startEmbedding(nodusIds) {
+        globalThis.__reembedProbe.calls.push({ step: 'embed', ids: nodusIds });
+      }
+      export async function refreshRethemedIdeaEmbeddings(ideaIds) {
         const probe = globalThis.__reembedProbe;
-        probe.calls.push({ step: 'embed', ids: nodusIds });
-        // Only the library-wide refresh (no ids) is made to fail.
-        if (!nodusIds && probe.failLibraryEmbed) throw new Error('embedding backend down');
+        probe.calls.push({ step: 'refresh', ids: [...ideaIds] });
+        if (probe.failLibraryEmbed) throw new Error('embedding backend down');
+      }
+      export function embeddingIndexConfigured() {
+        const settings = globalThis.__reembedProbe.settings;
+        return ['nodus', 'ollama', 'lmstudio'].includes(settings.embeddingProvider) || settings.providerKeys[settings.embeddingProvider] === true;
       }
     `],
     [/\.\.\/ai\/passageEmbeddingPipeline$/, 'passages', `export async function startPassageEmbedding(nodusIds) { globalThis.__reembedProbe.calls.push({ step: 'passages', ids: nodusIds }); }`],
@@ -102,8 +110,8 @@ function settings(embeddingProvider) {
   };
 }
 
-async function scenario(name, { embeddingProvider, failLibraryEmbed = false, expectBridges }) {
-  const probe = { calls: [], failLibraryEmbed, settings: settings(embeddingProvider) };
+async function scenario(name, { embeddingProvider, failLibraryEmbed = false, expectBridges, rethemed = ['idea-a', 'idea-b'] }) {
+  const probe = { calls: [], failLibraryEmbed, rethemed, settings: settings(embeddingProvider) };
   globalThis.__reembedProbe = probe;
   const { module, directory } = await bundleScanQueue(name);
   try {
@@ -134,11 +142,13 @@ const ordered = await scenario('reembed-order', { embeddingProvider: 'nodus', ex
 console.log(`  Con proveedor local:   ${describe(ordered.calls)}`);
 const perWork = indexOf(ordered.calls, (call) => call.step === 'embed' && call.ids?.[0] === 'paper-1');
 const reprocess = indexOf(ordered.calls, (call) => call.step === 'reprocess');
-const refresh = indexOf(ordered.calls, (call) => call.step === 'embed' && call.ids === undefined);
+const refresh = indexOf(ordered.calls, (call) => call.step === 'refresh');
 const bridges = indexOf(ordered.calls, (call) => call.step === 'bridges');
 assert(perWork >= 0, 'la obra escaneada debe indexarse justo después del análisis profundo');
 assert(reprocess > perWork, 'el reprocesado de temas debe llegar después de la indexación por obra');
-assert(refresh > reprocess, 'tras re-tematizar debe haber una reindexación de toda la biblioteca (sin ids)');
+assert(refresh > reprocess, 'tras re-tematizar deben reindexarse las ideas re-tematizadas');
+assert(JSON.stringify(ordered.calls[refresh]?.ids) === JSON.stringify(['idea-a', 'idea-b']), 'la reindexación recibe exactamente las ideas re-tematizadas');
+assert(!ordered.calls.some((call) => call.step === 'embed' && call.ids === undefined), 'nunca una reindexación de toda la biblioteca');
 assert(bridges > refresh, 'los puentes semánticos deben descubrirse con los vectores ya actualizados');
 assert(ordered.snapshot.maintenanceError === null, 'el mantenimiento debe terminar sin error');
 
@@ -152,7 +162,12 @@ assert(failing.calls.some((call) => call.step === 'bridges'), 'los puentes deben
 // ── 3. No embedding provider → no refresh ─────────────────────────────────────
 const lexical = await scenario('reembed-lexical', { embeddingProvider: 'openai', expectBridges: false });
 console.log(`  Sin proveedor:         ${describe(lexical.calls)}`);
-assert(!lexical.calls.some((call) => call.step === 'embed'), 'sin proveedor de embeddings no debe intentarse ninguna indexación');
+assert(!lexical.calls.some((call) => call.step === 'embed' || call.step === 'refresh'), 'sin proveedor de embeddings no debe intentarse ninguna indexación');
+
+// ── 4. Nothing re-themed → no refresh ─────────────────────────────────────────
+const unchanged = await scenario('reembed-unchanged', { embeddingProvider: 'nodus', expectBridges: true, rethemed: [] });
+console.log(`  Sin cambios de temas:  ${describe(unchanged.calls)}`);
+assert(!unchanged.calls.some((call) => call.step === 'refresh'), 'si ningún tema cambió no hay reindexación');
 
 console.log('\n──────── Resultado ────────');
 if (failures.length === 0) {

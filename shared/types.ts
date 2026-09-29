@@ -1228,6 +1228,9 @@ export interface ReprocessConnectionsResult {
   newThemes: number;
   /** Inferred idea↔idea relations added (0 when the relations option is off). */
   relationsAdded: number;
+  /** Ideas whose embedded theme labels this pass rewrote, so their vectors are stale.
+   * Main process only: IPC handlers refresh those vectors and drop the list. */
+  rethemedIdeaIds?: string[];
 }
 
 /**

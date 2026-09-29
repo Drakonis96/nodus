@@ -69,6 +69,7 @@ import type {
   QueueKind,
   ReadingPathRequest,
   ReprocessConnectionsOptions,
+  ReprocessConnectionsResult,
   ResearchChatRequest,
   ResearchContextSelection,
   RqDecomposeRequest,
@@ -261,7 +262,7 @@ import {
   runDeepResearchJob,
 } from '../ai/deepResearchQueue';
 import { reprocessConnections } from '../ai/reprocessConnections';
-import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses } from '../ai/embeddingPipeline';
+import { startEmbedding, reindexAll, pauseEmbedding, resumeEmbedding, stopEmbedding, clearEmbeddingProgress, onEmbeddingProgress, getWorkEmbeddingStatuses, refreshRethemedIdeaEmbeddings } from '../ai/embeddingPipeline';
 import { startPassageEmbedding, pausePassageEmbedding, resumePassageEmbedding, stopPassageEmbedding, clearPassageProgress, onPassageProgress, getWorkPassageStatuses } from '../ai/passageEmbeddingPipeline';
 import { getScopedLegacyPassageDetail } from '../citations/scopedLegacyCitations';
 import { getWebPassageDetail } from '../db/researchWebRepo';
@@ -1604,12 +1605,18 @@ export function registerAcademicIpc(context: IpcContext): void {
     themes.deleteTheme(themeId);
     return themes.listManagedThemes();
   });
+  // A re-themed idea's vector is stale (it embeds its theme labels): refresh just those
+  // in the background and keep the id list out of the IPC answer.
+  const refreshRethemed = ({ rethemedIdeaIds = [], ...result }: ReprocessConnectionsResult) => {
+    void refreshRethemedIdeaEmbeddings(rethemedIdeaIds).catch(() => undefined);
+    return result;
+  };
   h('themes:reprocess', async (e, options: ReprocessConnectionsOptions, model?: ModelRef | null) =>
     // Re-group the already-extracted ideas under the curated/existing themes (and
     // optionally re-trace idea↔idea relations) with the model. No document re-reading.
-    reprocessConnections(options ?? { relations: false }, model, (p) => {
+    refreshRethemed(await reprocessConnections(options ?? { relations: false }, model, (p) => {
       e.sender.send('themes:reprocess:progress', p);
-    })
+    }))
   );
   // Reassign idea themes only in the works whose links a graph repair removed. The
   // channel name keeps the `themes:reprocess` prefix so Manual mode blocks it like the
@@ -1621,7 +1628,7 @@ export function registerAcademicIpc(context: IpcContext): void {
       e.sender.send('themes:reprocess:progress', p);
     });
     dismissPendingThemeWorks();
-    return result;
+    return refreshRethemed(result);
   });
 
   // Graph health (Settings › Data): read-only audit, on-demand repair, pending themes.

@@ -2,6 +2,8 @@ import { isManualAcademic } from './academicMode';
 import { scheduleManualIndex } from './manualIdeaIndex';
 import type { EmbeddingPipelineProgress, WorkEmbeddingStatus } from '@shared/types';
 import { getDb } from '../db/database';
+import { IDEA_EMBEDDING_THEME_LABELS_SQL } from '../db/ideaEmbeddingText';
+import { getSettings } from '../db/settingsRepo';
 import {
   clearAllEmbeddings,
   currentEmbeddingConfig,
@@ -131,16 +133,20 @@ async function waitIfPaused(): Promise<boolean> {
 
 /**
  * Start the embedding pipeline for the given works.
- * If nodusIds is empty, processes all deep-scanned works.
+ * If nodusIds is empty, processes all deep-scanned works. `ideaIds` narrows the pass to
+ * those ideas, wherever they occur: re-embedding a few rewritten ideas must not also
+ * re-embed every other idea of their works that an old embedding model left behind.
  */
-export async function startEmbedding(nodusIds?: string[]): Promise<void> {
+export async function startEmbedding(nodusIds?: string[], options: { ideaIds?: readonly string[] } = {}): Promise<void> {
   if (isManualAcademic()) { scheduleManualIndex(true); return; }
   if (state.running) {
     // A caller awaiting required post-processing must not receive a false success.
     // Let the active batch finish, then run its requested scope explicitly.
     while (state.running) await new Promise((resolve) => setTimeout(resolve, 100));
-    return startEmbedding(nodusIds);
+    return startEmbedding(nodusIds, options);
   }
+  const ideaFilter = options.ideaIds ? new Set(options.ideaIds) : null;
+  if (ideaFilter && ideaFilter.size === 0) return;
 
   state.running = true;
   state.paused = false;
@@ -162,7 +168,12 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
     const db = getDb();
 
     let workRows: { nodus_id: string; title: string }[];
-    if (nodusIds && nodusIds.length > 0) {
+    if (ideaFilter) {
+      workRows = db
+        .prepare(`SELECT DISTINCT w.nodus_id, w.title FROM works w JOIN idea_occurrences io ON io.nodus_id = w.nodus_id
+          WHERE io.global_id IN (SELECT value FROM json_each(?)) AND w.archived = 0 ORDER BY w.nodus_id`)
+        .all(JSON.stringify([...ideaFilter])) as { nodus_id: string; title: string }[];
+    } else if (nodusIds && nodusIds.length > 0) {
       const placeholders = nodusIds.map(() => '?').join(',');
       workRows = db
         .prepare(`SELECT nodus_id, title FROM works WHERE nodus_id IN (${placeholders}) AND archived = 0`)
@@ -174,11 +185,13 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
     }
 
     if (workRows.length === 0) {
-      state.error = 'No hay obras con análisis profundo para indexar.';
+      // A refresh of ideas no active work holds any more has nothing to do; it is not an error.
+      state.error = ideaFilter ? null : 'No hay obras con análisis profundo para indexar.';
       emit();
       return;
     }
 
+    const claimedIdeas = new Set<string>();
     state.works = workRows.map((w) => ({
       nodusId: w.nodus_id,
       title: w.title,
@@ -198,12 +211,7 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
              i.embedding_model,
              i.embedding_dim,
              i.embedding_text_hash,
-             COALESCE((
-               SELECT GROUP_CONCAT(DISTINCT t.label)
-               FROM idea_theme_links it
-               JOIN themes t ON t.theme_id = it.theme_id
-               WHERE it.global_id = i.global_id
-             ), '') AS theme_labels
+             ${IDEA_EMBEDDING_THEME_LABELS_SQL} AS theme_labels
            FROM ideas i
            JOIN idea_occurrences io ON io.global_id = i.global_id
            WHERE io.nodus_id = ?`
@@ -235,8 +243,13 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
           embedding_text_hash: r.embedding_text_hash,
         }))
         .filter((idea) => {
+          // An idea shared by several works is embedded once, under the first of them.
+          if (ideaFilter && !ideaFilter.has(idea.globalId)) return false;
+          if (claimedIdeas.has(idea.globalId)) return false;
           const text = embeddingTextForIdea(idea);
-          return ideaNeedsEmbedding(idea, text);
+          const needed = ideaNeedsEmbedding(idea, text);
+          if (needed) claimedIdeas.add(idea.globalId);
+          return needed;
         })
         .map(({
           embedding: _embedding,
@@ -332,6 +345,26 @@ export async function startEmbedding(nodusIds?: string[]): Promise<void> {
   if (terminalError && !state.stopRequested) throw terminalError;
 }
 
+/** True when an embedding provider and its credential are configured for indexing. */
+export function embeddingIndexConfigured(): boolean {
+  const settings = getSettings();
+  return settings.embeddingProvider === 'nodus'
+    || settings.embeddingProvider === 'ollama'
+    || settings.embeddingProvider === 'lmstudio'
+    || settings.providerKeys[settings.embeddingProvider] === true;
+}
+
+/**
+ * Re-embed the ideas a reprocess pass re-themed. An idea is embedded with its theme
+ * labels, so rewriting them leaves its vector stale. Only those ideas are refreshed:
+ * a library-wide pass would also re-embed every idea that an earlier embedding model
+ * produced, which is a paid rebuild of the whole library nobody asked for.
+ */
+export async function refreshRethemedIdeaEmbeddings(ideaIds: readonly string[]): Promise<void> {
+  if (!ideaIds.length || !embeddingIndexConfigured()) return;
+  await startEmbedding(undefined, { ideaIds });
+}
+
 /**
  * Clear all existing embeddings and re-embed every idea from scratch.
  * Useful after changing the embedding model.
@@ -389,12 +422,7 @@ export function getWorkEmbeddingStatuses(
                 i.embedding_model,
                 i.embedding_dim,
                 i.embedding_text_hash,
-                COALESCE((
-                  SELECT GROUP_CONCAT(DISTINCT t.label)
-                  FROM idea_theme_links it
-                  JOIN themes t ON t.theme_id = it.theme_id
-                  WHERE it.global_id = i.global_id
-                ), '') AS theme_labels
+                ${IDEA_EMBEDDING_THEME_LABELS_SQL} AS theme_labels
          FROM idea_occurrences io
          JOIN ideas i ON i.global_id = io.global_id
          WHERE io.nodus_id IN (${placeholders})`
@@ -414,12 +442,7 @@ export function getWorkEmbeddingStatuses(
                 i.embedding_model,
                 i.embedding_dim,
                 i.embedding_text_hash,
-                COALESCE((
-                  SELECT GROUP_CONCAT(DISTINCT t.label)
-                  FROM idea_theme_links it
-                  JOIN themes t ON t.theme_id = it.theme_id
-                  WHERE it.global_id = i.global_id
-                ), '') AS theme_labels
+                ${IDEA_EMBEDDING_THEME_LABELS_SQL} AS theme_labels
          FROM idea_occurrences io
          JOIN ideas i ON i.global_id = io.global_id`
       )
