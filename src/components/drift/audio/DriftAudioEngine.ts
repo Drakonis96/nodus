@@ -35,7 +35,7 @@ import {
   type DriftVoiceErrorCode,
 } from '@shared/drift';
 import { createBinauralVoiceGraph, type BinauralVoiceGraph } from './binaural';
-import { buildLoopBuffer, pcmBytes } from './loopBuffer';
+import { buildLoopBuffer, crossfadeMsToFrames, pcmBytes } from './loopBuffer';
 import { createNoiseBuffer, type RandomSource } from './noise';
 
 /** Thrown for refusals the engine decides itself. `code` is what the interface shows. */
@@ -127,6 +127,12 @@ interface CacheEntry {
   lastUsed: number;
 }
 
+interface QueuedLoad {
+  id: string;
+  run: () => void;
+  cancel: () => void;
+}
+
 type Listener = (snapshot: DriftEngineSnapshot) => void;
 
 export class DriftAudioEngine {
@@ -160,7 +166,7 @@ export class DriftAudioEngine {
   private epoch = 0;
   private useClock = 0;
   private activeLoads = 0;
-  private readonly loadQueue: Array<() => void> = [];
+  private readonly loadQueue: QueuedLoad[] = [];
   private disposed = false;
   private disposePromise: Promise<void> | null = null;
   private stateListener: (() => void) | null = null;
@@ -357,7 +363,7 @@ export class DriftAudioEngine {
       this.cache.clear();
       this.reserved.clear();
       this.inflight.clear();
-      this.loadQueue.length = 0;
+      this.cancelUnusedQueuedLoads();
       const context = this.context;
       if (context) {
         if (this.stateListener) context.removeEventListener('statechange', this.stateListener);
@@ -519,6 +525,7 @@ export class DriftAudioEngine {
     if (voice.instance) this.retireInstance(voice);
     voice.gain = null;
     this.voices.delete(id);
+    this.cancelUnusedQueuedLoads();
     const slot = this.order.indexOf(id);
     if (slot >= 0) this.order.splice(slot, 1);
     // The voice gain outlives the voice by one fade so the release is not cut off.
@@ -577,6 +584,11 @@ export class DriftAudioEngine {
 
   private async prepare(voice: Voice): Promise<{ buffer: AudioBuffer | null; definition: DriftSoundDefinition; key: string }> {
     if (this.deps.ready) await this.deps.ready();
+    // A catalogue request can outlive Clear/Remove/Dispose, including for generators.
+    // Paused voices still own their buffers; removed voices must allocate nothing.
+    if (this.disposed || voice.removed || this.voices.get(voice.id) !== voice) {
+      throw new DriftEngineError('unavailable');
+    }
     const definition = this.deps.resolveSound(voice.id);
     if (!definition) throw new DriftEngineError('unavailable');
     const source = definition.source;
@@ -738,7 +750,7 @@ export class DriftAudioEngine {
 
     const load = async (): Promise<AudioBuffer> => {
       const context = this.context;
-      if (!context) throw new DriftEngineError('unavailable');
+      if (!context || !this.needsFileBuffer(id)) throw new DriftEngineError('unavailable');
       // Reserve the worst case (stereo at the context rate, doubled while a processed copy
       // exists beside the decoded one) before the first byte is read.
       const estimate = Math.ceil(source.durationSeconds * context.sampleRate) * 2 * 4 * (source.crossfadeMs > 0 ? 2 : 1);
@@ -746,15 +758,17 @@ export class DriftAudioEngine {
       this.reserved.set(id, estimate);
       try {
         const bytes = await this.deps.readAudio(id);
-        if (this.disposed) throw new DriftEngineError('unavailable');
+        if (!this.needsFileBuffer(id)) throw new DriftEngineError('unavailable');
         const decoded = await context.decodeAudioData(toArrayBuffer(bytes));
-        if (this.disposed) throw new DriftEngineError('unavailable');
-        const processed = buildLoopBuffer(context, decoded, source.crossfadeMs);
-        // The real transient peak is the decoded buffer plus its processed copy.
-        const peak = pcmBytes(decoded) + (processed !== decoded ? pcmBytes(processed) : 0);
+        if (!this.needsFileBuffer(id)) throw new DriftEngineError('unavailable');
+        // Check the actual peak BEFORE allocating the destination. buildLoopBuffer writes
+        // into that destination directly, so there is no third, full-length PCM copy.
+        const overlap = crossfadeMsToFrames(source.crossfadeMs, decoded.sampleRate, decoded.length);
+        const peak = pcmBytes(decoded) + (overlap >= 2 ? (decoded.length - overlap) * decoded.numberOfChannels * 4 : 0);
         this.reserved.set(id, peak);
         const over = this.usedBytes() - this.maxBytes;
         if (over > 0 && !this.evictInactive(over)) throw new DriftEngineError('capacity', 'There is not enough memory for another voice.');
+        const processed = buildLoopBuffer(context, decoded, source.crossfadeMs);
         this.cache.set(id, { buffer: processed, bytes: pcmBytes(processed), lastUsed: ++this.useClock });
         return processed;
       } finally {
@@ -762,15 +776,35 @@ export class DriftAudioEngine {
       }
     };
 
-    const tracked: Promise<AudioBuffer> = this.enqueueLoad(load).finally(() => {
+    const tracked: Promise<AudioBuffer> = this.enqueueLoad(id, load).finally(() => {
       if (this.inflight.get(id) === tracked) this.inflight.delete(id);
+      // Clear may also land between caching the result and starting its voice.
+      if (this.voices.size === 0) this.dropInactiveCache();
     });
     this.inflight.set(id, tracked);
     return tracked;
   }
 
+  /** A paused selection is still a consumer; a removed selection is not. */
+  private needsFileBuffer(id: string): boolean {
+    return !this.disposed && this.voices.has(id);
+  }
+
+  /** Reject obsolete queued jobs rather than reading them later or leaving promises pending. */
+  private cancelUnusedQueuedLoads(): void {
+    for (let index = this.loadQueue.length - 1; index >= 0; index--) {
+      const job = this.loadQueue[index];
+      if (this.needsFileBuffer(job.id)) continue;
+      this.loadQueue.splice(index, 1);
+      // A re-selection in this same tick must not join the cancelled job. Its finally
+      // checks identity, so it cannot delete the replacement job's in-flight entry.
+      this.inflight.delete(job.id);
+      job.cancel();
+    }
+  }
+
   /** At most `maxConcurrentLoads` fetch-and-decode operations at a time. */
-  private enqueueLoad<T>(work: () => Promise<T>): Promise<T> {
+  private enqueueLoad<T>(id: string, work: () => Promise<T>): Promise<T> {
     const limit = this.deps.maxConcurrentLoads ?? MAX_CONCURRENT_LOADS;
     return new Promise<T>((resolve, reject) => {
       const run = () => {
@@ -778,11 +812,11 @@ export class DriftAudioEngine {
         work().then(resolve, reject).finally(() => {
           this.activeLoads -= 1;
           const next = this.loadQueue.shift();
-          if (next) next();
+          if (next) next.run();
         });
       };
       if (this.activeLoads < limit) run();
-      else this.loadQueue.push(run);
+      else this.loadQueue.push({ id, run, cancel: () => reject(new DriftEngineError('unavailable')) });
     });
   }
 }

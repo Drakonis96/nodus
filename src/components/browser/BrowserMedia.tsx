@@ -142,6 +142,11 @@ export function BrowserMediaPopover({
       window.removeEventListener('keydown', onKey);
       setSnapshot(null);
       void window.nodus.setBrowserOverlayVisible(false);
+      // Clearing the final source removes the header button and unmounts this popover,
+      // but the header component itself survives with its anchor state. Forget that
+      // detached element, or the next selection reopens against a dead button. A normal
+      // close or StrictMode cleanup keeps its connected trigger and needs no extra close.
+      if (!anchorEl.isConnected) onCloseRef.current();
     };
     // Media-state updates recreate the callback supplied by the header. They
     // must not restart this effect: doing so briefly disabled and repainted the

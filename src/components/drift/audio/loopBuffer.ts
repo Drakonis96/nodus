@@ -46,30 +46,23 @@ export function crossfadeLoop(channels: readonly Float32Array[], overlap: number
   // An overlap of 0 or 1 sample is no crossfade at all.
   if (c < 2) return channels.map((channel) => channel.slice());
 
-  const length = frames - c;
-  const middle = frames - 2 * c;
-  const out = channels.map(() => new Float32Array(length));
-
-  // Precompute the gains once: they are identical for every channel.
-  const fadeOut = new Float32Array(c);
-  const fadeIn = new Float32Array(c);
-  for (let i = 0; i < c; i++) {
-    const w = i / (c - 1);
-    if (curve === 'equal-power') {
-      fadeOut[i] = Math.cos((w * Math.PI) / 2);
-      fadeIn[i] = Math.sin((w * Math.PI) / 2);
-    } else {
-      fadeOut[i] = 1 - w;
-      fadeIn[i] = w;
-    }
-  }
-
-  channels.forEach((x, channel) => {
-    const y = out[channel];
-    y.set(x.subarray(c, frames - c), 0);
-    for (let i = 0; i < c; i++) y[middle + i] = x[frames - c + i] * fadeOut[i] + x[i] * fadeIn[i];
-  });
+  const out = channels.map(() => new Float32Array(frames - c));
+  channels.forEach((channel, index) => writeCrossfadeChannel(channel, out[index], c, curve));
   return out;
+}
+
+/** Write into the caller's destination; no full-channel intermediate or gain arrays. */
+function writeCrossfadeChannel(x: Float32Array, y: Float32Array, overlap: number, curve: CrossfadeCurve): void {
+  const frames = x.length;
+  const middle = frames - 2 * overlap;
+  y.set(x.subarray(overlap, frames - overlap), 0);
+  for (let i = 0; i < overlap; i++) {
+    const w = i / (overlap - 1);
+    // Match the Float32 gain precision of the original crossfade implementation.
+    const fadeOut = Math.fround(curve === 'equal-power' ? Math.cos((w * Math.PI) / 2) : 1 - w);
+    const fadeIn = Math.fround(curve === 'equal-power' ? Math.sin((w * Math.PI) / 2) : w);
+    y[middle + i] = x[frames - overlap + i] * fadeOut + x[i] * fadeIn;
+  }
 }
 
 /** The structural part of an AudioBuffer this module needs, so it can be driven by a fake. */
@@ -103,10 +96,11 @@ export function buildLoopBuffer<B extends AudioBufferLike>(
 ): B {
   const overlap = crossfadeMsToFrames(crossfadeMs, source.sampleRate, source.length);
   if (overlap < 2) return source;
-  const channels: Float32Array[] = [];
-  for (let channel = 0; channel < source.numberOfChannels; channel++) channels.push(source.getChannelData(channel));
-  const processed = crossfadeLoop(channels, overlap, curve);
-  const buffer = factory.createBuffer(source.numberOfChannels, processed[0].length, source.sampleRate);
-  processed.forEach((data, channel) => buffer.copyToChannel(data, channel));
+  // Only the decoded source and the final AudioBuffer coexist. Writing into its channel
+  // views avoids a complete processed Float32Array copy before copyToChannel.
+  const buffer = factory.createBuffer(source.numberOfChannels, source.length - overlap, source.sampleRate);
+  for (let channel = 0; channel < source.numberOfChannels; channel++) {
+    writeCrossfadeChannel(source.getChannelData(channel), buffer.getChannelData(channel), overlap, curve);
+  }
   return buffer;
 }
