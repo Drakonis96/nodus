@@ -1245,6 +1245,7 @@ export type GraphIntegrityCheckId =
   | 'active_ideas_without_works'
   | 'dormant_ideas_with_works'
   | 'edges_missing_endpoint'
+  | 'self_loop_edges'
   | 'orphan_edge_traces'
   | 'rows_of_missing_works'
   | 'unused_themes'
@@ -1287,6 +1288,7 @@ export interface GraphIntegrityRepairCounts {
   wokenIdeas: number;
   sleptIdeas: number;
   danglingEdges: number;
+  selfLoopEdges: number;
   orphanTraces: number;
   prunedThemes: number;
 }

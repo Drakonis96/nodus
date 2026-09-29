@@ -79,6 +79,8 @@ try {
   addEdge('e-bridge', held, heldW3, null);
   addEdge('e-ghost', held, 'idea-that-was-deleted');
   addEdge('e-merged-away', held, heldW3, 'W-merged-away', 'supports');
+  // Fusion mapped two labels of one scan onto the same idea: a relation of an idea with itself.
+  addEdge('e-self', held, held, 'W1', 'supports');
   db.prepare("INSERT INTO edge_traces (edge_id, method, created_at) VALUES ('e-gone', 'bridge', ?)").run(now);
 
   const live = themesRepo.getOrCreateTheme('Tema vivo');
@@ -114,6 +116,7 @@ try {
       dormant_ideas_with_works: 1,
       active_ideas_without_works: 2, // the edge-only idea and the loose one
       edges_missing_endpoint: 1,
+      self_loop_edges: 1,
       orphan_edge_traces: 1,
       unused_themes: 1,
       rows_missing_idea: 1,
@@ -137,7 +140,8 @@ try {
     wokenIdeas: 1,
     sleptIdeas: 2,
     danglingEdges: 1,
-    orphanTraces: 2, // e-gone, plus the trace of the edge with a missing endpoint
+    selfLoopEdges: 1,
+    orphanTraces: 3, // e-gone, plus the traces of the edge with a missing endpoint and of the self-loop
     prunedThemes: 1,
   }, 'repair counts');
   assert.deepEqual([...repaired.themeWorks].sort(), ['W1', 'W3'], 'works whose idea themes were removed');
