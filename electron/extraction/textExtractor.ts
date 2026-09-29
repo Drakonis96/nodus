@@ -414,9 +414,14 @@ export async function extractPdfStreaming(
     if (t) parts.push(`[[p. ${p}]]\n${t}`);
   }
 
+  // Pages the OCR page cap left out are not "pages without text": McMurry's 7th edition lost
+  // its last 342 of 1,342 scanned pages to a 1,000-page cap, reported as blank.
+  const ocrAttempted = new Set(opts.ocr.enabled ? ocrCandidates : []);
+  const capped = opts.ocr.enabled ? blanks.filter((page) => !pageTexts.has(page) && !ocrAttempted.has(page)).length : 0;
   const notes: string[] = [];
   if (ocredPages) notes.push(`${ocredPages} página(s) recuperadas por OCR.`);
-  if (skippedPages) notes.push(`${skippedPages} página(s) sin texto omitidas.`);
+  if (capped) notes.push(`${capped} página(s) no procesadas: superan el límite de OCR (${opts.ocr.maxPages} páginas por documento).`);
+  if (skippedPages - capped > 0) notes.push(`${skippedPages - capped} página(s) sin texto omitidas.`);
 
   return {
     text: parts.join('\n\n'),
