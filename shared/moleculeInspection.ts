@@ -1629,7 +1629,12 @@ export function implyRacemicTarget(audit: RouteAudit, requestedTarget: string | 
   for (const step of audit.steps) {
     if (step.racemic || !(step.unspecifiedStereocentres > 0)) continue;
     const open = (step.products ?? []).filter((product) => product.unspecifiedStereocentres > 0);
-    if (open.length && open.every((product) => product.canonicalSmiles === target)) step.racemic = true;
+    if (open.length && open.every((product) => product.canonicalSmiles === target)) {
+      step.racemic = true;
+      // The checker's own sentence about this step's open centres is stale now; the route
+      // review is told what the checker found, so it must not read it.
+      audit.blocked = audit.blocked.filter((entry) => !entry.startsWith(`Step ${step.index + 1} leaves `));
+    }
   }
   return audit;
 }

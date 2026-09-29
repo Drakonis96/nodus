@@ -1369,12 +1369,13 @@ test('a target requested without stereochemistry is racemic by the request', asy
   const { implyRacemicTarget } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
   const product = (smiles, open) => ({ input: smiles, canonicalSmiles: smiles, skeletonSmiles: smiles, formula: '', charge: 0, heavyAtoms: 0, stereocentres: open, unspecifiedStereocentres: open });
   const step = (index, products) => ({ index, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: products.reduce((s, p) => s + p.unspecifiedStereocentres, 0), reactants: [], agents: [], products });
-  const audit = () => normalizeRouteAudit({ continuous: true, blocked: [], links: [], target: { input: 'CCC(C)C(=O)O', canonicalSmiles: 'CCC(C)C(=O)O', formula: 'C5H10O2', formedAt: 1, reason: 'formed' },
+  const audit = () => normalizeRouteAudit({ continuous: true, blocked: ['Step 2 leaves 1 stereocentre(s) or double bond(s) unspecified.'], links: [], target: { input: 'CCC(C)C(=O)O', canonicalSmiles: 'CCC(C)C(=O)O', formula: 'C5H10O2', formedAt: 1, reason: 'formed' },
     steps: [step(0, [product('CCC(C)(C(=O)O)C(=O)O', 0)]), step(1, [product('CCC(C)C(=O)O', 1), product('O=C=O', 0)])] });
   // Decarboxylation to 2-methylbutanoic acid, requested as CCC(C)C(=O)O: no stereo asked for.
   const excused = implyRacemicTarget(audit(), 'CCC(C)C(=O)O');
   assert.equal(excused.steps[1].racemic, true);
   assert.equal(routeStepFailure(excused.steps[1]), null);
+  assert.deepEqual(excused.blocked, [], 'the checker sentence about the excused step is dropped');
   // A target requested with stereo is still held to it.
   assert.notEqual(implyRacemicTarget(audit(), 'CC[C@H](C)C(=O)O').steps[1].racemic, true);
   // An intermediate with an open centre is not excused by the target rule.
