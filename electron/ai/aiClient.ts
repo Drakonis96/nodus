@@ -1,4 +1,5 @@
 import { currentResearchRequestBudget, researchPromptUpperBound } from './researchRequestBudget';
+import { documentedContextWindow } from '@shared/providerContextWindows';
 import { withJobThinking } from './thinkingEffort';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
@@ -828,9 +829,10 @@ export async function researchModelContextWindow(model: ModelRef): Promise<{ tok
   if (local) return { tokens: local, known: true };
   const advertised = cachedModelContextWindow(model.provider, model.model);
   if (advertised) return { tokens: advertised, known: true };
-  // Official direct endpoint model contract, verified 2026-09-23:
-  // https://api-docs.deepseek.com/quick_start/pricing/
-  if (model.provider === 'deepseek' && model.model === 'deepseek-flash') return { tokens: 1000000, known: true };
+  // A window the provider documents but its model list does not report (DeepSeek, incl. the
+  // legacy `deepseek-v4-flash` name for the same model as `deepseek-flash`).
+  const documented = documentedContextWindow(model.provider, model.model);
+  if (documented) return { tokens: documented, known: true };
   return { tokens: 32768, known: false };
 }
 async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise<void> {
