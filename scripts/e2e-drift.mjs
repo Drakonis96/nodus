@@ -399,15 +399,13 @@ try {
     await page.getByTestId('toolkit-drift').waitFor();
   });
 
-  await check('the tool can be pinned into the sidebar as toolkit:drift, and unpinned again', async () => {
+  await check('a new profile starts with Nodus Drift pinned as toolkit:drift; it can be unpinned and pinned again', async () => {
     await page.getByTestId('toolkit-drift-back').click();
     await page.getByTestId('toolkit-home').waitFor();
     const pin = page.getByTestId('toolkit-card-drift-pin');
-    assert.equal(await pin.getAttribute('aria-pressed'), 'false');
-    await pin.click();
-    await until(async () => (await call('getSettings')).toolkitPinnedPages?.includes('drift'), 'the pin to be saved');
+    assert.equal(await pin.getAttribute('aria-pressed'), 'true', 'pinned from the start, as Nodus Browser is in the sidebar');
+    assert.ok((await call('getSettings')).toolkitPinnedPages?.includes('drift'), 'and saved as such');
     await page.locator('[data-tour="nav-toolkit:drift"]').waitFor();
-    assert.equal(await pin.getAttribute('aria-pressed'), 'true');
     await page.locator('[data-tour="nav-toolkit:drift"]').click();
     await page.getByTestId('toolkit-drift').waitFor();
     await page.getByTestId('toolkit-drift-back').click();
@@ -415,6 +413,11 @@ try {
     await pin.click();
     await until(async () => !(await call('getSettings')).toolkitPinnedPages?.includes('drift'), 'the pin to be removed');
     await page.locator('[data-tour="nav-toolkit:drift"]').waitFor({ state: 'detached' });
+    assert.equal(await pin.getAttribute('aria-pressed'), 'false');
+    await pin.click();
+    await until(async () => (await call('getSettings')).toolkitPinnedPages?.includes('drift'), 'the pin to be saved again');
+    await page.locator('[data-tour="nav-toolkit:drift"]').waitFor();
+    assert.equal(await pin.getAttribute('aria-pressed'), 'true');
     await page.getByTestId('toolkit-card-drift').click();
     await page.getByTestId('toolkit-drift').waitFor();
   });

@@ -264,7 +264,9 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,
-  toolkitPinnedPages: [],
+  // A new profile starts with Nodus Drift pinned, the way Nodus Browser is in the sidebar. A profile that
+  // already saved its pins keeps them: this is only where a profile with none starts from.
+  toolkitPinnedPages: ['drift'],
   treeFrame: 'oak',
   treeFocusPersonId: null,
   treeOrientation: 'ancestors_top',

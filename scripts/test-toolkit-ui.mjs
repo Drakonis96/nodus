@@ -129,7 +129,7 @@ test('the Toolkit hub, real sidebar and Settings editor share the pin contract',
   assert.match(app, /setToolkitPage\(n\.toolkitPage\)[\s\S]*?setView\('toolkit'\)/, 'a shortcut opens its nested Toolkit page');
   assert.match(settings, /groupedNav\(sidebarOrder, \[\], toolkitPinnedPages\)/, 'Settings uses the real Tools group');
   assert.match(settings, /toolkitPinnedPages=\{settings\.toolkitPinnedPages\}/, 'Settings receives the persistent pin set');
-  assert.match(defaults, /toolkitPinnedPages: \[\]/, 'existing profiles start with no pinned tools');
+  assert.match(defaults, /toolkitPinnedPages: \['drift'\]/, 'a new profile starts with Nodus Drift pinned, as Nodus Browser is in the sidebar; a saved profile keeps its own pins');
   assert.match(appPrefs, /'toolkitPinnedPages'/, 'pins follow the user when switching vaults');
 });
 

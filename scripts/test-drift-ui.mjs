@@ -283,6 +283,9 @@ test('Drift is a Tools page: pinnable as toolkit:drift, never a View, never in a
   // a restart re-reads settings through the normaliser: known, unique, in order
   assert.deepEqual(toolkit.normalizeToolkitToolPages(['drift', 'drift', 'ocr', 'nope', 7, null]), ['drift', 'ocr']);
   assert.deepEqual(toolkit.normalizeToolkitToolPages(undefined), []);
+  // and the default a new profile starts from is pinned, and is one the normaliser keeps
+  assert.match(read('electron/db/settingsRepo.ts'), /toolkitPinnedPages: \['drift'\],/, 'a new profile starts with Nodus Drift pinned');
+  assert.deepEqual(toolkit.normalizeToolkitToolPages(['drift']), ['drift'], 'the default survives the normaliser every load runs it through');
   // alphabetical, after Convert and before Protect
   const names = navigation.TOOLKIT_TOOLS.map((entry) => entry.name);
   assert.equal(names.indexOf('Nodus Drift'), names.indexOf('Nodus Convert') + 1);
