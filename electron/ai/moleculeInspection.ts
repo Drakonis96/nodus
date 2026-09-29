@@ -3,6 +3,7 @@ import {
   annotateSpeciesSmiles,
   buildNameFeedbackRequest,
   buildRouteReviewRequest,
+  buildPrecedentQueries,
   buildRouteSteps,
   classifyCoProducts,
   countRouteSteps,
@@ -13,12 +14,15 @@ import {
   findStepNamedSpecies,
   findStepProse,
   formatNamedRouteFixPrompts,
+  formatReactionPrecedents,
   routeStepFailure,
+  precedentDrawingFor,
   formatRouteAudit,
   formatRouteCheckUnavailable,
   formatStructureAudit,
   formatUnresolvedNameClarification,
   normalizeMoleculeDossier,
+  normalizeReactionPrecedent,
   normalizeRouteAudit,
   parseNameFeedback,
   parseRouteReview,
@@ -27,15 +31,21 @@ import {
   type MoleculeDossier,
   type NamedSpecies,
   type NameFeedbackEntry,
+  type PrecedentQuery,
+  type ReactionPrecedent,
   type ResolvedSpecies,
   type RouteAudit,
   type RouteStepAudit,
   type RouteReview,
   type RouteSpeciesLabel,
+  type StepSupport,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
+import { findStartingSmiles, textbookQueryForClass } from '@shared/synthesisEvidence';
+import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
+import { reactionIndexService } from '../reactionIndex';
 import { completeText } from './aiClient';
 import type { ViewDocumentV1 } from '../../packages/capability-api/src/views';
 
@@ -45,11 +55,14 @@ const CHEMISTRY_CAPABILITY = 'nodus:chemistry';
 const INSPECT_TOOL = 'inspect';
 const ROUTE_TOOL = 'verify-route';
 const COMPILE_TOOL = 'compile';
+const KNOWN_REACTIONS_TOOL = 'known-reactions';
 const MAX_BATCH = 24;
 /** Each step is a full validated compile. The route checker refuses a plan with more than
  *  sixteen steps, so every step it accepted fits; keep the cap aligned so a long route never
  *  drops its tail — the final product step is the last one this could ever drop. */
 const MAX_ROUTE_DRAWINGS = 16;
+/** Open Reaction Database reactions drawn under the precedent section, one per step at most. */
+const MAX_PRECEDENT_DRAWINGS = 8;
 
 interface InspectOptions {
   model?: ModelRef | null;
@@ -150,6 +163,11 @@ export function routeVerificationAvailable(): boolean {
   return routeProvider() !== null;
 }
 
+function knownReactionsProvider() {
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  return provider && provider.tools.some((tool) => tool.id === KNOWN_REACTIONS_TOOL) ? provider : null;
+}
+
 /** A runner lease for one phase. A caller-supplied shared runner is reused and this lease
  *  owns nothing; otherwise it owns a fresh runner and disposing stops it. Sharing opens the
  *  capability worker once per turn, so its reference cache serves the resolve pass and the
@@ -197,6 +215,33 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
     throw new Error('The installed chemistry package omitted or renumbered route steps. Update Chemistry Studio before checking this route');
   }
   return audit;
+}
+
+/** Looks the route's reactions and target up in the local Open Reaction Database index, when
+ *  the package exposes the tool and the index has been downloaded and verified. Best-effort:
+ *  an absent index, an older package or a tool failure all return null and change nothing. */
+async function lookupReactionPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<{ precedent: ReactionPrecedent; provider: CapabilityProvider } | null> {
+  const provider = knownReactionsProvider();
+  if (!provider) return null;
+  const indexDir = await reactionIndexService().localDirectory();
+  if (!indexDir) return null;
+  try {
+    const result = await runner.invoke({
+      provider,
+      toolId: KNOWN_REACTIONS_TOOL,
+      input: {
+        indexDir,
+        reactions: steps.slice(0, 32),
+        products: options.target ? [options.target] : [],
+        similar: steps.slice(0, 16),
+      },
+    });
+    const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-precedent');
+    const precedent = artifact ? normalizeReactionPrecedent(artifact.data) : null;
+    return precedent ? { precedent, provider } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function verifyRouteSteps(steps: string[], options: InspectOptions, racemic?: boolean): Promise<RouteAudit | null> {
@@ -510,6 +555,112 @@ async function drawReaction(runner: Runner, provider: CapabilityProvider, reacti
   return artifact?.view ? runner.renderView({ provider, view: artifact.view as ViewDocumentV1 }) : null;
 }
 
+/** The view for each step's closest known reaction, from the drawing the package returned
+ *  with the lookup (an exact match is not drawn). No second tool call: the package draws the
+ *  record as listed in the same process that found it. */
+function precedentDrawings(
+  runner: Runner,
+  provider: CapabilityProvider,
+  precedent: ReactionPrecedent,
+  queries: PrecedentQuery[],
+): Map<number, string> {
+  const similarByInput = new Map(precedent.similar.map((item) => [item.input, item]));
+  const drawings = new Map<number, string>();
+  precedent.reactions.forEach((entry, position) => {
+    const step = queries[position]?.step;
+    const neighbor = entry.unchanged ? null : precedentDrawingFor(entry, similarByInput.get(entry.input));
+    if (step === undefined || !neighbor?.svg || drawings.size >= MAX_PRECEDENT_DRAWINGS) return;
+    const similarity = neighbor.similarity !== undefined ? `${Math.round(neighbor.similarity * 100)}% similar` : 'closest known reaction';
+    try {
+      drawings.set(step, runner.renderView({ provider, view: {
+        schemaVersion: 1,
+        title: `Closest known reaction to step ${step + 1}`,
+        summary: `Open Reaction Database reaction, ${similarity}, drawn as recorded.`,
+        // The view caps alt text at 1,000 characters; a long record keeps its opening SMILES.
+        nodes: [{ kind: 'svg', svg: neighbor.svg, title: `Closest known reaction to step ${step + 1}`, alt: `${(neighbor.reaction ?? '').slice(0, 900)} (as recorded, unbalanced)` }],
+      } }));
+    } catch {
+      // A drawing the view validator rejects is left out; the section still reads without it.
+    }
+  });
+  return drawings;
+}
+
+/** Steps whose product is worth other ways to make: a step the checker refused, or one with no
+ *  recorded precedent. At most this many, so the lookup stays one short call. */
+const MAX_ALTERNATIVE_STEPS = 6;
+const EXCERPT_CHARS = 220;
+
+/** Textbook support for each step's reaction class, and ORD alternatives for each step that
+ *  failed or has no precedent. Best-effort: each half returns nothing on failure. */
+async function buildStepSupport(
+  runner: Runner,
+  precedent: ReactionPrecedent,
+  queries: PrecedentQuery[],
+  labels: RouteSpeciesLabel[][],
+  audit: RouteAudit,
+  options: InspectOptions,
+): Promise<Map<number, StepSupport>> {
+  const support = new Map<number, StepSupport>();
+  const entryFor = new Map(precedent.reactions.map((entry, position) => [queries[position]?.step ?? position, entry]));
+
+  const byClass = new Map<string, number[]>();
+  for (const [step, entry] of entryFor) {
+    const name = entry.classes?.find((item) => textbookQueryForClass(item));
+    if (name) byClass.set(name, [...(byClass.get(name) ?? []), step]);
+  }
+  const passagesPromise = (async () => {
+    if (!byClass.size) return;
+    const names = [...byClass.keys()];
+    const found = await textbookPassages(names.map((name) => textbookQueryForClass(name)!), synthesisEvidenceWorkIds(), options.signal, 1);
+    for (const passage of found) {
+      const name = names.find((item) => textbookQueryForClass(item) === passage.retrievedFor);
+      if (!name) continue;
+      const excerpt = passage.text.length > EXCERPT_CHARS ? `${passage.text.slice(0, EXCERPT_CHARS).replace(/\s+\S*$/, '')}…` : passage.text;
+      for (const step of byClass.get(name) ?? []) {
+        support.set(step, { ...support.get(step), passage: { title: passage.work.title, location: passage.location, citation: passage.citation, excerpt, about: name } });
+      }
+    }
+  })().catch((error) => { console.warn('[route] textbook support unavailable:', error instanceof Error ? error.message : String(error)); });
+
+  const alternativesPromise = (async () => {
+    const products = new Map<number, string>();
+    for (const step of audit.steps) {
+      const entry = entryFor.get(step.index);
+      const needs = routeStepFailure(step) !== null || (entry ? entry.count === 0 && !entry.unchanged : false);
+      const product = (labels[step.index] ?? []).find((label) => label.role === 'product' && !label.byproduct && /[Cc]/.test(label.smiles))?.smiles;
+      if (needs && product && products.size < MAX_ALTERNATIVE_STEPS) products.set(step.index, product);
+    }
+    if (!products.size) return;
+    const starting = findStartingSmiles(options.question ?? '', options.target);
+    const briefs = await invokeDisconnections(runner, [...new Set(products.values())], starting, 4);
+    if (!briefs) return;
+    for (const [step, product] of products) {
+      const brief = briefs.find((item) => item.input === product);
+      const reactants = new Set((labels[step] ?? []).filter((label) => label.role === 'reactant').map((label) => label.smiles));
+      const proposals = (brief?.proposals ?? [])
+        .filter((proposal) => proposal.recorded > 0 || proposal.classes.length)
+        .filter((proposal) => !proposal.precursors.split('.').every((molecule) => reactants.has(molecule)))
+        .map(({ precursors, classes, recorded }) => ({ precursors, classes, recorded }));
+      if (proposals.length) support.set(step, { ...support.get(step), alternatives: { product: brief!.target, proposals } });
+    }
+  })().catch((error) => { console.warn('[route] ORD alternatives unavailable:', error instanceof Error ? error.message : String(error)); });
+
+  await Promise.all([passagesPromise, alternativesPromise]);
+  return support;
+}
+
+/** The target's name from the route labels: the main product of the step that formed it, or a
+ *  product labelled with exactly the target SMILES. */
+function targetName(labels: RouteSpeciesLabel[][], audit: RouteAudit, target: string | null | undefined): string | undefined {
+  const formedAt = audit.target?.formedAt;
+  if (formedAt !== null && formedAt !== undefined) {
+    const main = (labels[formedAt] ?? []).filter((entry) => entry.role === 'product' && !entry.byproduct && entry.name);
+    if (main.length === 1) return main[0].name;
+  }
+  return target ? labels.flat().find((entry) => entry.role === 'product' && entry.smiles === target && entry.name)?.name : undefined;
+}
+
 /** Draws every step the checker accepted, in order, on the runner already opened for the
  *  route check. A step the checker refused is never auto-drawn: the verified lane abstains
  *  for it and its fallback picture is unchecked, so it gets a deterministic note instead. */
@@ -592,6 +743,10 @@ export async function appendRouteReportAndDrawings(
   try {
     const audit = await invokeRoute(runner, provider, steps, racemic, options.target, labels);
     if (!audit) return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable('the chemistry package returned no route audit')}\n`;
+    // The index lookup runs alongside the review and the drawings; it is skipped entirely
+    // when the package has no such tool or the index has not been downloaded.
+    const queries = buildPrecedentQueries(labels);
+    const precedentPromise = lookupReactionPrecedent(runner, queries.map((query) => query.query), options);
     // One model review looks for plan problems the checker cannot see (prose vs names, a
     // product that is a different compound, a step that cannot work, a redundant step). It is
     // blocking: a finding marks the route not verified. An unreadable reply never blocks. It
@@ -602,12 +757,27 @@ export async function appendRouteReportAndDrawings(
     // replaces the provisional stream with this returned answer, so the route only waits on
     // the reviewer when the reviewer is the last thing outstanding.
     if (options.onDeterministic) options.onDeterministic(`${finalAnswer.trimEnd()}\n\n${formatRouteAudit(audit, labels, null, true)}\n${drawings}`);
+    // The lookup already carries its drawings; this only formats. Best-effort throughout. The
+    // step support (textbook passage per reaction class, ORD alternatives for a failed or
+    // unprecedented step) needs the lookup's classes, so it follows it, still beside the review.
+    const supportPromise = precedentPromise
+      .then((result) => (result ? buildStepSupport(runner, result.precedent, queries, labels, audit, options) : new Map<number, StepSupport>()))
+      .catch(() => new Map<number, StepSupport>());
+    const precedentSection = Promise.all([precedentPromise, supportPromise]).then(([result, support]) => {
+      if (!result) return '';
+      const target = options.target ? { smiles: options.target, name: targetName(labels, audit, options.target) } : null;
+      const drawings = precedentDrawings(runner, result.provider, result.precedent, queries);
+      return formatReactionPrecedents(result.precedent, { queries, labels, target, drawings, support });
+    }).catch(() => '');
     const review = await reviewPromise;
     const report = formatRouteAudit(audit, labels, review);
+    const precedentText = await precedentSection;
+    const support = await supportPromise;
     // A refusal the checker can name and the app cannot fix is offered back to the model as one
-    // click: names and roles only — the model never authored the derived SMILES.
-    const fix = formatNamedRouteFixPrompts(labels, audit, review);
-    return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${fix ? `\n${fix}\n` : ''}`;
+    // click: names and roles only — the model never authored the derived SMILES. The index's
+    // alternatives and a textbook passage ride along as evidence.
+    const fix = formatNamedRouteFixPrompts(labels, audit, review, support);
+    return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${precedentText}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
     if (options.signal?.aborted) return finalAnswer;
     return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable(error instanceof Error ? error.message : 'the route check failed')}\n`;

@@ -22,6 +22,8 @@ import { planResearchTurn, literalResearchTurnPlan } from './researchTurnPlanner
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
 import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, formatRouteCheckUnavailable, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor, routeFixPromptForHistory, routeReportsForHistory } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
+import { SYNTHESIS_EVIDENCE_KEY, SYNTHESIS_EVIDENCE_SYSTEM_RULE, synthesisEvidencePayload, synthesisRetrievalQuery } from '@shared/synthesisEvidence';
+import { gatherSynthesisEvidence } from './synthesisEvidence';
 import type {
   Author,
   ChatMessageRecord,
@@ -583,6 +585,11 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const genealogy = getActiveVault().type === 'genealogy';
   const chemistryEnabled = skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
   const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage });
+  // A new route request (not a correction, not a council member's opinion) gets the ORD
+  // disconnections and textbook passages before it is planned.
+  const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question);
+  const gathered = routeRequest && !council?.member ? await gatherSynthesisEvidence(question, { model, locale: promptLanguage }) : null;
+  const routeEvidence = synthesisEvidencePayload(gathered);
   const assessments = council?.assessments ? conciliumAssessments(council.assessments, window == null ? 12_000 : Math.max(256, Math.floor(window * LOCAL_CHARS_PER_TOKEN * 0.2 / council.assessments.members.length))) : undefined;
   const system = withResearchSystemPrompt([
     council?.member ? 'You are an independent Concilium council member. Assess the user question carefully and provide a concise, evidence-based answer with key reasons, uncertainties and verifiable citations. No skills or tools are available to you. Return prose only, with no skill directives or executable artifacts.' : '',
@@ -593,7 +600,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     chemistryEnabled ? ROUTE_CONTINUITY_SYSTEM_RULE : '',
     // A correction carries the same rules itself, with its own edit policy; the first-request
     // contract is not added on top, so the rules are sent once.
-    chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
+    routeRequest ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
+    routeEvidence ? SYNTHESIS_EVIDENCE_SYSTEM_RULE : '',
     !genealogy && request.selection.sourceFilter?.enabled === true
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
   ].filter(Boolean).join('\n\n'), request.systemPromptId, { surface: 'research', conversationId: request.conversationId });
@@ -609,7 +617,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     const promptChars = Math.max(0, window - maxTokens - margin) * LOCAL_CHARS_PER_TOKEN;
     // Reserve what system + history + the JSON wrapper already consume; the rest is the
     // corpus context's budget. Never below the floor — the shrinker then guarantees fit.
-    const reserved = system.length + JSON.stringify(messages).length + (assessments?.length ?? 0) + (moleculeDossiers.length ? JSON.stringify(moleculeDossiers).length : 0) + 400;
+    const reserved = system.length + JSON.stringify(messages).length + (assessments?.length ?? 0) + (moleculeDossiers.length ? JSON.stringify(moleculeDossiers).length : 0) + (routeEvidence ? JSON.stringify(routeEvidence).length : 0) + 400;
     contextBudget = Math.max(LOCAL_MIN_CONTEXT_CHARS, Math.floor(promptChars - reserved));
   }
 
@@ -678,7 +686,12 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       documents: snapshot.works.length, summaries: 0, passages: snapshot.passages.length, contextChars: JSON.stringify(context).length, truncated: run.budget.partial, researchTraversal: compactResearchTraversal(run.coverage()),
       ...(run.web.used || (run.web.explicit && !run.web.enabled) ? { webSearch: run.web.stats(), webSources: run.web.sources() } : {}) };
   } else {
-    ({ context, stats } = await buildResearchContext(request.selection, question, contextBudget, promptLanguage));
+    // A route request's corpus context is retrieved for its chemistry, and the corpus-level
+    // contradictions and research gaps (about the literature, not about making a molecule) are
+    // left out so the budget goes to ideas and passages.
+    ({ context, stats } = routeRequest
+      ? await buildResearchContext({ ...request.selection, contradictions: false, gaps: false }, question, contextBudget, promptLanguage, { retrievalQuery: synthesisRetrievalQuery(question, gathered) })
+      : await buildResearchContext(request.selection, question, contextBudget, promptLanguage));
     const layers = researchContextLayers(request.selection);
     if (!layers.ideas && !layers.documents) context = { ...context, research_scope: { instruction: NO_SOURCES_INSTRUCTION } };
   }
@@ -692,6 +705,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       conversacion: messages,
       ...(assessments ? { council_assessments: assessments } : {}),
       ...(moleculeDossiers.length ? { estructura_objetivo_verificada: moleculeDossiers } : {}),
+      ...(routeEvidence ? { [SYNTHESIS_EVIDENCE_KEY]: routeEvidence } : {}),
       ...(citationContract ? { contrato_de_salida_obligatorio: citationContract } : {}),
       application_output_contract: council?.member ? undefined : chatSkillsOutputContract(skills),
     },
@@ -879,7 +893,10 @@ export async function buildResearchContext(
   selection: ResearchContextSelection,
   question = '',
   maxContextChars = MAX_TOTAL_CONTEXT_CHARS,
-  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es',
+  /** A route request retrieves with a query focused on its chemistry (the verbatim prompt is
+   *  mostly output-format rules). */
+  route?: { retrievalQuery: string },
 ): Promise<BuildResult> {
   const prompt = researchAssistantPromptPack(language);
   const context: SectionPayload = {
@@ -890,7 +907,7 @@ export async function buildResearchContext(
   const linkedWorkIds = new Set<string>();
   let truncated = false;
 
-  const scope = await buildRelevanceScope(selection, question);
+  const scope = await buildRelevanceScope(selection, route?.retrievalQuery || question);
   if (scope.sourceScope) context.source_filter = { active: true, matched_works: scope.sourceScope.workIds.size, instruction: "Use only evidence from these works. If it is insufficient, say so; do not fill gaps from other sources or prior conversations." };
 
   if (selection.ideas) {

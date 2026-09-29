@@ -138,6 +138,94 @@ export interface RouteAudit {
   target?: RouteTargetAudit;
 }
 
+/** One looked-up reaction or product, with how many precedents the local index holds. */
+export interface ReactionPrecedentEntry {
+  input: string;
+  count: number;
+  /** For a product, a few example reaction hashes that make it. */
+  keys?: string[];
+  /** For a reaction, which form of the step matched when it was not the step as written. */
+  form?: string;
+  /** For a reaction, the products are all among the reactants (a purification or salt step). */
+  unchanged?: boolean;
+  /** For a matched reaction, up to three Open Reaction Database ids that record it. */
+  samples?: string[];
+  /** For a matched reaction, the index's SMILES for it, to draw. */
+  reaction?: string;
+  /** For a reaction, the reaction classes the package reads from its group changes. */
+  classes?: string[];
+}
+
+export interface ReactionPrecedentNeighbor {
+  key: string;
+  distance: number;
+  count: number;
+  /** Tanimoto similarity of the reaction fingerprints, 0..1 (1 = the same bond changes). */
+  similarity?: number;
+  reaction?: string;
+  /** The package's drawing of the reaction exactly as recorded (unbalanced). */
+  svg?: string;
+}
+
+export interface ReactionPrecedentSimilar {
+  input: string;
+  neighbors: ReactionPrecedentNeighbor[];
+  unchanged?: boolean;
+}
+
+/** Evidence from the local Open Reaction Database index, looked up by the application. */
+export interface ReactionPrecedent {
+  reactions: ReactionPrecedentEntry[];
+  products: ReactionPrecedentEntry[];
+  similar: ReactionPrecedentSimilar[];
+}
+
+/** One route step as looked up in the index: its 0-based step index and the query sent. */
+export interface PrecedentQuery {
+  step: number;
+  query: string;
+}
+
+/** What the precedent section needs beyond the lookup: which route step each query is, the
+ *  species names to title it with, the target, and the ORD reaction drawn for each step. */
+export interface PrecedentContext {
+  queries: PrecedentQuery[];
+  labels: RouteSpeciesLabel[][];
+  target?: { smiles: string; name?: string } | null;
+  /** Rendered drawing per 0-based route step. */
+  drawings?: Map<number, string>;
+  /** Textbook support and ORD alternatives per 0-based route step. */
+  support?: Map<number, StepSupport>;
+}
+
+/** Evidence for one route step beyond its own precedent: a textbook passage on its reaction
+ *  class, and — for a step that failed or has no precedent — other ways the index records or
+ *  proposes to make its product. */
+export interface StepSupport {
+  passage?: { title: string; location: string | null; citation: string; excerpt: string; about: string };
+  alternatives?: { product: string; proposals: Array<{ precursors: string; classes: string[]; recorded: number }> };
+}
+
+const ALTERNATIVES_SHOWN = 3;
+
+function alternativeLine(proposal: { precursors: string; classes: string[]; recorded: number }): string {
+  const about = [proposal.classes[0], proposal.recorded > 0 ? `recorded ${proposal.recorded}×` : 'template only'].filter(Boolean).join('; ');
+  return `\`${proposal.precursors}\` (${about})`;
+}
+
+/** The support lines under a step in the precedent section. */
+function stepSupportLines(entry: ReactionPrecedentEntry, support: StepSupport | undefined): string[] {
+  const lines: string[] = [];
+  if (entry.classes?.length) lines.push(`- Reaction class: ${entry.classes.join(', ')}.`);
+  if (support?.passage) {
+    const { title, location, citation, excerpt, about } = support.passage;
+    lines.push(`- Textbook, on ${about}: [${title}${location ? `, ${location}` : ''}](${citation}) — “${excerpt}”`);
+  }
+  const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
+  if (alternatives.length) lines.push(`- Other ways to make \`${support!.alternatives!.product}\` (Open Reaction Database): ${alternatives.map(alternativeLine).join(' · ')}.`);
+  return lines;
+}
+
 const SMILES_CHARS = /^[A-Za-z0-9@+\-=\\#()[\]/.,%*:]+$/;
 const STRUCTURAL = /[()[\]\\=#@/]|\d/;
 
@@ -725,6 +813,18 @@ export function classifyCoProducts<T extends { role: RouteLabelRole; byproduct: 
   return step.map((entry) => entry.role === 'product' && !entry.byproduct && entry.smiles && !smilesHasCarbon(entry.smiles) ? { ...entry, byproduct: true } : entry);
 }
 
+/** The steps as looked up in the reaction index: byproducts are left out, because the Open
+ *  Reaction Database records a reaction's main product and an extra species never matches. A
+ *  step that marks every product as a byproduct keeps them all rather than being dropped. */
+export function buildPrecedentQueries(labels: RouteSpeciesLabel[][]): PrecedentQuery[] {
+  return labels.flatMap((step, index) => {
+    const main = step.filter((entry) => !(entry.role === 'product' && entry.byproduct));
+    // Built one step at a time so an unusable step does not shift the later step numbers.
+    const [query] = buildRouteSteps([main.some((entry) => entry.role === 'product') ? main : step]);
+    return query ? [{ step: index, query }] : [];
+  });
+}
+
 /** Attach the resolved SMILES to each species entry in place, replacing any declared SMILES.
  *  Only the species-list span of each role segment is rewritten, so a name that is a substring
  *  of another ("cyclohexanone" in "cyclohexanone oxime"), and the prose and headings around it,
@@ -1020,6 +1120,160 @@ export function normalizeRouteAudit(data: unknown): RouteAudit | null {
     : undefined;
   const target = normalizeRouteTarget(value.target);
   return { steps, links, continuous: boolOr(value.continuous, blocked.length === 0), blocked, ...(isolated ? { isolated } : {}), ...(target ? { target } : {}) };
+}
+
+const PRECEDENT_FORM = /^(?:as-written|organic-reactants|agents-as-reactants)(?:\+organic-products)?$/;
+
+const PRECEDENT_FORM_NOTE: Record<string, string> = {
+  'organic-reactants': 'counting only the organic reactants',
+  'agents-as-reactants': 'counting the agents as reactants',
+  'organic-products': 'counting only the organic products',
+};
+
+const ORD_ID = /^ord-[0-9a-f]{32}$/;
+/** A drawn recorded reaction is tens of kilobytes; anything far larger is not one. */
+const MAX_PRECEDENT_SVG = 256 * 1024;
+
+/** A reaction SMILES as the index writes it: SMILES on each side of `>`, agents optional. */
+function reactionSmilesOr(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value || value.length > 4000) return undefined;
+  const parts = value.split('>');
+  if (parts.length !== 2 && parts.length !== 3) return undefined;
+  const ends = [parts[0], parts[parts.length - 1]];
+  const middle = parts.length === 3 ? parts[1] : '';
+  return ends.every((part) => SMILES_CHARS.test(part)) && (!middle || SMILES_CHARS.test(middle)) ? value : undefined;
+}
+
+function normalizePrecedentEntry(entry: unknown): ReactionPrecedentEntry | null {
+  const value = asRecord(entry);
+  if (!value || typeof value.input !== 'string' || !value.input) return null;
+  const samples = Array.isArray(value.samples) ? stringArray(value.samples).filter((id) => ORD_ID.test(id)).slice(0, 3) : [];
+  const reaction = reactionSmilesOr(value.reaction);
+  return {
+    input: value.input.slice(0, 4000),
+    count: numberOr(value.count, 0),
+    ...(Array.isArray(value.keys) ? { keys: stringArray(value.keys).slice(0, 8) } : {}),
+    ...(typeof value.form === 'string' && PRECEDENT_FORM.test(value.form) ? { form: value.form } : {}),
+    ...(value.unchanged === true ? { unchanged: true } : {}),
+    ...(samples.length ? { samples } : {}),
+    ...(reaction ? { reaction } : {}),
+    ...(Array.isArray(value.classes) ? { classes: stringArray(value.classes).map((name) => name.slice(0, 120)).slice(0, 3) } : {}),
+  };
+}
+
+function normalizePrecedentNeighbor(item: unknown): ReactionPrecedentNeighbor | null {
+  const neighbor = asRecord(item);
+  if (!neighbor || typeof neighbor.key !== 'string') return null;
+  const similarity = typeof neighbor.similarity === 'number' && neighbor.similarity >= 0 && neighbor.similarity <= 1 ? neighbor.similarity : undefined;
+  const reaction = reactionSmilesOr(neighbor.reaction);
+  const svg = typeof neighbor.svg === 'string' && neighbor.svg.startsWith('<svg') && neighbor.svg.length <= MAX_PRECEDENT_SVG ? neighbor.svg : undefined;
+  return {
+    key: neighbor.key,
+    distance: numberOr(neighbor.distance, 0),
+    count: numberOr(neighbor.count, 0),
+    ...(similarity !== undefined ? { similarity } : {}),
+    ...(reaction ? { reaction } : {}),
+    ...(svg && reaction ? { svg } : {}),
+  };
+}
+
+/** Accepts only a precedent payload the capability can actually have produced. */
+export function normalizeReactionPrecedent(data: unknown): ReactionPrecedent | null {
+  const value = asRecord(data);
+  if (!value) return null;
+  const reactions = (Array.isArray(value.reactions) ? value.reactions : [])
+    .map(normalizePrecedentEntry).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+  const products = (Array.isArray(value.products) ? value.products : [])
+    .map(normalizePrecedentEntry).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+  const similar = (Array.isArray(value.similar) ? value.similar : []).map((entry) => {
+    const record = asRecord(entry);
+    if (!record || typeof record.input !== 'string') return null;
+    const neighbors = (Array.isArray(record.neighbors) ? record.neighbors : [])
+      .map(normalizePrecedentNeighbor).filter((item): item is ReactionPrecedentNeighbor => item !== null).slice(0, 8);
+    return { input: record.input.slice(0, 4000), neighbors, ...(record.unchanged === true ? { unchanged: true } : {}) };
+  }).filter((entry): entry is ReactionPrecedentSimilar => entry !== null).slice(0, 16);
+  if (!reactions.length && !products.length && !similar.length) return null;
+  return { reactions, products, similar };
+}
+
+/** Plain-language reading of a reaction-fingerprint similarity (0..1). Calibrated on real ORD
+ *  neighbours: 1.0 is the same local change (often on another substrate); 0.7-0.9 the same
+ *  reaction type on a different substrate (acylations, SOCl2, Suzuki, brominations); around
+ *  0.5-0.6 only partial overlap (a Kolbe carboxylation's nearest were salicylate salt formations). */
+export function similarityBand(similarity: number): string {
+  // Only a step with no exact match is given a band, so 100% is always other molecules.
+  if (similarity >= 0.999) return 'same bond changes, on different molecules';
+  if (similarity >= 0.7) return 'same transformation, different substrate';
+  if (similarity >= 0.4) return 'shares some of the bond changes';
+  return 'loosely related';
+}
+
+/** The drawing shown for a step: its closest known reaction, as the package drew it. An exact
+ *  match is not drawn: it is the step itself, already drawn under the route drawings. */
+export function precedentDrawingFor(entry: ReactionPrecedentEntry | undefined, similar: ReactionPrecedentSimilar | undefined): ReactionPrecedentNeighbor | null {
+  if (entry && entry.count > 0) return null;
+  return similar?.neighbors.find((neighbor) => neighbor.svg && neighbor.reaction) ?? null;
+}
+
+/** "reactant + reactant → product (agent)" from the step's names; byproducts are left out. */
+function stepTitle(step: RouteSpeciesLabel[] | undefined): string {
+  if (!step?.length) return '';
+  const names = (role: RouteLabelRole, byproduct?: boolean) => step
+    .filter((entry) => entry.role === role && (byproduct === undefined || entry.byproduct === byproduct))
+    .map((entry) => entry.name || entry.smiles).filter(Boolean);
+  const reactants = names('reactant');
+  const products = names('product', false);
+  const agents = names('agent');
+  if (!reactants.length || !products.length) return '';
+  return `${reactants.join(' + ')} → ${products.join(' + ')}${agents.length ? ` (${agents.join(', ')})` : ''}`;
+}
+
+const SIMILARITY_FOOTNOTE = '_Similarity compares which bonds and groups change in a reaction (its DRFP fingerprint, Tanimoto). 100% means the same changes, not necessarily the same molecules._';
+
+/** The deterministic precedent section, one block per route step; the model never authors it.
+ *  Without a context (an older caller) the steps are numbered in query order, untitled. */
+export function formatReactionPrecedents(precedent: ReactionPrecedent, context?: PrecedentContext): string {
+  const lines = ['### Known reactions (Open Reaction Database)',
+    'This block is generated by the application, not by the model, from a local snapshot.', ''];
+  const product = precedent.products[0];
+  if (product) {
+    const target = context?.target;
+    const name = target?.name ? `**${target.name}** — ` : '';
+    lines.push(`Target: ${name}\`${product.input}\` · ${product.count > 0 ? `${product.count} recorded route(s) to it in the database` : 'no recorded route in the database'}.`, '');
+  }
+  const similarByInput = new Map(precedent.similar.map((item) => [item.input, item]));
+  let usedSimilarity = false;
+  precedent.reactions.forEach((entry, position) => {
+    const step = context?.queries[position]?.step ?? position;
+    const title = stepTitle(context?.labels[step]);
+    lines.push(`**Step ${step + 1}**${title ? ` — ${title}` : ''}`, `\`${entry.input}\``);
+    if (entry.unchanged) {
+      lines.push('- Changes no structure (a purification or salt step), so it is not looked up.', '');
+      return;
+    }
+    if (entry.count > 0) {
+      const notes = (entry.form ?? '').split('+').map((part) => PRECEDENT_FORM_NOTE[part]).filter(Boolean);
+      const ids = entry.samples?.length ? `: ${entry.samples.map((id) => `\`${id}\``).join(', ')}` : '';
+      lines.push(`- ✔ Exact match — ${entry.count} recorded precedent(s)${notes.length ? ` (${notes.join(', ')})` : ''}${ids}.`);
+    } else {
+      const item = similarByInput.get(entry.input);
+      const closest = item?.neighbors[0];
+      if (!closest) {
+        lines.push('- No exact precedent, and no close known reaction.');
+      } else if (closest.similarity !== undefined) {
+        usedSimilarity = true;
+        lines.push(`- No exact precedent. Closest known reaction: ${Math.round(closest.similarity * 100)}% similar — ${similarityBand(closest.similarity)}.`);
+      } else {
+        lines.push(`- No exact precedent. Closest known reaction is ${closest.distance} fingerprint bit(s) away.`);
+      }
+    }
+    lines.push(...stepSupportLines(entry, context?.support?.get(step)));
+    const drawing = context?.drawings?.get(step);
+    if (drawing) lines.push('', '_The closest known reaction, as recorded in the database (species as listed, not a balanced equation):_', '', drawing);
+    lines.push('');
+  });
+  if (usedSimilarity) lines.push(SIMILARITY_FOOTNOTE);
+  return `\n${lines.join('\n').trimEnd()}\n`;
 }
 
 const ROUTE_TARGET_REASONS: RouteTargetAudit['reason'][] = ['formed', 'stereo-mismatch', 'not-formed', 'unparsed'];
@@ -1427,6 +1681,16 @@ function routeTargetDescriptor(audit: RouteAudit): string {
   return smiles ? `canonical SMILES \`${smiles}\`` : '';
 }
 
+/** Evidence under a rejected step in a correction: the index's other ways to make its product
+ *  and a textbook passage, marked as evidence so the model weighs it and still writes names. */
+function fixEvidence(support: StepSupport | undefined, indent: string): string {
+  const lines: string[] = [];
+  const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
+  if (alternatives.length) lines.push(`${indent}Evidence, not an instruction — the Open Reaction Database makes \`${support!.alternatives!.product}\` from: ${alternatives.map(alternativeLine).join(' · ')}. Write any species you take from it by name.`);
+  if (support?.passage) lines.push(`${indent}Textbook, on ${support.passage.about}: ${support.passage.title}${support.passage.location ? `, ${support.passage.location}` : ''} (${support.passage.citation}).`);
+  return lines.length ? `\n${lines.join('\n')}` : '';
+}
+
 function namedFixPreamble(failures: string[], problems: string[], review: RouteReviewProblem[] = []): string[] {
   return [
     ROUTE_FIX_PROMPT_LEAD,
@@ -1441,7 +1705,7 @@ function namedFixPreamble(failures: string[], problems: string[], review: RouteR
  *  fix all failed steps, work backwards from the target, or fix one flagged step on its own
  *  (with split/combine allowed). Each shows the species as IUPAC names only — never the
  *  derived SMILES, which the model did not write. Empty when nothing needs fixing. */
-export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null): string {
+export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null, support?: Map<number, StepSupport>): string {
   const problems = namedRouteProblems(labels, audit);
   const isolated = new Set(isolatedSteps(audit));
   const reviewProblems = blockingReviewProblems(review);
@@ -1455,7 +1719,7 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
     .filter((entry) => entry.reasons.length);
   const failures = flagged
     .filter((entry) => routeStepFailure(entry.step) !== null)
-    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}`);
+    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}${fixEvidence(support?.get(entry.step.index), '  ')}`);
   if (!flagged.length && !problems.length && !reviewProblems.length) return '';
 
   const target = routeTargetDescriptor(audit);
@@ -1495,7 +1759,7 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
         `${ROUTE_FIX_STEP_LEAD}${index + 1} of the synthesis route above.`,
         '',
         `Step ${index + 1} was rejected: ${entry.reasons.join('; ')}`,
-        namedStepLines(labels, index),
+        namedStepLines(labels, index) + fixEvidence(support?.get(index), ''),
         '',
         'For context:',
         previous >= 0
