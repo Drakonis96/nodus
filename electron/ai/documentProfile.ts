@@ -692,7 +692,7 @@ async function analyzeSectionPart(
   options: RunDocumentProfileOptions,
   depth = 0,
 ): Promise<SectionAnalysis> {
-  const hash = sha256(evidence);
+  const hash = checkpointHash(options, evidence);
   const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, key, hash);
   if (cached) return cached;
   let candidate: SectionAnalysis;
@@ -737,6 +737,15 @@ async function analyzeSectionPart(
   return value;
 }
 
+/**
+ * A checkpoint belongs to the models that wrote it, not only to its input. Keyed by the
+ * evidence alone, a job resumed with another generator or auditor (the same-campaign
+ * resume switches models in place) reused the previous models' sections.
+ */
+function checkpointHash(options: Pick<RunDocumentProfileOptions, 'generatorModel' | 'auditorModel'>, content: string): string {
+  return sha256(JSON.stringify([options.generatorModel, options.auditorModel, content]));
+}
+
 async function analyzeSection(section: DerivedDocumentSection, options: RunDocumentProfileOptions): Promise<SectionAnalysis> {
   const sectionPack = documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').section;
   // The section audit sends the fragment AND the analysis of it, so the fragment may only
@@ -753,7 +762,7 @@ async function analyzeSection(section: DerivedDocumentSection, options: RunDocum
     return analyzeSectionPart(part, key, section.title, section.pageStart, { ...options, signal: poolSignal });
   }, options.signal);
   if (analyses.length === 1) return analyses[0];
-  const reduceHash = sha256(JSON.stringify(analyses));
+  const reduceHash = checkpointHash(options, JSON.stringify(analyses));
   const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, `section:${section.sectionId}:reduced`, reduceHash);
   if (cached) return cached;
   let candidate: SectionAnalysis;
@@ -944,7 +953,7 @@ async function synthesizeProfileAdaptive(
   splitPath = 'root',
   splitDepth = 0,
 ): Promise<ProfileSynthesis> {
-  const inputHash = sha256(JSON.stringify(input));
+  const inputHash = checkpointHash(options, JSON.stringify(input));
   const checkpointType = splitPath === 'root' ? 'profile:synthesis' : `profile:synthesis:${splitPath}`;
   const checkpoint = readDocumentCheckpoint<ProfileSynthesis>(options.jobId, checkpointType, inputHash);
   if (checkpoint) return checkpoint;
