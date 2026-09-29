@@ -15,6 +15,7 @@ import {
   type TargetDisconnections,
 } from '@shared/synthesisEvidence';
 import { evidenceText } from '@shared/passageQuality';
+import { isScannedWork, parseTextNotes } from '@shared/textProvenance';
 import { capabilityRegistry } from '../capabilities/registry';
 import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
@@ -105,11 +106,30 @@ export function synthesisEvidenceWorkIds(): string[] {
     .map((row) => row.nodus_id);
 }
 
+/** Whether a work was read mostly by OCR, from its extraction notes and highest page number. */
+function scannedWorkLookup(): (nodusId: string) => boolean {
+  const cache = new Map<string, boolean>();
+  return (nodusId) => {
+    if (cache.has(nodusId)) return cache.get(nodusId)!;
+    let scanned = false;
+    try {
+      const row = getDb().prepare(
+        `SELECT w.resolved_text_notes AS notes, (SELECT MAX(page_number) FROM passages p WHERE p.nodus_id = w.nodus_id) AS pages
+           FROM works w WHERE w.nodus_id = ?`
+      ).get(nodusId) as { notes: string | null; pages: number | null } | undefined;
+      scanned = row ? isScannedWork(parseTextNotes(row.notes), row.pages) : false;
+    } catch { /* unknown: not marked */ }
+    cache.set(nodusId, scanned);
+    return scanned;
+  };
+}
+
 /** Passages for each query from the scoped works: the lexical lane (named reactions, reagent
  *  names) and the dense lane, fused by reciprocal rank, a few per query. */
 export async function textbookPassages(queries: string[], workIds: string[], signal?: AbortSignal, perQuery = PASSAGES_PER_QUERY): Promise<EvidencePassage[]> {
   if (!queries.length || !workIds.length) return [];
   const chosen = new Map<string, EvidencePassage>();
+  const scannedWork = scannedWorkLookup();
   for (const query of queries) {
     signal?.throwIfAborted();
     const lanes: SimilarPassage[][] = [];
@@ -140,6 +160,7 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
         work: { title: hit.title, year: hit.year },
         retrievedFor: query,
         citation: `nodus://passage/${encodeURIComponent(hit.passage_id)}`,
+        ...(scannedWork(hit.nodus_id) ? { scanned: true } : {}),
       });
       taken += 1;
     }

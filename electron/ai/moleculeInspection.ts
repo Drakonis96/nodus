@@ -657,7 +657,7 @@ async function buildStepSupport(
       if (!name) continue;
       const excerpt = relevantExcerpt(name, passage.text, EXCERPT_CHARS);
       for (const step of byClass.get(name) ?? []) {
-        support.set(step, { ...support.get(step), passage: { title: passage.work.title, location: passage.location, citation: passage.citation, excerpt, about: name } });
+        support.set(step, { ...support.get(step), passage: { title: passage.work.title, location: passage.location, citation: passage.citation, excerpt, about: name, ...(passage.scanned ? { scanned: true } : {}) } });
       }
     }
   })().catch((error) => { console.warn('[route] textbook support unavailable:', error instanceof Error ? error.message : String(error)); });

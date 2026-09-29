@@ -94,3 +94,9 @@ test('the table is not replayed to the model in later turns', () => {
   const answer = `${ANSWER}\n### Route check\n**Route verified**\n\n${formatEvidenceSources(collectStepEvidence(ANSWER, 3, PRECEDENT, QUERIES))}`;
   for (const latest of [true, false]) assert.doesNotMatch(routeReportsForHistory(answer, latest), /Where the evidence came from/);
 });
+
+test('a passage from a scanned book is marked in the table', () => {
+  const support = new Map([[0, { passage: { title: 'Organic Chemistry 7e Ed', location: '882', citation: '', excerpt: '', about: 'enolate alkylation', scanned: true } }]]);
+  const text = formatEvidenceSources(collectStepEvidence(ANSWER, 3, null, [], support));
+  assert.match(text, /Organic Chemistry 7e Ed, p\. 882 \(scanned\) \(found by the check\)/);
+});

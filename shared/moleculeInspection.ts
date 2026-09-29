@@ -202,7 +202,7 @@ export interface PrecedentContext {
  *  class, and — for a step that failed or has no precedent — other ways the index records or
  *  proposes to make its product. */
 export interface StepSupport {
-  passage?: { title: string; location: string | null; citation: string; excerpt: string; about: string };
+  passage?: { title: string; location: string | null; citation: string; excerpt: string; about: string; scanned?: boolean };
   alternatives?: { product: string; proposals: Array<{ precursors: string; classes: string[]; recorded: number }> };
 }
 
@@ -219,7 +219,7 @@ function stepSupportLines(entry: ReactionPrecedentEntry, support: StepSupport | 
   if (entry.classes?.length) lines.push(`- Reaction class: ${entry.classes.join(', ')}.`);
   if (support?.passage) {
     const { title, location, citation, excerpt, about } = support.passage;
-    lines.push(`- Textbook, on ${about}: [${title}${location ? `, ${location}` : ''}](${citation}) — “${excerpt}”`);
+    lines.push(`- Textbook, on ${about}: [${title}${location ? `, ${location}` : ''}](${citation})${support?.passage?.scanned ? ' (scanned book, OCR text)' : ''} — “${excerpt}”`);
   }
   const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
   if (alternatives.length) lines.push(`- Other ways to make \`${support!.alternatives!.product}\` (Open Reaction Database): ${alternatives.map(alternativeLine).join(' · ')}.`);
@@ -585,7 +585,7 @@ export function collectStepEvidence(answer: string, stepCount: number, precedent
 function foundPassage(support: StepSupport | undefined): { found?: string } {
   const passage = support?.passage;
   const page = passage?.location ? (/^\d/.test(passage.location) ? `p. ${passage.location}` : passage.location) : null;
-  return passage ? { found: page ? `${passage.title}, ${page}` : passage.title } : {};
+  return passage ? { found: `${page ? `${passage.title}, ${page}` : passage.title}${passage.scanned ? ' (scanned)' : ''}` } : {};
 }
 
 const ordSupports = (ord: StepEvidence['ord']): boolean => ord?.kind === 'exact' || (ord?.kind === 'similar' && ord.similarity >= ORD_SUPPORT_SIMILARITY);
