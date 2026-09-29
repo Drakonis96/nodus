@@ -1468,7 +1468,10 @@ const SALT_DISPLAY_MAX = 30;
  *  "Na + Cr2O7 + … + Na" reads as a lost sodium. Ions shared between salts (sulfate in sodium and
  *  chromium(III) sulfate) are split by a small integer search; when no exact split exists the
  *  side is shown as the checker solved it. */
-function groupedSideTrace(species: RouteSpeciesSummary[], labels: RouteSpeciesLabel[], names: Map<string, string>, balanced: boolean): string {
+function groupedSideTrace(species: RouteSpeciesSummary[], labels: RouteSpeciesLabel[], names: Map<string, string>, balanced: boolean, otherSide: RouteSpeciesSummary[] = []): string {
+  // An ion on both sides (sodium in a dichromate oxidation) is a spectator the solver cancels, so
+  // its solved count is arbitrary (often 1:1); the salts fix it instead.
+  const spectators = new Set(otherSide.map((entry) => entry.input));
   const byInput = new Map(species.map((entry) => [entry.input, entry]));
   const salts = labels
     .filter((label) => label.smiles.includes('.'))
@@ -1489,7 +1492,7 @@ function groupedSideTrace(species: RouteSpeciesSummary[], labels: RouteSpeciesLa
     const search = (index: number, counts: number[]): void => {
       if (found) return;
       if (index === salts.length) {
-        const ok = [...used].every((ion) => salts.reduce((sum, salt, position) => sum + counts[position] * (salt.multiplicity.get(ion) ?? 0), 0) === coefficient(ion));
+        const ok = [...used].every((ion) => spectators.has(ion) || salts.reduce((sum, salt, position) => sum + counts[position] * (salt.multiplicity.get(ion) ?? 0), 0) === coefficient(ion));
         if (ok) found = [...counts];
         return;
       }
@@ -1712,8 +1715,8 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     const assemblyNote = assemblyFailure ? ` ${step.assemblyProblem}.` : '';
     const agents = step.agents.length ? ` [agents: ${sideTrace(step.agents, names)}]` : '';
     const stepLabels = labels[step.index] ?? [];
-    const reactantSide = groupedSideTrace(step.reactants, stepLabels.filter((entry) => entry.role === 'reactant'), names, step.balanced === true);
-    const productSide = groupedSideTrace(step.products, stepLabels.filter((entry) => entry.role === 'product'), names, step.balanced === true);
+    const reactantSide = groupedSideTrace(step.reactants, stepLabels.filter((entry) => entry.role === 'reactant'), names, step.balanced === true, step.products);
+    const productSide = groupedSideTrace(step.products, stepLabels.filter((entry) => entry.role === 'product'), names, step.balanced === true, step.reactants);
     lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${reactantSide}${agents} → ${productSide}`);
   }
   if (audit.links.length) {

@@ -1443,3 +1443,23 @@ test('a salt is shown whole with its count, and water at 7 in a dichromate oxida
   ]];
   assert.match(formatRouteAudit(disodium, disodiumLabels), /2 hydrogen chloride \(HCl\) \+ disodium 2-methylpropanedioate \(C4H4Na2O4\) → 2-methylpropanedioic acid \(C4H6O4\) \+ 2 sodium chloride \(ClNa\)/);
 });
+
+test('a spectator ion the solver left at 1:1 still lets the salts show whole (caprolactam, Suite 2b)', () => {
+  const sp = (input, formula, coefficient) => ({ input, canonicalSmiles: input, skeletonSmiles: input, formula, charge: 0, heavyAtoms: 1, stereocentres: 0, unspecifiedStereocentres: 0, coefficient });
+  const dichromate = '[O]=[Cr](=[O])([O-])[O][Cr](=[O])(=[O])[O-]';
+  const sulfate = 'O=S(=O)([O-])[O-]';
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+    reactants: [sp('OC1CCCCC1', 'C6H12O', 3), sp('[Na+]', 'Na', 1), sp(dichromate, 'Cr2O7', 1), sp('O=S(=O)(O)O', 'H2O4S', 4)], agents: [],
+    products: [sp('O=C1CCCCC1', 'C6H10O', 3), sp(sulfate, 'O4S', 4), sp('[Cr+3]', 'Cr', 2), sp('[Na+]', 'Na', 1), sp('O', 'H2O', 7)] }] });
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'cyclohexanol', smiles: 'OC1CCCCC1' },
+    { role: 'reactant', byproduct: false, name: 'sodium dichromate', smiles: `[Na+].[Na+].${dichromate}` },
+    { role: 'reactant', byproduct: false, name: 'sulfuric acid', smiles: 'O=S(=O)(O)O' },
+    { role: 'product', byproduct: false, name: 'cyclohexanone', smiles: 'O=C1CCCCC1' },
+    { role: 'product', byproduct: true, name: 'chromium(III) sulfate', smiles: `${sulfate}.${sulfate}.${sulfate}.[Cr+3].[Cr+3]` },
+    { role: 'product', byproduct: true, name: 'sodium sulfate', smiles: `${sulfate}.[Na+].[Na+]` },
+    { role: 'product', byproduct: true, name: 'water', smiles: 'O' },
+  ]];
+  const line = formatRouteAudit(audit, labels).split('\n').find((entry) => entry.startsWith('- Step 1'));
+  assert.match(line, /3 cyclohexanol \(C6H12O\) \+ 4 sulfuric acid \(H2O4S\) \+ sodium dichromate \(Cr2Na2O7\) → 3 cyclohexanone \(C6H10O\) \+ 7 water \(H2O\) \+ chromium\(III\) sulfate \(Cr2O12S3\) \+ sodium sulfate \(Na2O4S\)$/);
+});
