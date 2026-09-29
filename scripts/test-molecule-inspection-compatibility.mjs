@@ -42,7 +42,7 @@ test('an installed 2.5.6-style checker cannot attach shifted labels or correctio
   const answer = await appendRouteReportAndDrawings('Route prose', '', { runner: runnerFor(old) }, { steps, labels });
   assert.match(answer, /Route check unavailable:.*omitted or renumbered/);
   assert.match(answer, /Update Chemistry Studio/);
-  assert.doesNotMatch(answer, /Route verified|nodus-route-fix|### Route drawings/);
+  assert.doesNotMatch(answer, /Route checked: balanced|nodus-route-fix|### Route drawings/);
 });
 
 test('a checker that keeps the count but renumbers steps is also refused', async () => {

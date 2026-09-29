@@ -64,14 +64,14 @@ test('the table names the four sources, resolves library titles and counts model
   assert.match(text, /\| 1 — Oxidation of 4-nitrotoluene \| recorded \(4×\) \| Organic Chemistry 7e Ed, p\. 882 \| — \|/);
   assert.match(text, /\| 2 — Fischer esterification \| 81% similar \(same transformation\) \| Klein, 2012 \| orgsyn\.org \|/);
   assert.match(text, /\| 3 — Reduction of the nitro group \| 40% similar \(weak\) \| — \| — · _model knowledge only_ \|/);
-  assert.match(text, /\*\*3 step\(s\):\*\* the Open Reaction Database supports 2, the answer cites textbooks or library passages in 2 and the web in 1; 1 rests on the model's own knowledge\./);
+  assert.match(text, /\*\*3 step\(s\):\*\* the Open Reaction Database snapshot records 2 \(or the same transformation\), the answer cites textbooks or library passages in 2 and the web in 1; 1 rests on the model's own knowledge\./);
   assert.match(text, /Cited outside the steps: McMurry, 2012\./);
 });
 
 test('without the ORD index every step still gets a row', () => {
   const text = formatEvidenceSources(collectStepEvidence(ANSWER, 3, null, []));
   assert.match(text, /\| 3 — Reduction of the nitro group \| — \| — \| — · _model knowledge only_ \|/);
-  assert.match(text, /supports 0/);
+  assert.match(text, /snapshot records 0 \(or the same transformation\)/);
 });
 
 test('bold lead-in steps, the check\'s own passage, and a closing section kept out of the last step', () => {

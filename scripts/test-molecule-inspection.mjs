@@ -182,8 +182,8 @@ test('a route audit is normalized defensively and formatted deterministically', 
   assert.match(text, /- Step 1 FAIL — NOT balanced \(H: reactants 6, products 4\)\. C2H6O → C2H4O/);
   assert.match(text, /- Step 2 OK — balanced\./);
   assert.match(text, /- Step 1 → 2 OK — carried C2H4O/);
-  assert.match(text, /\*\*Route not verified\*\* — 1 of 2 step\(s\) do not pass \(step 1\)\./);
-  assert.match(text, /Not verified: Step 1 is not balanced/);
+  assert.match(text, /\*\*Route check failed\*\* — 1 of 2 step\(s\) do not pass \(step 1\)\./);
+  assert.match(text, /Check failed: Step 1 is not balanced/);
 });
 
 test('a route review blocks the verdict and is shown as a model finding', () => {
@@ -193,15 +193,15 @@ test('a route review blocks the verdict and is shown as a model finding', () => 
   });
   assert.ok(audit);
   const clean = formatRouteAudit(audit);
-  assert.match(clean, /\*\*Route verified\*\*/);
+  assert.match(clean, /\*\*Route checked: balanced and connected\*\*/);
   assert.doesNotMatch(clean, /Route review/);
   const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"the Products line names a different compound than the target."}]}');
   assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'blocking', detail: 'the Products line names a different compound than the target.' }] });
   const blockedText = formatRouteAudit(audit, [], review);
-  assert.match(blockedText, /\*\*Route not verified\*\* — a route review raised 1 problem\(s\)\./);
+  assert.match(blockedText, /\*\*Route check failed\*\* — a route review raised 1 problem\(s\)\./);
   assert.match(blockedText, /### Route review \(model\)/);
   assert.match(blockedText, /- Step 1: the Products line names a different compound than the target\./);
-  assert.match(blockedText, /Not verified: The route review raised 1 problem\(s\)\./);
+  assert.match(blockedText, /Check failed: The route review raised 1 problem\(s\)\./);
 });
 
 test('an advisory review finding is shown but never blocks the route', () => {
@@ -212,12 +212,12 @@ test('an advisory review finding is shown but never blocks the route', () => {
   const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"detail":"I doubt acid X can give the named product."}]}');
   assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'advisory', detail: 'I doubt acid X can give the named product.' }] });
   const text = formatRouteAudit(audit, [], review);
-  assert.match(text, /\*\*Route verified\*\*/);
-  assert.doesNotMatch(text, /Route not verified/);
+  assert.match(text, /\*\*Route checked: balanced and connected\*\*/);
+  assert.doesNotMatch(text, /Route check failed/);
   assert.match(text, /### Route review \(model, advisory\)/);
   assert.match(text, /I doubt acid X can give the named product\./);
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"advisory","detail":"x"}]}')), /\*\*Route verified\*\*/);
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"x"}]}')), /\*\*Route not verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"advisory","detail":"x"}]}')), /\*\*Route checked: balanced and connected\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"x"}]}')), /\*\*Route check failed\*\*/);
 });
 
 test('an unreadable review is not a problem and never blocks', () => {
@@ -227,9 +227,9 @@ test('an unreadable review is not a problem and never blocks', () => {
   assert.deepEqual(parseRouteReview('here it is: {"status":"ok"}'), { status: 'ok', problems: [] });
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.ok(audit);
-  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
   // A review of `ok` does not block either.
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route checked: balanced and connected\*\*/);
 });
 
 test('a review finding is kept whole or cut on a word boundary, never mid-word', () => {
@@ -374,9 +374,9 @@ test('the verified verdict only claims a formed target when one was checked', ()
     continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [],
     target: { input: 'CCO', canonicalSmiles: 'CCO', formula: 'C2H6O', formedAt: 0, reason: 'formed' },
   });
-  assert.match(formatRouteAudit(withTarget), /\*\*Route verified\*\* — every equation balances and every intermediate is carried over, and the target is formed\./);
+  assert.match(formatRouteAudit(withTarget), /\*\*Route checked: balanced and connected\*\* — every equation balances and every intermediate is carried over, and the target is formed\./);
   const withoutTarget = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
-  assert.match(formatRouteAudit(withoutTarget), /\*\*Route verified\*\* — every equation balances and every intermediate is carried over\./);
+  assert.match(formatRouteAudit(withoutTarget), /\*\*Route checked: balanced and connected\*\* — every equation balances and every intermediate is carried over\./);
   assert.doesNotMatch(formatRouteAudit(withoutTarget), /and the target is formed/);
 });
 
@@ -484,7 +484,7 @@ test('a step that cannot be assembled is FAIL and named in the verdict', () => {
     links: [],
   });
   const text = formatRouteAudit(audit);
-  assert.match(text, /\*\*Route not verified\*\* — [^.]*cannot be assembled from a single substrate molecule \(step 1\)/);
+  assert.match(text, /\*\*Route check failed\*\* — [^.]*cannot be assembled from a single substrate molecule \(step 1\)/);
   assert.match(text, /- Step 1 FAIL — balanced\. .*need 9 substrate molecules/);
   // The large-coefficient note is redundant once the assembly reason is shown.
   assert.doesNotMatch(text, /large coefficients/);
@@ -1021,8 +1021,8 @@ test('history drops the review and known reactions of superseded answers, and re
 test('the interim report says checks passed, not verified, while the review runs', () => {
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.match(formatRouteAudit(audit, [], null, true), /\*\*Route checks passed\*\*.*The model review is still running\./);
-  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route verified/);
-  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route checked: balanced/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
   assert.match(formatRouteCheckUnavailable('worker crashed'), /Route check unavailable: worker crashed\. The route above has not been checked\./);
 });
 
@@ -1164,9 +1164,9 @@ test('the precedent section is titled by route step, names the target and explai
     target: { smiles: 'CC(=O)Oc1ccccc1C(=O)O', name: '2-acetoxybenzoic acid' },
     drawings: new Map([[0, '<drawing of step 1 neighbour>']]),
   });
-  assert.match(text, /Target: \*\*2-acetoxybenzoic acid\*\* — `CC\(=O\)Oc1ccccc1C\(=O\)O` · 23 recorded route\(s\) to it in the database\./);
+  assert.match(text, /Target: \*\*2-acetoxybenzoic acid\*\* — `CC\(=O\)Oc1ccccc1C\(=O\)O` · 23 recorded route\(s\) to it in this local snapshot\./);
   assert.match(text, /\*\*Step 1\*\* — phenol \+ carbon dioxide → 2-hydroxybenzoic acid\n`Oc1ccccc1\.O=C=O>>O=C\(O\)c1ccccc1O`/);
-  assert.match(text, /No exact precedent\. Closest known reaction: 63% similar — shares some of the bond changes\./);
+  assert.match(text, /Not recorded in this snapshot\. Closest recorded reaction: 63% similar — shares some of the bond changes\./);
   assert.match(text, /\n\*\*Step 2\*\* — 2-hydroxybenzoic acid \+ acetic anhydride → 2-acetoxybenzoic acid \(sulfuric acid\)\n/, 'agents shown, the acetic acid byproduct left out');
   assert.match(text, new RegExp(`✔ Exact match — 4 recorded precedent\\(s\\): \`${ORD_A}\`, \`${ORD_B}\`\\.`));
   assert.match(text, /_The closest known reaction, as recorded in the database \(species as listed, not a balanced equation\):_\n\n<drawing of step 1 neighbour>/);
@@ -1291,8 +1291,8 @@ test('history drops the review and known reactions of superseded answers, and re
 test('the interim report says checks passed, not verified, while the review runs', () => {
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.match(formatRouteAudit(audit, [], null, true), /\*\*Route checks passed\*\*.*The model review is still running\./);
-  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route verified/);
-  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route checked: balanced/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
   assert.match(formatRouteCheckUnavailable('worker crashed'), /Route check unavailable: worker crashed\. The route above has not been checked\./);
 });
 
