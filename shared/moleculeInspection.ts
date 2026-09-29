@@ -625,31 +625,26 @@ export function findStepProse(text: string, count: number): string[] {
       if (!section) return '';
       const block = text.slice(section.start, section.end);
       const firstLine = block.split(/\r?\n/)[0] ?? '';
-      const title = ((HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1] ?? '').trim();
-      return stepProseText(title, block);
+      const heading = (HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1];
+      if (heading !== undefined) return stepProseText(heading.trim(), block);
+      // A bold lead-in ("**Step 2: aldol addition.** Treat the triketone…"): the first line is the
+      // paragraph itself, so keep what follows the bold title as the step's prose.
+      const leadIn = BOLD_LEAD_IN.exec(firstLine);
+      if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
+      return stepProseText('', block);
     });
   }
-  const found: string[] = [];
-  let pending: { title: string; start: number } | null = null;
-  let offset = 0;
-  const commit = (end: number) => {
-    if (!pending) return;
-    found.push(stepProseText(pending.title, text.slice(pending.start, end)));
-    pending = null;
-  };
-  for (const line of text.split(/\r?\n/)) {
-    const heading = HASH_HEADING.exec(line) ?? BOLD_HEADING.exec(line);
-    const title = (heading?.[1] ?? '').trim();
-    if (title) {
-      commit(offset);
-      if (STEP_TITLE.test(title)) pending = { title, start: offset };
-    }
-    offset += line.length + 1;
-  }
-  commit(text.length);
-  const out: string[] = [];
-  for (let index = 0; index < count; index++) out.push(found[index] ?? '');
-  return out;
+  // No sections: split on the step openings ("## Step 1 …", "**Step 1 — …**", or a bold lead-in
+  // that opens the paragraph, "**Step 1: … .** Treat…") as the evidence summary does.
+  return findStepBlocks(text, count).map((block) => {
+    if (!block) return '';
+    const firstLine = block.split(/\r?\n/)[0] ?? '';
+    const heading = (HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1];
+    if (heading !== undefined) return stepProseText(heading.trim(), block);
+    const leadIn = BOLD_LEAD_IN.exec(firstLine);
+    if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
+    return stepProseText('', block);
+  });
 }
 
 // ---------------------------------------------------------------- species labels
@@ -669,6 +664,8 @@ const NAME_ROLE_MARKER = /(?:`{1,2}|\*\*|__)?[ \t]*\b(reactants|products|by[-\s]
 const HASH_HEADING = /^[ \t]{0,3}#{1,6}[ \t]+(.+?)\s*$/;
 const BOLD_HEADING = /^[ \t]{0,3}\*\*([^*]+)\*\*[ \t]*$/;
 const STEP_TITLE = /^step\b[ \t]*\d+/i;
+/** A bold title that opens a paragraph ("**Step 2: aldol addition.** Treat…"). */
+const BOLD_LEAD_IN = /^[ \t]{0,3}(?:\*\*|__)([^*_]+?)(?:\*\*|__)[ \t]*/;
 function roleOf(label: string): { role: RouteLabelRole; byproduct: boolean } | null {
   const value = label.toLowerCase().replace(/\s+/g, '');
   if (value.startsWith('reactant')) return { role: 'reactant', byproduct: false };
@@ -1129,7 +1126,7 @@ export function requestedTargetFor(userMessages: string[]): string | null {
 
 // "Achiral" is not here: an achiral product has no stereocentre to excuse, and calling a chiral
 // product achiral is a mistake the checker should report, not accept.
-const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?\s+(?:is\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
+const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?(?:\s+(?:of|at|in)\s+(?:this|the|each|that)\s+(?:step|reaction|centres?|centers?|carbons?))?\s+(?:is\s+|are\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
 
 /** Whether a step's prose declares a stereochemically open outcome. The model may state it in
  *  several ways — a racemate, a meso product, or "stereochemistry not controlled" —
@@ -1138,6 +1135,20 @@ const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bnot\
  *  verification. */
 export function declaresRacemic(text: string): boolean {
   return RACEMIC_PATTERN.test(text);
+}
+
+/** Per step: whether its own section of the answer declares an open outcome. Read from the
+ *  whole section, not the 360-character prose the reviewer gets: Sonnet's declarations ("The
+ *  stereochemistry of this step is not controlled. The product is racemic…") came after 324–470
+ *  characters, and four correct steps failed four turns each. The labelled species lines are
+ *  left out, so a name never counts as a declaration. */
+export function stepDeclaresRacemic(answer: string, count: number): boolean[] {
+  const blocks = findStepBlocks(answer, count);
+  const prose = findStepProse(answer, count);
+  return Array.from({ length: count }, (_, index) => {
+    const block = (blocks[index] ?? '').split(/\r?\n/).filter((line) => !/^\s*(?:[-*]\s*)?(?:`{1,2}|\*\*|__)?\s*(?:reactants|products|by[-\s]?products|agents)\s*[:：]/i.test(line)).join('\n');
+    return declaresRacemic(block) || declaresRacemic(prose[index] ?? '');
+  });
 }
 
 function stringArray(value: unknown): string[] {
@@ -1856,7 +1867,11 @@ export function routeStepFailure(step: RouteStepAudit): string | null {
   // assembles a product from more than one substrate. The report already shows this, so the
   // one-click prompts must name it too, or they point at a different step than the checker did.
   if (step.assemblyProblem) return step.assemblyProblem;
-  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state in this step's prose that the outcome is racemic, that the product is meso, or that its stereochemistry is not controlled`;
+  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) {
+    // Say where the open centres are, so a model that already named something knows which name.
+    const open = step.products.filter((entry) => entry.unspecifiedStereocentres > 0).map((entry) => `${entry.name ? `“${entry.name}”` : `\`${entry.canonicalSmiles}\``} (${entry.unspecifiedStereocentres})`);
+    return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)${open.length ? ` in ${open.join(', ')}` : ''} — name the stereoisomer formed (descriptors in its systematic name), or state in this step's own paragraph that the outcome is racemic, that the product is meso, or that its stereochemistry is not controlled (a mixture of diastereomers)`;
+  }
   return null;
 }
 

@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification, routeReportsForHistory, classifyCoProducts, smilesHasCarbon, routeStepFailure, routeFixPromptForHistory, formatRouteCheckUnavailable, normalizeReactionPrecedent, formatReactionPrecedents, buildPrecedentQueries, similarityBand, precedentDrawingFor } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, stepDeclaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification, routeReportsForHistory, classifyCoProducts, smilesHasCarbon, routeStepFailure, routeFixPromptForHistory, formatRouteCheckUnavailable, normalizeReactionPrecedent, formatReactionPrecedents, buildPrecedentQueries, similarityBand, precedentDrawingFor } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -1462,4 +1462,29 @@ test('a spectator ion the solver left at 1:1 still lets the salts show whole (ca
   ]];
   const line = formatRouteAudit(audit, labels).split('\n').find((entry) => entry.startsWith('- Step 1'));
   assert.match(line, /3 cyclohexanol \(C6H12O\) \+ 4 sulfuric acid \(H2O4S\) \+ sodium dichromate \(Cr2Na2O7\) → 3 cyclohexanone \(C6H10O\) \+ 7 water \(H2O\) \+ chromium\(III\) sulfate \(Cr2O12S3\) \+ sodium sulfate \(Na2O4S\)$/);
+});
+
+
+test('a stereo declaration counts wherever it sits in the step, and a bold lead-in keeps its prose (Sonnet 5.5, hard suite)', () => {
+  const lead = 'Treat the triketone with pyrrolidine in methanol at room temperature. The methyl ketone enolate attacks one ring carbonyl and closes the second six-membered ring. The step is an isomerization with no gain or loss of atoms. It creates two stereocentres, the carbon bearing the OH and the methyl-bearing quaternary carbon. No chiral catalyst is used, so the stereochemistry of this step is not controlled and the ketol is racemic.';
+  const answer = [
+    '# Wieland–Miescher ketone', '',
+    '**Step 1: Michael addition.** Heat the dione with but-3-en-2-one in water.', '',
+    'Reactants: 2-methylcyclohexane-1,3-dione; but-3-en-2-one', 'Products: 2-methyl-2-(3-oxobutyl)cyclohexane-1,3-dione', '',
+    `**Step 2: intramolecular aldol addition.** ${lead}`, '',
+    'Reactants: 2-methyl-2-(3-oxobutyl)cyclohexane-1,3-dione', 'Products: 4a-hydroxy-8a-methyloctahydronaphthalene-1,6(2H,5H)-dione', '',
+  ].join('\n');
+  assert.ok(lead.indexOf('racemic') > 360, 'the declaration sits past the reviewer\'s 360-character prose');
+  assert.deepEqual(stepDeclaresRacemic(answer, 2), [false, true]);
+  const prose = findStepProse(answer, 2);
+  assert.match(prose[1], /^Step 2: intramolecular aldol addition\. — Treat the triketone with pyrrolidine/);
+  // "of this step" no longer hides the phrase; a species name never counts as a declaration.
+  assert.equal(declaresRacemic('The stereochemistry of this step is not controlled.'), true);
+  assert.deepEqual(stepDeclaresRacemic('**Step 1: x.** Heat it.\n\nProducts: rac-2-methylbutanoic acid (racemic)\n', 1), [false]);
+});
+
+test('an unspecified-stereo failure names the product that carries the open centres', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 2,
+    reactants: [], agents: [], products: [{ input: 'p', canonicalSmiles: 'CC12CCC(=O)CC1(O)CCCC2=O', skeletonSmiles: 'p', formula: 'C11H16O3', charge: 0, heavyAtoms: 14, stereocentres: 0, unspecifiedStereocentres: 2, name: '4a-hydroxy-8a-methyloctahydronaphthalene-1,6(2H,5H)-dione' }] }] });
+  assert.match(routeStepFailure(audit.steps[0]), /2 unspecified stereocentre\(s\) or double bond\(s\) in “4a-hydroxy-8a-methyloctahydronaphthalene-1,6\(2H,5H\)-dione” \(2\) — name the stereoisomer formed .* in this step's own paragraph/);
 });

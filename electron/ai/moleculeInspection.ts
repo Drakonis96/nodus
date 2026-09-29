@@ -7,7 +7,7 @@ import {
   buildRouteSteps,
   classifyCoProducts,
   countRouteSteps,
-  declaresRacemic,
+  stepDeclaresRacemic,
   findAnswerSpecies,
   findSmilesCandidates,
   findStepConditions,
@@ -776,7 +776,7 @@ export async function appendRouteReportAndDrawings(
   const stepProse = findStepProse(modelAnswer, steps.length);
   // Racemic is decided per step, from that step's own prose, as the rules ask: a sentence
   // elsewhere ("benzocaine is achiral", a note on the target) no longer excuses every step.
-  const racemic = stepProse.map((prose) => declaresRacemic(prose ?? ''));
+  const racemic = stepDeclaresRacemic(modelAnswer, steps.length);
   const provider = routeProvider();
   if (!provider) return finalAnswer;
   const compile = compileProvider();
