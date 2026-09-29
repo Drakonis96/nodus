@@ -80,7 +80,7 @@ import {
   parseGeminiBatchEmbeddingResponse,
 } from './geminiEmbeddings';
 import { completeGeminiDeterministicJson } from './geminiDeterministicCompletion';
-import { withTransportDeadline } from './transportDeadline';
+import { withIdleTransportDeadline, withTransportDeadline } from './transportDeadline';
 import {
   buildLocalRequestPlan,
   recordLocalAiDiagnostic,
@@ -396,6 +396,8 @@ function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
  * finite because a wedged local server must not hold the scan queue open forever.
  */
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
+/** The outer bound on one streamed answer; the stream's own deadline is idle time. */
+const STREAM_TOTAL_MS = 30 * 60_000;
 const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
 /**
@@ -2189,6 +2191,7 @@ async function rawCompleteStreamTransport(
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
     transportSignal: AbortSignal,
+    touch: () => void = () => {},
   ): Promise<void> => {
     const contentBefore = full.length;
     try {
@@ -2203,6 +2206,7 @@ async function rawCompleteStreamTransport(
           }
           throw new AiError(msg, false);
         }
+        touch();
         const choice = chunk?.choices?.[0];
         if (choice?.finish_reason) finishReason = choice.finish_reason;
         const delta = choice?.delta;
@@ -2216,14 +2220,17 @@ async function rawCompleteStreamTransport(
       throw error;
     }
   };
-  const executeStream = (body: any) => withTransportDeadline(
+  // Idle, not total: a reasoning stream that keeps sending chunks is working, however long it
+  // thinks. STREAM_TOTAL_MS still bounds a provider that never finishes.
+  const executeStream = (body: any) => withIdleTransportDeadline(
     streamTimeoutMs,
+    Math.max(streamTimeoutMs, STREAM_TOTAL_MS),
     signal ?? opts.signal,
-    (transportSignal) => model.provider === 'nodus'
+    (transportSignal, touch) => model.provider === 'nodus'
       ? withNodusLocalServerLease(model.model, 'chat', (apiUrl) => consumeStream(new OpenAI({
           apiKey: key, baseURL: apiUrl, timeout: streamTimeoutMs, maxRetries: 0,
-        }), body, transportSignal))
-      : consumeStream(client, body, transportSignal),
+        }), body, transportSignal, touch))
+      : consumeStream(client, body, transportSignal, touch),
   );
   /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
   const replayStream = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
