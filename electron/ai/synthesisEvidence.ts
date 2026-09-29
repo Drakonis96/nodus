@@ -24,7 +24,7 @@ const CHEMISTRY_CAPABILITY = 'nodus:chemistry';
 const DISCONNECT_TOOL = 'propose-disconnections';
 /** Proposals kept per molecule, and passages kept in all. */
 const PROPOSALS_PER_TARGET = 6;
-const MAX_PASSAGES = 6;
+const MAX_PASSAGES = 8;
 /** Passages per query, so one reaction class cannot crowd out the others. */
 const PASSAGES_PER_QUERY = 2;
 const PASSAGE_CHARS = 1_200;
@@ -60,18 +60,25 @@ export async function invokeDisconnections(runner: Runner, targets: string[], st
   return artifact ? normalizeDisconnections(artifact.data, limit) : [];
 }
 
-/** One-step disconnections of the target, then of the most promising precursors (one more call),
- *  from the local ORD index. Best-effort: an older package, an index without the retro tables or
- *  a tool failure returns what was found so far. */
+/** One-step disconnections of the target, then of the most promising precursors, level by level
+ *  (one call per level): two levels in all, three when the request names starting materials, so
+ *  a route's early steps (4-nitrotoluene → 4-nitrobenzoic acid under benzocaine) are covered.
+ *  Best-effort: an older package, an index without the retro tables or a tool failure returns
+ *  what was found so far. */
 async function ordDisconnections(target: string, starting: string[], options: EvidenceOptions): Promise<TargetDisconnections[]> {
   if (!disconnectProvider()) return [];
   const { runner, dispose } = chemistryRunner(options);
   const briefs: TargetDisconnections[] = [];
   try {
-    briefs.push(...(await invokeDisconnections(runner, [target], starting)) ?? []);
-    options.signal?.throwIfAborted();
-    const next = secondLevelTargets(briefs, starting, 3).filter((molecule) => !briefs.some((brief) => brief.target === molecule));
-    if (next.length) briefs.push(...((await invokeDisconnections(runner, next, starting)) ?? []).map((brief) => ({ ...brief, proposals: brief.proposals.slice(0, 3) })));
+    let level = (await invokeDisconnections(runner, [target], starting)) ?? [];
+    briefs.push(...level);
+    for (let depth = 2; depth <= (starting.length ? 3 : 2) && level.length; depth += 1) {
+      options.signal?.throwIfAborted();
+      const next = secondLevelTargets(level, starting, 3).filter((molecule) => !briefs.some((brief) => brief.input === molecule || brief.target === molecule));
+      if (!next.length) break;
+      level = ((await invokeDisconnections(runner, next, starting)) ?? []).map((brief) => ({ ...brief, proposals: brief.proposals.slice(0, 3) }));
+      briefs.push(...level);
+    }
   } catch (error) {
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] ORD disconnections unavailable:', error instanceof Error ? error.message : String(error));
@@ -146,7 +153,7 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   const disconnections = await ordDisconnections(target, startingMaterials, options);
   let passages: EvidencePassage[] = [];
   try {
-    const queries = synthesisEvidenceQueries(findTargetName(question), disconnectionClasses(disconnections, 4));
+    const queries = synthesisEvidenceQueries(findTargetName(question), disconnectionClasses(disconnections, 6));
     passages = await textbookPassages(queries, synthesisEvidenceWorkIds(), options.signal);
   } catch (error) {
     if (options.signal?.aborted) throw error;

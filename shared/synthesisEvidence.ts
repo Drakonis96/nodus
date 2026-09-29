@@ -189,7 +189,7 @@ export function synthesisEvidenceQueries(targetName: string | null, classes: rea
     const query = textbookQueryForClass(name);
     if (query && !queries.includes(query)) queries.push(query);
   }
-  return queries.slice(0, 5);
+  return queries.slice(0, 7);
 }
 
 /** The textbook search for one reaction class, or null for a class with no textbook name. */

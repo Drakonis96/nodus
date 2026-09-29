@@ -113,3 +113,26 @@ test('with the index present, the ORD brief is included', async () => {
   assert.equal(evidence.disconnections[0].proposals[0].classes[0], 'Fischer esterification');
   assert.ok(synthesisEvidencePayload(evidence).ord_disconnections);
 });
+
+test('with starting materials the lookup goes three levels back, toward them', async () => {
+  const brief = (target, precursors) => ({ input: target, target, madeBy: null, proposals: precursors.map((p) => ({ precursors: p, classes: ['a class'], recorded: 1, available: true })) });
+  // benzocaine ← ethyl 4-nitrobenzoate ← 4-nitrobenzoic acid ← 4-nitrotoluene
+  const chain = {
+    'CCOC(=O)c1ccc(N)cc1': brief('CCOC(=O)c1ccc(N)cc1', ['CCOC(=O)c1ccc([N+](=O)[O-])cc1']),
+    'CCOC(=O)c1ccc([N+](=O)[O-])cc1': brief('CCOC(=O)c1ccc([N+](=O)[O-])cc1', ['CCO.O=C(O)c1ccc([N+](=O)[O-])cc1']),
+    'O=C(O)c1ccc([N+](=O)[O-])cc1': brief('O=C(O)c1ccc([N+](=O)[O-])cc1', ['Cc1ccc([N+](=O)[O-])cc1']),
+  };
+  const asked = [];
+  const invoke = async ({ input }) => {
+    asked.push(input.targets);
+    return { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: input.targets.map((t) => chain[t]).filter(Boolean) } }] };
+  };
+  const evidence = await scenario({ provider: TOOL, indexDir: '/idx', invoke });
+  assert.deepEqual(asked, [['CCOC(=O)c1ccc(N)cc1'], ['CCOC(=O)c1ccc([N+](=O)[O-])cc1'], ['O=C(O)c1ccc([N+](=O)[O-])cc1']]);
+  assert.equal(evidence.disconnections.length, 3);
+  // Without starting materials it stops after two levels.
+  asked.length = 0;
+  Object.assign(globalThis.__ord, { provider: TOOL, indexDir: '/idx', invoke, calls: 0 });
+  await quiet(() => gatherSynthesisEvidence('Propose a synthesis of benzocaine (SMILES: CCOC(=O)c1ccc(N)cc1).'));
+  assert.equal(asked.length, 2);
+});

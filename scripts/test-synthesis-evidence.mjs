@@ -85,7 +85,7 @@ test('textbook queries use textbook reaction names and skip classes with none', 
 test('the research chat adds the evidence only to a new route request and reserves room for it', async () => {
   const source = await readFile(path.join(root, 'electron/ai/researchAssistant.ts'), 'utf8');
   assert.match(source, /const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt\(question\) && looksLikeSynthesisRequest\(question\);/);
-  assert.match(source, /routeRequest && !council\?\.member/, 'a council member answers without the evidence');
+  assert.match(source, /chemistryRoute && !council\?\.member \? await gatherSynthesisEvidence\(originalRequest,/, 'first answers and corrections gather it for the original request; a council member answers without it');
   assert.match(source, /routeEvidence \? SYNTHESIS_EVIDENCE_SYSTEM_RULE : ''/);
   assert.match(source, /routeEvidence \? JSON\.stringify\(routeEvidence\)\.length : 0/, 'the budget reserves the evidence');
   const app = await readFile(path.join(root, 'electron/ai/synthesisEvidence.ts'), 'utf8');

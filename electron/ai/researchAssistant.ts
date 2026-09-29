@@ -589,16 +589,17 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const genealogy = getActiveVault().type === 'genealogy';
   const chemistryEnabled = skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
   const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage });
-  // A new route request (not a correction, not a council member's opinion) gets the ORD
-  // disconnections and textbook passages before it is planned.
+  // A new route request (not a correction): it also gets the synthesis template.
   const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question);
-  const gathered = routeRequest && !council?.member ? await gatherSynthesisEvidence(question, { model, locale: promptLanguage }) : null;
-  const routeEvidence = synthesisEvidencePayload(gathered);
   // A route request or a route correction is about making one molecule: its corpus context is
   // retrieved for that chemistry (the target and the reaction classes in play) and leaves out the
   // library-wide research gaps and contradictions, which are about the literature.
   const chemistryRoute = chemistryEnabled && !genealogy && (routeRequest || isRouteFixPrompt(question));
   const originalRequest = [...messages].reverse().find(message => message.role === 'user' && !isRouteFixPrompt(message.content))?.content ?? question;
+  // The ORD disconnections and textbook passages are gathered for the route's original request,
+  // on the first answer and again on each correction, so a fix weighs the same evidence.
+  const gathered = chemistryRoute && !council?.member ? await gatherSynthesisEvidence(originalRequest, { model, locale: promptLanguage }) : null;
+  const routeEvidence = synthesisEvidencePayload(gathered);
   const retrievalQuestion = chemistryRoute ? synthesisRetrievalQuery(originalRequest, gathered) : question;
   const assessments = council?.assessments ? conciliumAssessments(council.assessments, window == null ? 12_000 : Math.max(256, Math.floor(window * LOCAL_CHARS_PER_TOKEN * 0.2 / council.assessments.members.length))) : undefined;
   const system = withResearchSystemPrompt([
