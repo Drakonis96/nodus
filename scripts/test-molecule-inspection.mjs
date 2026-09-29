@@ -256,6 +256,11 @@ test('the route review is told not to re-check balance and to allow one-pot casc
   assert.doesNotMatch(ROUTE_REVIEW_SYSTEM, /it has passed/, 'the review is not told a failed route passed');
   assert.match(ROUTE_REVIEW_SYSTEM, /Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem/);
   assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade/);
+  // A free amine vs its hydrochloride is a protonation-state choice: the review flipped between
+  // the two across corrections and blocked each time. It is advisory; a folded workup still blocks.
+  assert.match(ROUTE_REVIEW_SYSTEM, /a free amine or its hydrochloride, an acid or its carboxylate — is the author's choice/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /never report both forms in turn/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /a step that folds a separate workup into a different transformation/, 'the Kolbe–Schmitt workup rule still blocks');
   // The checker owns balance; the reviewer still owns the plan problem it can see.
   assert.match(ROUTE_REVIEW_SYSTEM, /regiochemistry/);
 });
