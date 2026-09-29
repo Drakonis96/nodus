@@ -422,7 +422,7 @@ async function evidenceSources(modelAnswer: string, stepCount: number, precedent
       const detail = getPassageDetail(passageId);
       if (!detail) return null;
       const page = detail.page_label ?? (detail.page_number != null ? String(detail.page_number) : null);
-      return page ? `${detail.work.title}, p. ${page}` : detail.work.title;
+      return page ? `${detail.work.title}, ${/^\d/.test(page) ? `p. ${page}` : page}` : detail.work.title;
     };
     return formatEvidenceSources(evidence, sourceFor);
   } catch {
