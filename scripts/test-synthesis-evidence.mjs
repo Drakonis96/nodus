@@ -100,5 +100,24 @@ test('a route request retrieves corpus context for its chemistry, not its output
   assert.equal(synthesisRetrievalQuery(request, null), 'benzocaine synthesis');
   assert.equal(synthesisRetrievalQuery('Make CCO somehow', null), 'Make CCO somehow', 'no target name: the request itself');
   const source = await readFile(path.join(root, 'electron/ai/researchAssistant.ts'), 'utf8');
-  assert.match(source, /contradictions: false, gaps: false \}, question, contextBudget, promptLanguage, \{ retrievalQuery: synthesisRetrievalQuery\(question, gathered\) \}/);
+  assert.match(source, /contradictions: false, gaps: false \}, question, contextBudget, promptLanguage, \{ retrievalQuery: retrievalQuestion \}/);
+  assert.match(source, /const retrievalQuestion = chemistryRoute \? synthesisRetrievalQuery\(originalRequest, gathered\) : question;/);
+});
+
+
+test('a route correction keeps Chemistry Studio and gets chemistry-focused corpus context', async () => {
+  const source = await readFile(path.join(root, 'electron/ai/researchAssistant.ts'), 'utf8');
+  // The fix chip's turn gets the chemistry skill back even in an academic vault (no standing skills).
+  assert.match(source, /isRouteFixPrompt\(userMessages\.at\(-1\) \?\? ''\) \? capabilityChatSkills\('nodus:chemistry'\) : \[\]/);
+  // Route requests and corrections both count as chemistry turns; the correction searches with
+  // the original request's chemistry, not the fix prompt's text.
+  assert.match(source, /const chemistryRoute = chemistryEnabled && !genealogy && \(routeRequest \|\| isRouteFixPrompt\(question\)\);/);
+  assert.match(source, /message\.role === 'user' && !isRouteFixPrompt\(message\.content\)/);
+  // The corpus path (5.7 academic chat) uses it too, and drops library-wide gaps and contradictions.
+  assert.match(source, /await run\.investigate\(retrievalQuestion, request\.model\)/);
+  assert.match(source, /contradicciones: request\.selection\.contradictions && !chemistryRoute/);
+  assert.match(source, /huecos: request\.selection\.gaps && !chemistryRoute/);
+  const skills = await readFile(path.join(root, 'electron/chatSkills.ts'), 'utf8');
+  assert.match(skills, /export function capabilityChatSkills\(capability: string\)/);
+  assert.match(skills, /skillActive\(skill\) && runnable\(skill\) && \(skill\.capabilities \?\? \[\]\)\.includes\(capability\)/, 'a skill the user disabled is not brought back');
 });

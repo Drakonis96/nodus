@@ -8,7 +8,7 @@ import { resolveResearchSourceScope, type ResearchSourceScope } from './research
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability, type ChatSkill } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
-import { enabledChatSkills, invokedChatSkills } from '../chatSkills';
+import { capabilityChatSkills, enabledChatSkills, invokedChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
@@ -218,7 +218,11 @@ function skillExecution(request: ResearchChatRequest) {
   const lastRequest = [...userMessages].reverse().find(message => !isRouteFixPrompt(message));
   // Skills invoked with @ apply to this turn in every vault, academic included.
   const standing = getActiveVault().type === 'academic' ? [] : enabledChatSkills('assistant');
-  const invoked = invokedChatSkills(request.skillIds).filter(skill => !standing.some(item => item.id === skill.id));
+  // A route-fix chip is Chemistry Studio's own output, so its turn gets Chemistry Studio back:
+  // the @ that started the route is not stored with the conversation.
+  const fixSkills = isRouteFixPrompt(userMessages.at(-1) ?? '') ? capabilityChatSkills('nodus:chemistry') : [];
+  const invoked = [...invokedChatSkills(request.skillIds), ...fixSkills]
+    .filter((skill, index, all) => !standing.some(item => item.id === skill.id) && all.findIndex(item => item.id === skill.id) === index);
   return { skills: [...standing, ...invoked], question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
@@ -590,6 +594,12 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question);
   const gathered = routeRequest && !council?.member ? await gatherSynthesisEvidence(question, { model, locale: promptLanguage }) : null;
   const routeEvidence = synthesisEvidencePayload(gathered);
+  // A route request or a route correction is about making one molecule: its corpus context is
+  // retrieved for that chemistry (the target and the reaction classes in play) and leaves out the
+  // library-wide research gaps and contradictions, which are about the literature.
+  const chemistryRoute = chemistryEnabled && !genealogy && (routeRequest || isRouteFixPrompt(question));
+  const originalRequest = [...messages].reverse().find(message => message.role === 'user' && !isRouteFixPrompt(message.content))?.content ?? question;
+  const retrievalQuestion = chemistryRoute ? synthesisRetrievalQuery(originalRequest, gathered) : question;
   const assessments = council?.assessments ? conciliumAssessments(council.assessments, window == null ? 12_000 : Math.max(256, Math.floor(window * LOCAL_CHARS_PER_TOKEN * 0.2 / council.assessments.members.length))) : undefined;
   const system = withResearchSystemPrompt([
     council?.member ? 'You are an independent Concilium council member. Assess the user question carefully and provide a concise, evidence-based answer with key reasons, uncertainties and verifiable citations. No skills or tools are available to you. Return prose only, with no skill directives or executable artifacts.' : '',
@@ -653,7 +663,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     if (window) run.budget.constrainToWindow(window, Math.max(Math.ceil(window * 0.75),
       new TextEncoder().encode(system + JSON.stringify(messages)).length + maxTokens + 4096));
     const depth = webDepth(retrieval);
-    run.web = new ResearchWebGrant(request.webSearch ?? getSettings().researchWebSearch ?? 'auto', depth, question, signal, request.model,
+    run.web = new ResearchWebGrant(request.webSearch ?? getSettings().researchWebSearch ?? 'auto', depth, retrievalQuestion, signal, request.model,
       Math.min(WEB_RESEARCH_LIMITS[depth].evidenceBytes, Math.max(0, Math.floor(contextBudget / 3))));
     // The chat is an agent: it plans the turn from the conversation, keeps what earlier
     // answers cited and looks in the catalogue before it lets the answer be written.
@@ -661,7 +671,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     const plan = consulted ? await planResearchTurn(messages, request.model, signal) : literalResearchTurnPlan(question);
     run.agent = { plan, question, compact, minSources: ['definition', 'comparison', 'survey'].includes(plan.kind) ? 3 : 2 };
     if (run.layers.documents) run.seedPriorEvidence(messages.slice(0, -1));
-    await run.investigate(plan.goal, request.model);
+    // A synthesis-route turn searches for the target and its reaction classes: the request
+    // itself is mostly output rules, and a planned goal drawn from it retrieved passages on
+    // formatting rather than chemistry.
+    await run.investigate(chemistryRoute ? retrievalQuestion : plan.goal, request.model);
     await run.web.afterLibrary({ evidence: run.evidence.size, matched: run.matchedDocuments.size, supervised: run.supervised,
       titles: run.scope.documents.filter(document => run.matchedDocuments.has(document.id)).map(document => document.title) });
     const webPassages = run.web.contextPassages();
@@ -674,8 +687,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       obras: nothingConsulted ? [] : snapshot.works,
       ideas_generadas: request.selection.ideas ? snapshot.ideas.map(idea => ({ ...idea, citation: `nodus://idea/${encodeURIComponent(idea.id)}` })) : [],
       temas_principales: request.selection.themes ? snapshot.themes : [],
-      contradicciones: request.selection.contradictions ? snapshot.contradictions : [],
-      huecos: request.selection.gaps ? snapshot.gaps.map(gap => ({ ...gap, citation: `nodus://gap/${encodeURIComponent(gap.id)}` })) : [],
+      contradicciones: request.selection.contradictions && !chemistryRoute ? snapshot.contradictions : [],
+      huecos: request.selection.gaps && !chemistryRoute ? snapshot.gaps.map(gap => ({ ...gap, citation: `nodus://gap/${encodeURIComponent(gap.id)}` })) : [],
       pasajes_relevantes: snapshot.passages,
       ...(webPassages.length ? { pasajes_web: webPassages } : {}),
       ...(run.web.enabled ? {} : run.web.explicit ? { web_search: 'disabled_by_user' } : {}),
@@ -689,8 +702,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     // A route request's corpus context is retrieved for its chemistry, and the corpus-level
     // contradictions and research gaps (about the literature, not about making a molecule) are
     // left out so the budget goes to ideas and passages.
-    ({ context, stats } = routeRequest
-      ? await buildResearchContext({ ...request.selection, contradictions: false, gaps: false }, question, contextBudget, promptLanguage, { retrievalQuery: synthesisRetrievalQuery(question, gathered) })
+    ({ context, stats } = chemistryRoute
+      ? await buildResearchContext({ ...request.selection, contradictions: false, gaps: false }, question, contextBudget, promptLanguage, { retrievalQuery: retrievalQuestion })
       : await buildResearchContext(request.selection, question, contextBudget, promptLanguage));
     const layers = researchContextLayers(request.selection);
     if (!layers.ideas && !layers.documents) context = { ...context, research_scope: { instruction: NO_SOURCES_INSTRUCTION } };
