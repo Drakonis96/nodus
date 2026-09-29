@@ -485,11 +485,26 @@ function stepProseText(title: string, block: string): string {
  *  section for each number wins. The evidence summary reads its citations from here. */
 export function findStepBlocks(text: string, count: number): string[] {
   const lines = text.split('\n');
-  const starts: Array<{ step: number; line: number }> = [];
+  let starts: Array<{ step: number; line: number }> = [];
   lines.forEach((line, at) => {
     const match = /^[ \t]{0,3}(?:#{1,6}[ \t]*|\*\*|__)?[ \t]*Step[ \t]+(\d+)\b/i.exec(line);
     if (match) starts.push({ step: Number(match[1]) - 1, line: at });
   });
+  // No "Step N" anywhere: a numbered list ("1. **Acid-catalysed rearrangement.** …") is the
+  // route when its items, and only they, carry the labelled species lines — a numbered list of
+  // conditions inside one step does not.
+  if (!starts.length) {
+    const numbered = lines.flatMap((line, at) => {
+      // Unindented only: an indented item belongs to a list inside a step.
+      const match = /^(?:#{1,6}[ \t]*)?(\d+)[.)][ \t]+\S/.exec(line);
+      return match ? [{ step: Number(match[1]) - 1, line: at }] : [];
+    });
+    const labelled = numbered.filter((entry, index) => {
+      const end = numbered[index + 1]?.line ?? lines.length;
+      return lines.slice(entry.line, end).some((line) => /^\s*(?:[-*]\s*)?(?:`{1,2}|\*\*|__)?\s*(?:reactants|products)\s*[:：]/i.test(line));
+    });
+    if (labelled.length === count && labelled.every((entry, index) => entry.step === index)) starts = labelled;
+  }
   const blocks: string[] = Array.from({ length: count }, () => '');
   starts.forEach(({ step, line }, index) => {
     if (step < 0 || step >= count || blocks[step]) return;
@@ -631,7 +646,8 @@ export function findStepProse(text: string, count: number): string[] {
       // paragraph itself, so keep what follows the bold title as the step's prose.
       const leadIn = BOLD_LEAD_IN.exec(firstLine);
       if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
-      return stepProseText('', block);
+      // Neither a heading nor a bold title: the first line is already the step's prose.
+    return stepProseText('', `\n${block}`);
     });
   }
   // No sections: split on the step openings ("## Step 1 …", "**Step 1 — …**", or a bold lead-in
@@ -643,7 +659,8 @@ export function findStepProse(text: string, count: number): string[] {
     if (heading !== undefined) return stepProseText(heading.trim(), block);
     const leadIn = BOLD_LEAD_IN.exec(firstLine);
     if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
-    return stepProseText('', block);
+    // Neither a heading nor a bold title: the first line is already the step's prose.
+    return stepProseText('', `\n${block}`);
   });
 }
 
@@ -665,7 +682,7 @@ const HASH_HEADING = /^[ \t]{0,3}#{1,6}[ \t]+(.+?)\s*$/;
 const BOLD_HEADING = /^[ \t]{0,3}\*\*([^*]+)\*\*[ \t]*$/;
 const STEP_TITLE = /^step\b[ \t]*\d+/i;
 /** A bold title that opens a paragraph ("**Step 2: aldol addition.** Treat…"). */
-const BOLD_LEAD_IN = /^[ \t]{0,3}(?:\*\*|__)([^*_]+?)(?:\*\*|__)[ \t]*/;
+const BOLD_LEAD_IN = /^[ \t]{0,3}(?:\d+[.)][ \t]+)?(?:\*\*|__)([^*_]+?)(?:\*\*|__)[ \t]*/;
 function roleOf(label: string): { role: RouteLabelRole; byproduct: boolean } | null {
   const value = label.toLowerCase().replace(/\s+/g, '');
   if (value.startsWith('reactant')) return { role: 'reactant', byproduct: false };

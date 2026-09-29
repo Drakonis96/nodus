@@ -1488,3 +1488,18 @@ test('an unspecified-stereo failure names the product that carries the open cent
     reactants: [], agents: [], products: [{ input: 'p', canonicalSmiles: 'CC12CCC(=O)CC1(O)CCCC2=O', skeletonSmiles: 'p', formula: 'C11H16O3', charge: 0, heavyAtoms: 14, stereocentres: 0, unspecifiedStereocentres: 2, name: '4a-hydroxy-8a-methyloctahydronaphthalene-1,6(2H,5H)-dione' }] }] });
   assert.match(routeStepFailure(audit.steps[0]), /2 unspecified stereocentre\(s\) or double bond\(s\) in “4a-hydroxy-8a-methyloctahydronaphthalene-1,6\(2H,5H\)-dione” \(2\) — name the stereoisomer formed .* in this step's own paragraph/);
 });
+
+test('steps written as a numbered list are found, and a numbered list inside one step is not (Opus 4.8, camphor)', () => {
+  const answer = [
+    'Camphor from α-pinene in three steps.', '',
+    '1. **Acid-catalysed rearrangement.** α-Pinene is treated with acetic acid and catalytic sulfuric acid. A Wagner–Meerwein shift gives the bornyl cation. The stereochemistry of this step is not controlled: the acetate is racemic.', '',
+    'Reactants: 2,6,6-trimethylbicyclo[3.1.1]hept-2-ene; acetic acid', 'Products: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-yl acetate', '',
+    '2. **Ester hydrolysis.** The acetate is hydrolysed. Conditions:', '   1. reflux 2 h', '   2. cool', 'The alcohol is racemic.', '',
+    'Reactants: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-yl acetate; water', 'Products: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-ol', '',
+  ].join('\n');
+  assert.deepEqual(stepDeclaresRacemic(answer, 2), [true, true]);
+  assert.match(findStepProse(answer, 2)[0], /^Acid-catalysed rearrangement\. — α-Pinene is treated/);
+  assert.match(findStepProse(answer, 2)[1], /^Ester hydrolysis\. — The acetate is hydrolysed/);
+  // Without labelled species under the items, a numbered list is not taken for the route.
+  assert.deepEqual(stepDeclaresRacemic('1. First, it is racemic.\n2. Second.\n', 2), [false, false]);
+});
