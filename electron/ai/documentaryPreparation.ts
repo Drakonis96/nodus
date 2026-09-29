@@ -296,17 +296,27 @@ async function prepareDocumentaryEmbeddingsNow(indexKey: string, chunks: Documen
   } finally { clearInterval(heartbeat); signal?.removeEventListener('abort', abort); }
 }
 
-function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number; chunks_json: string }> {
-  return documentaryStore().db.prepare(`SELECT * FROM documentary_revisions WHERE document_id=? AND json_extract(identity_json,'$.revision')=? ORDER BY embedding_ready DESC,created_at DESC`)
+/** A document's revisions without their text. `SELECT *` brought every revision's full text
+ * and chunk JSON (327 MB over 453 revisions in a real library) into the main process for each
+ * of 1,229 sources, and the inventory parsed the chunks twice to count them: 1.3–2.7 s with
+ * the window frozen, at every Research Chat question and every documentary search. */
+function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number }> {
+  return documentaryStore().db.prepare(`SELECT index_key,identity_json,embedding_ready,lexical_ready FROM documentary_revisions WHERE document_id=? AND json_extract(identity_json,'$.revision')=? ORDER BY embedding_ready DESC,created_at DESC`)
     .all(document.id, document.indexedSource?.revision ?? document.revision) as ReturnType<typeof revisionsFor>;
+}
+/** Chunks in a revision. A published one has exactly one passage per chunk (publishLexical
+ * writes them in the transaction that sets lexical_ready), so they are counted on an index
+ * instead of parsing the chunk JSON; an unpublished one is counted by SQLite. */
+function chunkCount(store: DocumentaryStore, row: { index_key: string; lexical_ready: number }): number {
+  const counted = row.lexical_ready
+    ? store.db.prepare('SELECT COUNT(*) n FROM documentary_passages WHERE index_key=?').get(row.index_key)
+    : store.db.prepare('SELECT json_array_length(chunks_json) n FROM documentary_revisions WHERE index_key=?').get(row.index_key);
+  return (counted as { n: number | null } | undefined)?.n ?? 0;
 }
 function attachmentRevisions(document: ResearchCorpusDocument): Array<ReturnType<typeof revisionsFor>> {
   const groups = new Map<string | null, ReturnType<typeof revisionsFor>>();
   const attachments = document.indexedSource ? document.indexedSource.attachments : document.attachments;
-  const published = document.indexedSource?.indexKeys.flatMap(key => {
-    const job = documentaryStore().getJob(key);
-    return job ? [JSON.parse(job.identity_json) as DocumentaryIndexIdentity] : [];
-  });
+  const published = document.indexedSource?.indexKeys.flatMap(key => documentaryStore().jobIdentity(key) ?? []);
   for (const row of revisionsFor(document)) {
     const identity: DocumentaryIndexIdentity = JSON.parse(row.identity_json);
     if (published && !published.some(base => base.attachmentId === identity.attachmentId && base.textFingerprint === identity.textFingerprint
@@ -351,14 +361,14 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     const latest = store.db.prepare('SELECT state,error,revision FROM documentary_requests WHERE document_id=? OR source_id=? ORDER BY updated_at DESC LIMIT 1').get(document.id, document.id) as { state: string; error: string | null; revision: string } | undefined;
     // A request for bytes that have since been replaced says nothing about the current file.
     const request = latest && latest.revision === current.revision ? latest : undefined;
-    const passages = revisions.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
+    const passages = revisions.reduce((sum, row) => sum + chunkCount(store, row), 0);
     const compatibleVectors = groups.flatMap(group => group.find(row => {
       const identity = JSON.parse(row.identity_json) as DocumentaryIndexIdentity;
       return row.embedding_ready && selectedEmbedding && identity.embedding?.provider === selectedEmbedding.provider
         && identity.embedding.model === selectedEmbedding.modelId
         && JSON.stringify(identity.embedding.parameters) === JSON.stringify(embeddingIdentityParameters(selectedEmbedding));
     }) ?? []);
-    const embedded = compatibleVectors.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
+    const embedded = compatibleVectors.reduce((sum, row) => sum + chunkCount(store, row), 0);
     const incompatible = groups.some(group => group.some(row => row.embedding_ready)) && compatibleVectors.length === 0;
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     // An error on a request that is still queued or running is a retry in progress,

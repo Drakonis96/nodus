@@ -175,8 +175,9 @@ export class ResearchCorpusRun {
     // Interleave independent native/shared lanes, retaining source diversity.
     const candidates = shared.evidence.map(item => this.passage(item));
     const separable = readDocuments ? scopedIdeaEvidencePassages(query, stableWorks, settings.candidates) : [];
+    const inventory = researchCorpusInventory().documents;
     const legacy = selectPassageEvidence([...hierarchy.passages, ...separable], settings.passagesPerRound, { preferLexical: true, preferSourceDiversity: true }).flatMap(hit => {
-      const receipt = recordScopedLegacyPassage(this.scope, hit.passage_id);
+      const receipt = recordScopedLegacyPassage(this.scope, hit.passage_id, inventory);
       return receipt ? [{ id: receipt.passage_id, label: hit.title, summary: receipt.text, nodus_id: hit.nodus_id, pageLabel: receipt.page_label,
         authors: this.scope.documents.find(document => document.workId === hit.nodus_id)?.authors ?? [], year: hit.year, zotero_key: hit.zotero_key,
         citation: `nodus://passage/${encodeURIComponent(receipt.passage_id)}`, score: hit.similarity, reason: 'source' }] : [];
@@ -193,8 +194,12 @@ export class ResearchCorpusRun {
     const lexical = !readIdeas ? [] : getDb().prepare(`SELECT global_id,type,label,statement FROM ideas WHERE global_id IN (SELECT value FROM json_each(?))`).all(JSON.stringify(stableIdeas)) as Array<{ global_id: string; type: WritingWorkshopIdeaCandidate['type']; label: string; statement: string }>;
     const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
     const ordered = !readIdeas ? [] : [...hierarchy.ideas, ...lexical.map(idea => ({ ...idea, similarity: words.reduce((score, word) => score + Number(`${idea.label} ${idea.statement}`.toLocaleLowerCase().includes(word)), 0) })).filter(idea => idea.similarity > 0).sort((a, b) => b.similarity - a.similarity)];
-    for (const row of ordered.slice(0, settings.passagesPerRound)) {
-      if (this.ideas.has(row.global_id) || !acceptRound(`idea:${row.global_id}`, row.statement)) continue;
+    for (const found of ordered.slice(0, settings.passagesPerRound)) {
+      // Some analysed ideas have no statement (6 in one real library): they read as their
+      // label, and one with neither is skipped rather than charged to the budget as null.
+      const statement = found.statement ?? found.label ?? '';
+      const row = { ...found, statement };
+      if (!statement || this.ideas.has(row.global_id) || !acceptRound(`idea:${row.global_id}`, statement)) continue;
       const ids = getDb().prepare('SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id=?').all(row.global_id) as { nodus_id: string }[];
       const documents = this.scope.documents.filter(document => ids.some(id => id.nodus_id === document.workId));
       this.ideas.set(row.global_id, { id: row.global_id, label: row.label, summary: row.statement, statement: row.statement,

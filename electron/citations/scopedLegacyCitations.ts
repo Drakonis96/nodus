@@ -14,27 +14,29 @@ type StoredScope = ResolvedResearchScope & { legacyEvidence?: Record<string, Rec
 /** Adapt a legacy passage only after its content hash and scoped work match.
  * The immutable receipt lives with the backend scope, never in renderer input or
  * synced chat metadata. Old raw passage URLs remain a compatibility API. */
-export function recordScopedLegacyPassage(scope: ResolvedResearchScope, passageId: string): PassageDetail | null {
+export function recordScopedLegacyPassage(scope: ResolvedResearchScope, passageId: string, current = researchCorpusInventory().documents): PassageDetail | null {
   const detail = getPassageDetail(passageId);
   if (!detail) return null;
   const document = scope.documents.find(item => item.workId === detail.nodus_id);
   if (!document || (document.indexedSource && document.indexedSource.revision !== document.revision)) return null;
-  assertResearchDocument(scope, document.id, researchCorpusInventory().documents.find(item => item.id === document.id));
-  return recordScopedSourcePassage(scope, document.id, detail);
+  assertResearchDocument(scope, document.id, current.find(item => item.id === document.id));
+  return recordScopedSourcePassage(scope, document.id, detail, current);
 }
 
-/** Preserve only backend-read bytes; no index or preparation consent is implied. */
-export function recordScopedSourcePassage(scope: ResolvedResearchScope, documentId: string, detail: PassageDetail): PassageDetail | null {
-  const document = assertResearchDocument(scope, documentId, researchCorpusInventory().documents.find(item => item.id === documentId));
+/** Preserve only backend-read bytes; no index or preparation consent is implied. A caller
+ * recording several passages in one step may pass the inventory it just read. */
+export function recordScopedSourcePassage(scope: ResolvedResearchScope, documentId: string, detail: PassageDetail, current = researchCorpusInventory().documents): PassageDetail | null {
+  const document = assertResearchDocument(scope, documentId, current.find(item => item.id === documentId));
   if (detail.nodus_id !== (document.workId ?? document.id)) throw new Error('research_source_not_authorized');
   const receipt: Receipt = { documentId: document.id, detail: { ...detail, revision: document.revision } };
   const key = researchFingerprint(receipt);
   recordResearchScope(scope);
   const db = getDb();
   const saved = db.transaction(() => {
-    const row = db.prepare('SELECT scope_json FROM research_run_scopes WHERE id=?').get(scope.id) as { scope_json: string };
-    const stored: StoredScope = JSON.parse(row.scope_json);
-    if (!stored.legacyEvidence?.[key] && Object.keys(stored.legacyEvidence ?? {}).length >= 512) return false;
+    // Counted by SQLite: parsing the stored scope here cost a megabyte per passage.
+    const row = db.prepare(`SELECT json_type(scope_json,'$.legacyEvidence.' || ?) present,
+      (SELECT COUNT(*) FROM json_each(scope_json,'$.legacyEvidence')) receipts FROM research_run_scopes WHERE id=?`).get(key, scope.id) as { present: string | null; receipts: number };
+    if (!row.present && row.receipts >= 512) return false;
     db.prepare('UPDATE research_run_scopes SET scope_json=json_set(scope_json,?,json(?)) WHERE id=?')
       .run(`$.legacyEvidence.${key}`, JSON.stringify(receipt), scope.id);
     return true;

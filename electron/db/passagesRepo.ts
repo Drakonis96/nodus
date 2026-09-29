@@ -59,23 +59,37 @@ export function lexicalPassageSearch(
     .slice(0, 32);
   const ftsQuery = unique.map((token) => `"${token.replaceAll('"', '""')}"*`).join(' OR ');
   if (!ftsQuery) return [];
-  const nodusIds = [...new Set(opts.nodusIds ?? [])];
-  const scoped = nodusIds.length ? ` AND p.nodus_id IN (${nodusIds.map(() => '?').join(',')})` : '';
-  const rows = getDb().prepare(
+  const scope = opts.nodusIds ? new Set(opts.nodusIds) : null;
+  const wanted = Math.max(limit, limit * 4);
+  // Rank on the full-text index alone, then read passages in that order until enough pass.
+  // Joining first made SQLite read every match's row — its text, then its embedding blob to
+  // reach source_ref — and sort them all before the LIMIT: 14,437 matches of a common word
+  // held the main process for 1.1 s. Ties keep the index order, as the sorted join did.
+  const db = getDb();
+  const ranked = db.prepare('SELECT passage_id FROM passages_fts WHERE passages_fts MATCH ? ORDER BY bm25(passages_fts), rowid')
+    .pluck().all(ftsQuery) as string[];
+  const read = db.prepare(
     `SELECT p.passage_id,p.nodus_id,p.text,p.page_label,p.source_ref,p.page_number,
-            w.title,w.authors_json,w.year,w.zotero_key,bm25(passages_fts) AS rank
-       FROM passages_fts f
-       JOIN passages p ON p.passage_id=f.passage_id
+            w.title,w.authors_json,w.year,w.zotero_key
+       FROM passages p
        JOIN works w ON w.nodus_id=p.nodus_id
-      WHERE passages_fts MATCH ? AND w.archived=0
-        AND ${PASSAGE_MATCHES_RESOLVED_TEXT}${scoped}
-      ORDER BY rank
-      LIMIT ?`
-  ).all(ftsQuery, ...nodusIds, Math.max(limit, limit * 4)) as Array<Omit<SimilarPassage, 'similarity'> & { rank: number }>;
+      WHERE p.passage_id IN (SELECT value FROM json_each(?)) AND w.archived=0
+        AND ${PASSAGE_MATCHES_RESOLVED_TEXT}`
+  );
+  const rows: Array<Omit<SimilarPassage, 'similarity'>> = [];
+  for (let start = 0; start < ranked.length && rows.length < wanted; start += 64) {
+    const batch = ranked.slice(start, start + 64);
+    const found = new Map((read.all(JSON.stringify(batch)) as Array<Omit<SimilarPassage, 'similarity'>>).map(row => [row.passage_id, row]));
+    for (const id of batch) {
+      const row = found.get(id);
+      if (row && (!scope || scope.has(row.nodus_id))) rows.push(row);
+      if (rows.length === wanted) break;
+    }
+  }
   // BM25 alone rewards a very frequent generic term. Re-rank its bounded candidate
   // pool by how many distinct roots from this one atomic question the passage
   // actually covers, with a small proximity and original-rank tie-breaker.
-  return rows.map(({ rank: _rank, ...row }, index) => {
+  return rows.map((row, index) => {
     const passageTokens = fold(row.text).match(/[\p{L}\p{N}]+/gu) ?? [];
     const positions = unique.map((root) => passageTokens
       .map((token, at) => token.startsWith(root) ? at : -1)
