@@ -1862,7 +1862,15 @@ function namedFixPreamble(failures: string[], problems: string[], review: RouteR
  *  fix all failed steps, work backwards from the target, or fix one flagged step on its own
  *  (with split/combine allowed). Each shows the species as IUPAC names only — never the
  *  derived SMILES, which the model did not write. Empty when nothing needs fixing. */
-export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null, support?: Map<number, StepSupport>): string {
+/** The note under a step whose species did not resolve: the checker built the step without
+ *  them, so its balance failure is a symptom, and the fix is a name the resolver knows. */
+function unresolvedStepLines(names: UnresolvedName[], indent: string): string {
+  if (!names.length) return '';
+  const roleWord = (entry: UnresolvedName) => (entry.byproduct ? 'Byproduct' : entry.role === 'reactant' ? 'Reactant' : entry.role === 'product' ? 'Product' : 'Agent');
+  return names.map((entry) => `${indent}- “${entry.name}” (${roleWord(entry)}) could not be resolved to a structure, so the checker built this step without it; any balance failure above follows from that. Give it a systematic IUPAC name for the whole species (a salt by its cation and anion), or — for a reactive intermediate such as an enolate salt, which references rarely name — its isomeric SMILES.\n`).join('');
+}
+
+export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null, support?: Map<number, StepSupport>, unresolved: UnresolvedName[] = []): string {
   const problems = namedRouteProblems(labels, audit);
   const isolated = new Set(isolatedSteps(audit));
   const reviewProblems = blockingReviewProblems(review);
@@ -1876,8 +1884,13 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
     .filter((entry) => entry.reasons.length);
   const failures = flagged
     .filter((entry) => routeStepFailure(entry.step) !== null)
-    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}${fixEvidence(support?.get(entry.step.index), '  ')}`);
-  if (!flagged.length && !problems.length && !reviewProblems.length) return '';
+    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}${unresolvedStepLines(unresolved.filter((name) => name.step === entry.step.index + 1), '  ')}${fixEvidence(support?.get(entry.step.index), '  ')}`);
+  // A step whose unresolved species left it passing (or unchecked) still needs the name fixed.
+  const failedSteps = new Set(flagged.filter((entry) => routeStepFailure(entry.step) !== null).map((entry) => entry.step.index + 1));
+  for (const step of [...new Set(unresolved.map((name) => name.step))].filter((step) => !failedSteps.has(step)).sort((a, b) => a - b)) {
+    failures.push(`- Step ${step}: a species did not resolve to a structure\n${unresolvedStepLines(unresolved.filter((name) => name.step === step), '  ')}`);
+  }
+  if (!flagged.length && !problems.length && !reviewProblems.length && !unresolved.length) return '';
 
   const target = routeTargetDescriptor(audit);
   const atTarget = target ? ` (${target})` : '';
@@ -1916,7 +1929,7 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
         `${ROUTE_FIX_STEP_LEAD}${index + 1} of the synthesis route above.`,
         '',
         `Step ${index + 1} was rejected: ${entry.reasons.join('; ')}`,
-        namedStepLines(labels, index) + fixEvidence(support?.get(index), ''),
+        namedStepLines(labels, index) + unresolvedStepLines(unresolved.filter((name) => name.step === index + 1), '') + fixEvidence(support?.get(index), ''),
         '',
         'For context:',
         previous >= 0

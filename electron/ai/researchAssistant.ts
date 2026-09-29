@@ -273,7 +273,7 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
     // The structure check reads the model's own text: the resolved answer carries the app's
     // derived SMILES beside every name, which the route check already covers.
     const withStructures = await appendStructureAudit(resolved.answer, skilled, options);
-    const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
+    const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels, unresolved: resolved.unresolved ?? [] });
     const correctionNote = formatNameCorrectionNote(resolved.corrections);
     const structureNote = formatAuthorStructureNote(resolved.authorStructures);
     const notes = [correctionNote, structureNote].filter(Boolean).join('\n\n');

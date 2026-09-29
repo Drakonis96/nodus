@@ -1389,3 +1389,27 @@ test('a racemic outcome is declared per step, and "achiral" is not a declaration
   assert.equal(declaresRacemic('Its stereochemistry is not controlled.'), true);
   assert.equal(declaresRacemic('Benzocaine is achiral, so no descriptors are needed.'), false, 'an achiral product has nothing to excuse');
 });
+
+test('a fix chip names the species that did not resolve, not only the balance it broke', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'diethyl malonate', smiles: 'CCOC(=O)CC(=O)OCC' },
+    { role: 'reactant', byproduct: false, name: 'sodium ethoxide', smiles: 'CC[O-].[Na+]' },
+    { role: 'product', byproduct: true, name: 'ethanol', smiles: 'CCO' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: false, balanced: false, chargeBalanced: true, differences: ['C: reactants 9, products 2'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const unresolved = [{ step: 1, role: 'product', byproduct: false, name: 'sodium diethyl malonate enolate' }];
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, null, undefined, unresolved));
+  const backwards = chips.find(chip => chip.label === 'Fix from the target backwards');
+  assert.match(backwards.prompt, /“sodium diethyl malonate enolate” \(Product\) could not be resolved to a structure, so the checker built this step without it/);
+  assert.match(chips.find(chip => chip.label === 'Fix step 1').prompt, /could not be resolved/);
+  // Without unresolved names the chips are unchanged.
+  assert.doesNotMatch(routeFixChips(formatNamedRouteFixPrompts(labels, audit))[0].prompt, /could not be resolved/);
+});
+
+test('an unresolved species in a step that otherwise passes still gets a fix chip', () => {
+  const labels = [[{ role: 'product', byproduct: false, name: 'x', smiles: 'C' }]];
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, null, undefined, [{ step: 1, role: 'reactant', byproduct: false, name: 'the enolate' }]));
+  assert.ok(chips.length);
+  assert.match(chips[0].prompt, /- Step 1: a species did not resolve to a structure\n  - “the enolate” \(Reactant\)/);
+});

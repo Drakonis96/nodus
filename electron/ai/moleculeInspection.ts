@@ -289,6 +289,8 @@ export interface RouteResolutionOutcome {
   labels: RouteSpeciesLabel[][];
   consistent: boolean;
   clarification?: string;
+  /** Reactant/product names that resolved to no structure, per step; the fix prompts name them. */
+  unresolved?: UnresolvedName[];
   /** One line per name the resolver corrected, e.g. "old → new"; empty when nothing changed. */
   corrections: string[];
   /** Species the model supplied as structures because no name would resolve, as prose, so the
@@ -553,7 +555,7 @@ export async function resolveNamedRoute(
       consistent: critical.length === 0,
       corrections,
       authorStructures,
-      ...(critical.length ? { clarification: formatUnresolvedNameClarification(critical, options.target) } : {}),
+      ...(critical.length ? { clarification: formatUnresolvedNameClarification(critical, options.target), unresolved: critical } : {}),
       legacy: false,
     };
   } catch (error) {
@@ -749,7 +751,7 @@ export async function appendRouteReportAndDrawings(
   finalAnswer: string,
   modelAnswer: string,
   options: InspectOptions = {},
-  overrides: { steps?: string[]; labels?: RouteSpeciesLabel[][] } = {},
+  overrides: { steps?: string[]; labels?: RouteSpeciesLabel[][]; unresolved?: UnresolvedName[] } = {},
 ): Promise<string> {
   if (options.enabled === false || !routeVerificationAvailable()) return finalAnswer;
   // The names-first path derives the equations from the resolved names and passes them in.
@@ -802,7 +804,7 @@ export async function appendRouteReportAndDrawings(
     // A refusal the checker can name and the app cannot fix is offered back to the model as one
     // click: names and roles only — the model never authored the derived SMILES. The index's
     // alternatives and a textbook passage ride along as evidence.
-    const fix = formatNamedRouteFixPrompts(labels, audit, review, support);
+    const fix = formatNamedRouteFixPrompts(labels, audit, review, support, overrides.unresolved ?? []);
     const sources = await evidenceSources(modelAnswer, steps.length, precedentPromise, queries, support);
     return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${precedentText}${sources}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
