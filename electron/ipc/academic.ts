@@ -1711,19 +1711,22 @@ export function registerAcademicIpc(context: IpcContext): void {
     try { return await new ResearchCorpusRun(scope, notebook?.settings ?? RETRIEVAL_PRESETS.balanced, controller.signal).readDocument(input.documentId, input.operation); }
     finally { release(); }
   });
+  // A one-time store compaction holds the write lock for tens of seconds; preparation
+  // actions wait for it instead of failing on a locked database.
+  const afterDocumentaryMaintenance = <T>(work: () => T | Promise<T>) => documentaryPreparation.documentaryMaintenanceSettled().then(work);
   h('research:preparation:policy', async () => preparationExperience.getResearchPreparationPolicy());
-  h('research:preparation:policy:set', async (_e, input) => preparationExperience.setResearchPreparationPolicy(input));
-  h('research:preparation:preview', async (_e, input) => preparationExperience.previewResearchPreparation(input));
-  h('research:preparation:campaign:start', async (_e, input) => preparationExperience.startResearchPreparationCampaign(input));
+  h('research:preparation:policy:set', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.setResearchPreparationPolicy(input)));
+  h('research:preparation:preview', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.previewResearchPreparation(input)));
+  h('research:preparation:campaign:start', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.startResearchPreparationCampaign(input)));
   h('research:preparation:progress', async () => preparationExperience.getResearchPreparationProgress());
-  h('research:preparation:campaign:control', async (_e, input) => preparationExperience.controlResearchPreparationCampaign(input));
-  h('research:preparation:control', async (_e, action) => preparationExperience.controlAllResearchPreparation(action));
+  h('research:preparation:campaign:control', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.controlResearchPreparationCampaign(input)));
+  h('research:preparation:control', async (_e, action) => afterDocumentaryMaintenance(() => preparationExperience.controlAllResearchPreparation(action)));
   h('research:preparation:inventory', async () => documentaryPreparation.getResearchPreparationInventory());
-  h('research:preparation:start', async (_e, ids: string[]) => documentaryPreparation.prepareResearchDocuments(ids));
-  h('research:preparation:index', async (_e, input) => preparationExperience.indexResearchWorks(input));
-  h('research:preparation:cancel', async (_e, ids: string[]) => documentaryPreparation.cancelResearchDocuments(ids));
-  h('research:preparation:enabled', async (_e, enabled: boolean) => documentaryPreparation.setResearchPreparationEnabled(enabled));
-  h('research:preparation:paused', async (_e, paused: boolean) => documentaryPreparation.setResearchPreparationPaused(paused));
+  h('research:preparation:start', async (_e, ids: string[]) => afterDocumentaryMaintenance(() => documentaryPreparation.prepareResearchDocuments(ids)));
+  h('research:preparation:index', async (_e, input) => afterDocumentaryMaintenance(() => preparationExperience.indexResearchWorks(input)));
+  h('research:preparation:cancel', async (_e, ids: string[]) => afterDocumentaryMaintenance(() => documentaryPreparation.cancelResearchDocuments(ids)));
+  h('research:preparation:enabled', async (_e, enabled: boolean) => afterDocumentaryMaintenance(() => documentaryPreparation.setResearchPreparationEnabled(enabled)));
+  h('research:preparation:paused', async (_e, paused: boolean) => afterDocumentaryMaintenance(() => documentaryPreparation.setResearchPreparationPaused(paused)));
   h('research:chat', async (_e, request: ResearchChatRequest) => answerResearchChat(request));
   h('research:chatStream', async (e, requestId: string, request: ResearchChatRequest) => {
     // Track the in-flight stream so `research:chatStream:cancel` can abort it. On

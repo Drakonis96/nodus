@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { randomUUID } from 'node:crypto';
 import type { DocumentaryIndexIdentity, ResearchCorpusDocument } from '@shared/researchCorpus';
 import { documentaryIndexKey } from '../ai/researchCorpusScope';
+import { decodeDocumentaryVector, encodeDocumentaryVector } from './documentaryVectors';
 
 export interface DocumentaryChunk {
   text: string;
@@ -23,6 +24,8 @@ export interface DocumentaryJob {
   lease_token: string | null;
   lease_until: number | null;
 }
+
+export type DocumentaryPreference = 'enabled' | 'paused' | 'managed-zotero-disabled' | 'legacy-vectors-converted';
 
 /** A profile-owned durable store, independent from rebuildable library catalogs
  * and vault analyses. Callers choose its path; construction never discovers one. */
@@ -73,6 +76,23 @@ export class DocumentaryStore {
         PRIMARY KEY(vault_id,notebook_id)
       );
     `);
+    // Vectors are Float32 blobs; `vector_json` only survives on rows written before, until
+    // convertLegacyVectors() rewrites them.
+    const passageColumns = new Set((this.db.prepare('PRAGMA table_info(documentary_passages)').all() as { name: string }[]).map(column => column.name));
+    if (!passageColumns.has('vector')) this.db.exec('ALTER TABLE documentary_passages ADD COLUMN vector BLOB');
+  }
+  /** Rewrite the next `limit` legacy JSON vectors after `afterRowid` as blobs and return
+   * the cursor to continue from, or null once none remain. A cursor, not a count: counting
+   * the remaining rows read the whole table (3 s on a real 54 k-passage store) per batch. */
+  convertLegacyVectors(afterRowid = 0, limit = 100): number | null {
+    return this.db.transaction(() => {
+      const rows = this.db.prepare('SELECT rowid,vector_json FROM documentary_passages WHERE rowid>? AND vector_json IS NOT NULL ORDER BY rowid LIMIT ?')
+        .all(afterRowid, limit) as { rowid: number; vector_json: string }[];
+      const update = this.db.prepare('UPDATE documentary_passages SET vector=?,vector_json=NULL WHERE rowid=?');
+      for (const row of rows) update.run(encodeDocumentaryVector(JSON.parse(row.vector_json) as number[]), row.rowid);
+      if (rows.length < limit) { this.setPreference('legacy-vectors-converted', true); return null; }
+      return rows[rows.length - 1].rowid;
+    }).immediate();
   }
   /** Remove every published and working derivative, fencing in-flight leases. */
   removeDocument(documentId: string): void {
@@ -92,10 +112,10 @@ export class DocumentaryStore {
     }).immediate();
   }
   close(): void { this.db.close(); }
-  setPreference(key: 'enabled' | 'paused' | 'managed-zotero-disabled', value: boolean): void {
+  setPreference(key: DocumentaryPreference, value: boolean): void {
     this.db.prepare('INSERT INTO documentary_preferences VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, String(value));
   }
-  preference(key: 'enabled' | 'paused' | 'managed-zotero-disabled'): boolean {
+  preference(key: DocumentaryPreference): boolean {
     return (this.db.prepare('SELECT value FROM documentary_preferences WHERE key=?').get(key) as { value: string } | undefined)?.value === 'true';
   }
   enqueue(identity: DocumentaryIndexIdentity, payload: unknown, priority = 0, now = Date.now()): string {
@@ -187,8 +207,8 @@ export class DocumentaryStore {
       this.assertLease(job, now);
       const rows = this.db.prepare('SELECT id FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(job.id) as { id: string }[];
       if (rows.length !== vectors.length || !rows.length) throw new Error('documentary_embedding_count_mismatch');
-      const update = this.db.prepare('UPDATE documentary_passages SET vector_json=? WHERE id=?');
-      rows.forEach((row, index) => update.run(JSON.stringify(vectors[index]), row.id));
+      const update = this.db.prepare('UPDATE documentary_passages SET vector=?,vector_json=NULL WHERE id=?');
+      rows.forEach((row, index) => update.run(encodeDocumentaryVector(vectors[index]), row.id));
       this.db.prepare('UPDATE documentary_revisions SET embedding_ready=1 WHERE index_key=?').run(job.id);
       this.complete(job, now);
     }).immediate();
@@ -254,17 +274,21 @@ export class DocumentaryStore {
     if (!indexKeys.length || !query.length || limit <= 0) return [];
     const norm = Math.sqrt(query.reduce((sum, value) => sum + value * value, 0));
     if (!norm) return [];
-    this.db.function('documentary_similarity', (json: string) => {
-      const vector: number[] = JSON.parse(json);
-      if (vector.length !== query.length || vector.some(value => !Number.isFinite(value))) return -2;
+    this.db.function('documentary_similarity', (blob: Uint8Array | null, json: string | null) => {
+      const vector: ArrayLike<number> = blob ? decodeDocumentaryVector(blob) : JSON.parse(json!) as number[];
+      if (vector.length !== query.length) return -2;
+      for (let index = 0; index < vector.length; index++) if (!Number.isFinite(vector[index])) return -2;
       let dot = 0, magnitude = 0;
       for (let index = 0; index < vector.length; index++) { dot += vector[index] * query[index]; magnitude += vector[index] ** 2; }
       return magnitude ? dot / (norm * Math.sqrt(magnitude)) : -2;
     });
-    return this.db.prepare(`SELECT id,document_id,index_key,text,locator_json FROM (
-      SELECT *,documentary_similarity(vector_json) similarity FROM documentary_passages
-      WHERE vector_json IS NOT NULL AND index_key IN (SELECT value FROM json_each(?)))
-      WHERE similarity>=? ORDER BY similarity DESC,id LIMIT ?`).all(JSON.stringify(indexKeys), threshold, limit) as ReturnType<DocumentaryStore['lexicalSearch']>;
+    // Materialized so the similarity is computed once per passage (a flattened subquery
+    // computed it again for the ORDER BY) and the sort carries ids, not texts and vectors.
+    return this.db.prepare(`WITH scored AS MATERIALIZED (
+      SELECT id,documentary_similarity(vector,vector_json) similarity FROM documentary_passages
+      WHERE (vector IS NOT NULL OR vector_json IS NOT NULL) AND index_key IN (SELECT value FROM json_each(?)))
+      SELECT p.id,p.document_id,p.index_key,p.text,p.locator_json FROM scored JOIN documentary_passages p ON p.id=scored.id
+      WHERE scored.similarity>=? ORDER BY scored.similarity DESC,scored.id LIMIT ?`).all(JSON.stringify(indexKeys), threshold, limit) as ReturnType<DocumentaryStore['lexicalSearch']>;
   }
   adjacentPassages(id: string, indexKeys: string[], radius = 1): ReturnType<DocumentaryStore['lexicalSearch']> {
     if (!indexKeys.length || radius < 0 || radius > 3) return [];

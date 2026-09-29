@@ -4,7 +4,7 @@ import { researchActivityEnabled, startResearchActivity } from './researchActivi
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { backgroundProcess } from '../workers/backgroundProcess';
+import { backgroundProcess, type BackgroundProcess } from '../workers/backgroundProcess';
 import { createHash } from 'node:crypto';
 import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
 import { unpreparedResearchAttachmentIds } from '@shared/researchCorpus';
@@ -20,6 +20,7 @@ import { getGlobalLibraryItem } from '../library/libraryService';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
 import { embedMany, effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
 import { DocumentaryEmbeddingBatches } from '../db/documentaryEmbeddingBatches';
+import { storedDocumentaryVector } from '../db/documentaryVectors';
 import { mapOrderedPool } from './orderedPool';
 import { getWork } from '../db/worksRepo';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
@@ -42,8 +43,97 @@ export function documentaryStore(): DocumentaryStore {
     fs.mkdirSync(directory, { recursive: true });
     shared = new DocumentaryStore(path.join(directory, 'store.sqlite'));
     new DocumentaryCampaigns(shared.db);
+    convertLegacyVectorsInBackground();
   }
   return shared;
+}
+let vectorConversion: ReturnType<typeof setTimeout> | null = null;
+let vectorCursor = 0;
+/** Stores written before vectors were binary hold each one twice as JSON: in the passage
+ * and in its finished working copy. Both are rewritten in short batches in the
+ * background (about 20 ms each on the main thread); semantic search reads either
+ * format meanwhile. Afterwards the store is compacted once preparation is idle. */
+function convertLegacyVectorsInBackground(): void {
+  if (vectorConversion) return;
+  vectorConversion = setTimeout(() => {
+    vectorConversion = null;
+    if (!shared || stopping) return;
+    const store = shared;
+    try {
+      if (!store.preference('legacy-vectors-converted')) {
+        if (!new DocumentaryEmbeddingBatches(store.db).discardFinished()) {
+          const next = store.convertLegacyVectors(vectorCursor);
+          if (next !== null) vectorCursor = next;
+        }
+        if (!store.preference('legacy-vectors-converted')) { convertLegacyVectorsInBackground(); return; }
+      }
+      compactDocumentaryStoreWhenIdle();
+    } catch { /* Retried the next time the store opens. */ }
+  }, 25);
+  vectorConversion.unref?.();
+}
+
+let maintenance: Promise<void> | null = null;
+let maintenanceWorker: BackgroundProcess | null = null;
+let documentaryWriters = 0;
+let initialized = false;
+/** A failed VACUUM (a full disk, say) is not retried in the same session: every attempt
+ * holds the writers off again. */
+let compactionFailed = false;
+/** Resolves when no store maintenance is running. */
+export function documentaryMaintenanceSettled(): Promise<void> {
+  return maintenance ?? Promise.resolve();
+}
+/** Work that writes the store outside the drain waits for maintenance to finish, and
+ * holds the next one off while it runs. */
+export async function withDocumentaryWrites<T>(work: () => Promise<T> | T): Promise<T> {
+  // Starts synchronously when nothing is being maintained, like the work it wraps did.
+  while (maintenance) await maintenance;
+  documentaryWriters += 1;
+  try { return await work(); } finally { documentaryWriters -= 1; }
+}
+const COMPACTION_MIN_FREE_BYTES = 256 * 1024 * 1024;
+const COMPACTION_MIN_FREE_RATIO = 0.3;
+function maintenanceWorkerFile(): string | null {
+  const candidates = [process.env.NODUS_DOCUMENTARY_MAINTENANCE_WORKER_FILE, path.join(__dirname, 'documentaryMaintenanceWorker.js'),
+    path.join(app.getAppPath(), 'dist-electron/documentaryMaintenanceWorker.js')];
+  return candidates.find((file): file is string => !!file && fs.existsSync(file)) ?? null;
+}
+/** Rewrite the store without its free pages once most of it is free. On a real store,
+ * binary vectors left 2.1 of 3.7 GB free and scattered what remained: semantic search
+ * took 5 s per query before compaction and 0.3 s after, with identical results. VACUUM
+ * holds the write lock for tens of seconds, so it runs in its own process and only while
+ * nothing writes: the drain, reconciliation and preparation actions wait for it. */
+export function compactDocumentaryStoreWhenIdle(threshold = { minFreeBytes: COMPACTION_MIN_FREE_BYTES, minFreeRatio: COMPACTION_MIN_FREE_RATIO }): void {
+  if (!initialized || compactionFailed || maintenance || !shared || stopping || draining || lanes || activePreparations.size || documentaryWriters) return;
+  const store = shared;
+  const pages = store.db.pragma('page_count', { simple: true }) as number;
+  const free = store.db.pragma('freelist_count', { simple: true }) as number;
+  const pageSize = store.db.pragma('page_size', { simple: true }) as number;
+  if (free * pageSize < threshold.minFreeBytes || free < pages * threshold.minFreeRatio) return;
+  const file = maintenanceWorkerFile();
+  if (!file) return;
+  maintenance = withoutOwningVault(() => withoutDatabaseContext(() => new Promise<void>(resolve => {
+    const worker = backgroundProcess(file, 'Nodus documentary maintenance');
+    maintenanceWorker = worker;
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true; maintenanceWorker = null;
+      if (!ok) compactionFailed = true;
+      void worker.terminate().finally(resolve);
+    };
+    worker.once('message', (message: { ok?: boolean }) => finish(message?.ok === true));
+    worker.once('error', () => finish(false));
+    worker.once('exit', () => finish(false));
+    worker.postMessage({ filename: store.db.name });
+  }))).finally(() => {
+    maintenance = null;
+    if (shared !== store || stopping) return;
+    try { store.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* A later checkpoint trims the log. */ }
+    notifyDocumentaryPreparation();
+    void drainDocumentaryRequests().catch(() => undefined);
+  });
 }
 /** Resolves once the shared store is closed: at once when idle, or when a drain in
  * progress has stopped (it closes the store itself, so no write is cut short). */
@@ -53,6 +143,9 @@ export function closeDocumentaryPreparation(): Promise<void> {
   for (const active of activePreparations.values()) active.controller.abort();
   if (retryTimer) clearTimeout(retryTimer);
   if (autoTimer) clearTimeout(autoTimer);
+  if (vectorConversion) clearTimeout(vectorConversion); vectorConversion = null;
+  // An interrupted VACUUM rolls back; the store stays as it was.
+  if (maintenanceWorker) void maintenanceWorker.terminate().catch(() => undefined);
   unsubscribe?.(); unsubscribe = null;
   if (!draining) { shared?.close(); shared = null; return Promise.resolve(); }
   return new Promise(resolve => { drainClosed = resolve; });
@@ -60,7 +153,10 @@ export function closeDocumentaryPreparation(): Promise<void> {
 let drainClosed: (() => void) | null = null;
 
 /** Shared text writer used once extraction has supplied a real source revision. */
-export async function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
+export function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
+  return withDocumentaryWrites(() => prepareDocumentaryTextNow(document, text, sourceMap, signal, processingVersion));
+}
+async function prepareDocumentaryTextNow(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string>, signal: AbortSignal | undefined, processingVersion: string): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
   const store = documentaryStore();
   const identity: DocumentaryIndexIdentity = { documentId: document.id, attachmentId: document.attachmentId, revision: document.revision,
     attachmentRevision: document.attachments?.find(attachment => attachment.id === document.attachmentId)?.revision,
@@ -96,7 +192,10 @@ function embeddingIdentityParameters(config: EmbeddingExecutionConfig) {
   return { endpoint: createHash('sha256').update(config.endpoint).digest('hex'), inputPolicy: 'utf8-4096/2' };
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: (final?: boolean) => void = () => {}, progress: (completed: number, unknown: number) => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+export function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: (final?: boolean) => void = () => {}, progress: (completed: number, unknown: number) => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+  return withDocumentaryWrites(() => prepareDocumentaryEmbeddingsNow(indexKey, chunks, signal, execution, assertAuthorized, progress));
+}
+async function prepareDocumentaryEmbeddingsNow(indexKey: string, chunks: DocumentaryChunk[], signal: AbortSignal | undefined, execution: EmbeddingExecutionConfig, assertAuthorized: (final?: boolean) => void, progress: (completed: number, unknown: number) => void): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
   assertAuthorized(true);
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
@@ -109,9 +208,9 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     AND json_extract(identity_json,'$.attachmentId') IS ?
     AND json_extract(identity_json,'$.embedding.parameters')=?`).get(base.documentId, base.textFingerprint, base.revision, base.chunkerVersion, config.provider, config.model, base.processingVersion, base.attachmentId, JSON.stringify(parameters)) as { index_key: string } | undefined;
   if (cached) {
-    const rows = store.db.prepare('SELECT vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as { vector_json: string }[];
+    const rows = store.db.prepare('SELECT vector,vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as Array<{ vector: Buffer | null; vector_json: string | null }>;
     progress(rows.length, 0);
-    return { indexKey: cached.index_key, vectors: rows.map(row => JSON.parse(row.vector_json)), ...config };
+    return { indexKey: cached.index_key, vectors: rows.map(row => storedDocumentaryVector(row)!), ...config };
   }
   if (store.preference('paused')) throw new Error('documentary_paused');
   // Dimensions are measured from the response, so lease a persistent operation
@@ -188,6 +287,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     store.publishLexical(job);
     store.publishEmbeddings(job, vectors as number[][]);
     requests.finish(lease, null);
+    checkpoints.discard(operation);
     return { indexKey: id, vectors: vectors as number[][], ...config };
   } catch (error) {
     if (job && store.getJob(job.id)?.state === 'running') store.fail(job, 'documentary_embedding_publication_failed');
@@ -309,6 +409,8 @@ export function embeddingConfigurationUsable(config: Pick<EmbeddingExecutionConf
   return ['ollama', 'lmstudio', 'nodus'].includes(config.provider) || !!getSettings().providerKeys[config.provider];
 }
 export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
+  // Callers rely on the queue being written synchronously; only a running maintenance defers it.
+  if (maintenance) await maintenance;
   const store = documentaryStore();
   const inventory = researchCorpusInventory();
   const configuration = { embedding: mode === 'text' ? null : effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' };
@@ -353,6 +455,7 @@ export function drainDocumentaryRequests(): Promise<void> {
 const preparationOwners = () => listVaults().filter(vault => vault.type === 'academic').map(vault => vault.id);
 async function drainOwnedDocumentaryRequests(): Promise<void> {
   if (stopping) return;
+  if (maintenance) { void maintenance.then(() => drainDocumentaryRequests()).catch(() => undefined); return; }
   const store = documentaryStore();
   if (store.preference('paused')) return;
   // New work while a drain runs gets a lane of its own if one is free.
@@ -376,6 +479,7 @@ async function drainOwnedDocumentaryRequests(): Promise<void> {
         retryTimer = setTimeout(() => { retryTimer = null; void drainDocumentaryRequests().catch(() => undefined); }, delay);
         retryTimer.unref();
       }
+      if (store.preference('legacy-vectors-converted')) compactDocumentaryStoreWhenIdle();
     }
   }
 }
@@ -573,7 +677,10 @@ export function setResearchPreparationEnabled(enabled: boolean): void {
 }
 
 /** Reconcile ownership before garbage collection. Shared copies survive other vaults. */
-export async function reconcileResearchDocumentOwnership(): Promise<void> {
+export function reconcileResearchDocumentOwnership(): Promise<void> {
+  return withDocumentaryWrites(reconcileOwnedResearchDocuments);
+}
+async function reconcileOwnedResearchDocuments(): Promise<void> {
   const store = documentaryStore();
   const snapshots: Array<{ vaultId: string; ids: Set<string> }> = [];
   for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
@@ -614,7 +721,7 @@ export function notifyResearchCorpusChanged(): void {
   if (autoTimer) clearTimeout(autoTimer);
   autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
     autoTimer = null;
-    void (async () => {
+    void withDocumentaryWrites(async () => {
       await initialization;
       const repo = new DocumentaryCampaigns(documentaryStore().db);
       await reconcileResearchDocumentOwnership();
@@ -631,7 +738,7 @@ export function notifyResearchCorpusChanged(): void {
           repo.savePolicy({ ...updated, known: inventory.map(document => document.id) });
         })).catch(() => { /* Retry discovery after configuration/import recovery; keep other vaults moving. */ });
       }
-    })().catch(() => undefined);
+    }).catch(() => undefined);
   }, 1000)));
   autoTimer.unref();
 }
@@ -674,6 +781,9 @@ async function initializeOwnedDocumentaryPreparation(): Promise<void> {
   }
   // Resume explicitly queued work after a restart, including a crashed stage.
   if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite'))) void drainDocumentaryRequests().catch(() => undefined);
+  // Store maintenance never overlaps the start-up writes above.
+  initialized = true;
+  if (shared) convertLegacyVectorsInBackground();
 }
 
 export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal, read?: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {

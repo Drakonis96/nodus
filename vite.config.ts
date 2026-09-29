@@ -286,6 +286,7 @@ export default defineConfig({
           documentaryChunkWorker: 'electron/workers/documentaryChunkWorker.ts',
           backgroundUtility: 'electron/workers/backgroundUtility.ts',
           documentaryRetrievalWorker: 'electron/workers/documentaryRetrievalWorker.ts',
+          documentaryMaintenanceWorker: 'electron/workers/documentaryMaintenanceWorker.ts',
           computeWorker: 'electron/workers/computeWorker.ts',
           libraryExtractionWorker: 'electron/workers/libraryExtractionWorker.ts',
           libraryOperationWorker: 'electron/workers/libraryOperationWorker.ts',
