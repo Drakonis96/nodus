@@ -2291,14 +2291,26 @@ try {
     await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
     await page.mouse.up();
     await floatingRibbon.waitFor({ state: 'visible', timeout: 10_000 });
-    const ribbonBox = await floatingRibbon.boundingBox();
     // This toolbar can be nearly as wide as the editor column it is positioned in,
     // so it is centred on the pointer only where that column leaves room.
-    const column = await floatingRibbon.evaluate((node) => {
-      const parent = node.offsetParent instanceof HTMLElement ? node.offsetParent.getBoundingClientRect() : null;
-      return { left: Math.max(8, parent?.left ?? 8), right: Math.min(window.innerWidth - 8, parent?.right ?? window.innerWidth - 8) };
-    });
-    const wanted = Math.min(Math.max(editorDrag.to.x - ribbonBox.width / 2, column.left), column.right - ribbonBox.width);
+    const measureRibbon = async () => {
+      const box = await floatingRibbon.boundingBox();
+      const column = await floatingRibbon.evaluate((node) => {
+        const parent = node.offsetParent instanceof HTMLElement ? node.offsetParent.getBoundingClientRect() : null;
+        return { left: Math.max(8, parent?.left ?? 8), right: Math.min(window.innerWidth - 8, parent?.right ?? window.innerWidth - 8) };
+      });
+      return { box, wanted: Math.min(Math.max(editorDrag.to.x - box.width / 2, column.left), column.right - box.width) };
+    };
+    // floating-ui can move the toolbar again after it turns visible; the pointer anchor
+    // re-applies its correction on a 30 ms timer (rAF does not run in the CI window), so
+    // one early read can land between the two. Wait for the placement to settle.
+    let placement = await measureRibbon();
+    for (let attempt = 0; attempt < 20 && Math.abs(placement.box.x - placement.wanted) > 2; attempt += 1) {
+      await page.waitForTimeout(50);
+      placement = await measureRibbon();
+    }
+    const ribbonBox = placement.box;
+    const wanted = placement.wanted;
     assert.ok(Math.abs(ribbonBox.x - wanted) <= 2, `the editor ribbon follows the pointer inside its column (${ribbonBox.x} vs ${wanted})`);
     assert.ok(ribbonBox.y + ribbonBox.height <= editorDrag.to.y, 'the editor ribbon sits above the pointer');
     assert.ok(ribbonBox.y + ribbonBox.height >= editorDrag.to.y - 90, 'the editor ribbon hugs the released line rather than the first one');
