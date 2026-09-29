@@ -197,6 +197,19 @@ function routeAcceptsLabels(provider: CapabilityProvider): boolean {
   return Boolean(schema?.properties && 'labels' in schema.properties);
 }
 
+function routeAccepts(provider: CapabilityProvider, property: string): boolean {
+  const schema = provider.tools.find((tool) => tool.id === ROUTE_TOOL)?.inputSchema as { properties?: Record<string, unknown> } | undefined;
+  return Boolean(schema?.properties && property in schema.properties);
+}
+
+/** Whether the route check may enumerate stereoisomers in the package's Python runtime: only
+ *  where that runtime is already installed, which the downloaded reaction index implies, so a
+ *  route check never starts an install. */
+async function stereoEnumerationAvailable(provider: CapabilityProvider): Promise<boolean> {
+  if (!routeAccepts(provider, 'enumerateStereo')) return false;
+  try { return Boolean(await reactionIndexService().localDirectory()); } catch { return false; }
+}
+
 async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: string[], racemic?: boolean | boolean[], target?: string | null, labels?: RouteSpeciesLabel[][]): Promise<RouteAudit | null> {
   // A package that predates `target`/`labels` ignores them, and the audit simply has no
   // target entry or name check. The schema probe keeps a 2.3.0 package from rejecting an
@@ -207,6 +220,7 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
     ...(racemic ? { racemic } : {}),
     ...(target ? { target } : {}),
     ...(named && routeAcceptsLabels(provider) ? { labels } : {}),
+    ...(await stereoEnumerationAvailable(provider) ? { enumerateStereo: true } : {}),
   };
   const result = await runner.invoke({ provider, toolId: ROUTE_TOOL, input });
   const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'route-audit');
