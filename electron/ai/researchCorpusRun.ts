@@ -31,6 +31,22 @@ import { readResearchOriginalInWorker } from '../library/libraryExtractionWorker
 import type { ModelRef } from '@shared/types';
 import { activeManualIdeaIds } from '../db/manualIdeaVisibility';
 import type { ResearchWebGrant } from './researchWebStep';
+import { searchResearchCatalog, type ResearchCatalogHit, type ResearchCatalogQuery } from '@shared/researchCatalog';
+import type { ResearchTurnPlan } from './researchTurnPlanner';
+import { extractCitationRefs } from './citationSanitize';
+import { getDocumentaryPassageDetail } from '../citations/documentaryCitations';
+import { getScopedLegacyPassageDetail } from '../citations/scopedLegacyCitations';
+
+/** Research Chat's agent: the turn's plan and how many independent sources a finish needs.
+ * Deep Research, the Dictionary and notebook reads leave it unset and keep their loop. */
+export interface ResearchChatAgent {
+  plan: ResearchTurnPlan;
+  /** The user's literal last message, which may only say where or how to search. */
+  question: string;
+  minSources: number;
+  /** A small local window: shorter menus in every decision. */
+  compact: boolean;
+}
 
 /** Compatibility requests are explicit snapshots of the active vault. A notebook
  * may additionally authorize unlinked Global Library works. Neither path uses a
@@ -55,6 +71,16 @@ export class ResearchCorpusRun {
   layers: ResearchContextLayers = { ideas: true, documents: true };
   /** Whether the supervisor made at least one decision in this run. */
   supervised = false;
+  /** Research Chat only. See ResearchChatAgent. */
+  agent?: ResearchChatAgent;
+  /** Works found by author, title or keywords in the library catalogue, best first. */
+  readonly catalogHits = new Map<string, ResearchCatalogHit>();
+  /** The finds of lookups by an author or a title the user named, as opposed to by topic. */
+  readonly namedCatalogHits = new Set<string>();
+  readonly catalogLookups: Array<{ query: ResearchCatalogQuery; hits: number }> = [];
+  /** Passages earlier answers of the conversation cited and this turn carries again. */
+  priorPassages = 0;
+  private documentsByWork?: Map<string, ResolvedResearchScope['documents'][number]>;
   private readonly workIds: string[];
   private readonly ideaIds: string[];
   private originalPins?: Promise<ZoteroOriginalPins>;
@@ -89,6 +115,7 @@ export class ResearchCorpusRun {
       this.budget.partial = true;
     }
   }
+  /** Research Chat's agent starts from every query of its plan; other callers from one. */
   async investigate(query: string, model?: ModelRef | null): Promise<void> {
     if (this.pinRevisions && !this.originalPins) {
       const controller = new AbortController();
@@ -100,8 +127,20 @@ export class ResearchCorpusRun {
     }
     // Leave room for an actual decision and bounded original read. Otherwise a
     // successful first retrieval would consume the entire expansion allowance.
-    await this.retrieve(query, 1, this.budget.settings.autoExpand && this.budget.settings.rounds > 1
-      ? Math.max(256, Math.floor((this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens) / 3)) : undefined);
+    const queries = this.agent ? [...new Set([query, ...this.agent.plan.queries])].slice(0, 3) : [query];
+    const opening = Math.floor((this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens) / 3 / queries.length);
+    const limit = this.budget.settings.autoExpand && this.budget.settings.rounds > 1 ? Math.max(256, opening) : undefined;
+    await this.retrieve(queries[0], 1, limit);
+    // The plan's further queries widen the search; one that fails (a retrieval timeout on a
+    // loaded machine) costs its own evidence, not the turn.
+    for (const each of queries.slice(1)) {
+      try { await this.retrieve(each, 1, limit); }
+      catch (error) {
+        this.validate();
+        if (/not_authorized|scope_changed/.test(error instanceof Error ? error.message : '')) throw error;
+        this.budget.partial = true; this.limitations.add('research_read_unavailable');
+      }
+    }
     // The supervisor's decisions read documents: nothing to decide with the documents off.
     if (this.layers.documents) await deepenResearch(this, query, model);
   }
@@ -185,7 +224,7 @@ export class ResearchCorpusRun {
       return { scopeId: this.scope.id, evidence: [], partial: true };
     }
     const result = await retrieveSharedDocumentaryEvidence({ ...this.scope, documents: [document] }, query,
-      { ...this.budget.settings, rounds: 1, autoExpand: false, evidenceTokens: this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens }, null, this.signal, read);
+      { ...this.budget.settings, rounds: 1, autoExpand: false, evidenceTokens: this.stepAllowance() }, null, this.signal, read);
     this.validate();
     const evidence = result.evidence.filter(item => {
       const candidate = this.passage(item);
@@ -208,7 +247,7 @@ export class ResearchCorpusRun {
     if (!document) throw new Error('research_source_not_authorized');
     const current = researchCorpusInventory().documents.find(item => item.id === documentId);
     assertResearchDocument(this.scope, documentId, current);
-    const remaining = this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens;
+    const remaining = this.stepAllowance();
     if ((!counted && !this.budget.nextRound(true)) || remaining < 256) {
       this.limitations.add('budget_exhausted'); return { evidence: [], scopeId: this.scope.id, partial: true };
     }
@@ -271,6 +310,96 @@ export class ResearchCorpusRun {
     if (!evidence.length) this.limitations.add('no_readable_text');
     this.traversal.push({ query: `original-pages:${read.from}-${read.to ?? read.from}`, sources: [document.id], candidates: pages.length, partial: this.budget.partial });
     return { evidence, scopeId: this.scope.id, partial: this.budget.partial };
+  }
+  /** Evidence one read of one source may bring. The chat agent reads several sources per turn:
+   * handed the whole remaining allowance, its first read of a long work took all of it. */
+  stepAllowance(): number {
+    const remaining = this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens;
+    return this.agent ? Math.min(remaining, Math.max(1024, Math.floor(this.budget.evidenceTokenLimit / 8))) : remaining;
+  }
+  /** The authorized source a passage's work belongs to. */
+  documentForWork(nodusId: string): ResolvedResearchScope['documents'][number] | undefined {
+    this.documentsByWork ??= new Map(this.scope.documents.map(document => [document.workId ?? document.id, document]));
+    return this.documentsByWork.get(nodusId);
+  }
+  /** Distinct sources whose own text is in the evidence: the voices an answer can cite. */
+  supportedDocuments(): Set<string> {
+    const ids = new Set<string>();
+    for (const item of this.evidence.values()) { const document = this.documentForWork(item.nodus_id); if (document) ids.add(document.id); }
+    return ids;
+  }
+  /** Find authorized sources by who wrote them, what they are called or what their title is
+   * about. Reads the catalogue records only; no text is added to the evidence. */
+  catalog(query: ResearchCatalogQuery): ResearchCatalogHit[] {
+    this.validate();
+    const finish = startResearchActivity('scope', 'metadata', [query.author, query.title, query.keywords].filter(Boolean).join(' · '));
+    const hits = searchResearchCatalog(this.scope.documents, query);
+    for (const hit of hits) {
+      if (!this.catalogHits.has(hit.id)) this.catalogHits.set(hit.id, hit);
+      if (query.author || query.title) this.namedCatalogHits.add(hit.id);
+    }
+    this.catalogLookups.push({ query, hits: hits.length });
+    finish('completed', hits.length);
+    return hits;
+  }
+  /** Carry the passages earlier answers cited into this turn. A follow-up that brought back
+   * only new evidence dropped them, and the answer then disowned its own earlier citations.
+   * Each id is resolved through its persisted receipt, which rechecks vault and permission. */
+  seedPriorEvidence(history: ReadonlyArray<{ role: string; content: string }>, limit = 12): number {
+    this.validate();
+    const ids: string[] = [];
+    for (const message of [...history].reverse()) {
+      if (message.role !== 'assistant') continue;
+      for (const ref of extractCitationRefs(message.content)) if (ref.kind === 'passage' && /^(documentary|scoped):/.test(ref.id) && !ids.includes(ref.id)) ids.push(ref.id);
+    }
+    if (!ids.length) return 0;
+    const finish = startResearchActivity('context', 'read');
+    // A quarter of the evidence allowance at most: the turn still has to look further.
+    let room = Math.floor(this.budget.evidenceTokenLimit / 4);
+    for (const id of ids) {
+      if (this.priorPassages >= limit) break;
+      if (this.evidence.has(id)) continue;
+      const detail = id.startsWith('documentary:') ? getDocumentaryPassageDetail(id) : getScopedLegacyPassageDetail(id);
+      const document = detail && !detail.historical ? this.documentForWork(detail.nodus_id) : undefined;
+      if (!detail || !document) continue;
+      const bytes = Buffer.byteLength(detail.text);
+      if (bytes > room) continue;
+      if (!this.budget.accept(`prior:${id}`, detail.text)) break;
+      room -= bytes;
+      this.evidence.set(id, { id, label: document.title, summary: detail.text, nodus_id: detail.nodus_id, authors: document.authors, year: document.year,
+        pageLabel: detail.page_label, zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '',
+        citation: `nodus://passage/${encodeURIComponent(id)}`, score: 1, reason: 'prior-turn' });
+      this.matchedDocuments.add(document.id);
+      this.priorPassages++;
+    }
+    finish('completed', this.priorPassages);
+    return this.priorPassages;
+  }
+  /** What this turn's research did, in words the answer model can repeat to the reader. */
+  researchLog(): string[] {
+    const title = (id: string) => {
+      const document = this.scope.documents.find(item => item.id === id);
+      if (!document) return null;
+      const author = document.authors[0]?.split(',')[0]?.trim();
+      return `«${document.title}»${author || document.year ? ` (${[author, document.year].filter(Boolean).join(', ')})` : ''}`;
+    };
+    const log: string[] = [];
+    if (this.agent) log.push(`Goal of this turn, as the research agent understood it from the conversation: ${this.agent.plan.goal}`);
+    if (this.priorPassages) log.push(`${this.priorPassages} passages cited in earlier answers of this conversation were carried into this turn.`);
+    const searches = this.traversal.filter(entry => entry.sources.length !== 1).map(entry => `«${entry.query.slice(0, 160)}»`);
+    if (searches.length) log.push(`Searched the indexes of the library for: ${[...new Set(searches)].join('; ')}.`);
+    for (const lookup of this.catalogLookups) {
+      const hits = [...this.catalogHits.values()].filter(hit => searchResearchCatalog([hit], lookup.query).length).slice(0, 8).map(hit => title(hit.id)).filter(Boolean);
+      const asked = [lookup.query.author && `author ${lookup.query.author}`, lookup.query.title && `title ${lookup.query.title}`, lookup.query.keywords && `keywords ${lookup.query.keywords}`].filter(Boolean).join(', ');
+      log.push(`Looked up the library catalogue (the user's Zotero and Nodus records: authors, titles, years) for ${asked}: ${lookup.hits ? `${lookup.hits} works, ${hits.join('; ')}` : 'no work matches'}.`);
+    }
+    const inside = [...new Set(this.traversal.filter(entry => entry.sources.length === 1 && !entry.query.startsWith('original-pages:')).map(entry => entry.sources[0]))].map(title).filter(Boolean);
+    if (inside.length) log.push(`Searched inside: ${inside.join('; ')}.`);
+    const read = [...this.readDocuments].map(title).filter(Boolean);
+    if (read.length) log.push(`Read pages or the surrounding passages of: ${read.join('; ')}.`);
+    const supported = [...this.supportedDocuments()].map(title).filter(Boolean);
+    log.push(supported.length ? `Sources whose own text reached this answer: ${supported.join('; ')}.` : 'No source text was found for this turn.');
+    return log;
   }
   coverage(): ResearchTraversal {
     return { scopeId: this.scope.id, sourceCount: this.scope.documents.length, rounds: this.budget.rounds,

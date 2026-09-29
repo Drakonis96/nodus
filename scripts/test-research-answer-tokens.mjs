@@ -15,10 +15,10 @@ test('an answer with invoked skills keeps its larger allowance when the window i
   try {
     await build({ entryPoints: ['shared/researchRetrievalBudget.ts'], outfile: path.join(root, 'budget.cjs'), bundle: true, platform: 'node', format: 'cjs' });
     const { researchAnswerTokens } = require(path.join(root, 'budget.cjs'));
-    assert.equal(researchAnswerTokens(null, false), 6000);
+    assert.equal(researchAnswerTokens(null, false), 8000, 'prose drawn from several sources carries long citation links');
     assert.equal(researchAnswerTokens(null, true), 10_000);
-    assert.equal(researchAnswerTokens(131_072, false), 6000);
-    assert.equal(researchAnswerTokens(131_072, true), 10_000, 'a large window does not shrink a skill answer to 6,000');
+    assert.equal(researchAnswerTokens(131_072, false), 8000);
+    assert.equal(researchAnswerTokens(131_072, true), 10_000, 'a large window does not shrink a skill answer to the prose allowance');
     assert.equal(researchAnswerTokens(8192, true), Math.floor((8192 - 410) * 0.3), 'a small window still bounds it');
     assert.equal(researchAnswerTokens(512, true), 320);
     const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');

@@ -1,6 +1,6 @@
 import type { ResearchNotebookInput, ResearchNotebookPreparation, ResolvedResearchScope } from '@shared/researchCorpus';
 import type { ResearchChatRequest } from '@shared/types';
-import { RETRIEVAL_PRESETS, notebookPreparationStatus, validateRetrievalSettings } from '@shared/researchCorpus';
+import { notebookPreparationStatus, validateRetrievalSettings } from '@shared/researchCorpus';
 import { getDb } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import * as notebooks from '../db/researchNotebooksRepo';
@@ -105,7 +105,8 @@ export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequ
   // The conversation's own system prompt and effort apply, chosen in the chat like any other.
   return { ...input, [pinnedScope]: scope, attachmentIds: input.selection.notebookId ? [] : input.attachmentIds,
     messages: authorizedNotebookHistory(input, scope),
-    selection: { ...input.selection, documents: false, passages: true, retrieval: validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval ?? RETRIEVAL_PRESETS.balanced),
+    // Limits a notebook or the user chose are pinned; without them the chat's agent sets its own.
+    selection: { ...input.selection, documents: false, passages: true, retrieval: notebook?.settings || input.selection.retrieval ? validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval!) : undefined,
       sourceFilter: { enabled: true, authorIds: [], workIds: scope.documents.flatMap(document => document.workId ? [document.workId] : []) } } };
 }
 export function validateNotebookRequest(input: ResearchChatRequest): void {
