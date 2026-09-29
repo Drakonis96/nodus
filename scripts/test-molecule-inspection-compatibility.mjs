@@ -17,8 +17,11 @@ await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')
       '../capabilities/registry': `export const capabilityRegistry=()=>({providers:new Map([['nodus:chemistry',{id:'nodus:chemistry',tools:[{id:'verify-route',inputSchema:{properties:{labels:{}}}}]}]])}); export const pinCapabilitiesForTurn=()=>[];`,
       '../capabilities/runner': `export function createTrustedCapabilityRunner(){throw Error('test must supply a runner')}`,
       './aiClient': `export function completeText(){throw Error('test must not call a model')}`,
+      // The reaction index and the route evidence are optional; with no index they add nothing.
+      '../reactionIndex': `export const reactionIndexService=()=>({localDirectory:async()=>null})`,
+      './synthesisEvidence': `export async function invokeDisconnections(){return null} export function synthesisEvidenceWorkIds(){return []} export async function textbookPassages(){return []}`,
     };
-    api.onResolve({ filter: /^(\.\/aiClient|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
   } }],
 });
