@@ -177,6 +177,24 @@ Nodus is independently licensed. OpenAI, ChatGPT, Codex, GitHub and Copilot are
 trademarks of their respective owners. Inclusion does not imply affiliation,
 certification or endorsement.
 
+## Nodus Drift — Moodist catalogue data (MIT); its recordings are not distributed
+
+The catalogue of Nodus Drift lists the sound identifiers, English labels and
+relative file paths read from the active catalogue of Moodist
+(https://github.com/remvze/moodist, commit
+`11c0be2200116a3635880d600fd6953899cc51a3`), copyright (c) 2023 MAZE, licensed
+under the MIT License; the license text is in `legal/drift/MOODIST_LICENSE.txt`.
+No Moodist source code is used or adapted.
+
+Moodist's recordings are third-party material. Its README says some sounds are
+under the Pixabay Content License and others under CC0, without saying which
+applies to each file. Nodus therefore treats none of them as cleared: **no
+Moodist recording is bundled with Nodus, and none is played**, until
+`legal/drift/REVIEW.md` records the evidence and a distribution review for it.
+The pending list, with the upstream path, size and SHA-256 of every file, is in
+`legal/drift/PROVENANCE.md`. Nodus Drift's noise and binaural tones are generated
+by Nodus's own code and reuse no Moodist audio.
+
 ## Zotero mark
 
 The Zotero “Z” shown in the in-app tutorial is the official symbolic icon from

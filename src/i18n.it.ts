@@ -7,6 +7,7 @@ import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
+import { DRIFT_TRANSLATIONS } from './i18n.drift';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -8267,4 +8268,5 @@ export const IT: Record<string, string> = {
   "Ask the model to fix the failed steps": "Chiedi al modello di correggere i passaggi non riusciti",
   "Sent": "Inviato",
   ...CONCILIUM_TRANSLATIONS['it'],
+  ...DRIFT_TRANSLATIONS['it'],
 };

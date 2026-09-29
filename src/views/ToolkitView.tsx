@@ -13,6 +13,7 @@ import { ToolkitPresenterView } from './ToolkitPresenterView';
 import { ToolkitAiOcrView } from './ToolkitAiOcrView';
 import { ToolkitAppsView } from './ToolkitAppsView';
 import { ToolkitTranslateView } from './ToolkitTranslateView';
+import { ToolkitDriftView } from './ToolkitDriftView';
 
 interface ToolCardProps {
   testid: string;
@@ -152,6 +153,8 @@ export function ToolkitView({
         <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : page === 'apps' ? (
         <ToolkitAppsView onBack={() => onNavigate('home')} settings={settings} />
+      ) : page === 'drift' ? (
+        <ToolkitDriftView onBack={() => onNavigate('home')} />
       ) : page === 'translate' ? (
         <ToolkitTranslateView onBack={() => onNavigate('home')} settings={settings} />
       ) : page === 'protect' ? (
