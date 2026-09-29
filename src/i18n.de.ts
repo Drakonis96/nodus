@@ -72,6 +72,7 @@ import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
@@ -125,6 +126,7 @@ export const DE: Record<string, string> = {
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.de,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.de,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.de,
+  ...TEXT_PROVENANCE_TRANSLATIONS.de,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.de,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.de,
   ...LIBRARY_TUTORIAL_TRANSLATIONS.de,

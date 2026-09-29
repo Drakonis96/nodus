@@ -5,6 +5,7 @@
 // on its own so a reader never has to re-run a whole analysis to repair one index.
 import { useEffect, useState } from 'react';
 import type { DocumentUnderstandingState, WorkView } from '@shared/types';
+import { parseTextNotes } from '@shared/textProvenance';
 import { Icon } from '../components/ui';
 import { notifyDataChanged, useDismissableLayer } from '../hooks';
 import { RETRYABLE_STEP_STATES, STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
@@ -256,7 +257,16 @@ export function WorkStatusModal({
           if (step.reason === 'text_and_model_changed') return t('El texto y el modelo de embeddings cambiaron.');
           return t('Algunos fragmentos no tienen un embedding válido.');
         }
-        return step.total ? tx('{n} fragmentos indexados', { n: step.total }) : '—';
+        {
+          // Scanned books and pages the OCR page cap left out, from the extraction notes.
+          const provenance = parseTextNotes(work.resolved_text_notes);
+          const extra = [
+            provenance.ocrPages ? tx('escaneado: {n} páginas leídas por OCR', { n: provenance.ocrPages }) : '',
+            provenance.cappedPages ? tx('{n} páginas sin procesar por el límite de OCR ({cap} páginas): súbelo en Ajustes y vuelve a extraer el texto', { n: provenance.cappedPages, cap: provenance.cap ?? '?' }) : '',
+          ].filter(Boolean);
+          const base = step.total ? tx('{n} fragmentos indexados', { n: step.total }) : '—';
+          return extra.length ? `${base} · ${extra.join(' · ')}` : base;
+        }
     }
   };
 
