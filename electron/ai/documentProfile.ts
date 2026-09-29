@@ -826,6 +826,27 @@ function quoteOffset(text: string, quote: string): number {
   return normalizedOffset >= 0 ? (haystack.offsets[normalizedOffset] ?? -1) : -1;
 }
 
+/** Collapsed prefixes of a quote, longest first. A quote can run past the end of its
+ * chunk; one shorter than the floor (a running head: "Index I:15") is matched whole. */
+function quoteNeedles(quote: string): string[] {
+  const collapsedQuote = collapsedLiteralText(quote).text.trim();
+  const needles: string[] = [];
+  for (const length of [60, 40, 24]) {
+    const needle = collapsedQuote.slice(0, length).trim();
+    if (needle.length < Math.min(12, collapsedQuote.length)) break;
+    needles.push(needle);
+  }
+  return needles;
+}
+
+/** How much of a quote's opening a passage holds: the longest of quoteNeedles it contains,
+ * 0 for none. Short prefixes can match inside unrelated words ("regla adición" holds "la
+ * adición"), so passages are compared by this length, longest first, as passageForQuote does. */
+export function quoteMatchLength(text: string, quote: string): number {
+  const haystack = collapsedLiteralText(text).text;
+  return quoteNeedles(quote).find((needle) => haystack.includes(needle))?.length ?? 0;
+}
+
 /**
  * The passage a support's citation jump opens. The quote's literal offset already fixed
  * its source and page, so the passage must agree with them: first a passage of that
@@ -856,12 +877,8 @@ export function passageForQuote(
     list.reduce<T | null>((best, row) => (best == null || distance(row) < distance(best) ? row : best), null);
 
   // A quote can run past the end of its chunk, so try shorter prefixes before giving up.
-  const collapsedQuote = collapsedLiteralText(quote).text.trim();
   const haystacks = rows.map((row) => collapsedLiteralText(row.text).text);
-  for (const length of [60, 40, 24]) {
-    const needle = collapsedQuote.slice(0, length).trim();
-    // A quote shorter than the floor (a running head: "Index I:15") is matched whole.
-    if (needle.length < Math.min(12, collapsedQuote.length)) break;
+  for (const needle of quoteNeedles(quote)) {
     const containing = rows.filter((_, index) => haystacks[index].includes(needle));
     const chosen = nearest(containing.filter(startsBefore)) ?? nearest(containing);
     if (chosen) return chosen.passage_id;

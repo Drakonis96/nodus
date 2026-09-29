@@ -17,6 +17,7 @@ import { documentIndexQueue } from './pipeline/documentIndexQueue';
 import { reconcileAuthorLayerOnce, reconcileAuthorRolesOnce } from './db/authorsRepo';
 import { pruneDormantIdeas } from './db/ideasRepo';
 import { repairGraphIntegrityOnce } from './db/graphIntegrityRepair';
+import { repairDocumentSupportPassagesOnce } from './ai/documentSupportRepair';
 import {
   maybeRunAutoBackup,
   maybeRunBackupCleanup,
@@ -1090,6 +1091,7 @@ app.whenReady().then(async () => {
   reconcileAuthorLayerOnce(); // one-time: collapse duplicate author nodes onto Zotero identity
   reconcileAuthorRolesOnce(); // one-time: stop crediting volume editors as authors
   repairGraphIntegrityOnce(); // one-time: drop links to deleted themes, put edge-only ideas back to sleep
+  repairDocumentSupportPassagesOnce(); // one-time: point citation supports at the passage holding their quote
   // Maintenance: drop ideas that have sat dormant (no occurrences) for >30 days.
   // Recent dormancy is kept — it lets fusion revive an idea with the same
   // global_id when its work is rescanned.
