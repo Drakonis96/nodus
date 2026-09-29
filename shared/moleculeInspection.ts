@@ -478,6 +478,139 @@ function stepProseText(title: string, block: string): string {
   return prose ? `${title} — ${prose}` : title;
 }
 
+/** Each step's whole section of the answer, as written (links included), in step order; missing
+ *  steps are empty strings. A step starts at a line that begins "Step N" (a heading, a bold
+ *  lead-in or plain) and runs to the next step, a markdown heading or a whole-line bold heading
+ *  ("**Target structure**"): those belong to the answer, not to the last step. The first
+ *  section for each number wins. The evidence summary reads its citations from here. */
+export function findStepBlocks(text: string, count: number): string[] {
+  const lines = text.split('\n');
+  const starts: Array<{ step: number; line: number }> = [];
+  lines.forEach((line, at) => {
+    const match = /^[ \t]{0,3}(?:#{1,6}[ \t]*|\*\*|__)?[ \t]*Step[ \t]+(\d+)\b/i.exec(line);
+    if (match) starts.push({ step: Number(match[1]) - 1, line: at });
+  });
+  const blocks: string[] = Array.from({ length: count }, () => '');
+  starts.forEach(({ step, line }, index) => {
+    if (step < 0 || step >= count || blocks[step]) return;
+    const next = starts[index + 1]?.line ?? lines.length;
+    let stop = next;
+    for (let at = line + 1; at < next; at++) {
+      if (HASH_HEADING.test(lines[at]) || BOLD_HEADING.test(lines[at])) { stop = at; break; }
+    }
+    blocks[step] = lines.slice(line, stop).join('\n');
+  });
+  return blocks;
+}
+
+/** A step block's heading title without its "Step N" prefix ("Oxidation of 4-nitrotoluene"). */
+function stepBlockTitle(block: string): string {
+  const firstLine = block.split(/\r?\n/)[0] ?? '';
+  const heading = (HASH_HEADING.exec(firstLine) ?? /^[ \t]{0,3}(?:\*\*|__)(.+?)(?:\*\*|__)/.exec(firstLine))?.[1] ?? '';
+  return heading.replace(/[*_`]/g, '').replace(/^step\s*\d+\s*[—–:.-]*\s*/i, '').replace(/[.:]\s*$/, '').trim();
+}
+
+/** One step's support among the four sources a route can draw on. */
+export interface StepEvidence {
+  step: number;
+  title: string;
+  /** Open Reaction Database: a recorded precedent, or the closest record's similarity (0..1). */
+  ord: { kind: 'exact'; count: number } | { kind: 'similar'; similarity: number } | null;
+  /** Library passages cited in the step: passage ids (route evidence and corpus search alike). */
+  library: Array<{ id: string; label: string }>;
+  /** Web pages cited in the step. */
+  web: Array<{ label: string; host: string }>;
+  /** The textbook passage the route check found for the step's reaction class, if any. */
+  found?: string;
+}
+
+/** ORD counts as support for a step at a recorded precedent or at the "same transformation,
+ *  different substrate" band of the similarity scale. */
+const ORD_SUPPORT_SIMILARITY = 0.7;
+const PASSAGE_LINK = /\[([^\]]+)\]\(nodus:\/\/passage\/([^)\s]+)\)/g;
+const WEB_LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+function citationsIn(text: string): { library: StepEvidence['library']; web: StepEvidence['web'] } {
+  const library: StepEvidence['library'] = [];
+  const web: StepEvidence['web'] = [];
+  for (const match of text.matchAll(PASSAGE_LINK)) {
+    let id = match[2];
+    try { id = decodeURIComponent(id); } catch { /* keep as written */ }
+    if (id.startsWith('web:')) { if (!web.some((entry) => entry.label === match[1])) web.push({ label: match[1], host: '' }); }
+    else if (!library.some((entry) => entry.id === id)) library.push({ id, label: match[1] });
+  }
+  for (const match of text.matchAll(WEB_LINK)) {
+    let host = '';
+    try { host = new URL(match[2]).host.replace(/^www\./, ''); } catch { /* keep the label */ }
+    if (!web.some((entry) => entry.host === host && entry.label === match[1])) web.push({ label: match[1], host });
+  }
+  return { library, web };
+}
+
+/** Where each step's support came from: the ORD lookup for the step and the citations in the
+ *  step's own section of the answer. Citations outside every step are returned separately. */
+export function collectStepEvidence(answer: string, stepCount: number, precedent: ReactionPrecedent | null, queries: PrecedentQuery[], support: Map<number, StepSupport> = new Map()): { steps: StepEvidence[]; elsewhere: { library: StepEvidence['library']; web: StepEvidence['web'] } } {
+  const blocks = findStepBlocks(answer, stepCount);
+  const similarByInput = new Map((precedent?.similar ?? []).map((item) => [item.input, item]));
+  const ordByStep = new Map<number, StepEvidence['ord']>();
+  (precedent?.reactions ?? []).forEach((entry, position) => {
+    const step = queries[position]?.step ?? position;
+    if (entry.unchanged) return;
+    if (entry.count > 0) { ordByStep.set(step, { kind: 'exact', count: entry.count }); return; }
+    const scores = (similarByInput.get(entry.input)?.neighbors ?? []).map((neighbor) => neighbor.similarity).filter((value): value is number => typeof value === 'number');
+    if (scores.length) ordByStep.set(step, { kind: 'similar', similarity: Math.max(...scores) });
+  });
+  const steps = blocks.map((block, index) => ({ step: index, title: stepBlockTitle(block), ord: ordByStep.get(index) ?? null, ...citationsIn(block), ...foundPassage(support.get(index)) }));
+  let rest = answer;
+  for (const block of blocks) if (block) rest = rest.replace(block, '');
+  const reports = rest.search(/^### (?:Route check|Structure check|Known reactions)/m);
+  return { steps, elsewhere: citationsIn(reports >= 0 ? rest.slice(0, reports) : rest) };
+}
+
+function foundPassage(support: StepSupport | undefined): { found?: string } {
+  const passage = support?.passage;
+  const page = passage?.location ? (/^\d/.test(passage.location) ? `p. ${passage.location}` : passage.location) : null;
+  return passage ? { found: page ? `${passage.title}, ${page}` : passage.title } : {};
+}
+
+const ordSupports = (ord: StepEvidence['ord']): boolean => ord?.kind === 'exact' || (ord?.kind === 'similar' && ord.similarity >= ORD_SUPPORT_SIMILARITY);
+
+/** The evidence summary appended to a checked route: one row per step, the four sources
+ *  (Open Reaction Database, textbooks and library, web, the model's own knowledge) and a total.
+ *  `sourceFor` turns a library passage id into "Title, p. N" when the library holds it. */
+export function formatEvidenceSources(evidence: ReturnType<typeof collectStepEvidence>, sourceFor: (passageId: string) => string | null = () => null): string {
+  const { steps, elsewhere } = evidence;
+  if (!steps.length) return '';
+  const library = (entries: StepEvidence['library']) => [...new Set(entries.map((entry) => sourceFor(entry.id) ?? entry.label))];
+  const web = (entries: StepEvidence['web']) => [...new Set(entries.map((entry) => entry.host || entry.label))];
+  const lines = ['### Where the evidence came from',
+    'Generated by the application from the answer\'s own citations and the Open Reaction Database lookup; the model does not write it. "Found by the check" marks a textbook passage the route check looked up for the step\'s reaction class, not one the answer cited. A step with no Open Reaction Database support and no citation rests on the model\'s own knowledge.', '',
+    '| Step | Open Reaction Database | Textbooks and library | Web |', '|---|---|---|---|'];
+  let ordCount = 0, libraryCount = 0, webCount = 0, modelOnly = 0, foundCount = 0;
+  for (const step of steps) {
+    const ord = step.ord?.kind === 'exact' ? `recorded (${step.ord.count}×)`
+      : step.ord?.kind === 'similar' ? `${Math.round(step.ord.similarity * 100)}% similar${step.ord.similarity >= ORD_SUPPORT_SIMILARITY ? ' (same transformation)' : ' (weak)'}` : '—';
+    const books = library(step.library);
+    const pages = web(step.web);
+    const supported = ordSupports(step.ord);
+    ordCount += supported ? 1 : 0;
+    libraryCount += books.length ? 1 : 0;
+    webCount += pages.length ? 1 : 0;
+    const none = !supported && !books.length && !pages.length;
+    modelOnly += none ? 1 : 0;
+    const title = step.title ? ` — ${step.title.replace(/\|/g, '/').slice(0, 60)}` : '';
+    foundCount += step.found ? 1 : 0;
+    const shelf = [...books, ...(step.found && !books.includes(step.found) ? [`${step.found} (found by the check)`] : [])];
+    lines.push(`| ${step.step + 1}${title} | ${ord} | ${shelf.join('; ') || '—'} | ${pages.join('; ') || '—'}${none ? ' · _model knowledge only_' : ''} |`);
+  }
+  const n = steps.length;
+  lines.push('', `**${n} step(s):** the Open Reaction Database supports ${ordCount}, the answer cites textbooks or library passages in ${libraryCount} and the web in ${webCount}${foundCount ? `, the check found a textbook passage for ${foundCount}` : ''}; ${modelOnly} rest${modelOnly === 1 ? 's' : ''} on the model's own knowledge.`);
+  const otherBooks = library(elsewhere.library);
+  const otherPages = web(elsewhere.web);
+  if (otherBooks.length || otherPages.length) lines.push('', `Cited outside the steps: ${[...otherBooks, ...otherPages].join('; ')}.`);
+  return `\n${lines.join('\n')}\n`;
+}
+
 /** The “Step N — <title>” heading and the paragraph under it for each step, in step order, so
  *  the route review can judge the transformation the author intended, not only the species.
  *  The heading already names the reaction ("Dehydration of citric acid…"); the prose explains
@@ -896,7 +1029,7 @@ export function formatNameCorrectionNote(corrections: string[]): string {
  *  for the latest answer only, as are the model review, its "Not verified" recap and the known
  *  reactions: that is the route the next turn corrects, and every earlier one has been superseded
  *  (a correction prompt repeats the failures it asks about anyway). */
-const HISTORY_ALWAYS_DROPPED = ['### Route drawings (RDKit)'];
+const HISTORY_ALWAYS_DROPPED = ['### Route drawings (RDKit)', '### Where the evidence came from'];
 const HISTORY_LATEST_ONLY = [
   '### Structure check (RDKit)', '### Route check (RDKit)',
   '### Route review (model)', '### Route review (model, advisory)',

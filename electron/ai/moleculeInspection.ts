@@ -15,6 +15,8 @@ import {
   findStepProse,
   formatNamedRouteFixPrompts,
   formatReactionPrecedents,
+  collectStepEvidence,
+  formatEvidenceSources,
   routeStepFailure,
   precedentDrawingFor,
   formatRouteAudit,
@@ -406,6 +408,26 @@ async function requestCorrectedNames(prose: string, unresolved: UnresolvedName[]
 
 /** One model review of the route plan: the problems a balance and continuity check cannot
  *  see. Defensive — an unreadable reply yields no review, so it never blocks a route. */
+/** The per-step evidence summary: the ORD lookup and the answer's own citations, library
+ *  passages named by title and page. Best-effort: a failure leaves the answer without it. */
+async function evidenceSources(modelAnswer: string, stepCount: number, precedentPromise: ReturnType<typeof lookupReactionPrecedent>, queries: PrecedentQuery[], support: Map<number, StepSupport>): Promise<string> {
+  try {
+    const result = await precedentPromise.catch(() => null);
+    const evidence = collectStepEvidence(modelAnswer, stepCount, result?.precedent ?? null, queries, support);
+    const { getPassageDetail } = await import('../db/passagesRepo');
+    const sourceFor = (passageId: string): string | null => {
+      if (passageId.startsWith('scoped:')) return null;
+      const detail = getPassageDetail(passageId);
+      if (!detail) return null;
+      const page = detail.page_label ?? (detail.page_number != null ? String(detail.page_number) : null);
+      return page ? `${detail.work.title}, p. ${page}` : detail.work.title;
+    };
+    return formatEvidenceSources(evidence, sourceFor);
+  } catch {
+    return '';
+  }
+}
+
 async function requestRouteReview(question: string, labels: RouteSpeciesLabel[][], audit: RouteAudit, options: InspectOptions, stepProse: string[] = []): Promise<RouteReview | null> {
   try {
     const raw = await completeText({
@@ -781,7 +803,8 @@ export async function appendRouteReportAndDrawings(
     // click: names and roles only — the model never authored the derived SMILES. The index's
     // alternatives and a textbook passage ride along as evidence.
     const fix = formatNamedRouteFixPrompts(labels, audit, review, support);
-    return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${precedentText}${fix ? `\n${fix}\n` : ''}`;
+    const sources = await evidenceSources(modelAnswer, steps.length, precedentPromise, queries, support);
+    return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${precedentText}${sources}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
     if (options.signal?.aborted) return finalAnswer;
     return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable(error instanceof Error ? error.message : 'the route check failed')}\n`;
