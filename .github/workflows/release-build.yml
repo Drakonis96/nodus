@@ -84,7 +84,14 @@ jobs:
           - os: windows-latest
             platform: '--win'
             asset-platform: win
-          - os: ubuntu-latest
+          # Linux ships against the host's C library, so the runner's glibc is
+          # the oldest glibc the app can start on. Build on the oldest Ubuntu
+          # LTS GitHub still hosts, never ubuntu-latest: 5.7.1 came off 24.04
+          # and needed glibc 2.38, so it died at launch on Ubuntu 22.04 and
+          # Debian 12. Move this forward only when 22.04 leaves GitHub's
+          # runners (standard support ends April 2027), together with FLOOR in
+          # scripts/verify-linux-glibc.mjs.
+          - os: ubuntu-22.04
             platform: '--linux'
             asset-platform: linux
     runs-on: ${{ matrix.os }}
@@ -235,9 +242,20 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: node scripts/verify-macos-release.cjs release ${{ matrix.mac_arch }}
 
+      # better-sqlite3 has no prebuilt binary for Electron 43, so it compiles
+      # here. Electron 43's V8 headers are rejected by GCC 11 and 12, the
+      # compilers 22.04 carries; clang 15 accepts them and still links against
+      # the stock glibc and libstdc++, which is the point of this runner.
       - name: Build Linux installer
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
+        env:
+          CC: clang-15
+          CXX: clang++-15
         run: npx electron-builder ${{ matrix.platform }} --publish never --config build/electron-builder.release.cjs
+
+      - name: Verify the Linux build starts on the oldest supported Ubuntu LTS
+        if: runner.os == 'Linux'
+        run: node scripts/verify-linux-glibc.mjs release/linux-unpacked
 
       - name: Remove temporary macOS credentials
         if: always() && startsWith(matrix.os, 'macos')
