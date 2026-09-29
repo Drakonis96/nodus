@@ -1503,3 +1503,16 @@ test('steps written as a numbered list are found, and a numbered list inside one
   // Without labelled species under the items, a numbered list is not taken for the route.
   assert.deepEqual(stepDeclaresRacemic('1. First, it is racemic.\n2. Second.\n', 2), [false, false]);
 });
+
+test('a route request asks for backwards, one-step planning without hand-balancing or mechanisms, before the format', () => {
+  const method = SYNTHESIS_TEMPLATE_ADDENDUM.indexOf('How to plan the route:');
+  const format = SYNTHESIS_TEMPLATE_ADDENDUM.indexOf('Output format — follow exactly.');
+  assert.ok(method >= 0 && format > method, 'the method comes first, the output format after it');
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Work backwards from the target, one step at a time/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Once a step is written, do not revisit or re-derive it/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Do not count atoms, track hydrogens or balance equations in your reasoning/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Do not work out reaction mechanisms/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Present the finished route in forward order, step 1 first/);
+  // The addendum is still recognised as already applied, so it is never appended twice.
+  assert.equal(looksLikeSynthesisRequest(`Propose a synthesis of benzocaine.\n${SYNTHESIS_TEMPLATE_ADDENDUM}`), false);
+});
