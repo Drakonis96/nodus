@@ -1350,7 +1350,7 @@ test('the route rules agree with each other and with what the checker does', () 
   assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /never a species that takes no part|true catalysts or solvents only/);
   assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Agents \(catalysts, solvents and other conditions the step does not consume\)/);
   // Solvent water that is also formed has a home, and salts sharing an ion are named whole.
-  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /goes under Agents as the solvent and under Byproducts as the water formed, never under Reactants/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /goes under Agents as the solvent and under Byproducts as the amount formed, never under Reactants/);
   assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Name each salt whole \(sodium sulfate, chromium\(III\) sulfate\) even when two salts share an ion/);
   assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /do not repeat an ion that two salts share/);
   // The checker files an idle reagent under Agents, so only an unformed product is removed.
