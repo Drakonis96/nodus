@@ -994,10 +994,12 @@ export function requestedTargetFor(userMessages: string[]): string | null {
   return null;
 }
 
-const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bachiral\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?\s+(?:is\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
+// "Achiral" is not here: an achiral product has no stereocentre to excuse, and calling a chiral
+// product achiral is a mistake the checker should report, not accept.
+const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?\s+(?:is\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
 
-/** Whether the answer declares a stereochemically open outcome. The model may state it in
- *  several ways — a racemate, a meso/achiral product, or "stereochemistry not controlled" —
+/** Whether a step's prose declares a stereochemically open outcome. The model may state it in
+ *  several ways — a racemate, a meso product, or "stereochemistry not controlled" —
  *  and each is a stated outcome, so the route audit reports the open centre as declared
  *  instead of refusing the step for leaving it unspecified. This is model prose, not a
  *  verification. */
@@ -1640,7 +1642,7 @@ export function routeStepFailure(step: RouteStepAudit): string | null {
   // assembles a product from more than one substrate. The report already shows this, so the
   // one-click prompts must name it too, or they point at a different step than the checker did.
   if (step.assemblyProblem) return step.assemblyProblem;
-  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state in the prose that the outcome is racemic, that the product is meso or achiral, or that its stereochemistry is not controlled`;
+  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state in this step's prose that the outcome is racemic, that the product is meso, or that its stereochemistry is not controlled`;
   return null;
 }
 

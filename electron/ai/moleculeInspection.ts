@@ -195,7 +195,7 @@ function routeAcceptsLabels(provider: CapabilityProvider): boolean {
   return Boolean(schema?.properties && 'labels' in schema.properties);
 }
 
-async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: string[], racemic?: boolean, target?: string | null, labels?: RouteSpeciesLabel[][]): Promise<RouteAudit | null> {
+async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: string[], racemic?: boolean | boolean[], target?: string | null, labels?: RouteSpeciesLabel[][]): Promise<RouteAudit | null> {
   // A package that predates `target`/`labels` ignores them, and the audit simply has no
   // target entry or name check. The schema probe keeps a 2.3.0 package from rejecting an
   // input it never declared.
@@ -736,7 +736,9 @@ export async function appendRouteReportAndDrawings(
   if (!steps.length || !labels.some((entries) => entries.length)) return finalAnswer;
   const conditions = findStepConditions(modelAnswer, steps.length);
   const stepProse = findStepProse(modelAnswer, steps.length);
-  const racemic = declaresRacemic(modelAnswer);
+  // Racemic is decided per step, from that step's own prose, as the rules ask: a sentence
+  // elsewhere ("benzocaine is achiral", a note on the target) no longer excuses every step.
+  const racemic = stepProse.map((prose) => declaresRacemic(prose ?? ''));
   const provider = routeProvider();
   if (!provider) return finalAnswer;
   const compile = compileProvider();

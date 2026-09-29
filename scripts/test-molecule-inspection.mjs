@@ -1382,3 +1382,9 @@ test('a target requested without stereochemistry is racemic by the request', asy
     steps: [step(0, [product('CC(O)CC', 1)])] });
   assert.notEqual(implyRacemicTarget(intermediate, 'CCC(C)C(=O)O').steps[0].racemic, true);
 });
+
+test('a racemic outcome is declared per step, and "achiral" is not a declaration', () => {
+  assert.equal(declaresRacemic('The decarboxylation gives racemic 2-methylbutanoic acid.'), true);
+  assert.equal(declaresRacemic('Its stereochemistry is not controlled.'), true);
+  assert.equal(declaresRacemic('Benzocaine is achiral, so no descriptors are needed.'), false, 'an achiral product has nothing to excuse');
+});
