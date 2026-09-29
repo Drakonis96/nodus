@@ -61,17 +61,15 @@ async function bundleScanQueue(name) {
       }
     `],
     [/\.\.\/ai\/embeddingPipeline$/, 'embeddings', `
-      export async function startEmbedding(nodusIds) {
-        globalThis.__reembedProbe.calls.push({ step: 'embed', ids: nodusIds });
-      }
-      export async function refreshRethemedIdeaEmbeddings(ideaIds) {
+      export async function startEmbedding(nodusIds, options = {}) {
         const probe = globalThis.__reembedProbe;
-        probe.calls.push({ step: 'refresh', ids: [...ideaIds] });
-        if (probe.failLibraryEmbed) throw new Error('embedding backend down');
-      }
-      export function embeddingIndexConfigured() {
-        const settings = globalThis.__reembedProbe.settings;
-        return ['nodus', 'ollama', 'lmstudio'].includes(settings.embeddingProvider) || settings.providerKeys[settings.embeddingProvider] === true;
+        // The post-reprocess refresh is the call scoped to ideas; only that one is made to fail.
+        if (options.ideaIds) {
+          probe.calls.push({ step: 'refresh', ids: [...options.ideaIds] });
+          if (probe.failLibraryEmbed) throw new Error('embedding backend down');
+          return;
+        }
+        probe.calls.push({ step: 'embed', ids: nodusIds });
       }
     `],
     [/\.\.\/ai\/passageEmbeddingPipeline$/, 'passages', `export async function startPassageEmbedding(nodusIds) { globalThis.__reembedProbe.calls.push({ step: 'passages', ids: nodusIds }); }`],

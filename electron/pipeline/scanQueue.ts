@@ -18,7 +18,7 @@ import { clearDeepQueued, setDeepPending, setDeepResult, setResolvedTextState, s
 import { failedSummaryWorks, pendingSummaryWorks } from '../db/workSummariesRepo';
 import { AiError } from '../ai/aiClient';
 import { discoverSemanticBridges } from '../ai/semanticBridges';
-import { embeddingIndexConfigured, refreshRethemedIdeaEmbeddings, startEmbedding } from '../ai/embeddingPipeline';
+import { startEmbedding } from '../ai/embeddingPipeline';
 import { startPassageEmbedding } from '../ai/passageEmbeddingPipeline';
 import { startPerf } from '../perf';
 import { addNotification } from '../notifications';
@@ -611,7 +611,7 @@ class ScanQueue {
     this.maintenanceDetail = 'Actualizando el índice de ideas…';
     this.emit();
     try {
-      await refreshRethemedIdeaEmbeddings(ideaIds);
+      await startEmbedding(undefined, { ideaIds });
     } catch {
       // Already logged by the embedding pipeline.
     }
@@ -619,7 +619,11 @@ class ScanQueue {
 
   /** True when an embedding provider + model are configured for indexing. */
   private embeddingConfigured(): boolean {
-    return embeddingIndexConfigured();
+    const settings = getSettings();
+    return settings.embeddingProvider === 'nodus'
+      || settings.embeddingProvider === 'ollama'
+      || settings.embeddingProvider === 'lmstudio'
+      || settings.providerKeys[settings.embeddingProvider] === true;
   }
 
   /** Enqueue semantic bridge discovery once indexing is done, if configured. */
