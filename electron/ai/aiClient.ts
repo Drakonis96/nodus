@@ -2187,6 +2187,9 @@ async function rawCompleteStreamTransport(
   // The last chunk's `finish_reason` is the only truncation signal on this transport; capture it
   // so a stream cut at the output ceiling is reported instead of silently stored as the answer.
   let finishReason: string | undefined;
+  let streamChunks = 0;
+  let streamReasoningChars = 0;
+  const streamStarted = Date.now();
   const consumeStream = async (
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
@@ -2210,6 +2213,8 @@ async function rawCompleteStreamTransport(
         const choice = chunk?.choices?.[0];
         if (choice?.finish_reason) finishReason = choice.finish_reason;
         const delta = choice?.delta;
+        streamChunks += 1;
+        streamReasoningChars += String(delta?.reasoning ?? delta?.reasoning_content ?? '').length;
         emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
         emitContent(delta?.content);
       }
@@ -2286,7 +2291,12 @@ async function rawCompleteStreamTransport(
   if (/^(length|max_tokens|max_output_tokens)$/i.test(finishReason ?? '')) {
     throw new AiError(truncatedOutputMessage(model, maxTokens), false, false, 'output_truncated');
   }
-  if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  if (!answer.trim()) {
+    // Say what came back: a stream that ended after reasoning only, with no finish reason, reads
+    // the same to the user as an outage (hard synthesis routes on deepseek-flash, thinking high).
+    console.error(`[compat-stream] empty answer finish_reason=${finishReason ?? 'none'} chunks=${streamChunks} reasoning_chars=${streamReasoningChars} max_tokens=${maxTokens} elapsed_ms=${Date.now() - streamStarted} model=${model.provider}/${model.model}`);
+    throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  }
   return answer;
 }
 
