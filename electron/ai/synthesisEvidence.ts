@@ -14,6 +14,7 @@ import {
   type SynthesisEvidence,
   type TargetDisconnections,
 } from '@shared/synthesisEvidence';
+import { evidenceText } from '@shared/passageQuality';
 import { capabilityRegistry } from '../capabilities/registry';
 import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
@@ -128,8 +129,11 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
     let taken = 0;
     for (const { hit } of [...scores.values()].sort((a, b) => b.score - a.score)) {
       if (taken >= perQuery || chosen.size >= MAX_PASSAGES) break;
-      if (chosen.has(hit.passage_id) || isIndexLikePassage(hit.text) || !passageFitsQuery(query, hit.text)) continue;
-      const text = hit.text.replace(/\s+/g, ' ').trim();
+      if (chosen.has(hit.passage_id) || isIndexLikePassage(hit.text)) continue;
+      // Schemes flattened into text, citation runs and running heads cut out: a model given
+      // "O O BN H CH2Br OH NO 2 PhCH2 …" as evidence spends its reasoning decoding it.
+      const text = evidenceText(hit.text);
+      if (!text || !passageFitsQuery(query, text)) continue;
       chosen.set(hit.passage_id, {
         text: text.length > PASSAGE_CHARS ? `${text.slice(0, PASSAGE_CHARS)}…` : text,
         location: hit.page_label,
