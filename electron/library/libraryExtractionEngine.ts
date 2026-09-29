@@ -16,7 +16,7 @@ import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
 import { isScannedDocument, pagePaintsImage, sampleScanVerdict, TEXTLESS_PAGE_CHARACTERS } from '../extraction/scanDetection';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
-import { cleanInlineText, dehyphenatingJoin } from '../extraction/textCleanup';
+import { cleanInlineText, dehyphenatingJoin, replaceNulCharacters } from '../extraction/textCleanup';
 import { atomicWriteFile, atomicWriteJson, assertInside, resolveLibraryFile, safeLibraryFolderName } from './libraryFileUtils';
 import { LibraryDiskStore } from './libraryStorage';
 import {
@@ -141,7 +141,7 @@ function sha256File(file: string): string {
 export { cleanInlineText } from '../extraction/textCleanup';
 
 export function normalizeCleanMarkdown(value: string): string {
-  const input = value.replace(/\r\n?/g, '\n').normalize('NFC').replace(/\u00ad/g, '');
+  const input = replaceNulCharacters(value.replace(/\r\n?/g, '\n')).normalize('NFC').replace(/\u00ad/g, '');
   const output: string[] = [];
   let fenced = false;
   let commented = false;

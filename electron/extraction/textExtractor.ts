@@ -21,7 +21,7 @@ import { getExtractionCache, upsertExtractionCache } from '../db/extractionCache
 import { perfLog, startPerf, type PerfContext } from '../perf';
 import { getLibraryReaderRawContent } from '../libraryReader/libraryReaderStore';
 import { libraryMarkdownWithPageMarkers, readDocumentarySourceMap } from '../library/librarySourcePages';
-import { cleanExtractedText } from './textCleanup';
+import { cleanExtractedText, replaceNulCharacters } from './textCleanup';
 import type { PipelineLogReasonId } from '@shared/pipelineLogMessages';
 import { logPipelineWarning } from '../logging/pipelineLogCore';
 
@@ -141,11 +141,7 @@ export function combineSegments(segments: ExtractedTextSegment[], notes: string 
     if (hashes.has(segment.contentHash)) continue;
     hashes.add(segment.contentHash);
     const marker = `s${unique.length + 1}`;
-    // PDF text layers occasionally carry U+0000. SQLite's text functions and FTS
-    // snippets stop at it, truncating every citation that crosses one. A space keeps
-    // every character offset (page markers, quote offsets) where it was.
-    const text = segment.text.includes('\u0000') ? segment.text.replaceAll('\u0000', ' ') : segment.text;
-    unique.push({ ...segment, text, marker });
+    unique.push({ ...segment, text: replaceNulCharacters(segment.text), marker });
   }
   const text = unique.map((segment) => sourceMarkedText(segment.text, segment.marker)).join('\n\n');
   return {

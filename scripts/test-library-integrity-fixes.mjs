@@ -142,6 +142,18 @@ try {
   }], null, true);
   assert.ok(!doc.text.includes('\u0000'), 'no NUL survives');
   assert.ok(doc.text.endsWith('ab cd'), 'the NUL becomes a space, keeping offsets');
+  // The Library extractor (reader.md, and so the documentary index) cleans it too.
+  const { LibraryDiskStore } = require(path.join(repoRoot, 'electron/library/libraryStorage.ts'));
+  const { extractLibraryItem } = require(path.join(repoRoot, 'electron/library/libraryExtractionEngine.ts'));
+  const store = new LibraryDiskStore(path.join(root, 'library'), 'nul-test');
+  const folder = store.itemFolder('nul'); fs.mkdirSync(folder, { recursive: true });
+  fs.writeFileSync(path.join(folder, 'original.txt'), 'Primer párrafo con un nulo aquí:\u0000y el resto del texto sigue entero hasta el final.');
+  const item = store.upsertItem({ id: 'local:nul', storageId: 'nul', source: 'local', metadata: { title: 'Nulo', itemType: 'book', creators: [], isbn: [], issn: [], tags: [] },
+    collectionIds: [], attachments: [], files: { original: 'original.txt' }, extraction: { status: 'pending' } });
+  const extracted = await extractLibraryItem({ item, store });
+  const reader = fs.readFileSync(path.join(folder, extracted.item.files.reader), 'utf8');
+  assert.ok(!reader.includes('\u0000'), 'no NUL reaches reader.md');
+  assert.match(reader, /aquí: y el resto del texto sigue entero hasta el final\./, 'the text after it survives');
 
   console.log('OK: edges, checkpoints, section pages, support passages and NUL text all hold.');
 } finally {
