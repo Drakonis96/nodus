@@ -71,12 +71,19 @@ export type DriftSource =
 
 export type DriftSourceKind = DriftSource['kind'];
 
-/** `verified`: the evidence in `evidenceRefs` supports the intended distribution. */
-export type DriftLicenseStatus = 'verified' | 'unresolved';
+/**
+ * How firmly the licence of an entry is established.
+ *  - `verified`: the evidence in `evidenceRefs` identifies the licence and supports the distribution.
+ *  - `declared`: the licence is the one the upstream project declares for this material. That
+ *    declaration is the evidence, and nobody checked the licence of the individual file. The
+ *    entry says so instead of passing for `verified`.
+ *  - `unresolved`: nothing is established.
+ */
+export type DriftLicenseStatus = 'verified' | 'declared' | 'unresolved';
 
 export interface DriftProvenance {
   licenseStatus: DriftLicenseStatus;
-  /** Absent while the licence is not identified for a given recording. */
+  /** Absent while nothing is established; a `LicenseRef-` for a declaration that names more than one licence. */
   licenseId?: string;
   upstreamRepository?: string;
   upstreamCommit?: string;
@@ -154,13 +161,14 @@ export function isSafeDriftAssetPath(value: unknown): value is string {
 }
 
 /**
- * The gate in front of every bundled recording: a licence identified from evidence
- * AND a documented distribution review. Generators are first-party code and pass
- * through the same fields (see legal/drift/REVIEW.md), so there is one rule.
+ * The gate in front of every bundled recording: a licence that is either verified or declared by
+ * the upstream project, AND a documented distribution review that says so. Generators are
+ * first-party code and pass through the same fields (see legal/drift/REVIEW.md), so there is
+ * one rule.
  */
 export function isDriftDistributable(definition: Pick<DriftSoundDefinition, 'provenance'>): boolean {
   const { provenance } = definition;
-  return provenance.licenseStatus === 'verified'
+  return (provenance.licenseStatus === 'verified' || provenance.licenseStatus === 'declared')
     && typeof provenance.licenseId === 'string' && provenance.licenseId.length > 0
     && provenance.evidenceRefs.length > 0
     && provenance.distributionReview === 'approved'
@@ -212,16 +220,16 @@ export function validateDriftDefinition(definition: DriftSoundDefinition, iconNa
   const provenance = definition.provenance;
   if (!provenance || typeof provenance !== 'object') at('provenance is missing');
   else {
-    if (!['verified', 'unresolved'].includes(provenance.licenseStatus)) at('unknown licenseStatus');
+    if (!['verified', 'declared', 'unresolved'].includes(provenance.licenseStatus)) at('unknown licenseStatus');
     if (!Array.isArray(provenance.evidenceRefs) || provenance.evidenceRefs.some((ref) => typeof ref !== 'string' || !ref)) at('evidenceRefs must be non-empty strings');
     if (!['approved', 'pending'].includes(provenance.distributionReview)) at('unknown distributionReview');
     if (provenance.licenseStatus === 'unresolved' && provenance.licenseId !== undefined) at('an unresolved entry must not name a licence');
-    if (provenance.licenseStatus === 'verified') {
-      if (!provenance.licenseId) at('a verified entry must name its licence');
-      if (!provenance.evidenceRefs?.length) at('a verified entry needs evidence');
+    if (provenance.licenseStatus === 'verified' || provenance.licenseStatus === 'declared') {
+      if (!provenance.licenseId) at(`a ${provenance.licenseStatus} entry must name its licence`);
+      if (!provenance.evidenceRefs?.length) at(`a ${provenance.licenseStatus} entry needs evidence`);
     }
     if (provenance.distributionReview === 'approved') {
-      if (provenance.licenseStatus !== 'verified') at('an approved review requires a verified licence');
+      if (provenance.licenseStatus === 'unresolved') at('an approved review requires a verified or declared licence');
       if (!provenance.reviewRef) at('an approved review must cite its record');
     }
     if (provenance.upstreamCommit !== undefined && !GIT_COMMIT.test(provenance.upstreamCommit)) at('upstreamCommit is not a 40-hex commit');

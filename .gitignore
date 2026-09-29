@@ -128,8 +128,9 @@ build/zotero-mcp/
 build/apple-calendar/arm64/
 build/apple-calendar/x64/
 
-# Nodus Drift recordings are prepared locally from sources cleared for distribution
-# (node scripts/prepare-drift-assets.mjs). Publishing them as independent files is not
-# authorised, so no audio in this directory is ever versioned; only the README is.
+# Nodus Drift recordings are fetched from their pinned upstream commit, checked against their
+# SHA-256 and packaged inside the app (node scripts/prepare-drift-assets.mjs, run by the
+# packaging hook). They are never published as independent files, so no audio in this
+# directory is ever versioned; only the README is.
 electron/assets/drift/audio/*
 !electron/assets/drift/audio/README.md

@@ -103,18 +103,53 @@ test('a generated sound has no file to read', async () => {
   for (const id of ['white-noise', 'pink-noise', 'brown-noise', 'binaural-alpha']) await rejectsWith(s.readAudio(id), 'unavailable', id);
 });
 
+/** A real recording's entry set back to what every recording once was: nothing established, nothing reviewed. */
+function pendingOf(id) {
+  const clone = structuredClone(DRIFT_SOUNDS.find((sound) => sound.id === id));
+  clone.provenance = {
+    licenseStatus: 'unresolved',
+    upstreamRepository: clone.provenance.upstreamRepository,
+    upstreamCommit: clone.provenance.upstreamCommit,
+    upstreamPath: clone.provenance.upstreamPath,
+    evidenceRefs: [...clone.provenance.evidenceRefs],
+    distributionReview: 'pending',
+  };
+  return clone;
+}
+
 test('a recording that is not cleared for distribution is refused even if its file is sitting there', async () => {
   const root = path.join(scratch, 'pending-root');
   mkdirSync(path.join(root, 'rain'), { recursive: true });
-  const rain = DRIFT_SOUNDS.find((sound) => sound.id === 'light-rain');
+  const rain = pendingOf('light-rain');
   // A file with exactly the catalogued name, size and even bytes of the right length
   writeFileSync(path.join(root, 'rain', 'light-rain.mp3'), Buffer.alloc(rain.source.bytes, 1));
   const spy = spyOnReads();
   try {
-    const s = ipc.createDriftAudioService({ entries: entriesOf(DRIFT_SOUNDS, root) });
+    const s = ipc.createDriftAudioService({ entries: entriesOf([...DRIFT_SOUNDS.filter((sound) => sound.id !== 'light-rain'), rain], root) });
     await rejectsWith(s.readAudio('light-rain'), 'unavailable', 'unresolved recording');
     assert.deepEqual(spy.reads, [], 'and its bytes were never read');
   } finally { spy.restore(); }
+});
+
+test('an approved recording, declared upstream, is read like any other: exactly its bytes', async () => {
+  const root = path.join(scratch, 'declared-root');
+  mkdirSync(path.join(root, 'rain'), { recursive: true });
+  // The real entry (declared licence, approved review) with the size and digest of a small stand-in file.
+  const payload = Buffer.from('a stand-in for a recording'.repeat(50));
+  const rain = structuredClone(DRIFT_SOUNDS.find((sound) => sound.id === 'light-rain'));
+  assert.equal(rain.provenance.licenseStatus, 'declared');
+  rain.source.bytes = payload.length;
+  rain.source.sha256 = crypto.createHash('sha256').update(payload).digest('hex');
+  writeFileSync(path.join(root, 'rain', 'light-rain.mp3'), payload);
+  const s = ipc.createDriftAudioService({ entries: entriesOf([rain], root) });
+  const bytes = await s.readAudio('light-rain');
+  assert.deepEqual(Buffer.from(bytes), payload);
+  assert.equal(Object.getPrototypeOf(bytes), Uint8Array.prototype);
+  const answer = await s.catalog();
+  assert.equal(answer.sounds[0].availability, 'available');
+  // and the same file with one byte changed is refused, whatever the entry says about its licence
+  writeFileSync(path.join(root, 'rain', 'light-rain.mp3'), Buffer.concat([payload.subarray(0, payload.length - 1), Buffer.from([0])]));
+  await rejectsWith(s.readAudio('light-rain'), 'corrupt', 'an approved recording still has to match its digest');
 });
 
 // ── the file ───────────────────────────────────────────────────────────────
@@ -240,12 +275,15 @@ test('the catalogue reports availability, reads no audio and never exposes a pat
   assert.equal(response.schemaVersion, 1);
   assert.equal(response.sounds.length, DRIFT_SOUNDS.length + fixtures.sounds.length);
   const by = (id) => response.sounds.find((sound) => sound.id === id);
-  assert.equal(by('light-rain').availability, 'license-unresolved');
+  assert.equal(by('light-rain').availability, 'missing', 'approved, but this root holds no audio: reported as absent, not as pending');
   assert.equal(by('white-noise').availability, 'available');
   assert.equal(by('binaural-gamma').availability, 'available');
   assert.equal(by('fixture-a').availability, 'available');
   assert.equal(by('fixture-missing').availability, 'missing');
-  assert.equal(response.sounds.filter((s) => s.availability === 'license-unresolved').length, 81);
+  assert.equal(response.sounds.filter((s) => s.availability === 'license-unresolved').length, 0, 'nothing is waiting for a licence any more');
+  assert.equal(response.sounds.filter((s) => s.availability === 'missing').length, 82, 'the 81 recordings this root lacks, and the fixture that is declared but absent');
+  const held = await service([...DRIFT_SOUNDS.filter((sound) => sound.id !== 'light-rain'), pendingOf('light-rain')]).catalog();
+  assert.equal(held.sounds.find((sound) => sound.id === 'light-rain').availability, 'license-unresolved', 'an entry nobody approved is still held back');
   const text = JSON.stringify(response);
   assert.ok(!text.includes(scratch) && !text.includes(repoRoot) && !text.includes(tmpdir()), 'no absolute path in the payload');
   assert.doesNotMatch(text, /"message"|"error"/, 'no field the payload localiser would rewrite');
@@ -309,20 +347,23 @@ test('a trusted caller still cannot name a path or an unknown sound', async () =
   const window = fakeWindow();
   const handlers = await register({ window });
   const read = handlers.get('drift:read-audio');
-  for (const input of ['../x', 'https://a.example/b.wav', 'no-such-sound', 'light-rain', 'white-noise', 5, null]) {
+  for (const input of ['../x', 'https://a.example/b.wav', 'no-such-sound', 'white-noise', 5, null]) {
     await assert.rejects(read(trustedEvent(window), input), /drift-audio:unavailable/, String(input));
   }
+  // a real, approved recording is a valid id; this app path simply has no audio in it
+  await assert.rejects(read(trustedEvent(window), 'light-rain'), /drift-audio:missing/);
 });
 
 test('the bundled directory is app.getAppPath()/electron/assets/drift/audio', async () => {
   const appPath = path.join(scratch, 'packaged-app');
   const window = fakeWindow();
   const handlers = await register({ window, appPath });
-  // nothing cleared is bundled: every recording is reported for what it is
+  // an app path with no audio in it: the 8 generators work, and each of the 81 approved recordings is reported as absent
   const { sounds } = await handlers.get('drift:catalog')(trustedEvent(window));
   assert.equal(sounds.filter((s) => s.availability === 'available').length, 8);
-  assert.equal(sounds.filter((s) => s.availability === 'license-unresolved').length, 81);
-  // a cleared recording placed where the app looks for it would be found there and nowhere else
+  assert.equal(sounds.filter((s) => s.availability === 'missing').length, 81);
+  assert.equal(sounds.filter((s) => s.availability === 'license-unresolved').length, 0);
+  // an approved recording placed where the app looks for it would be found there and nowhere else
   const source = readSource('electron/ipc/drift.ts');
   assert.match(source, /path\.join\(app\.getAppPath\(\), 'electron', 'assets', 'drift', 'audio'\)/);
 });

@@ -81,14 +81,31 @@ const driftShared = loadTs('shared/drift.ts');
 
 const fixtures = buildDriftFixtures(path.join(outDir, 'fixtures'));
 const ALL = [...DRIFT_SOUNDS, ...fixtures.sounds];
-const CATALOG = { schemaVersion: 1, sounds: ALL.map((definition) => ({ ...structuredClone(definition), availability: fixtures.sounds.includes(definition) && definition.id === 'fixture-missing' ? 'missing' : driftShared.baseDriftAvailability(definition) })) };
+// The catalogue as the main process would answer with every recording approved: what the app ships.
+const APPROVED_CATALOG = { schemaVersion: 1, sounds: ALL.map((definition) => ({ ...structuredClone(definition), availability: definition.id === 'fixture-missing' ? 'missing' : driftShared.baseDriftAvailability(definition) })) };
+// The same, with the two ways a recording can be unavailable put back, so the page that explains them stays covered:
+// three recordings nobody approved, and one whose file is not in the app.
+const PENDING_IDS = new Set(['light-rain', 'heavy-rain', 'thunder']);
+const ABSENT_IDS = new Set(['rain-on-window']);
+const CATALOG = {
+  schemaVersion: 1,
+  sounds: APPROVED_CATALOG.sounds.map((entry) => {
+    const copy = structuredClone(entry);
+    if (PENDING_IDS.has(copy.id)) {
+      copy.availability = 'license-unresolved';
+      copy.provenance = { licenseStatus: 'unresolved', evidenceRefs: [...copy.provenance.evidenceRefs], distributionReview: 'pending' };
+    }
+    if (ABSENT_IDS.has(copy.id)) copy.availability = 'missing';
+    return copy;
+  }),
+};
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * A fresh jsdom window with the preload bridge and Web Audio replaced. `catalogGate` holds the
  * catalogue back; `readImpl` decides what reading a recording does.
  */
-function environment({ stored = null, catalogGate = null, readImpl = null, browserSessions = [] } = {}) {
+function environment({ stored = null, catalogGate = null, readImpl = null, browserSessions = [], catalog = CATALOG } = {}) {
   const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'https://nodus.test/' });
   for (const key of Object.getOwnPropertyNames(dom.window)) if (!(key in globalThis)) globalThis[key] = dom.window[key];
   for (const key of ['window', 'document', 'navigator', 'Event']) defineGlobal(key, dom.window[key === 'window' ? 'window' : key] ?? dom.window);
@@ -108,7 +125,7 @@ function environment({ stored = null, catalogGate = null, readImpl = null, brows
     constructor(options) { super({ sampleRate: 48000 }); this.constructorOptions = options; contexts.push(this); }
   };
   dom.window.nodus = {
-    getDriftCatalog: async () => { calls.catalog += 1; if (catalogGate) await catalogGate.promise; return structuredClone(CATALOG); },
+    getDriftCatalog: async () => { calls.catalog += 1; if (catalogGate) await catalogGate.promise; return structuredClone(catalog); },
     readDriftAudio: async (id) => {
       calls.reads.push(id);
       if (readImpl) return readImpl(id);
@@ -264,23 +281,42 @@ test('browsing never starts audio: search, filters, favourites and the unavailab
   await env.click(env.q('[data-testid="drift-card-brown-noise-favorite"]'));
   assert.equal(env.q('[data-testid="drift-card-brown-noise-favorite"]').getAttribute('aria-pressed'), 'true');
   assert.deepEqual(harness.probe.current.selection, [], 'starring a card does not select it');
-  // Even asked directly, the provider refuses what the catalogue does not offer: a recording pending
-  // review, a file that is not there, an id nobody has ever heard of.
+  // Even asked directly, the provider refuses what the catalogue does not offer: a recording nobody
+  // approved, a file that is not there, an id nobody has ever heard of.
   await act(async () => {
-    for (const id of ['light-rain', 'fixture-missing', 'no-such-sound', '../../etc/passwd', 'https://example.com/a.mp3']) harness.probe.current.toggleSound(id);
+    for (const id of ['light-rain', 'rain-on-window', 'fixture-missing', 'no-such-sound', '../../etc/passwd', 'https://example.com/a.mp3']) harness.probe.current.toggleSound(id);
   });
   await env.settle();
   assert.deepEqual(harness.probe.current.selection, [], 'nothing unavailable can enter the mix');
   assert.equal(env.contexts.length, 0, 'none of that made a sound, or even a context');
   assert.deepEqual(env.calls.reads, []);
-  // the 81 pending recordings are explained, collapsed, and none of them is a control
+  // what is unavailable is explained, collapsed, and none of it is a control
   const unavailable = env.q('[data-testid="drift-unavailable"]');
   assert.ok(unavailable, 'the unavailable section exists');
   assert.equal(unavailable.open, false);
   const buttons = [...unavailable.querySelectorAll('button')].map((b) => b.getAttribute('data-testid'));
   assert.ok(buttons.length > 0 && buttons.every((id) => id.endsWith('-favorite')), 'only favourite stars: no card there can play or download');
   assert.match(env.q('[data-testid="drift-card-light-rain-reason"]').textContent, /Pendiente de revisión de licencia/);
+  assert.match(env.q('[data-testid="drift-card-rain-on-window-reason"]').textContent, /No se encuentra el archivo/);
   assert.ok(env.q('[data-testid="drift-license-note"]'), 'and the page says why');
+  await act(async () => env.root.unmount());
+});
+
+test('with every recording approved there is no pending-licence note, and a real recording plays through the bridge', async () => {
+  const env = environment({ catalog: APPROVED_CATALOG });
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  assert.equal(env.q('[data-testid="drift-license-note"]'), null, 'nothing is waiting for a licence, so the page does not say so');
+  const unavailable = env.qa('[data-testid="drift-unavailable"] [data-testid^="drift-card-"]:not([data-testid$="-favorite"]):not([data-testid$="-reason"])');
+  assert.deepEqual(unavailable.map((card) => card.getAttribute('data-testid')), ['drift-card-fixture-missing'], 'only the file that is not there is listed as unavailable');
+  for (const id of ['light-rain', 'rain-on-tent', 'airport']) {
+    assert.ok(env.q(`[data-testid="drift-grid"] [data-testid="drift-card-${id}"] button[aria-pressed]`), `${id} is a playable card`);
+  }
+  await env.click(env.q('[data-testid="drift-card-light-rain"] button[aria-pressed]'));
+  await env.settle(6);
+  assert.deepEqual(harness.probe.current.selection, ['light-rain']);
+  assert.deepEqual(env.calls.reads, ['light-rain'], 'the recording came through readDriftAudio, by id');
+  assert.equal(env.contexts.length, 1);
+  assert.equal(harness.probe.current.playing, true);
   await act(async () => env.root.unmount());
 });
 

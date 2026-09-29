@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// Nodus Drift: explicit preparation of the bundled recordings.
+// Nodus Drift: preparation of the bundled recordings.
 //
-// This is run by a person, on purpose. It is never run at start-up, by the app, or by the
-// tests, and it never widens what may be distributed: a recording is only ever written to
-// electron/assets/drift/audio/ when the catalogue says it is `verified` AND its distribution
-// review is `approved` (legal/drift/REVIEW.md). Everything else is listed, not prepared.
+// It is run by a person (`npm run drift:prepare-assets`) and by the packaging hook
+// (build/beforePack.cjs), so every installer carries the recordings. It is never run at
+// start-up, by the app, or by the tests, and it never widens what may be distributed: a
+// recording is only ever written to electron/assets/drift/audio/ when the catalogue says its
+// licence is `verified` or `declared` AND its distribution review is `approved`
+// (legal/drift/REVIEW.md). Everything else is listed, not prepared.
 //
 //   node scripts/prepare-drift-assets.mjs --list
 //       Every recording, split into approved (would be prepared) and pending review.
@@ -12,8 +14,9 @@
 //       Prepare the approved recordings. Bytes come from --source (a directory laid out like
 //       Moodist's public/sounds, e.g. a checkout of the pinned commit) or, without it, from
 //       the pinned upstream commit. Each file is checked against the catalogued size and
-//       SHA-256 before it is written, and written atomically. Nothing pending is written,
-//       not even when asked for by id.
+//       SHA-256 before it is written, and written atomically; a file that is already there and
+//       matches is kept without being fetched again. Nothing pending is written, not even
+//       when asked for by id.
 //   node scripts/prepare-drift-assets.mjs --measure <dir>
 //       Reproduce the technical fields of the catalogue from the files in <dir> (bytes and
 //       SHA-256 always; duration and loop seam when ffprobe and ffmpeg are installed, which
@@ -99,9 +102,42 @@ async function obtainBytes(definition, { sourceDir, fetcher }) {
   }
   const url = provenance.upstreamRepository.replace('https://github.com/', 'https://raw.githubusercontent.com/')
     + `/${provenance.upstreamCommit}/${provenance.upstreamPath}`;
-  const response = await fetcher(url, { signal: AbortSignal.timeout(120_000) });
-  if (!response.ok) throw new Error(`${definition.id}: HTTP ${response.status} for ${url}`);
-  return Buffer.from(await response.arrayBuffer());
+  return fetchWithRetry(fetcher, url, definition.id);
+}
+
+/**
+ * A hosted runner drops a connection now and then, and one lost download must not fail a whole
+ * release. Network errors, timeouts, 429 and 5xx are retried with a growing pause; any other
+ * status is final, because a pinned file that is missing will not appear on a second try. A
+ * truncated body is caught by the size and SHA-256 checks that follow, not here.
+ */
+export async function fetchWithRetry(fetcher, url, label, { attempts = 4, pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetcher(url, { signal: AbortSignal.timeout(120_000) });
+      if (response.ok) return Buffer.from(await response.arrayBuffer());
+      const error = new Error(`${label}: HTTP ${response.status} for ${url}`);
+      if (response.status !== 429 && response.status < 500) throw Object.assign(error, { permanent: true });
+      lastError = error;
+    } catch (error) {
+      if (error.permanent) throw error;
+      lastError = error;
+    }
+    if (attempt < attempts) await pause(500 * 2 ** (attempt - 1));
+  }
+  throw lastError;
+}
+
+/** A file on disk that has the catalogued size and SHA-256. */
+function isIntact(file, source) {
+  try {
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.size !== source.bytes) return false;
+    return sha256Hex(fs.readFileSync(file)) === source.sha256;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -111,7 +147,7 @@ async function obtainBytes(definition, { sourceDir, fetcher }) {
  */
 export async function prepareAssets({ definitions, drift, targetDir = AUDIO_DIR, sourceDir = null, only = null, fetcher = fetch, log = () => {} }) {
   const plan = planAssets(definitions, drift);
-  const result = { written: [], skipped: [], failed: [] };
+  const result = { written: [], kept: [], skipped: [], failed: [] };
   let selected = plan.approved;
   if (only) {
     const target = definitions.find((definition) => definition.id === only);
@@ -127,6 +163,12 @@ export async function prepareAssets({ definitions, drift, targetDir = AUDIO_DIR,
     const { source } = definition;
     try {
       const destination = resolveTarget(targetDir, source.asset, drift);
+      // Already there and exactly right: keep it. A packaging run then costs nothing after the first.
+      if (isIntact(destination, source)) {
+        result.kept.push({ id: definition.id, bytes: source.bytes });
+        log(`kept ${definition.id}`);
+        continue;
+      }
       const bytes = await obtainBytes(definition, { sourceDir, fetcher });
       if (bytes.length !== source.bytes) throw new Error(`${bytes.length} bytes, the catalogue says ${source.bytes}`);
       if (bytes.length > drift.MAX_DRIFT_AUDIO_BYTES) throw new Error('larger than the 12 MiB limit');
@@ -273,30 +315,33 @@ function arg(name) {
   return index >= 0 ? process.argv[index + 1] : null;
 }
 
+/** Returns the exit code; the entry point below exits once what was printed has left the pipe. */
 async function main() {
   const catalog = loadDriftCatalog();
   const definitions = catalog.DRIFT_SOUNDS;
   const problems = catalog.validateDriftCatalog(definitions, readIconNames());
   if (problems.length > 0) {
     console.error(`the catalogue is not well formed:\n  ${problems.join('\n  ')}`);
-    process.exit(1);
+    return 1;
   }
 
   if (arg('--measure')) {
     const rows = measureDirectory({ dir: path.resolve(arg('--measure')), definitions });
     console.log(JSON.stringify(rows, null, 2));
-    process.exit(rows.some((row) => row.status.startsWith('DIFFERS')) ? 1 : 0);
+    return rows.some((row) => row.status.startsWith('DIFFERS')) ? 1 : 0;
   }
 
   const plan = planAssets(definitions, catalog);
   if (process.argv.includes('--list')) {
     const bytes = (list) => list.reduce((sum, d) => sum + d.source.bytes, 0);
+    const line = (d) => `  ${d.id.padEnd(20)} ${String(d.source.bytes).padStart(9)}  ${d.source.sha256}  ${d.provenance.upstreamPath}`;
     console.log(`Upstream: ${catalog.DRIFT_UPSTREAM.repository} @ ${catalog.DRIFT_UPSTREAM.commit}`);
     console.log(`Generators (no files): ${plan.generated.length}`);
-    console.log(`Approved recordings: ${plan.approved.length} (${bytes(plan.approved)} bytes)`);
-    console.log(`Pending review: ${plan.pending.length} (${bytes(plan.pending)} bytes) — not bundled, not prepared`);
-    for (const d of plan.pending) console.log(`  ${d.id.padEnd(20)} ${String(d.source.bytes).padStart(9)}  ${d.source.sha256}  ${d.provenance.upstreamPath}`);
-    process.exit(0);
+    console.log(`Approved recordings: ${plan.approved.length} (${bytes(plan.approved)} bytes) - prepared and bundled`);
+    for (const d of plan.approved) console.log(line(d));
+    console.log(`Pending review: ${plan.pending.length} (${bytes(plan.pending)} bytes) - not bundled, not prepared`);
+    for (const d of plan.pending) console.log(line(d));
+    return 0;
   }
 
   const result = await prepareAssets({
@@ -307,11 +352,21 @@ async function main() {
     only: arg('--only'),
     log: (line) => console.log(line),
   });
-  console.log(`\nprepared ${result.written.length} recording(s), skipped ${result.skipped.length} pending, failed ${result.failed.length}.`);
-  if (plan.approved.length === 0) console.log('No recording has been cleared for distribution yet (legal/drift/REVIEW.md), so there is nothing to prepare.');
-  process.exit(result.failed.length ? 1 : 0);
+  console.log(`\nprepared ${result.written.length} recording(s), kept ${result.kept.length} already in place, skipped ${result.skipped.length} pending, failed ${result.failed.length}.`);
+  if (plan.approved.length === 0) console.log('No recording has been cleared for distribution (legal/drift/REVIEW.md), so there is nothing to prepare.');
+  return result.failed.length ? 1 : 0;
+}
+
+/**
+ * process.exit() right after console.log can cut a piped listing short, because stdout to a
+ * pipe is asynchronous. Wait for both streams to drain, then leave.
+ */
+export async function exitAfterFlush(code) {
+  process.exitCode = code;
+  await Promise.all([process.stdout, process.stderr].map((stream) => new Promise((resolve) => stream.write('', resolve))));
+  process.exit(code);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => { console.error(error); process.exit(1); });
+  main().then(exitAfterFlush, (error) => { console.error(error); return exitAfterFlush(1); });
 }

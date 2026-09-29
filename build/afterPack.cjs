@@ -29,6 +29,13 @@ exports.default = async function afterPack(context) {
   copyFileSync(electronLicense, path.join(resourcesPath, 'LICENSE.electron.txt'));
   copyFileSync(chromiumLicenses, path.join(resourcesPath, 'LICENSES.chromium.html'));
 
+  // Every recording the catalogue approves must be inside the packed app.asar, intact, and nothing
+  // else may be: an app that lost them (a failed download, an ignored directory) must not become an
+  // installer. The legal record for them travels beside the app and is checked too.
+  execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'verify-drift-assets.mjs'), '--asar', resourcesPath, '--require-all'], {
+    stdio: 'inherit',
+  });
+
   if (context.electronPlatformName !== 'darwin') return;
 
   // npm optional native packages follow the runner architecture, so each macOS

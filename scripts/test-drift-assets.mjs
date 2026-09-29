@@ -3,6 +3,10 @@
 // The property under test is one sentence: no recording reaches the bundle unless the
 // catalogue says it is cleared, and everything that does is byte-for-byte what was
 // catalogued. Each case below is a way of breaking that sentence.
+//
+// The real catalogue now approves all 81 recordings (legal/drift/REVIEW.md#recordings), so the
+// "not cleared" cases run on copies of them that are set back to unresolved. Nothing here
+// touches the network: fetching is always through a fake, and a real fetch fails the test.
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -12,10 +16,13 @@ import path from 'node:path';
 import test from 'node:test';
 import { buildDriftFixtures } from './drift-fixtures.mjs';
 import {
-  auditAudioDirectory, crossfadeRule, loadDriftCatalog, measureFile, planAssets, prepareAssets, readIconNames, resolveTarget, sha256Hex,
+  auditAudioDirectory, crossfadeRule, fetchWithRetry, loadDriftCatalog, measureFile, planAssets, prepareAssets, readIconNames, resolveTarget, sha256Hex,
 } from './prepare-drift-assets.mjs';
 import { auditAsar, locateAsar } from './verify-drift-assets.mjs';
 import { repoRoot } from './drift-test-utils.mjs';
+
+// A download the test did not ask for must not happen: it would be slow, flaky and 99 MiB.
+globalThis.fetch = () => { throw new Error('the network is forbidden in the Drift asset tests: pass a fetcher'); };
 
 const catalog = loadDriftCatalog();
 const real = catalog.DRIFT_SOUNDS;
@@ -25,32 +32,57 @@ const fixtures = buildDriftFixtures(path.join(scratch, 'fixtures'));
 const sourceDir = path.join(fixtures.directory, 'audio');
 const clean = (name) => { const dir = path.join(scratch, name); rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true }); return dir; };
 
-/** A copy of a real recording, cleared for the sake of the test, carrying the digest of `payload`. */
+/** A copy of a real recording, carrying the digest of `payload` (so a stand-in file can pass its checks). */
 function approvedClone(id, payload) {
   const clone = structuredClone(real.find((sound) => sound.id === id));
   clone.source.bytes = payload.length;
   clone.source.sha256 = sha256Hex(payload);
-  clone.provenance = { ...clone.provenance, licenseStatus: 'verified', licenseId: 'CC0-1.0', distributionReview: 'approved', reviewRef: 'legal/drift/REVIEW.md#test' };
-  delete clone.provenance.evidenceRefs;
-  clone.provenance.evidenceRefs = ['legal/drift/REVIEW.md#test'];
   return clone;
 }
 
+/** A copy of a real recording that nobody has approved: what every recording used to be. */
+function pendingOf(id) {
+  const clone = structuredClone(real.find((sound) => sound.id === id));
+  clone.provenance = {
+    licenseStatus: 'unresolved',
+    upstreamRepository: clone.provenance.upstreamRepository,
+    upstreamCommit: clone.provenance.upstreamCommit,
+    upstreamPath: clone.provenance.upstreamPath,
+    evidenceRefs: [...clone.provenance.evidenceRefs],
+    distributionReview: 'pending',
+  };
+  return clone;
+}
+
+/** The whole real catalogue with every recording set back to pending. */
+const allPending = () => real.map((definition) => (definition.source.kind === 'file' ? pendingOf(definition.id) : definition));
+const payloadResponse = (payload) => ({ ok: true, status: 200, arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length) });
+
 // ── the plan ───────────────────────────────────────────────────────────────
 
-test('today: no recording is cleared, all 81 are pending, 8 are generators', () => {
+test('today: all 81 recordings are approved (as declared upstream) and 8 sounds are generators', () => {
   const plan = planAssets(real, catalog);
+  assert.equal(plan.approved.length, 81);
+  assert.equal(plan.pending.length, 0);
+  assert.equal(plan.generated.length, 8);
+  assert.equal(plan.approved.reduce((sum, d) => sum + d.source.bytes, 0), 103863687);
+  assert.deepEqual(catalog.validateDriftCatalog(real, readIconNames()), []);
+});
+
+test('an entry nobody approved is planned as pending, whatever else is true of it', () => {
+  const plan = planAssets(allPending(), catalog);
   assert.equal(plan.approved.length, 0);
   assert.equal(plan.pending.length, 81);
   assert.equal(plan.generated.length, 8);
-  assert.equal(plan.pending.reduce((sum, d) => sum + d.source.bytes, 0), 103863687);
-  assert.deepEqual(catalog.validateDriftCatalog(real, readIconNames()), []);
+  const half = allPending().map((definition, index) => (index < 40 && definition.source.kind === 'file' ? real[index] : definition));
+  assert.equal(planAssets(half, catalog).approved.length, 40, 'approval is per entry');
 });
 
 test('preparing with nothing cleared writes nothing, even to a directory that does not exist yet', async () => {
   const target = path.join(scratch, 'never-created');
-  const result = await prepareAssets({ definitions: real, drift: catalog, targetDir: target, fetcher: () => { throw new Error('nothing may be fetched'); } });
+  const result = await prepareAssets({ definitions: allPending(), drift: catalog, targetDir: target, fetcher: () => { throw new Error('nothing may be fetched'); } });
   assert.deepEqual(result.written, []);
+  assert.deepEqual(result.kept, []);
   assert.deepEqual(result.failed, []);
   assert.equal(result.skipped.length, 81);
   assert.equal(fs.existsSync(target), false);
@@ -59,7 +91,7 @@ test('preparing with nothing cleared writes nothing, even to a directory that do
 test('asking for a pending recording by id is refused, never honoured', async () => {
   const target = clean('pending-by-id');
   await assert.rejects(
-    prepareAssets({ definitions: real, drift: catalog, targetDir: target, only: 'light-rain', fetcher: () => { throw new Error('no fetch'); } }),
+    prepareAssets({ definitions: allPending(), drift: catalog, targetDir: target, only: 'light-rain', fetcher: () => { throw new Error('no fetch'); } }),
     /has not been cleared for distribution/,
   );
   await assert.rejects(prepareAssets({ definitions: real, drift: catalog, targetDir: target, only: 'white-noise' }), /not a catalogued recording/);
@@ -126,7 +158,7 @@ test('without a local source the bytes are fetched from the PINNED commit, never
   const payload = Buffer.from('a stand-in for a recording'.repeat(40));
   const clone = approvedClone('light-rain', payload);
   const requested = [];
-  const fetcher = async (url) => { requested.push(url); return { ok: true, status: 200, arrayBuffer: async () => payload.buffer.slice(payload.byteOffset, payload.byteOffset + payload.length) }; };
+  const fetcher = async (url) => { requested.push(url); return payloadResponse(payload); };
   const target = clean('fetched');
   const result = await prepareAssets({ definitions: [clone], drift: catalog, targetDir: target, fetcher });
   assert.deepEqual(result.failed, []);
@@ -141,6 +173,61 @@ test('without a local source the bytes are fetched from the PINNED commit, never
   assert.match(changed.failed[0].error, /bytes|SHA-256/);
 });
 
+test('a lost download is retried; a missing file is not', async () => {
+  const payload = Buffer.from('a stand-in for a recording'.repeat(40));
+  const noPause = () => Promise.resolve();
+  const pauses = [];
+  const recordPause = (ms) => { pauses.push(ms); return Promise.resolve(); };
+
+  const flaky = (failures) => { let calls = 0; return { calls: () => calls, fetcher: async () => { calls += 1; if (calls <= failures.length) return failures[calls - 1](); return payloadResponse(payload); } }; };
+  const dropped = () => { throw new Error('socket hang up'); };
+  const status = (code) => () => ({ ok: false, status: code });
+
+  const twice = flaky([dropped, dropped]);
+  assert.deepEqual(await fetchWithRetry(twice.fetcher, 'https://example.test/a', 'a', { pause: recordPause }), payload);
+  assert.equal(twice.calls(), 3, 'two lost connections, then the file');
+  assert.deepEqual(pauses, [500, 1000], 'the pause grows');
+
+  for (const code of [500, 503, 429]) {
+    const once = flaky([status(code)]);
+    assert.deepEqual(await fetchWithRetry(once.fetcher, 'https://example.test/a', 'a', { pause: noPause }), payload, `HTTP ${code} is retried`);
+    assert.equal(once.calls(), 2);
+  }
+
+  for (const code of [404, 403, 401]) {
+    const gone = flaky([status(code), status(code), status(code)]);
+    await assert.rejects(fetchWithRetry(gone.fetcher, 'https://example.test/a', 'a', { pause: noPause }), new RegExp(`HTTP ${code}`));
+    assert.equal(gone.calls(), 1, `HTTP ${code} is final: a pinned file that is missing will not appear on a second try`);
+  }
+
+  const never = flaky([dropped, dropped, dropped, dropped, dropped]);
+  await assert.rejects(fetchWithRetry(never.fetcher, 'https://example.test/a', 'a', { attempts: 3, pause: noPause }), /socket hang up/);
+  assert.equal(never.calls(), 3, 'it gives up after the attempts it was given');
+});
+
+test('a recording already in place and intact is kept without being fetched; a damaged one is fetched again', async () => {
+  const payload = Buffer.from('a stand-in for a recording'.repeat(40));
+  const clone = approvedClone('light-rain', payload);
+  const target = clean('kept');
+  let fetched = 0;
+  const fetcher = async () => { fetched += 1; return payloadResponse(payload); };
+
+  const first = await prepareAssets({ definitions: [clone], drift: catalog, targetDir: target, fetcher });
+  assert.deepEqual(first.written.map((w) => w.id), ['light-rain']);
+  assert.equal(fetched, 1);
+
+  const second = await prepareAssets({ definitions: [clone], drift: catalog, targetDir: target, fetcher });
+  assert.deepEqual(second.kept.map((k) => k.id), ['light-rain']);
+  assert.deepEqual(second.written, []);
+  assert.equal(fetched, 1, 'a packaging run after the first costs no download');
+
+  fs.writeFileSync(path.join(target, 'rain', 'light-rain.mp3'), 'damaged on disk');
+  const third = await prepareAssets({ definitions: [clone], drift: catalog, targetDir: target, fetcher });
+  assert.deepEqual(third.written.map((w) => w.id), ['light-rain']);
+  assert.equal(fetched, 2, 'what does not match its digest is replaced, never trusted');
+  assert.deepEqual(fs.readFileSync(path.join(target, 'rain', 'light-rain.mp3')), payload);
+});
+
 // ── auditing a directory (and what the verifier says) ──────────────────────
 
 test('an empty, absent or placeholder-only directory is clean and reports zero recordings', () => {
@@ -152,7 +239,8 @@ test('an empty, absent or placeholder-only directory is clean and reports zero r
     assert.deepEqual(audit.problems, []);
     assert.equal(audit.present.length, 0);
     assert.equal(audit.bytes, 0);
-    assert.equal(audit.pending.length, 81);
+    assert.equal(audit.pending.length, 0, 'every recording is approved now');
+    assert.equal(audit.missing.length, 81, 'and each one is reported as absent, not failed');
     assert.equal(audit.generators.length, 8);
   }
 });
@@ -161,7 +249,7 @@ test('the audit rejects audio that is pending, undeclared, altered, resized, lin
   const dir = clean('audit-bad');
   const put = (relative, bytes) => { const file = path.join(dir, ...relative.split('/')); mkdirSync(path.dirname(file), { recursive: true }); writeFileSync(file, bytes); return file; };
 
-  put('rain/light-rain.mp3', Buffer.alloc(real.find((s) => s.id === 'light-rain').source.bytes)); // pending recording
+  put('rain/light-rain.mp3', Buffer.alloc(real.find((s) => s.id === 'light-rain').source.bytes)); // a recording nobody approved
   put('mystery/track.mp3', 'undeclared');
   put('noise/white-noise.wav', 'a Moodist WAV that must not be reused');
   const a = fixtures.sounds.find((s) => s.id === 'fixture-a');
@@ -178,7 +266,7 @@ test('the audit rejects audio that is pending, undeclared, altered, resized, lin
   symlinkSync(outside, path.join(dir, c.source.asset)); // linked
   const huge = put(d.source.asset, ''); truncateSync(huge, 12 * 1024 * 1024 + 1); // oversized
 
-  const definitions = [...real, a, b, c, d];
+  const definitions = [...real.filter((definition) => definition.id !== 'light-rain'), pendingOf('light-rain'), a, b, c, d];
   const audit = auditAudioDirectory({ root: dir, definitions, drift: catalog });
   const says = (needle) => audit.problems.some((problem) => problem.includes(needle));
   assert.ok(says('rain/light-rain.mp3') && says('not cleared for distribution'), 'a pending recording');
@@ -200,28 +288,36 @@ test('the audit accepts exactly what is declared, cleared and intact, and counts
     fs.copyFileSync(path.join(sourceDir, ...sound.source.asset.split('/')), file);
   }
   const extra = fixtures.sounds.find((s) => s.id === 'fixture-c'); // cleared but not shipped
-  const audit = auditAudioDirectory({ root: dir, definitions: [...real, ...good, extra], drift: catalog });
+  const generators = real.filter((definition) => definition.source.kind !== 'file');
+  const audit = auditAudioDirectory({ root: dir, definitions: [...generators, ...good, extra], drift: catalog });
   assert.deepEqual(audit.problems, []);
   assert.deepEqual(audit.present.map((p) => p.id).sort(), ['fixture-a', 'fixture-b']);
   assert.equal(audit.bytes, good.reduce((sum, s) => sum + s.source.bytes, 0), 'the byte total is measured, not asserted');
   assert.deepEqual(audit.missing, ['fixture-c'], 'a cleared recording that is absent is reported, not failed');
 });
 
-test('the repository\'s own audio directory passes: nothing undeclared, nothing uncleared', () => {
+test('the repository\'s own audio directory passes: nothing undeclared, nothing uncleared, nothing altered', () => {
+  // A fresh checkout has no audio (it is fetched at packaging time); a prepared one has all 81.
+  // Either is clean, and every approved recording is either there or reported as absent.
   const output = execFileSync('node', [path.join(repoRoot, 'scripts/verify-drift-assets.mjs')], { encoding: 'utf8' });
-  assert.match(output, /recordings packaged: 0 \(0 bytes\)/);
-  assert.match(output, /pending review:\s+81/);
+  const packaged = Number(/recordings packaged: (\d+) \(/.exec(output)?.[1]);
+  const absent = Number(/cleared but absent:\s+(\d+)/.exec(output)?.[1]);
+  assert.equal(packaged + absent, 81, output);
+  assert.match(output, /pending review:\s+0/);
   assert.match(output, /\[drift-assets\] ok/);
 });
 
-test('the list command names every pending recording precisely', () => {
-  const output = execFileSync('node', [path.join(repoRoot, 'scripts/prepare-drift-assets.mjs'), '--list'], { encoding: 'utf8' });
-  assert.match(output, new RegExp(`@ ${catalog.DRIFT_UPSTREAM.commit}`));
-  assert.match(output, /Approved recordings: 0/);
-  assert.match(output, /Pending review: 81 \(103863687 bytes\)/);
-  const rows = output.split('\n').filter((line) => /public\/sounds\//.test(line));
-  assert.equal(rows.length, 81);
-  assert.ok(rows.every((row) => /[0-9a-f]{64}/.test(row)));
+test('the list command names every approved recording precisely, however it is piped', () => {
+  // Run it several times: exiting right after printing to a pipe used to cut the listing short under load.
+  for (let run = 0; run < 4; run++) {
+    const output = execFileSync('node', [path.join(repoRoot, 'scripts/prepare-drift-assets.mjs'), '--list'], { encoding: 'utf8' });
+    assert.match(output, new RegExp(`@ ${catalog.DRIFT_UPSTREAM.commit}`));
+    assert.match(output, /Approved recordings: 81 \(103863687 bytes\)/);
+    assert.match(output, /Pending review: 0 \(0 bytes\)/);
+    const rows = output.split('\n').filter((line) => /public\/sounds\//.test(line));
+    assert.equal(rows.length, 81, `run ${run}`);
+    assert.ok(rows.every((row) => /[0-9a-f]{64}/.test(row)));
+  }
 });
 
 // ── a packaged archive ─────────────────────────────────────────────────────
@@ -250,9 +346,11 @@ test('a packaged app.asar is audited like a directory', async (t) => {
     writeFileSync(path.join(dir, 'rain', 'light-rain.mp3'), Buffer.alloc(real.find((s) => s.id === 'light-rain').source.bytes));
     writeFileSync(path.join(dir, 'stray.mp3'), 'x');
   });
-  const bad = await auditAsar({ asarPath: dirty, definitions: real, drift: catalog });
+  const bad = await auditAsar({ asarPath: dirty, definitions: [...real.filter((definition) => definition.id !== 'light-rain'), pendingOf('light-rain')], drift: catalog });
   assert.ok(bad.problems.some((p) => p.includes('rain/light-rain.mp3') && p.includes('not cleared')));
   assert.ok(bad.problems.some((p) => p.includes('stray.mp3') && p.includes('does not declare')));
+  const altered = await auditAsar({ asarPath: dirty, definitions: real, drift: catalog });
+  assert.ok(altered.problems.some((p) => p.includes('rain/light-rain.mp3') && p.includes('SHA-256')), 'an approved recording with the wrong bytes is still refused');
 
   const good = await build('good', (dir) => {
     const a = fixtures.sounds.find((s) => s.id === 'fixture-a');
@@ -277,6 +375,38 @@ test('the archive is found from the archive itself, a macOS app, or a resources 
   writeFileSync(path.join(win, 'app.asar'), 'x');
   assert.equal(locateAsar(path.join(root, 'win')), path.join(win, 'app.asar'));
   assert.throws(() => locateAsar(path.join(root, 'nowhere')), /no app\.asar/);
+});
+
+test('--require-all turns a build without its recordings into a failure, and a complete one into a pass', async (t) => {
+  let asar;
+  try { asar = await import('@electron/asar'); } catch { t.skip('@electron/asar is not installed'); return; }
+  const verify = path.join(repoRoot, 'scripts/verify-drift-assets.mjs');
+  const resources = clean('require-all-resources');
+  // The legal record that must travel beside the app, copied from the repository.
+  const legal = path.join(resources, 'legal', 'drift');
+  mkdirSync(legal, { recursive: true });
+  for (const file of ['README.md', 'PROVENANCE.md', 'REVIEW.md', 'MOODIST_LICENSE.txt']) fs.copyFileSync(path.join(repoRoot, 'legal', 'drift', file), path.join(legal, file));
+  const src = clean('require-all-src');
+  const audioDir = path.join(src, 'electron', 'assets', 'drift', 'audio');
+  mkdirSync(audioDir, { recursive: true });
+  writeFileSync(path.join(audioDir, '.gitkeep'), '');
+  await asar.createPackage(src, path.join(resources, 'app.asar'));
+
+  const plain = spawnSync('node', [verify, '--asar', resources], { encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stdout + plain.stderr);
+  assert.match(plain.stdout, /recordings packaged: 0 \(0 bytes\)/);
+  assert.match(plain.stdout, /cleared but absent:\s+81/);
+
+  const strict = spawnSync('node', [verify, '--asar', resources, '--require-all'], { encoding: 'utf8' });
+  assert.equal(strict.status, 1, 'an installer without its 81 recordings must not be produced');
+  assert.match(strict.stderr, /81 approved recording\(s\) are not in this build/);
+  assert.match(strict.stderr, /prepare-drift-assets/, 'and it says what to run');
+
+  // the legal record is required too: the notice shown to users points at it
+  fs.rmSync(path.join(legal, 'MOODIST_LICENSE.txt'));
+  const noLicense = spawnSync('node', [verify, '--asar', resources], { encoding: 'utf8' });
+  assert.equal(noLicense.status, 1);
+  assert.match(noLicense.stderr, /MOODIST_LICENSE\.txt: not shipped beside the app/);
 });
 
 // ── measuring ──────────────────────────────────────────────────────────────

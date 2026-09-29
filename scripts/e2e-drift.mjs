@@ -6,10 +6,11 @@
 // restores a mix without making a sound. This script launches the app on a throw-away profile
 // and checks each of those from the outside.
 //
-// * No recording of the Moodist catalogue is cleared for distribution (legal/drift/REVIEW.md), so
-//   the file-backed sounds used here are FIXTURES synthesised by scripts/drift-fixtures.mjs and
-//   handed to the main process through NODUS_E2E_DRIFT_FIXTURES. The noise and binaural
-//   generators are the real ones.
+// * The recordings are the real ones: the 81 Moodist files, bundled unmodified and prepared by
+//   scripts/prepare-drift-assets.mjs. On top of them, FIXTURES synthesised by
+//   scripts/drift-fixtures.mjs and handed to the main process through NODUS_E2E_DRIFT_FIXTURES cover
+//   what the real catalogue cannot: a file that was altered, one that is not audio, one that is not
+//   there, and a mix that reaches the sixth voice. The noise and binaural generators are the real ones.
 // * "Is there sound?" is answered without any hook in the product: an init script wraps
 //   AudioContext and AudioNode.prototype.connect in the page, so whatever reaches the context's
 //   destination also feeds an AnalyserNode that only listens.
@@ -22,7 +23,7 @@
 //   NODUS_E2E_EXECUTABLE=<app binary> node scripts/e2e-drift.mjs   against a packaged build
 //   NODUS_E2E_AUDIBLE=1 ...                                 let the speakers play the (quiet) mix
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -41,6 +42,16 @@ const audible = process.env.NODUS_E2E_AUDIBLE === '1';
 if (!packagedExecutable && (!existsSync(path.join(repoRoot, 'dist-electron/main.js')) || !existsSync(path.join(repoRoot, 'dist/index.html')))) {
   console.log('[e2e-drift] no build found, running npm run build first…');
   execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'inherit' });
+}
+
+// The recordings are not in Git: make sure this working tree has them (one already in place and intact is
+// kept, so this costs nothing after the first run). A packaged build carries its own inside app.asar.
+if (!packagedExecutable) {
+  const prepared = spawnSync(process.execPath, [path.join(repoRoot, 'scripts', 'prepare-drift-assets.mjs')], { cwd: repoRoot, encoding: 'utf8' });
+  if (prepared.status !== 0) {
+    console.error(`${prepared.stdout}${prepared.stderr}`);
+    throw new Error('[e2e-drift] the Nodus Drift recordings could not be prepared (they are fetched from their pinned commit)');
+  }
 }
 
 /* ------------------------------------------------------------- audio tap (page) */
@@ -409,23 +420,23 @@ try {
   });
 
   // ── 2. The catalogue and what merely browsing it does ───────────────────────
-  await check('the catalogue offers the generators and the fixtures, and lists pending recordings as unavailable', async () => {
+  await check('the catalogue offers the generators, the real recordings and the fixtures; only a file that is not there is unavailable', async () => {
     await page.getByTestId('drift-card-brown-noise').waitFor();
-    for (const id of ['white-noise', 'pink-noise', 'brown-noise', 'binaural-delta', 'binaural-gamma', 'fixture-a', 'fixture-g']) {
+    for (const id of ['white-noise', 'pink-noise', 'brown-noise', 'binaural-delta', 'binaural-gamma', 'light-rain', 'rain-on-tent', 'airport', 'fixture-a', 'fixture-g']) {
       assert.equal(await page.locator(`[data-testid="drift-grid"] [data-testid="drift-card-${id}"]`).count(), 1, `${id} is playable`);
     }
-    assert.equal(await page.locator('[data-testid="drift-grid"] [data-testid="drift-card-rain-on-tent"]').count(), 0,
-      'a recording pending review is not in the playable grid');
-    assert.equal(await page.locator('[data-testid="drift-unavailable"] [data-testid="drift-card-rain-on-tent"]').count(), 1);
+    // 8 generators + 81 recordings + 7 good fixtures + the altered one + the one that is not audio
+    assert.equal(await page.locator('[data-testid="drift-grid"] > li').count(), 98, 'every generator, recording and fixture that can be played is in the grid');
+    assert.equal(await page.locator('[data-testid="drift-unavailable"] > ul > li').count(), 1, 'one card is unavailable');
     assert.equal(await page.locator('[data-testid="drift-unavailable"] [data-testid="drift-card-fixture-missing"]').count(), 1,
-      'a declared file that is not on disk is unavailable too');
-    assert.equal(await page.getByTestId('drift-license-note').count(), 1);
+      'a declared file that is not on disk is unavailable');
+    assert.equal(await page.getByTestId('drift-license-note').count(), 0, 'no recording waits for a licence, so the page does not say so');
     await page.getByTestId('drift-unavailable').locator('summary').click();
-    const pending = page.getByTestId('drift-card-rain-on-tent');
-    assert.equal(await pending.locator('[aria-disabled="true"]').count(), 1);
-    assert.match(await page.getByTestId('drift-card-rain-on-tent-reason').innerText(), /licencia/i);
-    assert.equal(await pending.locator(':scope > button:not([data-testid])').count(), 0, 'an unavailable sound has no play button');
-    await page.getByTestId('drift-card-rain-on-tent').locator('[aria-disabled="true"]').click({ force: true });
+    const missing = page.getByTestId('drift-card-fixture-missing');
+    assert.equal(await missing.locator('[aria-disabled="true"]').count(), 1);
+    assert.match(await page.getByTestId('drift-card-fixture-missing-reason').innerText(), /archivo/i);
+    assert.equal(await missing.locator(':scope > button:not([data-testid])').count(), 0, 'an unavailable sound has no play button');
+    await missing.locator('[aria-disabled="true"]').click({ force: true });
     assert.equal(await page.getByTestId('drift-mix-empty').count(), 1, 'clicking an unavailable sound adds nothing');
   });
 
@@ -470,6 +481,22 @@ try {
     assert.ok(after.mean > before.mean * 1.05, `two voices are louder than one (${before.mean} → ${after.mean})`);
     assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos');
     assert.equal(await page.getByTestId('drift-mix-voice-fixture-a-status').count(), 1);
+  });
+
+  await check('real recordings are read through the bridge, decoded and looped: one that needs no crossfade and one that does', async () => {
+    await audibleNow('the mix before the real recordings');
+    // light-rain loops as it is; rain-on-tent gets a circular crossfade of 1 s (shared/driftCatalog.ts).
+    for (const id of ['light-rain', 'rain-on-tent']) {
+      await card(id).click();
+      await until(async () => /Reproduciendo/.test(await page.getByTestId(`drift-mix-voice-${id}-status`).innerText()), `${id} to play`, 30_000);
+    }
+    const heard = await audibleNow('the real recordings mixed in', 15_000);
+    assert.equal(heard.created, 1, 'still the same single context');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 de 6 sonidos');
+    for (const id of ['rain-on-tent', 'light-rain']) await page.getByTestId(`drift-remove-${id}`).click();
+    await page.getByTestId('drift-mix-voice-light-rain').waitFor({ state: 'detached' });
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos');
+    await audibleNow('the first two voices, after the recordings were removed');
   });
 
   await check('volume sliders move the real signal and are saved, without ever restarting anything', async () => {

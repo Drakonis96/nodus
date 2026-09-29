@@ -9,10 +9,12 @@
  * WAV files, and its alarm and silence helpers, are deliberately not part of this
  * catalogue: the generators below are implemented locally.
  *
- * Licences are NOT presumed. Moodist declares its audio as third-party material under
- * either the Pixabay Content License or CC0 without saying which applies to each file, so
- * every recording is `unresolved` and `pending` review until legal/drift/REVIEW.md records
- * evidence for it. An unresolved recording is listed but is never bundled, read or played.
+ * Licences are not invented. Moodist declares its audio as third-party material under either
+ * the Pixabay Content License or CC0 without saying which applies to each file, and Nodus
+ * has not checked that per file. The recordings are therefore `declared`, not `verified`:
+ * their licence is the one Moodist's repository declares, and the maintainer's decision to
+ * distribute them on that basis is recorded in legal/drift/REVIEW.md. An entry that has no such
+ * record stays `unresolved` and `pending`, and is listed but never bundled, read or played.
  *
  * `crossfadeMs` rule (see legal/drift/PROVENANCE.md): 0 keeps a loop that is already
  * seamless (seam step <= 4x the median sample step and the last and first 100 ms within
@@ -24,11 +26,16 @@ import { BINAURAL_CARRIER_HZ } from './drift';
 export const DRIFT_UPSTREAM = {
   repository: 'https://github.com/remvze/moodist',
   commit: '11c0be2200116a3635880d600fd6953899cc51a3',
-  /** The licence of Moodist's CODE. Its audio is third-party and is tracked per file. */
+  /** The licence of Moodist's CODE. Its audio is third-party and keeps the licences Moodist declares for it. */
   codeLicense: 'MIT',
 } as const;
 
-const UNRESOLVED_EVIDENCE = ['legal/drift/PROVENANCE.md#upstream-declaration'];
+/** The one identifier for "the licence Moodist declares": the Pixabay Content License or CC0 1.0, per file. */
+export const MOODIST_DECLARED_LICENSE = 'LicenseRef-Moodist-declared-Pixabay-or-CC0';
+
+/** What Moodist says about its audio, and the record of the decision to distribute it on that basis. */
+const DECLARATION_EVIDENCE = ['legal/drift/PROVENANCE.md#upstream-declaration'];
+const RECORDINGS_REVIEW = 'legal/drift/REVIEW.md#recordings';
 
 interface Described {
   id: string;
@@ -46,12 +53,14 @@ function recording(
     ...described,
     source: { kind: 'file', ...file, loop: true },
     provenance: {
-      licenseStatus: 'unresolved',
+      licenseStatus: 'declared',
+      licenseId: MOODIST_DECLARED_LICENSE,
       upstreamRepository: DRIFT_UPSTREAM.repository,
       upstreamCommit: DRIFT_UPSTREAM.commit,
       upstreamPath: `public/sounds/${file.asset}`,
-      evidenceRefs: [...UNRESOLVED_EVIDENCE],
-      distributionReview: 'pending',
+      evidenceRefs: [...DECLARATION_EVIDENCE],
+      distributionReview: 'approved',
+      reviewRef: RECORDINGS_REVIEW,
     },
   };
 }

@@ -8,6 +8,9 @@
 //   node scripts/verify-drift-assets.mjs --asar <path to app.asar | Nodus.app | resources dir>
 //       The same audit of what a PACKAGED build really carries: the audio inside app.asar,
 //       and the legal record (legal/drift) beside it.
+//   ... --require-all
+//       Also fail when a recording the catalogue approves is not there. The packaging hook
+//       passes it, so an installer can never silently ship without its recordings.
 //
 // It exits 1 on any problem and prints the real number and size of packaged recordings, so
 // "how many recordings does this build contain" is a measurement and not a claim.
@@ -15,7 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { AUDIO_DIR, auditAudioDirectory, loadDriftCatalog, readIconNames, repoRoot } from './prepare-drift-assets.mjs';
+import { AUDIO_DIR, auditAudioDirectory, exitAfterFlush, loadDriftCatalog, readIconNames, repoRoot } from './prepare-drift-assets.mjs';
 
 const AUDIO_IN_ARCHIVE = 'electron/assets/drift/audio';
 
@@ -66,13 +69,14 @@ function report(label, audit) {
   console.log(`  generators:          ${audit.generators.length} (no files)`);
 }
 
+/** Returns the exit code; the entry point exits once what was printed has left the pipe. */
 async function main() {
   const catalog = loadDriftCatalog();
   const definitions = catalog.DRIFT_SOUNDS;
   const problems = catalog.validateDriftCatalog(definitions, readIconNames());
   if (problems.length > 0) {
     console.error(`[drift-assets] the catalogue is not well formed:\n  ${problems.join('\n  ')}`);
-    process.exit(1);
+    return 1;
   }
 
   const asarIndex = process.argv.indexOf('--asar');
@@ -83,7 +87,7 @@ async function main() {
     report(`packaged archive ${asarPath}`, audit);
     // The legal record must travel with the app: it is what says why a recording is (not) there.
     const resources = path.dirname(asarPath);
-    for (const file of ['legal/drift/README.md', 'legal/drift/PROVENANCE.md', 'legal/drift/REVIEW.md']) {
+    for (const file of ['legal/drift/README.md', 'legal/drift/PROVENANCE.md', 'legal/drift/REVIEW.md', 'legal/drift/MOODIST_LICENSE.txt']) {
       if (!fs.existsSync(path.join(resources, file))) audit.problems.push(`${file}: not shipped beside the app`);
     }
   } else {
@@ -91,13 +95,17 @@ async function main() {
     report(`source tree ${path.relative(repoRoot, AUDIO_DIR)}`, audit);
   }
 
+  if (process.argv.includes('--require-all') && audit.missing.length > 0) {
+    audit.problems.push(`${audit.missing.length} approved recording(s) are not in this build: ${audit.missing.slice(0, 6).join(', ')}${audit.missing.length > 6 ? ', ...' : ''}. Run node scripts/prepare-drift-assets.mjs before packaging.`);
+  }
   if (audit.problems.length > 0) {
     console.error(`[drift-assets] ${audit.problems.length} problem(s):\n  ${audit.problems.join('\n  ')}`);
-    process.exit(1);
+    return 1;
   }
   console.log('[drift-assets] ok');
+  return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => { console.error(error); process.exit(1); });
+  main().then(exitAfterFlush, (error) => { console.error(error); return exitAfterFlush(1); });
 }
