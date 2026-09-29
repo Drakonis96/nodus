@@ -1,18 +1,18 @@
 import fs from 'node:fs';
 import { createHash } from 'node:crypto';
-import { loadPdfjs, openPdf, pageText } from './pdfjsLoader';
+import { openPdf, pageText } from './pdfjsLoader';
+import { isScannedDocument, pagePaintsImage, sampleScanVerdict, TEXTLESS_PAGE_CHARACTERS } from './scanDetection';
 
 export interface OriginalPageRead { file: string; sha256: string; from: number; to: number; maxBytes: number; languages: string }
 export interface OriginalPage { text: string; pageNumber: number; pageLabel: string | null; partial: boolean; ocr: boolean }
 const hash = (bytes: Uint8Array) => createHash('sha256').update(bytes).digest('hex');
 async function needsOcr(page: any, text: string): Promise<boolean> {
-  if (text.trim().length >= 50) return false;
-  const pdfjs = await loadPdfjs();
-  const operators = await page.getOperatorList();
-  return operators.fnArray.some((op: number) => [pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintJpegXObject].includes(op));
+  return text.trim().length < TEXTLESS_PAGE_CHARACTERS && await pagePaintsImage(page);
 }
 export interface OriginalInspection { pages: number; needsOcr: boolean; textCharacters: number }
-/** Read-only preflight. Scans are identified, never recognized or downloaded. */
+/** Read-only preflight. Scans are identified, never recognized or downloaded, by the
+ * same rule preparation defers them with: a spread sample first, every page only when
+ * the sample is mixed. */
 export async function inspectOriginalPdf(input: { file: string; sha256?: string }, signal?: AbortSignal): Promise<OriginalInspection> {
   if (fs.statSync(input.file).size > 256 * 1024 * 1024) throw new Error('documentary_attachment_too_large');
   const before = hash(fs.readFileSync(input.file));
@@ -20,14 +20,19 @@ export async function inspectOriginalPdf(input: { file: string; sha256?: string 
   const pdf = await openPdf(input.file);
   try {
     let textCharacters = 0, scanned = false;
-    for (let number = 1; number <= pdf.numPages; number++) {
-      signal?.throwIfAborted();
-      const page = await pdf.getPage(number);
-      const text = await pageText(page);
-      textCharacters += text.length;
-      scanned = await needsOcr(page, text);
-      page.cleanup?.();
-      if (scanned) break;
+    const verdict = await sampleScanVerdict(pdf, signal);
+    if (verdict !== 'undecided') scanned = verdict === 'scan';
+    else {
+      let textless = 0, imageOnly = 0;
+      for (let number = 1; number <= pdf.numPages; number++) {
+        signal?.throwIfAborted();
+        const page = await pdf.getPage(number);
+        const text = (await pageText(page)).trim();
+        textCharacters += text.length;
+        if (text.length < TEXTLESS_PAGE_CHARACTERS) { textless += 1; if (await pagePaintsImage(page)) imageOnly += 1; }
+        page.cleanup?.();
+      }
+      scanned = isScannedDocument({ pages: pdf.numPages, textless, imageOnly, characters: textCharacters });
     }
     if (before !== hash(fs.readFileSync(input.file))) throw new Error('research_source_revision_changed');
     return { pages: pdf.numPages, needsOcr: scanned, textCharacters };

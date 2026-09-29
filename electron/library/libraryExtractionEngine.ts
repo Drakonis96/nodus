@@ -13,6 +13,7 @@ import type {
   LibrarySourceMap,
 } from '@shared/libraryTypes';
 import { openPdf, loadPdfjs } from '../extraction/pdfjsLoader';
+import { isScannedDocument, pagePaintsImage, sampleScanVerdict, TEXTLESS_PAGE_CHARACTERS } from '../extraction/scanDetection';
 import { ocrPdfPages } from '../extraction/ocr';
 import { csvFileToText, xlsxFileToText } from '../extraction/tabular';
 import { cleanInlineText, dehyphenatingJoin } from '../extraction/textCleanup';
@@ -1207,22 +1208,30 @@ async function pdfBlocks(
   const layouts: PageLayout[] = [];
   const blank: number[] = [];
   let ocrPages = 0;
+  let textless = 0;
+  let characters = 0;
+  // Documentary preparation defers scans to OCR instead of recognizing them.
+  const deferScans = !!options.localOcrOnly && options.ocrMode === 'off';
   try {
+    // A scan is recognized from a spread sample, not after reading every page.
+    if (deferScans && await sampleScanVerdict(pdf, signal) === 'scan') throw new Error('documentary_ocr_deferred');
     for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
       abortIfNeeded(signal);
       const page = await pdf.getPage(pageNumber);
       const layout = await pageLayout(page, pageNumber);
       layouts.push(layout);
-      if (layout.lines.reduce((sum, line) => sum + line.text.length, 0) < 50) {
-        const pdfjs = options.localOcrOnly ? await loadPdfjs() : null;
-        const operators = pdfjs ? await page.getOperatorList() : null;
+      const pageCharacters = layout.lines.reduce((sum, line) => sum + line.text.length, 0);
+      characters += pageCharacters;
+      if (pageCharacters < TEXTLESS_PAGE_CHARACTERS) {
+        textless += 1;
         // Blank leaves and short digital title pages do not require OCR.
-        if (!operators || operators.fnArray.some((op: number) => [pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintJpegXObject].includes(op))) blank.push(pageNumber);
+        if (!options.localOcrOnly || await pagePaintsImage(page)) blank.push(pageNumber);
       }
       page.cleanup?.();
       onProgress?.({ phase: 'extract', progress: 0.08 + (pageNumber / pdf.numPages) * 0.47, message: `Extrayendo página ${pageNumber} de ${pdf.numPages}…`, page: pageNumber, totalPages: pdf.numPages });
     }
-    if (blank.length && options.localOcrOnly && options.ocrMode === 'off') throw new Error('documentary_ocr_deferred');
+    // A digital document keeps its text; its image-only pages (a cover, plates) have none.
+    if (deferScans && isScannedDocument({ pages: pdf.numPages, textless, imageOnly: blank.length, characters })) throw new Error('documentary_ocr_deferred');
     if (blank.length && options.ocrMode !== 'off') {
       const pages = blank.slice(0, options.maxOcrPages);
       if (options.ocrMode === 'local') {
@@ -1264,7 +1273,7 @@ async function pdfBlocks(
         }
       }
     }
-    if (options.localOcrOnly && blank.length > ocrPages) throw new Error('documentary_ocr_incomplete');
+    if (options.localOcrOnly && !deferScans && blank.length > ocrPages) throw new Error('documentary_ocr_incomplete');
     const chrome = repeatedChrome(layouts);
     const pageContent: OutputBlock[] = [];
     let continuingTable = false;
