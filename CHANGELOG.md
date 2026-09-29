@@ -1,5 +1,21 @@
 # Changelog
 
+## 5.7.2 — 2026-09-29
+
+- Research Chat now plans each turn. It rewrites your question as a goal that stands on its own, keeps the topic of the conversation, looks up the authors and titles you mention in the library catalogue with accents folded and one typo tolerated, and reads several sources before answering. If an answer rests on fewer than three independent sources while candidates remain unread, it rejects the answer and names those candidates.
+- Follow-up questions keep the thread. Earlier citations come back to the conversation, the answer lists only the sources that took part with their author and year, and it explains in plain words what it searched, looked up and read. It no longer says an indexed work has no index, and it no longer states that Zotero is unavailable.
+- Research Chat answers without freezing the window. On a library of 1,229 sources the longest block of the interface fell from about five seconds to under one. A question also no longer fails when one of the stored ideas has no statement.
+- Preparing documents is faster and takes less space. Two documents are prepared at the same time, each document keeps up to four batches of vectors in flight, remote embeddings are requested in parallel, the source is checked at most every five seconds instead of on every page, and vectors are stored once in a compact format. The store is compacted in the background and semantic search is faster.
+- Only real scans wait for OCR. A digital book is no longer sent to OCR because it has a single image-only page, and the preparation preview and the preparation itself now use the same rule.
+- Graph health in Settings, Data now also detects relations from an idea to itself and repairs them.
+- A citation now rests on the passage that holds the quoted text, inside its own source and as close as possible to its page. Supports published earlier are re-pointed once per vault.
+- A section's page range stays inside its own source. It no longer ends on the page of the next attachment.
+- Library records are cleaner. An idea can no longer be related to itself, two ideas from the same scan with the same statement are joined into one, and the checkpoints of a failed job are dropped when a later one succeeds.
+- Extracted text arrives complete. The characters that made a query stop reading at that point are replaced, so a passage no longer reports a shorter length or a cut-off snippet. A work whose document profile failed no longer appears in red as if it had no profile at all, and the row now says the profile failed and offers the retry.
+- After a reprocess pass, only the ideas whose theme text changed are converted into vectors again, once each, instead of the whole library. This applies to the automatic pass and to both manual reprocess actions.
+- The Linux packages start again on Ubuntu 22.04, Debian 12 and other systems with glibc older than 2.38. Version 5.7.1 stopped before its first window with the message GLIBC_2.38 not found. Linux packages are now built on Ubuntu 22.04, and the release fails if any bundled library needs a newer glibc.
+- Updated the desktop, server, Zotero and browser connector versions, source release links, citation and website metadata.
+
 ## 5.7.1 — 2026-09-28
 
 - The indexing welcome answers at once: its Yes, start button no longer stays disabled behind Loading… while Nodus inspected every unindexed PDF, one after another, before letting you choose. That per-file check is only shown when managing the preparation, so the welcome no longer waits for it.
