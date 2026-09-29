@@ -15,6 +15,7 @@ import {
 } from '../db/worksRepo';
 import { setWorkCollections, addWorkCollections, upsertCollections, expandCollectionKeys } from '../db/collectionsRepo';
 import { collectionItems, libraries as zoteroLibraries, libraryVersion, topCollections, childCollections } from '../zotero/zoteroClient';
+import { archiveWorksRemovedFromZotero, unobservedUnmonitoredWorks } from './zoteroRemoval';
 import type { ZoteroCollection, ZoteroLibrary } from '@shared/types';
 import { scanQueue } from '../pipeline/scanQueue';
 import type { SyncLogEntry, WorkCreator, ZoteroItem } from '@shared/types';
@@ -224,7 +225,7 @@ function reconcileMonitoredCollectionMemberships(
   observedMemberships: Map<string, Set<string>>,
   monitored: string[],
   previousScope: string[] = [],
-): void {
+): string[] {
   // Membership rows carry the direct child collection key, not necessarily the
   // monitored root. Expand the persisted hierarchy so a deletion/move from any
   // descendant is reconciled as well. Stale collection rows are intentionally
@@ -233,7 +234,7 @@ function reconcileMonitoredCollectionMemberships(
     ...previousScope,
     ...expandCollectionKeys([...new Set(monitored.filter((key) => typeof key === 'string' && key))]),
   ])];
-  if (keys.length === 0) return;
+  if (keys.length === 0) return [];
   const db = getDb();
   const placeholders = keys.map(() => '?').join(',');
   const rows = db.prepare(`
@@ -272,11 +273,15 @@ function reconcileMonitoredCollectionMemberships(
     return identities.length > 0
       && !identities.some((key) => observedMemberships.get(key)?.has(row.collection_key));
   });
-  if (stale.length === 0) return;
+  if (stale.length === 0) return [];
   const remove = db.prepare('DELETE FROM work_collections WHERE nodus_id = ? AND collection_key = ?');
   db.transaction(() => {
     for (const row of stale) remove.run(row.nodus_id, row.collection_key);
   })();
+  // Works that just lost their last monitored membership: the caller asks Zotero whether the
+  // item left the collection or left the library.
+  const remaining = db.prepare(`SELECT 1 FROM work_collections WHERE nodus_id = ? AND collection_key IN (${placeholders}) LIMIT 1`);
+  return [...new Set(stale.map((row) => row.nodus_id))].filter((nodusId) => !remaining.get(nodusId, ...keys));
 }
 
 /** Full sync over all monitored collections. */
@@ -405,7 +410,13 @@ export async function fullSync(mode: ZoteroSyncMode, options: ZoteroSyncOptions 
         for (const [nodusId, memberships] of observedWorkMemberships) {
           addWorkCollections(nodusId, [...memberships]);
         }
-        reconcileMonitoredCollectionMemberships(observedMemberships, settings.monitoredCollections, previousMonitoredScope);
+        const unmoored = reconcileMonitoredCollectionMemberships(observedMemberships, settings.monitoredCollections, previousMonitoredScope);
+        // Also works an earlier sync already left without a monitored membership (the item was
+        // trashed before this fix, or before the Trash was emptied): unseen now, and outside
+        // every monitored collection. Bounded so a large library is not probed item by item.
+        const unseen = unobservedUnmonitoredWorks(observedMemberships, settings.monitoredCollections, 300);
+        const removed = await archiveWorksRemovedFromZotero(userId, [...new Set([...unmoored, ...unseen])]);
+        if (removed) console.info(`[zotero-sync] archived ${removed} work(s) removed from Zotero`);
         setLibraryVersions(endingVersions);
       }
     } catch (error) {

@@ -492,6 +492,23 @@ export async function getItem(userId: string, itemKey: string, requestedLibrary?
   return mapItem(await res.json(), parsed.library);
 }
 
+/** Whether an item is still in the Zotero library: `trashed` when it sits in Zotero's Trash
+ *  (`deleted`), `gone` when Zotero no longer knows it (the Trash was emptied), `unknown` when
+ *  Zotero could not be asked. The local API reports no deletions, so a sync that stops seeing
+ *  an item asks here before treating it as removed. */
+export async function itemPresence(userId: string, itemKey: string): Promise<'present' | 'trashed' | 'gone' | 'unknown'> {
+  try {
+    const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
+    if (res.status === 404) return 'gone';
+    if (!res.ok) return 'unknown';
+    const body = (await res.json()) as { data?: { deleted?: boolean | number } };
+    return body?.data?.deleted ? 'trashed' : 'present';
+  } catch {
+    return 'unknown';
+  }
+}
+
 export async function searchItems(library: ZoteroLibrary, query: string): Promise<ZoteroItem[]> {
   const q = query.trim();
   const params = new URLSearchParams({ limit: '50', sort: 'dateModified', direction: 'desc' });
