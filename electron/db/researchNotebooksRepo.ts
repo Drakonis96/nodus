@@ -86,6 +86,9 @@ export function notebookForConversation(conversationId: string): string | null {
   return (getDb().prepare('SELECT notebook_id FROM research_notebook_conversations WHERE conversation_id=?').get(conversationId) as { notebook_id: string } | undefined)?.notebook_id ?? null;
 }
 export function recordResearchScope(scope: ResolvedResearchScope): void {
+  // Once per scope: serializing a library-wide scope (about 1 MB) for every passage receipt,
+  // only for the insert to be ignored, was a large share of a chat turn's frozen time.
+  if (getDb().prepare('SELECT 1 FROM research_run_scopes WHERE id=?').get(scope.id)) return;
   getDb().prepare('INSERT OR IGNORE INTO research_run_scopes(id,notebook_id,scope_json,created_at) VALUES (?,?,?,?)')
     .run(scope.id, scope.notebookId, JSON.stringify(scope), scope.resolvedAt);
 }

@@ -17,6 +17,9 @@ export class DocumentaryRequests {
       attempts: 'INTEGER NOT NULL DEFAULT 0', available_at: 'INTEGER NOT NULL DEFAULT 0', priority: 'INTEGER NOT NULL DEFAULT 0', created_at: 'INTEGER NOT NULL DEFAULT 0', configuration_json: 'TEXT', source_id: 'TEXT', stage: "TEXT NOT NULL DEFAULT 'extraction'", completed_passages: 'INTEGER NOT NULL DEFAULT 0', total_passages: 'INTEGER', unknown_requests: 'INTEGER NOT NULL DEFAULT 0', current_page: 'INTEGER', total_pages: 'INTEGER' })) {
       if (!columns.has(name)) db.exec(`ALTER TABLE documentary_requests ADD COLUMN ${name} ${sql}`);
     }
+    // Lookups are `document_id=? OR source_id=?`, once per source for every inventory: without
+    // this index the OR scanned the whole table 16,000 times per Research Chat question.
+    db.exec('CREATE INDEX IF NOT EXISTS documentary_requests_source ON documentary_requests(source_id)');
   }
   enqueue(documentId: string, revision: string, vaultId: string, now = Date.now(), priority = 0, configuration: unknown = null): void {
     this.db.prepare(`INSERT INTO documentary_requests(document_id,revision,vault_id,state,error,updated_at,available_at,priority,created_at,configuration_json)

@@ -56,6 +56,9 @@ export class DocumentaryStore {
         document_id TEXT NOT NULL, ordinal INTEGER NOT NULL, text TEXT NOT NULL, locator_json TEXT NOT NULL, vector_json TEXT
       );
       CREATE INDEX IF NOT EXISTS documentary_passages_revision ON documentary_passages(index_key, ordinal);
+      -- Covers the per-source revision lookup. Its flags and date are stored after the text and
+      -- chunk JSON, so reading them from the table walked hundreds of megabytes of overflow pages.
+      CREATE INDEX IF NOT EXISTS documentary_revisions_document ON documentary_revisions(document_id, index_key, identity_json, lexical_ready, embedding_ready, created_at);
       CREATE VIRTUAL TABLE IF NOT EXISTS documentary_fts USING fts5(id UNINDEXED,text,tokenize='unicode61 remove_diacritics 2');
       CREATE TABLE IF NOT EXISTS documentary_jobs (
         id TEXT PRIMARY KEY, document_id TEXT NOT NULL, identity_json TEXT NOT NULL, payload_json TEXT NOT NULL,
@@ -215,6 +218,11 @@ export class DocumentaryStore {
   cancel(id: string): void { this.db.prepare("UPDATE documentary_jobs SET state='cancelled',lease_token=NULL,lease_until=NULL WHERE id=? AND state<>'complete'").run(id); }
   retry(id: string): void { this.db.prepare("UPDATE documentary_jobs SET state='queued',attempts=0,error=NULL,available_at=? WHERE id=? AND state IN ('failed','cancelled')").run(Date.now(), id); }
   getJob(id: string): DocumentaryJob | null { return this.db.prepare('SELECT * FROM documentary_jobs WHERE id=?').get(id) as DocumentaryJob ?? null; }
+  /** A job's index identity alone: its payload can hold a whole extracted text. */
+  jobIdentity(id: string): DocumentaryIndexIdentity | null {
+    const row = this.db.prepare('SELECT identity_json FROM documentary_jobs WHERE id=?').get(id) as { identity_json: string } | undefined;
+    return row ? JSON.parse(row.identity_json) as DocumentaryIndexIdentity : null;
+  }
   revision(id: string): { text: string | null; chunks_json: string | null; lexical_ready: number; embedding_ready: number } | null {
     return this.db.prepare('SELECT text,chunks_json,lexical_ready,embedding_ready FROM documentary_revisions WHERE index_key=?').get(id) as ReturnType<DocumentaryStore['revision']> ?? null;
   }
