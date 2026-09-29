@@ -1444,6 +1444,73 @@ const sideTrace = (species: RouteSpeciesSummary[], names?: Map<string, string>):
   return entry.coefficient && entry.coefficient > 1 ? `${entry.coefficient} ${label}` : label;
 }).join(' + ');
 
+/** Element counts of a formula written as the checker writes it ("C2H5O", "Cr2O7"); charges ignored. */
+function formulaCounts(formula: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const match of formula.matchAll(/([A-Z][a-z]?)(\d*)/g)) counts.set(match[1], (counts.get(match[1]) ?? 0) + (match[2] ? Number(match[2]) : 1));
+  return counts;
+}
+
+/** A formula in Hill order (C, H, then alphabetical; alphabetical without carbon). */
+function hillFormula(counts: Map<string, number>): string {
+  const elements = [...counts.keys()].filter((element) => (counts.get(element) ?? 0) > 0);
+  const carbon = elements.includes('C');
+  const order = carbon ? ['C', 'H', ...elements.filter((element) => element !== 'C' && element !== 'H').sort()] : elements.sort();
+  return order.filter((element) => elements.includes(element)).map((element) => `${element}${counts.get(element)! > 1 ? counts.get(element) : ''}`).join('');
+}
+
+/** Largest salt coefficient the display search tries; the solver's own cap is 30. */
+const SALT_DISPLAY_MAX = 30;
+
+/** One side of a step as the reader should see it: each named salt whose ions are all on this
+ *  side is shown whole ("sodium dichromate (Cr2Na2O7)"), with the count the ions' solved
+ *  coefficients imply. The checker balances ions separately (that is how it solves salts), but
+ *  "Na + Cr2O7 + … + Na" reads as a lost sodium. Ions shared between salts (sulfate in sodium and
+ *  chromium(III) sulfate) are split by a small integer search; when no exact split exists the
+ *  side is shown as the checker solved it. */
+function groupedSideTrace(species: RouteSpeciesSummary[], labels: RouteSpeciesLabel[], names: Map<string, string>, balanced: boolean): string {
+  const byInput = new Map(species.map((entry) => [entry.input, entry]));
+  const salts = labels
+    .filter((label) => label.smiles.includes('.'))
+    .map((label) => {
+      const parts = label.smiles.split('.').map((part) => part.trim()).filter(Boolean);
+      const multiplicity = new Map<string, number>();
+      for (const part of parts) multiplicity.set(part, (multiplicity.get(part) ?? 0) + 1);
+      return { label, multiplicity };
+    })
+    .filter((salt) => [...salt.multiplicity.keys()].every((part) => byInput.has(part)));
+  if (!salts.length || salts.length > 4) return sideTrace(species, names);
+  const used = new Set(salts.flatMap((salt) => [...salt.multiplicity.keys()]));
+  const coefficient = (input: string) => byInput.get(input)?.coefficient ?? 1;
+  // Salt counts k_s with Σ k_s · m(s, ion) = the ion's solved coefficient for every ion.
+  let found: number[] | null = null;
+  if (!balanced) found = salts.map(() => 1);
+  else {
+    const search = (index: number, counts: number[]): void => {
+      if (found) return;
+      if (index === salts.length) {
+        const ok = [...used].every((ion) => salts.reduce((sum, salt, position) => sum + counts[position] * (salt.multiplicity.get(ion) ?? 0), 0) === coefficient(ion));
+        if (ok) found = [...counts];
+        return;
+      }
+      for (let k = 1; k <= SALT_DISPLAY_MAX; k++) search(index + 1, [...counts, k]);
+    };
+    search(0, []);
+  }
+  if (!found) return sideTrace(species, names);
+  const counts: number[] = found;
+  const saltTerms = salts.map((salt, position) => {
+    const total = new Map<string, number>();
+    for (const [ion, times] of salt.multiplicity) {
+      for (const [element, n] of formulaCounts(byInput.get(ion)?.formula ?? '')) total.set(element, (total.get(element) ?? 0) + n * times);
+    }
+    const label = `${salt.label.name} (${hillFormula(total)})`;
+    return balanced && counts[position] > 1 ? `${counts[position]} ${label}` : label;
+  });
+  const rest = species.filter((entry) => !used.has(entry.input));
+  return [...(rest.length ? [sideTrace(rest, names)] : []), ...saltTerms].join(' + ');
+}
+
 /** A lookup from a declared SMILES to the IUPAC name the author wrote beside it. The
  *  authoring labels carry the name and the exact token; the audit species carries the
  *  canonical form, so both are keyed. */
@@ -1635,13 +1702,19 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     const nameNote = nameFailure ? ` name check failed: ${step.nameProblems!.join('; ')}.` : '';
     // A step can balance only by solving an odd stoichiometry (8 citric acid → 9 …); the numbers
     // are shown, and a large one is called out, because that usually means a byproduct is wrong.
-    const largest = Math.max(1, ...[...step.reactants, ...step.agents, ...step.products].map((entry) => entry.coefficient ?? 1));
+    // Only the carbon compounds count: water, acids and inorganic salts reach 7 or more in an
+    // ordinary metal-oxo oxidation, while 8 citric acid → 9 … means a wrong product or byproduct.
+    const organic = [...step.reactants, ...step.products].filter((entry) => formulaCounts(entry.formula || '').has('C'));
+    const largest = Math.max(1, ...organic.map((entry) => entry.coefficient ?? 1));
     const largeNote = step.balanced && !assemblyFailure && largest > LARGE_COEFFICIENT
-      ? ` The equation balances only with large coefficients (up to ${largest}); a byproduct is likely missing or wrong.`
+      ? ` Note: the carbon compounds balance only with large coefficients (up to ${largest}); the step passes, but check that its products and byproducts are the intended ones.`
       : '';
     const assemblyNote = assemblyFailure ? ` ${step.assemblyProblem}.` : '';
     const agents = step.agents.length ? ` [agents: ${sideTrace(step.agents, names)}]` : '';
-    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${sideTrace(step.reactants, names)}${agents} → ${sideTrace(step.products, names)}`);
+    const stepLabels = labels[step.index] ?? [];
+    const reactantSide = groupedSideTrace(step.reactants, stepLabels.filter((entry) => entry.role === 'reactant'), names, step.balanced === true);
+    const productSide = groupedSideTrace(step.products, stepLabels.filter((entry) => entry.role === 'product'), names, step.balanced === true);
+    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${reactantSide}${agents} → ${productSide}`);
   }
   if (audit.links.length) {
     lines.push('', 'Intermediate continuity:', '');
