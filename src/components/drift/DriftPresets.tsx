@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { normalizeDriftSearch } from '@shared/drift';
 import { Icon, ModalBackdrop } from '../ui';
-import { t, tx } from '../../i18n';
+import { getActiveLang, t, tx } from '../../i18n';
+import { sortDriftItems } from './driftSort';
 import { useDrift } from './DriftProvider';
 import { MAX_DRIFT_PRESETS, type DriftPreset, type DriftPresetIcon } from './driftState';
 
@@ -14,7 +15,11 @@ export const DRIFT_PRESET_ICON_OPTIONS: Array<{ icon: DriftPresetIcon; label: st
 export function DriftPresets({ query, onEdit, onApplied }: { query: string; onEdit: (preset: DriftPreset) => void; onApplied: () => void }) {
   const drift = useDrift();
   const search = normalizeDriftSearch(query);
-  const presets = drift.presets.filter((preset) => !search || normalizeDriftSearch(preset.name).includes(search));
+  const presets = sortDriftItems(drift.presets.filter((preset) => !search || normalizeDriftSearch(preset.name).includes(search)), drift.sort, {
+    language: getActiveLang(), name: (preset) => preset.name,
+    type: (preset) => t(DRIFT_PRESET_ICON_OPTIONS.find((option) => option.icon === preset.icon)!.label),
+    uses: (preset) => drift.presetUsage[preset.id] ?? 0,
+  });
   return <section className="drift-presets" aria-label={t('Predefinidos')}>
     <p className="drift-presets-hint">{t('Los predefinidos guardan los sonidos y sus volúmenes. Al cargarlos, la mezcla queda en pausa.')}</p>
     {drift.presets.length === 0 ? <p data-testid="drift-presets-empty" className="drift-empty">{t('Crea una mezcla y guárdala para recuperarla aquí.')}</p>

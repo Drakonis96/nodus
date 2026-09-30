@@ -619,6 +619,93 @@ test('Active shows paused and failed voices, clears a stale search and keeps vol
   await act(async () => env.root.unmount());
 });
 
+test('usage counts successful playback starts, never failed loads, controls or paused preset restoration', async () => {
+  const env = environment({ readImpl: async () => { throw new Error('Unreadable fixture'); } });
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  await env.click(env.q('[data-testid="drift-card-brown-noise"] button[aria-pressed]'));
+  assert.equal(harness.probe.current.usage['brown-noise'], 1);
+  await act(async () => {
+    harness.probe.current.setVolume('brown-noise', 0.6);
+    harness.probe.current.setMaster(0.8);
+    harness.probe.current.setSort('usage');
+    harness.probe.current.toggleFavorite('brown-noise');
+  });
+  assert.equal(harness.probe.current.usage['brown-noise'], 1);
+  await env.click(env.q('[data-testid="drift-mix-toggle"]'));
+  await env.click(env.q('[data-testid="drift-mix-toggle"]'));
+  assert.equal(harness.probe.current.usage['brown-noise'], 2);
+  await act(async () => { harness.probe.current.toggleSound('fixture-a'); });
+  await env.settle();
+  assert.equal(harness.probe.current.voices.find(voice => voice.id === 'fixture-a').status, 'error');
+  assert.equal(harness.probe.current.usage['fixture-a'], undefined);
+  await act(async () => { harness.probe.current.savePreset('Lectura', 'bookOpen'); });
+  const preset = harness.probe.current.presets[0];
+  await act(async () => { harness.probe.current.applyPreset(preset.id); });
+  await env.settle();
+  assert.equal(harness.probe.current.usage['brown-noise'], 2);
+  assert.equal(harness.probe.current.presetUsage[preset.id], 1);
+  await env.click(env.q('[data-testid="drift-mix-toggle"]'));
+  assert.equal(harness.probe.current.usage['brown-noise'], 3);
+  assert.equal(harness.probe.current.usage['fixture-a'], undefined);
+  assert.equal(env.contexts.length, 1, 'usage tracking never rebuilds the engine');
+  await act(async () => env.root.unmount());
+  const restored = environment({ stored: env.writes.at(-1)[1] });
+  await restored.render(restored.strict(provider()));
+  assert.equal(harness.probe.current.sort, 'usage');
+  assert.equal(harness.probe.current.usage['brown-noise'], 3);
+  assert.equal(restored.contexts.length, 0);
+  await act(async () => restored.root.unmount());
+});
+
+test('the sorting popover offers four icon/text choices, changes order silently, and supports keyboard and fullscreen Escape', async () => {
+  const env = environment();
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  const names = () => env.qa('[data-testid="drift-grid"] .drift-sound-name').map(node => node.textContent);
+  const recommended = names();
+  const trigger = env.q('[data-testid="drift-sort-toggle"]');
+  assert.match(trigger.getAttribute('aria-label'), /Recomendado/);
+  await env.click(trigger);
+  const choices = env.qa('[data-testid="drift-sort-menu"] [role="menuitemradio"]');
+  assert.equal(choices.length, 4);
+  assert.ok(choices.every(button => button.querySelector('svg') && button.querySelector('span')?.textContent));
+  assert.equal(choices[0].getAttribute('aria-checked'), 'true');
+  await act(async () => choices[0].dispatchEvent(new env.dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })));
+  assert.equal(env.dom.window.document.activeElement, choices[1]);
+  await env.click(choices[1]);
+  assert.equal(env.q('[data-testid="drift-sort-menu"]'), null);
+  assert.equal(env.dom.window.document.activeElement, trigger);
+  const collator = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+  assert.deepEqual(names(), [...recommended].sort(collator.compare));
+  await env.click(trigger);
+  await env.click(env.q('[data-testid="drift-sort-recommended"]'));
+  assert.deepEqual(names(), recommended);
+  await env.click(trigger);
+  await act(async () => env.dom.window.document.body.dispatchEvent(new env.dom.window.MouseEvent('pointerdown', { bubbles: true })));
+  assert.equal(env.q('[data-testid="drift-sort-menu"]'), null, 'an outside click closes the popover');
+  const workspace = env.q('[data-testid="toolkit-drift"]');
+  let current = null;
+  Object.defineProperty(env.dom.window.document, 'fullscreenElement', { get: () => current });
+  workspace.requestFullscreen = async () => { current = workspace; env.dom.window.document.dispatchEvent(new env.dom.window.Event('fullscreenchange')); };
+  env.dom.window.document.exitFullscreen = async () => { current = null; env.dom.window.document.dispatchEvent(new env.dom.window.Event('fullscreenchange')); };
+  await env.click(env.q('[data-testid="drift-fullscreen-toggle"]'));
+  await env.click(trigger);
+  await act(async () => env.dom.window.document.dispatchEvent(new env.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(env.q('[data-testid="drift-sort-menu"]'), null);
+  assert.equal(current, workspace, 'Escape closes sorting before exiting fullscreen');
+  await act(async () => env.dom.window.document.dispatchEvent(new env.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(current, null);
+  await env.click(env.q('[data-testid="drift-filter-presets"]'));
+  assert.ok(env.q('[data-testid="drift-search"]'));
+  await env.click(trigger);
+  await env.click(env.q('[data-testid="drift-sort-alphabetical"]'));
+  assert.equal(env.contexts.length, 0, 'opening and choosing sorting never starts audio');
+  await act(async () => env.root.unmount());
+  const restored = environment({ stored: env.writes.at(-1)[1] });
+  await restored.render(restored.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  assert.match(restored.q('[data-testid="drift-sort-toggle"]').getAttribute('aria-label'), /Alfabético/);
+  await act(async () => restored.root.unmount());
+});
+
 test('preset search remains available when empty and filters names without accents or case without starting audio', async () => {
   for (const presets of [[], [
     { id: 'reading', name: 'Lectúra', icon: 'bookOpen', selection: ['brown-noise'], volumes: { 'brown-noise': 0.4 }, master: 0.5 },

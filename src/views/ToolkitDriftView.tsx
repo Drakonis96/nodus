@@ -6,10 +6,12 @@ import { Icon } from '../components/ui';
 import { DriftSoundCard, DriftStatus, DriftVoiceControls } from '../components/drift/DriftSoundCard';
 import { DriftMeditatingNodi } from '../components/drift/DriftMeditatingNodi';
 import { DriftPresets, DriftPresetEditor } from '../components/drift/DriftPresets';
+import { DriftSortMenu } from '../components/drift/DriftSortMenu';
+import { sortDriftItems } from '../components/drift/driftSort';
 import { driftVoiceCount } from '../components/drift/DriftMiniPlayer';
 import { useDrift, type DriftVoiceView } from '../components/drift/DriftProvider';
 import { MAX_DRIFT_PRESETS, type DriftFilter, type DriftPreset } from '../components/drift/driftState';
-import { t, tx } from '../i18n';
+import { getActiveLang, t, tx } from '../i18n';
 import '../components/drift/drift.css';
 
 const CATEGORY_BY_ID = new Map<string, (typeof DRIFT_CATEGORIES)[number]>(DRIFT_CATEGORIES.map((category) => [category.id, category]));
@@ -33,7 +35,7 @@ export function ToolkitDriftView({ onBack, settings }: { onBack: () => void; set
     const update = () => setFullscreen(document.fullscreenElement === workspace);
     const exitOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || document.fullscreenElement !== workspace) return;
-      if (workspace?.querySelector('.drift-preset-editor')) return;
+      if (workspace?.querySelector('.drift-preset-editor,[data-testid="drift-sort-menu"]')) return;
       event.preventDefault();
       event.stopPropagation();
       void document.exitFullscreen().catch(() => setFullscreenError(true));
@@ -59,14 +61,17 @@ export function ToolkitDriftView({ onBack, settings }: { onBack: () => void; set
   const voiceById = useMemo(() => new Map(drift.voices.map((voice) => [voice.id, voice])), [drift.voices]);
   const selected = useMemo(() => new Set(drift.selection), [drift.selection]);
   const search = normalizeDriftSearch(query);
-  const visible = useMemo(() => drift.sounds.filter((sound) => {
+  const language = getActiveLang();
+  const visible = useMemo(() => sortDriftItems(drift.sounds.filter((sound) => {
     if (drift.filter === 'active' || drift.filter === 'presets') return false;
     if (drift.filter === 'favorites' && !favorites.has(sound.id)) return false;
     if (drift.filter !== 'all' && drift.filter !== 'favorites' && sound.categoryId !== drift.filter) return false;
     return !search || normalizeDriftSearch(`${t(sound.nameKey)} ${t(sound.descriptionKey)} ${categoryLabel(sound.categoryId)}`).includes(search);
-  }), [drift.sounds, drift.filter, favorites, search]);
+  }), drift.sort, { language, name: (sound) => t(sound.nameKey), type: (sound) => categoryLabel(sound.categoryId), uses: (sound) => drift.usage[sound.id] ?? 0 }),
+  [drift.sounds, drift.filter, drift.sort, drift.usage, favorites, search, language]);
   // Read voices, not catalogue availability: paused, failed and restored sounds remain manageable.
-  const activeVoices = drift.voices.filter((voice) => !search || normalizeDriftSearch(`${t(voice.nameKey)} ${categoryLabel(voice.categoryId ?? '')}`).includes(search));
+  const activeVoices = sortDriftItems(drift.voices.filter((voice) => !search || normalizeDriftSearch(`${t(voice.nameKey)} ${categoryLabel(voice.categoryId ?? '')}`).includes(search)),
+    drift.sort, { language, name: (voice) => t(voice.nameKey), type: (voice) => categoryLabel(voice.categoryId ?? ''), uses: (voice) => drift.usage[voice.id] ?? 0 });
   const operative = visible.filter((sound) => sound.availability === 'available');
   const unavailable = visible.filter((sound) => sound.availability !== 'available');
   const anyRecordingAvailable = drift.sounds.some((sound) => sound.source.kind === 'file' && sound.availability === 'available');
@@ -102,11 +107,14 @@ export function ToolkitDriftView({ onBack, settings }: { onBack: () => void; set
             <p>{t('Sonidos para leer, estudiar y descansar')}</p>
           </section>
           <section className="drift-catalog" aria-label={t('Sonidos')}>
+            <div className="drift-search-row">
             <div className="drift-search">
               <Icon name="search" size={17} />
               <input type="search" data-testid="drift-search" aria-label={drift.filter === 'presets' ? t('Buscar predefinidos') : t('Buscar sonidos')} placeholder={drift.filter === 'presets' ? t('Buscar predefinidos') : t('Buscar sonidos')}
                 value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setQuery(''); }} />
               {query && <button type="button" aria-label={t('Limpiar búsqueda')} title={t('Limpiar búsqueda')} onClick={() => setQuery('')}><Icon name="x" size={16} /></button>}
+            </div>
+            <DriftSortMenu />
             </div>
             <div role="group" aria-label={t('Filtrar sonidos')} className="drift-filters">
               {filters.map((filter) => <button key={filter.id} type="button" data-testid={`drift-filter-${filter.id}`}

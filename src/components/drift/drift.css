@@ -60,12 +60,22 @@
 .drift-nodi[data-reduced-motion='true'] .drift-nodi-float { animation: none; }
 @keyframes drift-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
 .drift-catalog { padding-bottom: 12px; }
-.drift-search { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto 16px; border: 1px solid var(--drift-line); background: var(--drift-panel); border-radius: 999px; padding: 9px 15px; color: var(--drift-muted); }
+.drift-search-row { display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto 16px; position: relative; z-index: 3; }
+.drift-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 10px; border: 1px solid var(--drift-line); background: var(--drift-panel); border-radius: 999px; padding: 9px 15px; color: var(--drift-muted); }
 .drift-search:focus-within { border-color: var(--drift-accent); }
 .drift-search input { width: 100%; min-width: 0; background: transparent; color: var(--drift-text); font-size: 13px; outline: none; }
 .drift-search input::placeholder { color: var(--drift-muted); }
 .drift-search input::-webkit-search-cancel-button { display: none; }
 .drift-search button { display: flex; }
+.drift-sort { position: relative; flex: 0 0 auto; }
+.drift-sort-trigger { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--drift-line); border-radius: 50%; background: var(--drift-panel); color: var(--drift-muted); }
+.drift-sort-trigger:hover, .drift-sort-trigger[aria-expanded='true'] { color: var(--drift-accent); border-color: var(--drift-accent); }
+.drift-sort-menu { position: absolute; right: 0; top: calc(100% + 10px); width: 224px; max-width: calc(100vw - 56px); padding: 7px; border: 1px solid var(--drift-line); border-radius: 13px; background: var(--drift-bg); box-shadow: 0 14px 40px rgb(0 0 0 / .18); }
+.drift-sort-menu::before { content: ''; position: absolute; right: 13px; top: -5px; width: 9px; height: 9px; background: var(--drift-bg); border-top: 1px solid var(--drift-line); border-left: 1px solid var(--drift-line); transform: rotate(45deg); }
+.drift-sort-menu > p { margin: 3px 9px 6px; color: var(--drift-muted); font-size: 10px; }
+.drift-sort-menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 9px; border-radius: 7px; color: var(--drift-muted); font-size: 12px; text-align: left; }
+.drift-sort-menu button > span { flex: 1; }
+.drift-sort-menu button:hover, .drift-sort-menu button:focus-visible, .drift-sort-menu button[aria-checked='true'] { color: var(--drift-accent); background: var(--drift-panel); }
 .drift-filters { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px 14px; margin: 0 auto 18px; }
 .drift-filters button { display: inline-flex; align-items: center; gap: 5px; padding: 9px 2px; font-size: 12px; color: var(--drift-muted); border-bottom: 2px solid transparent; }
 .drift-filters button:hover, .drift-filters button[aria-pressed='true'] { color: var(--drift-accent); }

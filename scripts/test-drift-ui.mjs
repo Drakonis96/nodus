@@ -21,6 +21,8 @@ const DRIFT_RENDERER_FILES = [
   'src/components/drift/DriftSoundCard.tsx',
   'src/components/drift/DriftMeditatingNodi.tsx',
   'src/components/drift/DriftPresets.tsx',
+  'src/components/drift/DriftSortMenu.tsx',
+  'src/components/drift/driftSort.ts',
   'src/components/drift/DriftMiniPlayer.tsx',
   'src/components/drift/driftState.ts',
   'src/components/drift/audio/DriftAudioEngine.ts',
@@ -65,7 +67,7 @@ test('the engine is built in an effect and disposed by its cleanup, once per pro
   const provider = code('src/components/drift/DriftProvider.tsx');
   assert.equal((provider.match(/new DriftAudioEngine\(/g) ?? []).length, 1);
   assert.match(provider, /useEffect\(\(\) => \{\s*const created = new DriftAudioEngine\(/, 'created inside an effect, not during render or at module level');
-  assert.match(provider, /return \(\) => \{[\s\S]*?void created\.dispose\(\);[\s\S]*?\};\s*\}, \[loadCatalog\]\);/, 'and disposed in its cleanup');
+  assert.match(provider, /return \(\) => \{[\s\S]*?void created\.dispose\(\);[\s\S]*?\};\s*\}, \[loadCatalog, apply\]\);/, 'and disposed in its cleanup, depending only on stable callbacks');
   assert.match(provider, /if \(engineRef\.current === created\) engineRef\.current = null;/, 'a stale cleanup cannot clear a newer engine');
   assert.doesNotMatch(provider, /useMemo\(\(\) => new DriftAudioEngine|useRef\(new DriftAudioEngine|useState\(\(\) => new DriftAudioEngine/, 'never at render time (StrictMode would build two)');
 });
@@ -73,7 +75,7 @@ test('the engine is built in an effect and disposed by its cleanup, once per pro
 test('restoring the saved mix builds nothing audible: it goes through restore(), which never plays', () => {
   const provider = code('src/components/drift/DriftProvider.tsx');
   assert.match(provider, /created\.restore\(\{ ids: saved\.selection, volumes: saved\.volumes, master: saved\.master \}\);/);
-  const effect = provider.slice(provider.indexOf('const created = new DriftAudioEngine('), provider.indexOf('}, [loadCatalog]);'));
+  const effect = provider.slice(provider.indexOf('const created = new DriftAudioEngine('), provider.indexOf('}, [loadCatalog, apply]);'));
   assert.doesNotMatch(effect, /playAll|selectSound|retrySound|resume\(|createContext\(\)/, 'the start-up effect starts nothing');
   // and the persisted model has no play flag to restore
   assert.doesNotMatch(code('src/components/drift/driftState.ts'), /isPlaying|playing:|wantPlaying|loading:/);

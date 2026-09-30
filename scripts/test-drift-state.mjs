@@ -60,6 +60,8 @@ test('defaults: empty, quiet and paused by construction', () => {
   assert.deepEqual(s.selection, []);
   assert.equal(s.master, 0.35);
   assert.equal(s.filter, 'all');
+  assert.equal(s.sort, 'recommended');
+  assert.deepEqual(s.usage, {});
   assert.equal(state.driftVolumeOf(s, 'anything'), 0.25);
   // There is no play flag in the persisted model at all: restoring cannot start audio.
   assert.ok(!('playing' in s) && !('isPlaying' in s) && !('loading' in s));
@@ -142,13 +144,38 @@ test('serialisation keeps configuration only', () => {
   s = state.driftReducer(s, { type: 'toggleFavorite', id: 'light-rain', meta: meta('light-rain') });
   const text = state.serializeDriftState(s);
   const parsed = JSON.parse(text);
-  assert.deepEqual(Object.keys(parsed).sort(), ['favorites', 'filter', 'master', 'presets', 'selection', 'snapshot', 'version', 'volumes']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['favorites', 'filter', 'master', 'presetUsage', 'presets', 'selection', 'snapshot', 'sort', 'usage', 'version', 'volumes']);
   assert.ok(!/playing|loading|buffer|bytes|path|blob|context|https?:|file:/i.test(text.replace(/"nameKey":"[^"]*"/g, '')));
   assert.deepEqual(state.parseStoredDriftState(text).selection, ['brown-noise']);
   assert.equal(state.parseStoredDriftState(text).volumes['brown-noise'], 0.6);
   assert.deepEqual(state.parseStoredDriftState(text).favorites, ['light-rain']);
   // It round-trips.
   assert.deepEqual(state.parseStoredDriftState(text), state.normalizeDriftState(parsed));
+});
+
+test('sort and usage survive restart; old profiles remain recommended and hostile counts are ignored', () => {
+  assert.equal(state.normalizeDriftState({ version: 1 }).sort, 'recommended');
+  assert.equal(state.normalizeDriftState({ version: 1, sort: 'foreign' }).sort, 'recommended');
+  let s = select(fresh(), 'brown-noise');
+  s = state.driftReducer(s, { type: 'setSort', sort: 'usage' });
+  s = state.driftReducer(s, { type: 'recordUse', ids: ['brown-noise', 'brown-noise', 'not-selected'] });
+  s = state.driftReducer(s, { type: 'recordUse', ids: ['brown-noise'] });
+  s = state.driftReducer(s, { type: 'savePreset', id: 'reading', name: 'Lectura', icon: 'bookOpen' });
+  s = state.driftReducer(s, { type: 'applyPreset', id: 'reading' });
+  const restored = state.parseStoredDriftState(state.serializeDriftState(s));
+  assert.equal(restored.sort, 'usage');
+  assert.deepEqual(restored.usage, { 'brown-noise': 2 });
+  assert.deepEqual(restored.presetUsage, { reading: 1 });
+  assert.deepEqual(state.driftReducer(restored, { type: 'deletePreset', id: 'reading' }).presetUsage, {});
+  const hostile = state.normalizeDriftState({ version: 1, usage: { 'brown-noise': 2, '../path': 5, wind: Infinity, river: -1, birds: 1.5, cafe: '2' }, presetUsage: { missing: 2 } });
+  assert.deepEqual(hostile.usage, { 'brown-noise': 2 });
+  assert.deepEqual(hostile.presetUsage, {});
+  const many = state.normalizeDriftState({ version: 1, usage: Object.fromEntries(Array.from({ length: 600 }, (_, i) => [`sound-${i}`, 1])) });
+  assert.ok(Object.keys(many.usage).length <= 256);
+  const saturated = state.normalizeDriftState({ version: 1, selection: ['brown-noise'], usage: { 'brown-noise': Number.MAX_SAFE_INTEGER } });
+  assert.equal(state.driftReducer(saturated, { type: 'recordUse', ids: ['brown-noise'] }).usage['brown-noise'], Number.MAX_SAFE_INTEGER);
+  const prototypeId = state.normalizeDriftState({ version: 1, selection: ['constructor'] });
+  assert.equal(state.driftReducer(prototypeId, { type: 'recordUse', ids: ['constructor'] }).usage.constructor, 1);
 });
 
 test('the reducer: select, double select, the seventh voice, binaural replacement', () => {

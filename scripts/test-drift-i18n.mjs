@@ -31,10 +31,10 @@ const CATALOGUE_KEYS = [...new Set([
 const read = (file) => readFileSync(path.join(repoRoot, file), 'utf8');
 
 test('all Drift interface actions, preset editor and icon labels are translated in every locale', () => {
-  const files = ['src/views/ToolkitDriftView.tsx', 'src/components/drift/DriftSoundCard.tsx', 'src/components/drift/DriftMiniPlayer.tsx', 'src/components/drift/DriftPresets.tsx'];
+  const files = ['src/views/ToolkitDriftView.tsx', 'src/components/drift/DriftSoundCard.tsx', 'src/components/drift/DriftMiniPlayer.tsx', 'src/components/drift/DriftPresets.tsx', 'src/components/drift/DriftSortMenu.tsx'];
   const sources = files.map(read).join('\n');
   const keys = new Set([...sources.matchAll(/\b(?:t|tx)\(\s*(['"])(.*?)\1/g)].map((match) => match[2]));
-  for (const match of read(files[3]).matchAll(/label: '([^']+)'/g)) if (match[1] !== 'Nodus Drift') keys.add(match[1]);
+  for (const match of sources.matchAll(/label: '([^']+)'/g)) if (match[1] !== 'Nodus Drift') keys.add(match[1]);
   for (const { lang, table } of LANGUAGES) {
     for (const key of keys) {
       assert.ok(table[key]?.trim(), `${lang}: ${key}`);

@@ -34,6 +34,7 @@ import {
   type DriftState,
   type DriftPreset,
   type DriftPresetIcon,
+  type DriftSort,
 } from './driftState';
 
 /**
@@ -81,6 +82,10 @@ export interface DriftContextValue {
   filter: DriftFilter;
   master: number;
   presets: DriftPreset[];
+  sort: DriftSort;
+  usage: Record<string, number>;
+  presetUsage: Record<string, number>;
+  setSort: (sort: DriftSort) => void;
   savePreset: (name: string, icon: DriftPresetIcon) => void;
   editPreset: (id: string, name: string, icon: DriftPresetIcon) => void;
   deletePreset: (id: string) => void;
@@ -216,7 +221,14 @@ export function DriftProvider({ children }: { children: ReactNode }) {
       ready: () => loadCatalog(),
     });
     engineRef.current = created;
-    const stop = created.subscribe(setEngine);
+    let previousPlaying = new Set<string>();
+    const stop = created.subscribe((snapshot) => {
+      const playing = new Set(snapshot.voices.filter((voice) => voice.status === 'playing').map((voice) => voice.id));
+      const started = [...playing].filter((id) => !previousPlaying.has(id));
+      previousPlaying = playing;
+      if (started.length) apply({ type: 'recordUse', ids: started });
+      setEngine(snapshot);
+    });
     const saved = stateRef.current;
     // Restored PAUSED: no context, no fetch, nothing audible until an explicit play.
     created.restore({ ids: saved.selection, volumes: saved.volumes, master: saved.master });
@@ -226,7 +238,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
       if (engineRef.current === created) engineRef.current = null;
       void created.dispose();
     };
-  }, [loadCatalog]);
+  }, [loadCatalog, apply]);
 
   // ── Persistence: one debounced write, flushed when the page goes away ────────
   const persistenceRef = useRef<ReturnType<typeof createDriftPersistence> | null>(null);
@@ -330,6 +342,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
   }, [apply]);
 
   const setFilter = useCallback((filter: DriftFilter) => apply({ type: 'setFilter', filter }), [apply]);
+  const setSort = useCallback((sort: DriftSort) => apply({ type: 'setSort', sort }), [apply]);
   const dismissNotice = useCallback(() => setLimitNotice(null), []);
   const savePreset = useCallback((name: string, icon: DriftPresetIcon) => apply({ type: 'savePreset', id: crypto.randomUUID(), name, icon }), [apply]);
   const editPreset = useCallback((id: string, name: string, icon: DriftPresetIcon) => apply({ type: 'editPreset', id, name, icon }), [apply]);
@@ -372,6 +385,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
     filter: state.filter,
     master: state.master,
     presets: state.presets, savePreset, editPreset, deletePreset, applyPreset,
+    sort: state.sort, usage: state.usage, presetUsage: state.presetUsage, setSort,
     playing: engine.playing,
     loading: engine.loading,
     limitNotice,
@@ -391,7 +405,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
     setMediaTab,
   }), [
     catalogStatus, sounds, loadCatalog, state, voices, engine, limitNotice, toggleSound, removeSound, retrySound,
-    play, pause, togglePlayback, clear, setVolume, setMaster, toggleFavorite, setFilter, dismissNotice, mediaTab, savePreset, editPreset, deletePreset, applyPreset,
+    play, pause, togglePlayback, clear, setVolume, setMaster, toggleFavorite, setFilter, setSort, dismissNotice, mediaTab, savePreset, editPreset, deletePreset, applyPreset,
   ]);
 
   return <DriftContext.Provider value={value}>{children}</DriftContext.Provider>;

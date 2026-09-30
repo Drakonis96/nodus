@@ -12,6 +12,12 @@
  */
 const rows: string[][] = [
   ['Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift'],
+  ['Ordenar por', 'Sort by', 'Trier par', 'Sortieren nach', 'Ordenar por', 'Ordenar por', 'Ordina per', 'Sıralama ölçütü', '排序方式', '排序方式', '並び替え', '정렬 기준'],
+  ['Ordenar: {order}', 'Sort: {order}', 'Tri : {order}', 'Sortierung: {order}', 'Ordenação: {order}', 'Ordenação: {order}', 'Ordine: {order}', 'Sıralama: {order}', '排序：{order}', '排序：{order}', '並び順：{order}', '정렬: {order}'],
+  ['Recomendado', 'Recommended', 'Recommandé', 'Empfohlen', 'Recomendado', 'Recomendado', 'Consigliato', 'Önerilen', '推荐', '推薦', 'おすすめ', '추천'],
+  ['Alfabético', 'Alphabetical', 'Alphabétique', 'Alphabetisch', 'Alfabético', 'Alfabético', 'Alfabetico', 'Alfabetik', '按字母顺序', '依字母順序', '名前順', '가나다순'],
+  ['Por tipo', 'By type', 'Par type', 'Nach Typ', 'Por tipo', 'Por tipo', 'Per tipo', 'Türe göre', '按类型', '依類型', '種類別', '유형별'],
+  ['Más utilizados', 'Most used', 'Les plus utilisés', 'Am häufigsten verwendet', 'Mais utilizados', 'Mais utilizados', 'Più utilizzati', 'En çok kullanılan', '最常使用', '最常使用', '使用回数順', '많이 사용한 순'],
   ["Predefinidos", "Presets", "Préréglages", "Voreinstellungen", "Predefinições", "Predefinições", "Preimpostazioni", "Hazır ayarlar", "预设", "預設", "プリセット", "프리셋"],
   ['Buscar predefinidos', 'Search presets', 'Rechercher des préréglages', 'Voreinstellungen suchen', 'Pesquisar predefinições', 'Buscar predefinições', 'Cerca preimpostazioni', 'Hazır ayar ara', '搜索预设', '搜尋預設', 'プリセットを検索', '프리셋 검색'],
   ["Guardar predefinido", "Save preset", "Enregistrer le préréglage", "Voreinstellung speichern", "Guardar predefinição", "Salvar predefinição", "Salva preimpostazione", "Hazır ayarı kaydet", "保存预设", "儲存預設", "プリセットを保存", "프리셋 저장"],
