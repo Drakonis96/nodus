@@ -13,6 +13,7 @@ import { ToolkitPresenterView } from './ToolkitPresenterView';
 import { ToolkitAiOcrView } from './ToolkitAiOcrView';
 import { ToolkitAppsView } from './ToolkitAppsView';
 import { ToolkitTranslateView } from './ToolkitTranslateView';
+import { ToolkitDriftView } from './ToolkitDriftView';
 
 interface ToolCardProps {
   testid: string;
@@ -143,6 +144,8 @@ export function ToolkitView({
       setPinBusy(null);
     }
   };
+
+  if (page === 'drift') return <ToolkitDriftView onBack={() => onNavigate('home')} settings={settings} />;
 
   return (
     <div className="theme-workspace-surface toolkit-workspace h-full overflow-y-auto px-6 py-6 max-md:px-4">

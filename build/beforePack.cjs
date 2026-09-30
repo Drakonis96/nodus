@@ -30,6 +30,15 @@ exports.default = async function beforePack(context) {
   });
   console.log('[beforePack] Built the canonical Chrome connector ZIP');
 
+  // Nodus Drift's recordings are not versioned in Git. They come from their pinned upstream commit,
+  // each checked against its catalogued size and SHA-256, and one that is already in place and intact
+  // is kept. afterPack then refuses an app that does not carry every one of them.
+  execFileSync(process.execPath, [path.join(root, 'scripts', 'prepare-drift-assets.mjs')], {
+    cwd: root,
+    stdio: 'inherit',
+  });
+  console.log('[beforePack] Prepared the Nodus Drift recordings');
+
   if (context.electronPlatformName !== 'darwin') return;
   require('../scripts/build-apple-calendar.cjs').buildAppleCalendar(Arch[context.arch]);
   const source = path.join(__dirname, 'docktile');

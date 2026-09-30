@@ -14,6 +14,10 @@ type ToolkitAppHeroProps = {
   backTestId: string;
   actionDisabled?: boolean;
   actionBusy?: boolean;
+  /** Visible label of the back control; defaults to the toolkit's name. */
+  backLabel?: string;
+  /** Extra classes for the primary action, for a tool whose action is inert at rest (Drift with an empty mix). */
+  actionClassName?: string;
 };
 
 /** Shared first-screen header for every app in Nodus Toolkit. */
@@ -31,6 +35,8 @@ export function ToolkitAppHero({
   backTestId,
   actionDisabled = false,
   actionBusy = false,
+  backLabel = 'Nodus Toolkit',
+  actionClassName,
 }: ToolkitAppHeroProps) {
   return (
     <div className="space-y-4">
@@ -42,7 +48,7 @@ export function ToolkitAppHero({
           className="toolkit-back-button btn btn-ghost h-9 px-3 text-neutral-600 dark:text-neutral-300"
         >
           <Icon name="arrowLeft" size={14} />
-          Nodus Toolkit
+          {backLabel}
         </button>
       </div>
       <header
@@ -62,7 +68,7 @@ export function ToolkitAppHero({
           <button
             data-testid={actionTestId}
             type="button"
-            className="btn btn-primary h-11 shrink-0 px-5"
+            className={`btn btn-primary h-11 shrink-0 px-5${actionClassName ? ` ${actionClassName}` : ''}`}
             onClick={onAction}
             disabled={actionDisabled}
           >

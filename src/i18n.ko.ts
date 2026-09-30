@@ -8,6 +8,7 @@ import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
+import { DRIFT_TRANSLATIONS } from './i18n.drift';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -8227,4 +8228,5 @@ export const KO: Record<string, string> = {
   "Ask the model to fix the failed steps": "실패한 단계를 수정하도록 모델에 요청하세요",
   "Sent": "전송됨",
   ...CONCILIUM_TRANSLATIONS['ko'],
+  ...DRIFT_TRANSLATIONS['ko'],
 };

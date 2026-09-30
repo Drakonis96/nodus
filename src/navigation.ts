@@ -213,6 +213,14 @@ export const TOOLKIT_TOOLS = ([
     testid: 'convert',
   },
   {
+    page: 'drift',
+    name: 'Nodus Drift',
+    description: 'Combina sonidos ambiente para acompañar la lectura, el estudio y el descanso, sin conexión.',
+    icon: 'drift',
+    state: 'wip',
+    testid: 'drift',
+  },
+  {
     page: 'protect',
     name: 'Nodus Protect',
     description: 'Oculta datos, añade marcas de agua y crea o verifica copias trazables, siempre mediante procesamiento local.',

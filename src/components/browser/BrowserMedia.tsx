@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Icon } from '../ui';
 import { t } from '../../i18n';
 import type { BrowserMediaState } from '@shared/browser';
+import { defaultMediaTab, type MediaSourceTab } from './mediaTab';
 
 /**
  * The header's media control.
@@ -59,6 +60,21 @@ interface BrowserSnapshot {
 }
 
 /**
+ * What the header popover shows for Nodus Drift. Drift is a second, separate source of
+ * sound: it is NOT dressed up as a Browser media session, and choosing a tab here never
+ * touches playback. The panel itself is supplied by the caller, so this file stays free of
+ * Drift's engine and state.
+ */
+export interface DriftPopoverSlot {
+  /** Drift has a selection, even a paused one. */
+  hasSelection: boolean;
+  /** The tab chosen last, remembered while both sources exist. */
+  lastTab: MediaSourceTab | null;
+  onTab: (tab: MediaSourceTab) => void;
+  panel: ReactNode;
+}
+
+/**
  * The popover, anchored to the header button.
  *
  * Same anchoring pattern as the notifications panel, including the part that
@@ -73,14 +89,22 @@ interface BrowserSnapshot {
  * view go away. What the user sees is the page staying put behind the popover.
  */
 export function BrowserMediaPopover({
-  anchorEl, onClose, onOpenTab,
-}: { anchorEl: HTMLElement | null; onClose: () => void; onOpenTab: (tabId: string) => void }) {
+  anchorEl, onClose, onOpenTab, drift,
+}: { anchorEl: HTMLElement | null; onClose: () => void; onOpenTab: (tabId: string) => void; drift?: DriftPopoverSlot }) {
   const states = useBrowserMedia();
   const [deviceVolume, setDeviceVolume] = useState(50);
   const [deviceVolumeReady, setDeviceVolumeReady] = useState(false);
   const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
+  // The tab of THIS opening: decided by defaultMediaTab when the popover opens, changed only by
+  // the user's own choice, and never recomputed while it stays open. Clearing Drift's mix from
+  // the Drift tab must not throw the user onto another one.
+  const [chosen, setChosen] = useState<MediaSourceTab | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  useEffect(() => {
+    setChosen(anchorEl ? defaultMediaTab(states.length > 0, Boolean(drift?.hasSelection), drift?.lastTab ?? null) : null);
+    // Deliberately keyed on the anchor alone: media or Drift updates must not reset the tab.
+  }, [anchorEl]);
 
   useEffect(() => {
     if (!anchorEl) return;
@@ -118,14 +142,29 @@ export function BrowserMediaPopover({
       window.removeEventListener('keydown', onKey);
       setSnapshot(null);
       void window.nodus.setBrowserOverlayVisible(false);
+      // Clearing the final source removes the header button and unmounts this popover,
+      // but the header component itself survives with its anchor state. Forget that
+      // detached element, or the next selection reopens against a dead button. A normal
+      // close or StrictMode cleanup keeps its connected trigger and needs no extra close.
+      if (!anchorEl.isConnected) onCloseRef.current();
     };
     // Media-state updates recreate the callback supplied by the header. They
     // must not restart this effect: doing so briefly disabled and repainted the
     // volume slider after Pause, Previous, Next or Mute.
   }, [anchorEl]);
 
-  if (!anchorEl || states.length === 0) return null;
+  const hasBrowser = states.length > 0;
+  const hasDrift = Boolean(drift?.hasSelection);
+  if (!anchorEl || (!hasBrowser && !hasDrift)) return null;
   const rect = anchorEl.getBoundingClientRect();
+  // The very first frame of an opening has no choice yet: it reads the same rule the effect applies.
+  const tab: MediaSourceTab = drift
+    ? (chosen ?? defaultMediaTab(hasBrowser, hasDrift, drift.lastTab))
+    : 'browser';
+  const chooseTab = (next: MediaSourceTab) => {
+    setChosen(next);
+    drift?.onTab(next);
+  };
 
   return createPortal(
     <>
@@ -145,43 +184,95 @@ export function BrowserMediaPopover({
         className="fixed z-[131] w-80 rounded-xl border border-neutral-700 bg-neutral-900 p-2 shadow-xl"
         style={{ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) }}
       >
-        <div className="flex flex-col gap-1">
-          {states.map((state) => (
-            <MediaRow key={state.tabId} state={state} onOpenTab={onOpenTab} />
-          ))}
-        </div>
-        {states.length > 1 && (
-          <button
-            type="button"
-            className="btn btn-ghost mt-1 w-full justify-center border border-neutral-700 py-1 text-xs"
-            onClick={() => states.forEach((state) => void window.nodus.browserMediaCommand(state.tabId, 'pause'))}
-          >
-            {t('Pausar todo')}
-          </button>
-        )}
-        <label
-          data-testid="browser-device-volume"
-          className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-t border-neutral-700 px-2 pt-3 text-xs text-neutral-300"
-        >
-          <Icon name="volume" size={14} className="text-neutral-400" />
-          <span className="sr-only">{t('Volumen')}</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={1}
-            aria-label={t('Volumen')}
-            disabled={!deviceVolumeReady}
-            value={deviceVolume}
-            onChange={(event) => {
-              const volume = Number(event.currentTarget.value);
-              setDeviceVolume(volume);
-              void window.nodus.setBrowserDeviceVolume(volume);
+        {drift && (
+          <div
+            role="tablist"
+            aria-label={t('Fuente de medios')}
+            data-testid="media-source-tabs"
+            className="mb-2 grid grid-cols-2 gap-1 rounded-lg bg-neutral-800/70 p-1"
+            onKeyDown={(event) => {
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+              event.preventDefault();
+              const next: MediaSourceTab = event.key === 'ArrowRight' || event.key === 'End' ? 'drift' : 'browser';
+              chooseTab(next);
+              document.getElementById(`media-source-tab-${next}`)?.focus();
             }}
-            className="w-full accent-indigo-500 disabled:opacity-50"
-          />
-          <output className="w-9 text-right tabular-nums text-neutral-400">{deviceVolume}%</output>
-        </label>
+          >
+            {(['browser', 'drift'] as const).map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                id={`media-source-tab-${id}`}
+                data-testid={`media-source-tab-${id}`}
+                aria-selected={tab === id}
+                aria-controls="media-source-panel"
+                tabIndex={tab === id ? 0 : -1}
+                onClick={() => chooseTab(id)}
+                className={`rounded-md px-2 py-1 text-xs font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-400 ${
+                  tab === id ? 'bg-neutral-700 text-neutral-100' : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                {id === 'browser' ? 'Browser' : 'Drift'}
+              </button>
+            ))}
+          </div>
+        )}
+        <div
+          role={drift ? 'tabpanel' : undefined}
+          id={drift ? 'media-source-panel' : undefined}
+          aria-labelledby={drift ? `media-source-tab-${tab}` : undefined}
+        >
+          {tab === 'drift' && drift ? drift.panel : (
+            <div data-testid="browser-media-panel">
+              {hasBrowser ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    {states.map((state) => (
+                      <MediaRow key={state.tabId} state={state} onOpenTab={onOpenTab} />
+                    ))}
+                  </div>
+                  {states.length > 1 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost mt-1 w-full justify-center border border-neutral-700 py-1 text-xs"
+                      onClick={() => states.forEach((state) => void window.nodus.browserMediaCommand(state.tabId, 'pause'))}
+                    >
+                      {t('Pausar todo')}
+                    </button>
+                  )}
+                  <label
+                    data-testid="browser-device-volume"
+                    className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2 border-t border-neutral-700 px-2 pt-3 text-xs text-neutral-300"
+                  >
+                    <Icon name="volume" size={14} className="text-neutral-400" />
+                    <span className="sr-only">{t('Volumen')}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      aria-label={t('Volumen')}
+                      disabled={!deviceVolumeReady}
+                      value={deviceVolume}
+                      onChange={(event) => {
+                        const volume = Number(event.currentTarget.value);
+                        setDeviceVolume(volume);
+                        void window.nodus.setBrowserDeviceVolume(volume);
+                      }}
+                      className="w-full accent-indigo-500 disabled:opacity-50"
+                    />
+                    <output className="w-9 text-right tabular-nums text-neutral-400">{deviceVolume}%</output>
+                  </label>
+                </>
+              ) : (
+                <p data-testid="browser-media-empty" className="px-2 py-4 text-center text-xs text-neutral-400">
+                  {t('No hay medios en Nodus Browser.')}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </>,
     document.body,
