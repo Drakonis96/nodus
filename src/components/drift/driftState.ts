@@ -33,8 +33,11 @@ export const DRIFT_PERSIST_DEBOUNCE_MS = 300;
 const MAX_FAVORITES = 256;
 const MAX_VOLUME_ENTRIES = 256;
 const MAX_TEXT = 120;
+export const MAX_DRIFT_PRESETS = 48;
+export const DRIFT_PRESET_ICONS = ['drift', 'bookOpen', 'moon', 'cloudRain', 'wind', 'flame', 'coffee', 'waves', 'star'] as const;
+export type DriftPresetIcon = (typeof DRIFT_PRESET_ICONS)[number];
 
-export type DriftFilter = 'all' | 'favorites' | DriftCategoryId;
+export type DriftFilter = 'all' | 'favorites' | 'active' | 'presets' | DriftCategoryId;
 
 /**
  * What the header needs to name a voice before the authoritative catalogue has been
@@ -58,6 +61,17 @@ export interface DriftState {
   favorites: string[];
   filter: DriftFilter;
   snapshot: Record<string, DriftSoundSnapshot>;
+  presets: DriftPreset[];
+}
+
+export interface DriftPreset {
+  id: string;
+  name: string;
+  icon: DriftPresetIcon;
+  selection: string[];
+  volumes: Record<string, number>;
+  master: number;
+  snapshot: Record<string, DriftSoundSnapshot>;
 }
 
 export const DEFAULT_DRIFT_STATE: DriftState = Object.freeze({
@@ -68,6 +82,7 @@ export const DEFAULT_DRIFT_STATE: DriftState = Object.freeze({
   favorites: [],
   filter: 'all',
   snapshot: {},
+  presets: [],
 }) as DriftState;
 
 const SOURCE_KINDS: readonly DriftSourceKind[] = ['file', 'noise', 'binaural'];
@@ -108,7 +123,7 @@ function enforceSelectionPolicy(ids: readonly string[], kindOf: (id: string) => 
 
 /** Bring anything read from storage (or a future version's payload) to a valid state. */
 export function normalizeDriftState(raw: unknown): DriftState {
-  if (!isRecord(raw) || raw.version !== DRIFT_STORAGE_VERSION) return { ...DEFAULT_DRIFT_STATE, selection: [], volumes: {}, favorites: [], snapshot: {} };
+  if (!isRecord(raw) || raw.version !== DRIFT_STORAGE_VERSION) return { ...DEFAULT_DRIFT_STATE, selection: [], volumes: {}, favorites: [], snapshot: {}, presets: [] };
 
   const snapshotSource = isRecord(raw.snapshot) ? raw.snapshot : {};
   const snapshot: Record<string, DriftSoundSnapshot> = {};
@@ -135,7 +150,13 @@ export function normalizeDriftState(raw: unknown): DriftState {
   const prunedSnapshot: Record<string, DriftSoundSnapshot> = {};
   for (const id of keep) if (snapshot[id]) prunedSnapshot[id] = snapshot[id];
 
-  const filter: DriftFilter = raw.filter === 'all' || raw.filter === 'favorites' || isDriftCategoryId(raw.filter) ? raw.filter : 'all';
+  const filter: DriftFilter = raw.filter === 'all' || raw.filter === 'favorites' || raw.filter === 'active' || raw.filter === 'presets' || isDriftCategoryId(raw.filter) ? raw.filter : 'all';
+  const presets: DriftPreset[] = [];
+  if (Array.isArray(raw.presets)) for (const candidate of raw.presets.slice(0, MAX_DRIFT_PRESETS * 4)) {
+    const preset = normalizeDriftPreset(candidate);
+    if (preset && !presets.some((other) => other.id === preset.id)) presets.push(preset);
+    if (presets.length === MAX_DRIFT_PRESETS) break;
+  }
 
   return {
     version: DRIFT_STORAGE_VERSION,
@@ -145,7 +166,19 @@ export function normalizeDriftState(raw: unknown): DriftState {
     favorites,
     filter,
     snapshot: prunedSnapshot,
+    presets,
   };
+}
+
+/** Presets use exactly the mix policy. Nested preset lists are deliberately never read. */
+export function normalizeDriftPreset(raw: unknown): DriftPreset | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(raw.id) || typeof raw.name !== 'string') return null;
+  const name = raw.name.replace(/\p{Cc}/gu, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  if (!name) return null;
+  const mix = normalizeDriftState({ version: DRIFT_STORAGE_VERSION, selection: raw.selection, volumes: raw.volumes, master: raw.master, snapshot: raw.snapshot });
+  if (!mix.selection.length) return null;
+  const icon = DRIFT_PRESET_ICONS.includes(raw.icon as DriftPresetIcon) ? raw.icon as DriftPresetIcon : 'drift';
+  return { id: raw.id, name, icon, selection: mix.selection, volumes: Object.fromEntries(mix.selection.map((id) => [id, driftVolumeOf(mix, id)])), master: mix.master, snapshot: mix.snapshot };
 }
 
 /** Parse the stored text. Never throws: anything unreadable is the default state. */
@@ -174,6 +207,7 @@ export function serializeDriftState(state: DriftState): string {
     favorites: state.favorites,
     filter: state.filter,
     snapshot,
+    presets: state.presets,
   };
   return JSON.stringify(stored);
 }
@@ -197,6 +231,10 @@ export type DriftAction =
   | { type: 'setMaster'; value: number }
   | { type: 'toggleFavorite'; id: string; meta?: DriftSoundSnapshot }
   | { type: 'setFilter'; filter: DriftFilter }
+  | { type: 'savePreset'; id: string; name: string; icon: DriftPresetIcon }
+  | { type: 'editPreset'; id: string; name: string; icon: DriftPresetIcon }
+  | { type: 'deletePreset'; id: string }
+  | { type: 'applyPreset'; id: string }
   | { type: 'reconcile'; sounds: readonly DriftCatalogEntry[]; isKnownIcon?: (icon: string) => boolean };
 
 function snapshotOf(entry: DriftCatalogEntry, isKnownIcon?: (icon: string) => boolean): DriftSoundSnapshot {
@@ -210,6 +248,22 @@ function snapshotOf(entry: DriftCatalogEntry, isKnownIcon?: (icon: string) => bo
 
 export function driftReducer(state: DriftState, action: DriftAction): DriftState {
   switch (action.type) {
+    case 'savePreset': {
+      if (state.presets.length >= MAX_DRIFT_PRESETS || state.presets.some((preset) => preset.id === action.id)) return state;
+      const preset = normalizeDriftPreset({ ...state, id: action.id, name: action.name, icon: action.icon });
+      return preset ? { ...state, presets: [...state.presets, preset] } : state;
+    }
+    case 'editPreset': {
+      const previous = state.presets.find((preset) => preset.id === action.id);
+      const updated = previous && normalizeDriftPreset({ ...previous, name: action.name, icon: action.icon });
+      return updated ? { ...state, presets: state.presets.map((preset) => preset.id === action.id ? updated : preset) } : state;
+    }
+    case 'deletePreset':
+      return state.presets.some((preset) => preset.id === action.id) ? { ...state, presets: state.presets.filter((preset) => preset.id !== action.id) } : state;
+    case 'applyPreset': {
+      const preset = state.presets.find((preset) => preset.id === action.id);
+      return preset ? { ...state, selection: [...preset.selection], volumes: { ...state.volumes, ...preset.volumes }, master: preset.master, snapshot: { ...state.snapshot, ...preset.snapshot }, filter: 'active' } : state;
+    }
     case 'select': {
       // Selecting what is already in the mix is a no-op: a double click is one voice.
       if (!isDriftSoundId(action.id) || state.selection.includes(action.id)) return state;
@@ -264,6 +318,10 @@ export function driftReducer(state: DriftState, action: DriftAction): DriftState
         volumes,
         favorites: state.favorites.filter(known),
         snapshot,
+        // Refresh known metadata without deleting a saved mix when a sound disappears.
+        presets: state.presets.map((preset) => normalizeDriftPreset({ ...preset, snapshot: {
+          ...preset.snapshot, ...Object.fromEntries(preset.selection.filter(known).map((id) => [id, snapshotOf(byId.get(id)!, action.isKnownIcon)])),
+        } })!).filter(Boolean),
       };
     }
     default:

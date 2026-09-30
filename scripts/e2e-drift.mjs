@@ -38,6 +38,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const require = createRequire(import.meta.url);
 const packagedExecutable = process.env.NODUS_E2E_EXECUTABLE || '';
 const audible = process.env.NODUS_E2E_AUDIBLE === '1';
+const screenshotDirectory = process.env.NODUS_E2E_DRIFT_SCREENSHOTS || '';
 
 if (!packagedExecutable && (!existsSync(path.join(repoRoot, 'dist-electron/main.js')) || !existsSync(path.join(repoRoot, 'dist/index.html')))) {
   console.log('[e2e-drift] no build found, running npm run build first…');
@@ -333,12 +334,13 @@ const audibleNow = async (description, timeoutMs = 10_000) => {
   }, () => `${description} (heard ${JSON.stringify(heard)})`, timeoutMs);
 };
 
-/** Faded out and suspended: the context stopped only once the fade had reached silence. */
+/** Suspension guarantees silence. AnalyserNode keeps its final buffer while suspended;
+ * that stale buffer can predate the fade under load, so it is not a live output measurement. */
 const silentNow = async (description) => {
   let heard;
   return until(async () => {
     heard = await signal(200);
-    return heard.state === 'suspended' && heard.tail < SILENT ? heard : false;
+    return heard.state === 'suspended' ? heard : false;
   }, () => `${description} (heard ${JSON.stringify(heard)})`, 8_000);
 };
 
@@ -444,7 +446,7 @@ try {
   });
 
   await check('empty mix: Play and Clear are disabled; search, filters and favourites never start audio', async () => {
-    assert.equal(await page.getByTestId('drift-play-toggle').isDisabled(), true);
+    assert.equal(await page.getByTestId('drift-mix-toggle').isDisabled(), true);
     assert.equal(await page.getByTestId('drift-clear').isDisabled(), true);
     await page.getByTestId('drift-search').fill('MARRÓN');
     await page.getByTestId('drift-card-brown-noise').waitFor();
@@ -482,7 +484,7 @@ try {
     const after = await audibleNow('generator and fixture together');
     assert.equal(after.created, 1, 'still the same single context');
     assert.ok(after.mean > before.mean * 1.05, `two voices are louder than one (${before.mean} → ${after.mean})`);
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 / 6');
     assert.equal(await page.getByTestId('drift-mix-voice-fixture-a-status').count(), 1);
   });
 
@@ -495,10 +497,10 @@ try {
     }
     const heard = await audibleNow('the real recordings mixed in', 15_000);
     assert.equal(heard.created, 1, 'still the same single context');
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 / 6');
     for (const id of ['rain-on-tent', 'light-rain']) await page.getByTestId(`drift-remove-${id}`).click();
     await page.getByTestId('drift-mix-voice-light-rain').waitFor({ state: 'detached' });
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 / 6');
     await audibleNow('the first two voices, after the recordings were removed');
   });
 
@@ -517,14 +519,14 @@ try {
         && Math.abs(state.volumes?.['fixture-a'] - 0.4) < 0.011 && state.selection?.length === 2;
     }, 'the mix to be persisted (debounced)');
     const state = await stored();
-    assert.deepEqual(Object.keys(state).sort(), ['favorites', 'filter', 'master', 'selection', 'snapshot', 'version', 'volumes'].sort(),
+    assert.deepEqual(Object.keys(state).sort(), ['favorites', 'filter', 'master', 'presets', 'selection', 'snapshot', 'version', 'volumes'].sort(),
       'only configuration is persisted');
     assert.ok(!('playing' in state) && !('paused' in state), 'nothing about playback is stored');
     assert.equal((await signal(50)).created, 1);
   });
 
-  await check('the hero and the panel buttons pause and resume the same context', async () => {
-    await page.getByTestId('drift-play-toggle').click();
+  await check('the mix dock pauses and resumes the same context', async () => {
+    await page.getByTestId('drift-mix-toggle').click();
     await silentNow('the mix to fade out and the context to suspend');
     assert.equal(await page.getByTestId('drift-mix-toggle').getAttribute('aria-pressed'), 'false');
     await page.getByTestId('drift-mix-toggle').click();
@@ -541,7 +543,7 @@ try {
     await mediaButton().waitFor();
     await openDrift();
     assert.equal((await audibleNow('the mix to keep sounding on return')).created, 1);
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos', 'the mix is still there');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 / 6', 'the mix is still there');
   });
 
   await check('the header popover opens on Drift, pauses and resumes the mix and moves only the Drift master', async () => {
@@ -647,7 +649,7 @@ try {
     await page.getByTestId('drift-remove-fixture-corrupt').click();
     await page.getByTestId('drift-remove-fixture-garbage').click();
     await page.getByTestId('drift-mix-voice-fixture-corrupt').waitFor({ state: 'detached' });
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '2 / 6');
   });
 
   await check('a file that disappears after the catalogue was read errors alone, and Retry brings it back', async () => {
@@ -672,10 +674,10 @@ try {
       await card(id).click();
       await page.getByTestId(`drift-mix-voice-${id}`).waitFor();
     }
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '6 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '6 / 6');
     await card('fixture-f').click();
     await page.getByTestId('drift-limit-notice').waitFor();
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '6 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '6 / 6');
     assert.equal(await page.getByTestId('drift-mix-voice-fixture-f').count(), 0);
     assert.equal(await card('fixture-f').getAttribute('aria-pressed'), 'false');
     await audibleNow('six voices at once');
@@ -683,7 +685,7 @@ try {
     await page.getByTestId('drift-remove-fixture-e').click();
     await page.getByTestId('drift-remove-fixture-d').click();
     await page.getByTestId('drift-mix-voice-fixture-d').waitFor({ state: 'detached' });
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 / 6');
   });
 
   await check('a binaural preset replaces the previous one in place; the help asks for stereo headphones', async () => {
@@ -695,7 +697,7 @@ try {
     await card('binaural-theta').click();
     await page.getByTestId('drift-mix-voice-binaural-theta').waitFor();
     assert.equal(await page.getByTestId('drift-mix-voice-binaural-alpha').count(), 0, 'only one preset at a time');
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '5 de 6 sonidos', 'the replacement did not add a voice');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '5 / 6', 'the replacement did not add a voice');
     await audibleNow('the mix with a binaural voice');
     await page.getByTestId('drift-remove-binaural-theta').click();
   });
@@ -717,7 +719,7 @@ try {
     assert.equal(heard.created, 1, 'no second AudioContext');
     await mediaButton().waitFor();
     await openDrift();
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 / 6');
   });
 
   // ── 8. Offline ─────────────────────────────────────────────────────────────
@@ -738,6 +740,42 @@ try {
 
   // ── 9. Relaunch: restore paused, silent ─────────────────────────────────────
   let expected;
+  await check('named presets save volumes, edit metadata, load paused and delete independently', async () => {
+    await page.waitForTimeout(400);
+    const previous = await stored();
+    const created = (await signal(100)).created;
+    await page.getByTestId('drift-save-preset').click();
+    await page.getByTestId('drift-preset-name').fill('Lectura');
+    await page.getByTestId('drift-preset-icon-bookOpen').click();
+    await page.getByTestId('drift-preset-submit').click();
+    await until(async () => (await stored()).presets?.length === 1, 'the preset to be persisted');
+    const preset = (await stored()).presets[0];
+    assert.deepEqual(preset.selection, previous.selection);
+    assert.equal(preset.icon, 'bookOpen');
+    assert.equal(preset.master, previous.master);
+    await page.getByTestId(`drift-preset-edit-${preset.id}`).click();
+    await page.getByTestId('drift-preset-name').fill('Noche');
+    await page.getByTestId('drift-preset-icon-moon').click();
+    await page.getByTestId('drift-preset-submit').click();
+    await page.getByTestId('drift-clear').click();
+    await page.getByTestId(`drift-preset-load-${preset.id}`).click();
+    await silentNow('the preset to load paused');
+    assert.equal((await signal(100)).created, created, 'preset loading does not create another context');
+    for (const id of previous.selection) assert.equal(Number(await sliderValue(`drift-volume-${id}`)), Math.round(preset.volumes[id] * 100));
+    assert.equal(await sliderValue('drift-master'), String(Math.round(previous.master * 100)));
+    await page.getByTestId('drift-save-preset').click();
+    await page.getByTestId('drift-preset-name').fill('Temporal');
+    await page.getByTestId('drift-preset-submit').click();
+    await until(async () => (await stored()).presets?.length === 2, 'the second preset');
+    const temporary = (await stored()).presets.find((entry) => entry.name === 'Temporal');
+    await page.getByTestId(`drift-preset-delete-${temporary.id}`).click();
+    await until(async () => (await stored()).presets?.length === 1, 'preset deletion');
+    assert.deepEqual((await stored()).selection, previous.selection, 'deletion leaves the loaded mix in place');
+    await page.getByTestId('drift-mix-toggle').click();
+    await audibleNow('explicit play after loading a preset');
+    await page.getByTestId('drift-filter-all').click();
+  });
+
   await check('the mix is saved on quit', async () => {
     await until(async () => (await stored())?.selection?.length === 4, 'the final mix to be saved');
     const state = await stored();
@@ -762,7 +800,9 @@ try {
     assert.match(await page.getByTestId('drift-mini-count').innerText(), /4 sonidos en la mezcla · En pausa/);
     await page.keyboard.press('Escape');
     await openDrift();
-    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 de 6 sonidos');
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '4 / 6');
+    assert.equal((await stored()).presets[0].name, 'Noche', 'presets survive relaunch');
+    assert.equal((await stored()).presets[0].icon, 'moon');
     assert.equal(await sliderValue('drift-master'), expected.master);
     for (const id of expected.selection) assert.equal(await sliderValue(`drift-volume-${id}`), expected.volumes[id], `${id} kept its volume`);
     assert.equal(await page.getByTestId('drift-card-brown-noise-favorite').getAttribute('aria-pressed'), 'true');
@@ -793,7 +833,7 @@ try {
     // first show a card: wait for that instead of racing it.
     await page.getByTestId('drift-card-brown-noise').waitFor();
     const count = await page.getByTestId('drift-mix-count').innerText();
-    const [, n] = /^(\d+) de 6 sonidos$/.exec(count) ?? [];
+    const [, n] = /^(\d+) \/ 6$/.exec(count) ?? [];
     assert.ok(n !== undefined && Number(n) >= 1 && Number(n) <= 6, `between one and six voices, got "${count}"`);
     assert.equal(await page.getByTestId('drift-mix-voice-no-such-sound').count(), 0, 'an unknown id is dropped');
     for (const id of await page.locator('[data-testid^="drift-volume-"]').evaluateAll((inputs) => inputs.map((input) => input.getAttribute('data-testid').slice('drift-volume-'.length)))) {
@@ -806,9 +846,103 @@ try {
     assert.equal(await page.getByTestId('drift-filter-all').getAttribute('aria-pressed'), 'true', 'an unknown filter falls back to All');
   });
 
+  await check('Active manages paused sounds, Nodi follows the pointer and fullscreen exits by button or Escape', async () => {
+    const count = Number((await page.getByTestId('drift-mix-count').innerText()).split('/')[0].trim());
+    await until(async () => (await stored()).selection.length === count, 'the normalized selection to be persisted');
+    const previous = await stored();
+    await page.getByTestId('drift-filter-active').click();
+    assert.equal(await page.locator('[data-testid^="drift-active-voice-"]').count(), previous.selection.length);
+    assert.equal((await signal(100)).created, 0, 'switching filters stays silent');
+    const nodi = page.getByTestId('drift-nodi');
+    await page.mouse.move(30, 30);
+    await until(async () => await nodi.getAttribute('data-awake') === 'true', 'Nodi to open its eyes');
+    const gaze = await nodi.evaluate((node) => node.style.getPropertyValue('--nodi-gaze-x'));
+    assert.ok(parseFloat(gaze) < 0, 'looks towards the pointer to its left');
+    await until(async () => await nodi.getAttribute('data-awake') === 'false', 'Nodi to close its eyes', 5_000);
+    const toggle = page.getByTestId('drift-fullscreen-toggle');
+    await toggle.click();
+    await until(async () => await toggle.getAttribute('aria-pressed') === 'true', 'fullscreen to start');
+    // macOS animates the native window after Chromium enters its fullscreen top layer.
+    await page.waitForTimeout(1_200);
+    await page.getByTestId('drift-save-preset').click();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.getByTestId('drift-preset-editor').count(), 0, 'Escape closes the editor first');
+    assert.equal(await toggle.getAttribute('aria-pressed'), 'true', 'closing the editor keeps fullscreen');
+    await toggle.click();
+    await until(async () => await toggle.getAttribute('aria-pressed') === 'false', 'fullscreen to exit');
+    await page.waitForTimeout(1_200);
+    await toggle.click();
+    await until(async () => await toggle.getAttribute('aria-pressed') === 'true', 'fullscreen to start again');
+    await page.waitForTimeout(1_200);
+    await page.keyboard.press('Escape');
+    await until(async () => await toggle.getAttribute('aria-pressed') === 'false', 'Escape to exit fullscreen');
+    assert.deepEqual((await stored()).selection, previous.selection);
+    assert.equal((await signal(100)).created, 0, 'presentation changes create no audio context');
+    await page.getByTestId('drift-filter-all').click();
+  });
+
   await check('the window raised no uncaught exception while Drift was used', async () => {
     assert.deepEqual(pageErrors, []);
   });
+
+  // Optional review evidence, after all audio/restore checks, on the same disposable profile.
+  if (screenshotDirectory) {
+    await mkdir(screenshotDirectory, { recursive: true });
+    await call('updateSettings', { appTheme: 'deep-ocean', theme: 'dark', reduceMotion: true });
+    await page.reload();
+    await openDrift();
+    await page.getByTestId('drift-filter-all').click();
+    await page.getByTestId('drift-card-light-rain').waitFor();
+    await page.getByTestId('drift-clear').click();
+    const favorites = new Set(['light-rain', 'wind-in-trees', 'campfire', 'thunder', 'river', 'waves', 'birds', 'wind', 'white-noise', 'brown-noise', 'cafe', 'howling-wind']);
+    for (const button of await page.locator('[data-testid$="-favorite"]').all()) {
+      const id = (await button.getAttribute('data-testid')).slice('drift-card-'.length, -'-favorite'.length);
+      if ((await button.getAttribute('aria-pressed') === 'true') !== favorites.has(id)) await button.click();
+    }
+    for (const [id, volume] of [['light-rain', 60], ['wind-in-trees', 35], ['campfire', 25]]) {
+      await card(id).click();
+      await setSlider(`drift-volume-${id}`, volume);
+    }
+    await setSlider('drift-master', 70);
+    await page.getByTestId('drift-filter-favorites').click();
+    assert.equal(await page.getByTestId('drift-mix-count').innerText(), '3 / 6');
+    await page.waitForTimeout(1_200);
+    await page.mouse.move(1, 1);
+    await until(async () => await page.getByTestId('drift-nodi').getAttribute('data-awake') === 'false', 'Nodi to rest for the screenshot', 5_000);
+    const capture = async (name) => {
+      await page.locator('.drift-scroll').evaluate((node) => { node.scrollTop = 0; });
+      await page.waitForTimeout(350);
+      const rect = await page.getByTestId('toolkit-drift').evaluate((node) => {
+        const bounds = node.getBoundingClientRect();
+        return { x: Math.round(bounds.x), y: Math.round(bounds.y), width: Math.round(bounds.width), height: Math.round(bounds.height) };
+      });
+      // Electron's native capture includes retained compositor layers in successive screenshots.
+      const png = await app.evaluate(async ({ BrowserWindow }, bounds) => {
+        const window = BrowserWindow.getAllWindows().find((entry) => entry.webContents.getURL().includes('index.html'));
+        const picture = await window.webContents.capturePage(bounds);
+        return picture.toPNG().toString('base64');
+      }, rect);
+      await writeFile(path.join(screenshotDirectory, name), Buffer.from(png, 'base64'));
+    };
+    await capture('drift-electron-dark.png');
+    await page.getByTestId('drift-filter-active').click();
+    await capture('drift-electron-active.png');
+    await page.getByTestId('drift-filter-favorites').click();
+    await page.getByTestId('drift-fullscreen-toggle').click();
+    await until(async () => await page.getByTestId('drift-fullscreen-toggle').getAttribute('aria-pressed') === 'true', 'fullscreen screenshot');
+    await page.waitForTimeout(700);
+    await capture('drift-electron-fullscreen.png');
+    await page.keyboard.press('Escape');
+    await until(async () => await page.getByTestId('drift-fullscreen-toggle').getAttribute('aria-pressed') === 'false', 'fullscreen screenshot to exit');
+    await call('updateSettings', { theme: 'light' });
+    await page.reload();
+    await openDrift();
+    await page.getByTestId('drift-card-light-rain').waitFor();
+    await page.mouse.move(1, 1);
+    await page.waitForTimeout(2_700);
+    await capture('drift-electron-light.png');
+    console.log(`[e2e-drift] screenshots: ${screenshotDirectory}`);
+  }
 } finally {
   await closeApp();
   await new Promise((resolve) => server.close(resolve));

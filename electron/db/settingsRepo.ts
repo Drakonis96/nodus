@@ -388,7 +388,7 @@ export function getSettings(): AppSettings {
   merged.mascotScale = normalizeNodiScale(parsed.mascotScale);
   merged.studyImproveToolbarStyleIds = [...new Set((Array.isArray(merged.studyImproveToolbarStyleIds) ? merged.studyImproveToolbarStyleIds : [])
     .filter((value): value is string => typeof value === 'string' && value.trim().length > 0))].slice(0, 4);
-  merged.toolkitPinnedPages = normalizeToolkitToolPages(parsed.toolkitPinnedPages);
+  merged.toolkitPinnedPages = normalizeToolkitToolPages(merged.toolkitPinnedPages);
   merged.customEventTypes = sanitizeCustomEventTypes(parsed.customEventTypes);
   // Pre-2.3 builds called the Transformers.js worker simply "local".
   if ((parsed as { sttProvider?: string }).sttProvider === 'local') merged.sttProvider = 'transformers';

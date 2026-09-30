@@ -19,6 +19,8 @@ const code = (file) => read(file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
 const DRIFT_RENDERER_FILES = [
   'src/components/drift/DriftProvider.tsx',
   'src/components/drift/DriftSoundCard.tsx',
+  'src/components/drift/DriftMeditatingNodi.tsx',
+  'src/components/drift/DriftPresets.tsx',
   'src/components/drift/DriftMiniPlayer.tsx',
   'src/components/drift/driftState.ts',
   'src/components/drift/audio/DriftAudioEngine.ts',
@@ -131,17 +133,17 @@ test('the seventh voice and unavailable sounds never reach the engine from the i
 
 test('nothing in Drift\'s renderer code touches the network or Browser', () => {
   for (const file of DRIFT_RENDERER_FILES) {
-    const source = code(file);
+    const source = code(file).replace("'https://github.com/remvze/moodist'", "'moodist-credit'");
     assert.doesNotMatch(source, /\bfetch\(|XMLHttpRequest|WebSocket|sendBeacon|EventSource|https?:\/\/|new Audio\(|<audio|HTMLMediaElement|MediaElementAudioSource|createMediaStream/, `${file}: no network, no media element`);
     assert.doesNotMatch(source, /setBrowserDeviceVolume|getBrowserDeviceVolume|browserMediaCommand|setBrowserTabMuted|getBrowserMedia|onBrowserMediaChanged/, `${file}: no Browser media channel`);
     assert.doesNotMatch(source, /require\(|from 'node:|from "node:|ipcRenderer|electron/, `${file}: no Node or Electron`);
   }
 });
 
-test('the only bridge methods the renderer calls are the two Drift ones', () => {
+test('the bridge calls are Drift audio and the explicit Moodist credit link', () => {
   const calls = new Set();
   for (const file of DRIFT_RENDERER_FILES) for (const match of code(file).matchAll(/window\.nodus\.(\w+)/g)) calls.add(match[1]);
-  assert.deepEqual([...calls].sort(), ['getDriftCatalog', 'readDriftAudio']);
+  assert.deepEqual([...calls].sort(), ['getDriftCatalog', 'openExternal', 'readDriftAudio']);
 });
 
 test('the saved state has one home and one key, never inside a vault', () => {
@@ -159,19 +161,19 @@ test('the saved state has one home and one key, never inside a vault', () => {
 
 // ── the page ───────────────────────────────────────────────────────────────
 
-test('a card is one button and its favourite star is a sibling, so nothing is nested', () => {
+test('sound toggles, favourites and voice controls are independent siblings', () => {
   const card = read('src/components/drift/DriftSoundCard.tsx');
-  const body = card.slice(card.indexOf('const body = ('), card.indexOf('  return (\n    <div className="relative h-full"'));
-  assert.doesNotMatch(body, /<button|onClick|<input/, 'the content of the card holds no control');
-  const rendered = card.slice(card.indexOf('  return (\n    <div className="relative h-full"'));
-  assert.match(rendered, /operative \? \(\s*<button[\s\S]*?aria-pressed=\{selected\}[\s\S]*?\{body\}\s*<\/button>\s*\) : \(\s*<div\s+role="group"[\s\S]*?aria-disabled="true"/, 'operative: a toggle button; otherwise a labelled, disabled group with no button');
-  assert.match(rendered, /<\/div>\s*\)\}\s*<button\s+type="button"\s+data-testid=\{`drift-card-\$\{sound\.id\}-favorite`\}[\s\S]*?aria-pressed=\{favorite\}/, 'the star follows the card as its sibling');
-  assert.doesNotMatch(rendered, /stopPropagation/, 'no propagation trick is needed');
-  assert.match(rendered, /focus-visible:outline/, 'a visible focus ring');
+  const body = card.slice(card.indexOf('const body = <>'), card.indexOf('  return (', card.indexOf('const body = <>')));
+  assert.doesNotMatch(body, /<button|onClick|<input/);
+  assert.match(card, /aria-pressed=\{selected\}/);
+  assert.match(card, /aria-disabled="true"/);
+  assert.match(card, /data-testid=\{`drift-card-\$\{sound.id\}-favorite`\}/);
+  assert.doesNotMatch(card, /stopPropagation/);
+  assert.match(read('src/components/drift/drift.css'), /:focus-visible/);
 });
 
 test('every slider is labelled, every toggle is pressed-aware, notices are live regions', () => {
-  const sources = { view: read('src/views/ToolkitDriftView.tsx'), mini: read('src/components/drift/DriftMiniPlayer.tsx') };
+  const sources = { card: read('src/components/drift/DriftSoundCard.tsx'), view: read('src/views/ToolkitDriftView.tsx'), mini: read('src/components/drift/DriftMiniPlayer.tsx') };
   for (const [name, source] of Object.entries(sources)) {
     const sliders = source.match(/<input\s[^>]*type="range"[\s\S]*?\/>/g) ?? [];
     assert.ok(sliders.length > 0, `${name} has sliders`);
@@ -182,14 +184,13 @@ test('every slider is labelled, every toggle is pressed-aware, notices are live 
   assert.match(view, /aria-pressed=\{active\}/, 'the mix play toggle');
   assert.match(view, /data-testid="drift-limit-notice" role="status"/);
   assert.match(view, /data-testid="drift-catalog-error" role="alert"/);
-  assert.match(view, /data-testid=\{`drift-error-\$\{voice\.id\}`\} role="alert"/);
-  assert.match(view, /grid-cols-\[repeat\(auto-fill,minmax\(15rem,1fr\)\)\]/, 'a grid that adapts from one column to several without a breakpoint or a horizontal scrollbar');
+  assert.match(sources.card, /data-testid=\{`drift-error-\$\{voice\.id\}`\} role="alert"/);
+  assert.match(read('src/components/drift/drift.css'), /grid-template-columns: repeat\(auto-fill,minmax\(165px,1fr\)\)/, 'a grid that adapts from one column to several without a breakpoint or a horizontal scrollbar');
   assert.doesNotMatch(view, /overflow-x-(scroll|auto)|w-\[\d{4,}px\]|min-w-\[\d{3,}px\]/, 'nothing forces a horizontal scroll');
 });
 
 test('Play and Clear are disabled with nothing selected, and the empty state is useful', () => {
   const view = read('src/views/ToolkitDriftView.tsx');
-  assert.match(view, /actionDisabled=\{drift\.selection\.length === 0\}/, 'the hero action');
   assert.match(view, /data-testid="drift-mix-toggle"[\s\S]*?disabled=\{count === 0\}/);
   assert.match(view, /data-testid="drift-clear"[\s\S]*?disabled=\{count === 0\}/);
   assert.match(view, /data-testid="drift-mix-empty"/);
@@ -304,23 +305,22 @@ test('Drift is a Tools page: pinnable as toolkit:drift, never a View, never in a
 test('the Tools page routes to the view and back to the catalogue', () => {
   const view = read('src/views/ToolkitView.tsx');
   assert.match(view, /import \{ ToolkitDriftView \} from '\.\/ToolkitDriftView';/);
-  assert.match(view, /page === 'drift' \? \(\s*<ToolkitDriftView onBack=\{\(\) => onNavigate\('home'\)\} \/>/);
+  assert.match(view, /if \(page === 'drift'\) return <ToolkitDriftView onBack=\{\(\) => onNavigate\('home'\)\} settings=\{settings\} \/>/);
   const page = read('src/views/ToolkitDriftView.tsx');
-  assert.match(page, /export function ToolkitDriftView\(\{ onBack \}: \{ onBack: \(\) => void \}\)/);
-  assert.match(page, /backLabel=\{t\('Volver a herramientas'\)\}/);
-  assert.match(page, /backTestId="toolkit-drift-back"/);
-  assert.match(page, /heroTestId="toolkit-drift-hero"/);
-  assert.match(page, /<ToolkitAppHero\b/, 'the language of Tools: the shared hero');
+  assert.match(page, /data-testid="toolkit-drift-back"/);
+  assert.match(page, /title=\{t\('Volver a herramientas'\)\}/);
+  assert.match(page, /data-testid="toolkit-drift-hero"/);
+  assert.doesNotMatch(page, /ToolkitAppHero/);
+  assert.match(page, /DriftMeditatingNodi/);
+
 });
 
-test('an inert primary action looks inert, and no other tool changes because of it', () => {
+test('the standalone workspace keeps the empty playback action disabled', () => {
   const page = read('src/views/ToolkitDriftView.tsx');
-  assert.match(page, /actionDisabled=\{drift\.selection\.length === 0\}\s*actionClassName="[^"]*disabled:opacity-50[^"]*"/, 'the empty mix dims the hero action');
-  const hero = read('src/components/ToolkitAppHero.tsx');
-  // The shared hero adds classes only when a tool asks: without the prop the class string is what it always was.
-  assert.match(hero, /className=\{`btn btn-primary h-11 shrink-0 px-5\$\{actionClassName \? ` \$\{actionClassName\}` : ''\}`\}/);
+  assert.match(page, /data-testid="drift-mix-toggle"[\s\S]*?disabled=\{count === 0\}/);
+  assert.match(read('src/components/drift/drift.css'), /button:disabled/);
   for (const other of ['Convert', 'Presenter', 'AiOcr', 'Protect', 'Translate', 'Apps']) {
-    assert.doesNotMatch(read(`src/views/Toolkit${other}View.tsx`), /actionClassName/, `${other} keeps the hero exactly as it was`);
+    assert.doesNotMatch(read(`src/views/Toolkit${other}View.tsx`), /drift-workspace/);
   }
 });
 

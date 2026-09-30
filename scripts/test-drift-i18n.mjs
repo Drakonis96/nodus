@@ -30,6 +30,19 @@ const CATALOGUE_KEYS = [...new Set([
 
 const read = (file) => readFileSync(path.join(repoRoot, file), 'utf8');
 
+test('all Drift interface actions, preset editor and icon labels are translated in every locale', () => {
+  const files = ['src/views/ToolkitDriftView.tsx', 'src/components/drift/DriftSoundCard.tsx', 'src/components/drift/DriftMiniPlayer.tsx', 'src/components/drift/DriftPresets.tsx'];
+  const sources = files.map(read).join('\n');
+  const keys = new Set([...sources.matchAll(/\b(?:t|tx)\(\s*(['"])(.*?)\1/g)].map((match) => match[2]));
+  for (const match of read(files[3]).matchAll(/label: '([^']+)'/g)) if (match[1] !== 'Nodus Drift') keys.add(match[1]);
+  for (const { lang, table } of LANGUAGES) {
+    for (const key of keys) {
+      assert.ok(table[key]?.trim(), `${lang}: ${key}`);
+      assert.deepEqual([...table[key].matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort(), [...key.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort(), `${lang}: placeholders in ${key}`);
+    }
+  }
+});
+
 test('every sound name, description and category has a translation in every language', () => {
   assert.ok(CATALOGUE_KEYS.length > 150, `${CATALOGUE_KEYS.length} keys collected`);
   for (const { lang, table } of LANGUAGES) {
@@ -98,7 +111,7 @@ test('the brand is not translated', () => {
     }
   }
   const view = read('src/views/ToolkitDriftView.tsx');
-  assert.match(view, /title="Nodus Drift"/);
+  assert.match(view, /<h1>Nodus Drift<\/h1>/);
   assert.match(read('src/navigation.ts'), /name: 'Nodus Drift'/);
 });
 

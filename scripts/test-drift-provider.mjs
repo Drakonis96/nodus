@@ -26,7 +26,7 @@ function defineGlobal(key, value) {
 
 // react-dom decides at LOAD time whether the DOM can be trusted with `input` events, so a window
 // has to exist before it is required. Every test then replaces it with a fresh one.
-const bootstrap = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://nodus.test/' });
+const bootstrap = new JSDOM('<!doctype html><html><body></body></html>', { url: 'https://nodus.test/', pretendToBeVisual: true });
 for (const key of Object.getOwnPropertyNames(bootstrap.window)) if (!(key in globalThis)) globalThis[key] = bootstrap.window[key];
 defineGlobal('window', bootstrap.window);
 defineGlobal('document', bootstrap.window.document);
@@ -106,7 +106,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  * catalogue back; `readImpl` decides what reading a recording does.
  */
 function environment({ stored = null, catalogGate = null, readImpl = null, browserSessions = [], catalog = CATALOG } = {}) {
-  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'https://nodus.test/' });
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'https://nodus.test/', pretendToBeVisual: true });
   for (const key of Object.getOwnPropertyNames(dom.window)) if (!(key in globalThis)) globalThis[key] = dom.window[key];
   for (const key of ['window', 'document', 'navigator', 'Event']) defineGlobal(key, dom.window[key === 'window' ? 'window' : key] ?? dom.window);
   defineGlobal('window', dom.window);
@@ -593,4 +593,88 @@ test('the tabs are a WAI-ARIA tablist: roving focus and arrow keys', async () =>
   assert.equal(env.q('[data-testid="media-source-tab-drift"]').getAttribute('aria-selected'), 'true');
   assert.equal(env.contexts.length, 0, 'keyboard navigation of the tabs plays nothing');
   await act(async () => env.root.unmount());
+});
+
+test('Active shows paused and failed voices, clears a stale search and keeps volume, retry and removal available', async () => {
+  const env = environment({ readImpl: async () => { throw new Error('drift-audio:corrupt'); } });
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  await env.click(env.q('[data-testid="drift-card-brown-noise"] button[aria-pressed]'));
+  await env.click(env.q('[data-testid="drift-card-fixture-corrupt"] button[aria-pressed]'));
+  await env.settle(8);
+  await env.click(env.q('[data-testid="drift-mix-toggle"]'));
+  await env.input(env.q('[data-testid="drift-search"]'), 'a query that matches nothing');
+  await env.click(env.q('[data-testid="drift-filter-active"]'));
+  assert.equal(env.q('[data-testid="drift-search"]').value, '', 'Active reveals the whole mix');
+  assert.equal(env.qa('[data-testid^="drift-active-voice-"]').length, 2);
+  assert.equal(env.q('[data-testid="drift-grid"]'), null);
+  assert.ok(env.q('[data-testid="drift-retry-fixture-corrupt"]'), 'failed voice can be retried');
+  assert.match(env.q('[data-testid="drift-active-voice-brown-noise"]').textContent, /En pausa/);
+  await env.input(env.q('[data-testid="drift-volume-brown-noise"]'), 72);
+  assert.equal(harness.probe.current.voices.find((voice) => voice.id === 'brown-noise').volume, .72);
+  await env.click(env.q('[data-testid="drift-active-remove-fixture-corrupt"]'));
+  assert.deepEqual(harness.probe.current.selection, ['brown-noise']);
+  await env.click(env.q('[data-testid="drift-clear"]'));
+  assert.ok(env.q('[data-testid="drift-active-empty"]'));
+  assert.equal(env.q('[data-testid="drift-mix-toggle"]').disabled, true);
+  await act(async () => env.root.unmount());
+});
+
+test('presets save, edit, reload paused in the same context, survive restart and delete without changing the mix', async () => {
+  const env = environment();
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  assert.equal(env.q('[data-testid="drift-save-preset"]').disabled, true);
+  await env.click(env.q('[data-testid="drift-card-brown-noise"] button[aria-pressed]'));
+  await env.input(env.q('[data-testid="drift-volume-brown-noise"]'), 65);
+  await env.input(env.q('[data-testid="drift-master"]'), 80);
+  await env.click(env.q('[data-testid="drift-save-preset"]'));
+  await env.input(env.q('[data-testid="drift-preset-name"]'), 'Lectura');
+  await env.click(env.q('[data-testid="drift-preset-icon-bookOpen"]'));
+  await act(async () => env.q('[data-testid="drift-preset-editor"]').dispatchEvent(new env.dom.window.Event('submit', { bubbles: true, cancelable: true })));
+  const saved = structuredClone(harness.probe.current.presets[0]);
+  assert.equal(saved.name, 'Lectura'); assert.equal(saved.icon, 'bookOpen');
+  assert.equal(harness.probe.current.playing, true, 'saving does not interrupt playback');
+  await env.click(env.q(`[data-testid="drift-preset-edit-${saved.id}"]`));
+  await env.input(env.q('[data-testid="drift-preset-name"]'), 'Noche');
+  await env.click(env.q('[data-testid="drift-preset-icon-moon"]'));
+  await act(async () => env.q('[data-testid="drift-preset-editor"]').dispatchEvent(new env.dom.window.Event('submit', { bubbles: true, cancelable: true })));
+  assert.deepEqual(harness.probe.current.presets[0], { ...saved, name: 'Noche', icon: 'moon' });
+  await act(async () => { harness.probe.current.setVolume('brown-noise', 0.1); });
+  await env.click(env.q(`[data-testid="drift-preset-load-${saved.id}"]`));
+  await env.settle();
+  assert.equal(harness.probe.current.playing, false);
+  assert.equal(harness.probe.current.voices[0].status, 'paused');
+  assert.equal(harness.probe.current.voices[0].volume, 0.65);
+  assert.equal(harness.probe.current.master, 0.8);
+  assert.equal(env.contexts.length, 1, 'loading uses the original context');
+  await act(async () => { harness.probe.current.play(); });
+  await env.settle();
+  assert.equal(harness.probe.current.playing, true, 'explicit play starts the loaded mix');
+  await act(async () => env.root.unmount());
+  const restored = environment({ stored: env.writes.at(-1)[1] });
+  await restored.render(restored.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  assert.equal(harness.probe.current.presets[0].name, 'Noche');
+  assert.equal(restored.contexts.length, 0);
+  await restored.click(restored.q('[data-testid="drift-filter-presets"]'));
+  await restored.click(restored.q(`[data-testid="drift-preset-delete-${saved.id}"]`));
+  assert.deepEqual(harness.probe.current.presets, []);
+  assert.deepEqual(harness.probe.current.selection, ['brown-noise']);
+  await act(async () => restored.root.unmount());
+});
+
+test('fullscreen follows the document, exits with Escape and unmounts without changing playback', async () => {
+  const env = environment();
+  await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+  const workspace = env.q('[data-testid="toolkit-drift"]');
+  let current = null;
+  Object.defineProperty(env.dom.window.document, 'fullscreenElement', { get: () => current });
+  workspace.requestFullscreen = async () => { current = workspace; env.dom.window.document.dispatchEvent(new env.dom.window.Event('fullscreenchange')); };
+  env.dom.window.document.exitFullscreen = async () => { current = null; env.dom.window.document.dispatchEvent(new env.dom.window.Event('fullscreenchange')); };
+  await env.click(env.q('[data-testid="drift-fullscreen-toggle"]'));
+  assert.equal(workspace.dataset.fullscreen, 'true');
+  await act(async () => env.dom.window.document.dispatchEvent(new env.dom.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  assert.equal(workspace.dataset.fullscreen, 'false');
+  assert.equal(env.contexts.length, 0, 'fullscreen does not start audio');
+  await env.click(env.q('[data-testid="drift-fullscreen-toggle"]'));
+  await act(async () => env.root.unmount());
+  assert.equal(current, null, 'leaving the tool exits fullscreen');
 });

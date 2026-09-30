@@ -16,6 +16,45 @@ const meta = (id) => state.driftMetaFromEntry(entry(id));
 const select = (current, id) => state.driftReducer(current, { type: 'select', id, meta: meta(id) });
 const fresh = () => state.normalizeDriftState(null);
 
+test('named presets snapshot a mix, survive restart, edit only metadata and delete independently', () => {
+  let current = select(select(fresh(), 'light-rain'), 'brown-noise');
+  current = state.driftReducer(current, { type: 'setVolume', id: 'light-rain', value: 0.6 });
+  current = state.driftReducer(current, { type: 'setMaster', value: 0.7 });
+  current = state.driftReducer(current, { type: 'savePreset', id: 'reading', name: '  Lectura  ', icon: 'bookOpen' });
+  const saved = structuredClone(current.presets[0]);
+  assert.equal(saved.name, 'Lectura');
+  assert.equal(saved.volumes['light-rain'], 0.6);
+  current = state.driftReducer(current, { type: 'clear' });
+  current = state.driftReducer(current, { type: 'setVolume', id: 'light-rain', value: 0.1 });
+  current = state.parseStoredDriftState(state.serializeDriftState(current));
+  assert.deepEqual(current.presets[0], saved, 'later mix changes never alter a saved preset');
+  current = state.driftReducer(current, { type: 'editPreset', id: 'reading', name: 'Noche', icon: 'moon' });
+  assert.deepEqual(current.presets[0], { ...saved, name: 'Noche', icon: 'moon' });
+  current = state.driftReducer(current, { type: 'applyPreset', id: 'reading' });
+  assert.deepEqual(current.selection, saved.selection);
+  assert.equal(current.volumes['light-rain'], 0.6);
+  assert.equal(current.master, 0.7);
+  assert.equal(current.filter, 'active');
+  current = state.driftReducer(current, { type: 'deletePreset', id: 'reading' });
+  assert.deepEqual(current.presets, []);
+  assert.deepEqual(current.selection, saved.selection, 'deleting a preset keeps the current mix');
+});
+
+test('old profiles and hostile preset data are bounded and normalized without nested payloads', () => {
+  assert.deepEqual(state.normalizeDriftState({ version: 1, selection: ['light-rain'] }).presets, []);
+  const value = { id: 'valid', name: ' X ', icon: 'untrusted-icon', selection: ['light-rain', 'binaural-alpha', 'binaural-gamma'], volumes: { 'light-rain': 99 }, master: -1,
+    snapshot: { 'binaural-alpha': meta('binaural-alpha'), 'binaural-gamma': meta('binaural-gamma') }, presets: [{ selection: ['evil'] }] };
+  const raw = { version: 1, presets: [null, {}, { ...value, id: '../escape' }, { ...value, name: '  ' }, value, value, ...Array.from({ length: 100 }, (_, i) => ({ ...value, id: `id-${i}` }))] };
+  const parsed = state.normalizeDriftState(raw);
+  assert.equal(parsed.presets.length, state.MAX_DRIFT_PRESETS);
+  assert.equal(parsed.presets[0].icon, 'drift');
+  assert.deepEqual(parsed.presets[0].selection, ['light-rain', 'binaural-gamma']);
+  assert.equal(parsed.presets[0].volumes['light-rain'], 1);
+  assert.equal(parsed.presets[0].master, 0);
+  assert.ok(!('presets' in parsed.presets[0]));
+  assert.equal(state.driftReducer(fresh(), { type: 'savePreset', id: 'empty', name: 'Empty', icon: 'drift' }).presets.length, 0);
+});
+
 test('defaults: empty, quiet and paused by construction', () => {
   const s = fresh();
   assert.deepEqual(s.selection, []);
@@ -82,6 +121,7 @@ test('volumes: NaN, Infinity and text never survive; out-of-range values are cla
 test('the filter and the snapshot are validated', () => {
   assert.equal(state.normalizeDriftState({ version: 1, filter: 'rain' }).filter, 'rain');
   assert.equal(state.normalizeDriftState({ version: 1, filter: 'favorites' }).filter, 'favorites');
+  assert.equal(state.normalizeDriftState({ version: 1, filter: 'active' }).filter, 'active');
   assert.equal(state.normalizeDriftState({ version: 1, filter: 'weather' }).filter, 'all');
   const s = state.normalizeDriftState({
     version: 1, selection: ['light-rain', 'river'], favorites: ['wind'], master: 0.3, volumes: {}, filter: 'all',
@@ -102,7 +142,7 @@ test('serialisation keeps configuration only', () => {
   s = state.driftReducer(s, { type: 'toggleFavorite', id: 'light-rain', meta: meta('light-rain') });
   const text = state.serializeDriftState(s);
   const parsed = JSON.parse(text);
-  assert.deepEqual(Object.keys(parsed).sort(), ['favorites', 'filter', 'master', 'selection', 'snapshot', 'version', 'volumes']);
+  assert.deepEqual(Object.keys(parsed).sort(), ['favorites', 'filter', 'master', 'presets', 'selection', 'snapshot', 'version', 'volumes']);
   assert.ok(!/playing|loading|buffer|bytes|path|blob|context|https?:|file:/i.test(text.replace(/"nameKey":"[^"]*"/g, '')));
   assert.deepEqual(state.parseStoredDriftState(text).selection, ['brown-noise']);
   assert.equal(state.parseStoredDriftState(text).volumes['brown-noise'], 0.6);

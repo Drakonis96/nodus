@@ -145,6 +145,8 @@ export function ToolkitView({
     }
   };
 
+  if (page === 'drift') return <ToolkitDriftView onBack={() => onNavigate('home')} settings={settings} />;
+
   return (
     <div className="theme-workspace-surface toolkit-workspace h-full overflow-y-auto px-6 py-6 max-md:px-4">
       {/* Las herramientas tienen página propia; cualquier otra página
@@ -153,8 +155,6 @@ export function ToolkitView({
         <ToolkitConvertView onBack={() => onNavigate('home')} />
       ) : page === 'apps' ? (
         <ToolkitAppsView onBack={() => onNavigate('home')} settings={settings} />
-      ) : page === 'drift' ? (
-        <ToolkitDriftView onBack={() => onNavigate('home')} />
       ) : page === 'translate' ? (
         <ToolkitTranslateView onBack={() => onNavigate('home')} settings={settings} />
       ) : page === 'protect' ? (

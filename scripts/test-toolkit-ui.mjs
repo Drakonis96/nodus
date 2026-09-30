@@ -188,7 +188,7 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   assert.match(view, /page === 'ocr'/, 'OCR Workspace has its own routed workspace');
 });
 
-test('every Toolkit app starts with the shared Apps-style hero', async () => {
+test('file Toolkit apps keep the shared hero while Drift owns its ambient workspace', async () => {
   const hero = await read('src/components/ToolkitAppHero.tsx');
   for (const marker of ['rounded-3xl', 'border-amber-200', 'bg-gradient-to-br', 'from-amber-50', 'via-white', 'to-indigo-50', 'btn btn-primary']) {
     assert.ok(hero.includes(marker), `the shared hero keeps the Apps visual marker ${marker}`);
@@ -197,7 +197,6 @@ test('every Toolkit app starts with the shared Apps-style hero', async () => {
   const views = [
     ['src/views/ToolkitAppsView.tsx', 'toolkit-apps-hero'],
     ['src/views/ToolkitConvertView.tsx', 'toolkit-convert-hero'],
-    ['src/views/ToolkitDriftView.tsx', 'toolkit-drift-hero'],
     ['src/views/ToolkitProtectView.tsx', 'toolkit-protect-hero'],
     ['src/views/ToolkitTranslateView.tsx', 'toolkit-translate-hero'],
     ['src/views/ToolkitPresenterView.tsx', 'toolkit-presenter-hero'],
@@ -208,6 +207,11 @@ test('every Toolkit app starts with the shared Apps-style hero', async () => {
     assert.match(source, /<ToolkitAppHero\b/, `${file} uses the one shared first-screen header`);
     assert.ok(source.includes(`heroTestId="${testId}"`), `${file} exposes its hero for visual regression checks`);
   }
+
+  const drift = await read('src/views/ToolkitDriftView.tsx');
+  assert.doesNotMatch(drift, /ToolkitAppHero/);
+  assert.match(drift, /drift-workspace theme-workspace-surface/);
+  assert.match(drift, /data-testid="toolkit-drift-hero"/);
 
   const presenter = await read('src/views/ToolkitPresenterView.tsx');
   assert.equal((presenter.match(/data-testid="presenter-import"/g) ?? []).length, 0, 'Presenter does not duplicate the import action below its hero');

@@ -32,6 +32,8 @@ import {
   type DriftAction,
   type DriftFilter,
   type DriftState,
+  type DriftPreset,
+  type DriftPresetIcon,
 } from './driftState';
 
 /**
@@ -78,6 +80,11 @@ export interface DriftContextValue {
   favorites: string[];
   filter: DriftFilter;
   master: number;
+  presets: DriftPreset[];
+  savePreset: (name: string, icon: DriftPresetIcon) => void;
+  editPreset: (id: string, name: string, icon: DriftPresetIcon) => void;
+  deletePreset: (id: string) => void;
+  applyPreset: (id: string) => void;
   /** A voice is audibly running. */
   playing: boolean;
   /** A voice is still fetching or decoding. */
@@ -324,6 +331,16 @@ export function DriftProvider({ children }: { children: ReactNode }) {
 
   const setFilter = useCallback((filter: DriftFilter) => apply({ type: 'setFilter', filter }), [apply]);
   const dismissNotice = useCallback(() => setLimitNotice(null), []);
+  const savePreset = useCallback((name: string, icon: DriftPresetIcon) => apply({ type: 'savePreset', id: crypto.randomUUID(), name, icon }), [apply]);
+  const editPreset = useCallback((id: string, name: string, icon: DriftPresetIcon) => apply({ type: 'editPreset', id, name, icon }), [apply]);
+  const deletePreset = useCallback((id: string) => apply({ type: 'deletePreset', id }), [apply]);
+  const applyPreset = useCallback((id: string) => {
+    if (!stateRef.current.presets.some((preset) => preset.id === id)) return;
+    apply({ type: 'applyPreset', id });
+    const next = stateRef.current;
+    engineRef.current?.loadMix({ ids: next.selection, volumes: next.volumes, master: next.master });
+    setLimitNotice(null);
+  }, [apply]);
 
   // ── What the interface reads ────────────────────────────────────────────────
   const catalogMap = useMemo(() => new Map(sounds.map((entry) => [entry.id, entry])), [sounds]);
@@ -354,6 +371,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
     favorites: state.favorites,
     filter: state.filter,
     master: state.master,
+    presets: state.presets, savePreset, editPreset, deletePreset, applyPreset,
     playing: engine.playing,
     loading: engine.loading,
     limitNotice,
@@ -373,7 +391,7 @@ export function DriftProvider({ children }: { children: ReactNode }) {
     setMediaTab,
   }), [
     catalogStatus, sounds, loadCatalog, state, voices, engine, limitNotice, toggleSound, removeSound, retrySound,
-    play, pause, togglePlayback, clear, setVolume, setMaster, toggleFavorite, setFilter, dismissNotice, mediaTab,
+    play, pause, togglePlayback, clear, setVolume, setMaster, toggleFavorite, setFilter, dismissNotice, mediaTab, savePreset, editPreset, deletePreset, applyPreset,
   ]);
 
   return <DriftContext.Provider value={value}>{children}</DriftContext.Provider>;

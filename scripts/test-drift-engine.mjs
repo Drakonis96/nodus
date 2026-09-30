@@ -120,6 +120,27 @@ test('doing nothing creates nothing: play, pause and clear on an empty engine', 
 
 // ── starting ───────────────────────────────────────────────────────────────
 
+test('loading presets stays silent before first play and cancels a previous pending load in the same context', async () => {
+  const slow = deferred();
+  const t = setup({ files: { 'slow-file': slow } });
+  t.engine.loadMix({ ids: ['brown-noise'], volumes: { 'brown-noise': 0.6 }, master: 0.7 });
+  assert.equal(t.created, 0);
+  assert.deepEqual(statuses(t.engine), ['brown-noise:paused']);
+  const pending = t.engine.selectSound('slow-file');
+  await flush();
+  t.engine.loadMix({ ids: ['white-noise'], volumes: { 'white-noise': 0.4 }, master: 0.5 });
+  slow.resolve(fakeAudioBytes());
+  await pending;
+  await t.settle();
+  assert.deepEqual(statuses(t.engine), ['white-noise:paused'], 'stale decoding cannot resurrect the old mix');
+  assert.equal(t.engine.snapshot().contextState, 'suspended');
+  assert.equal(t.created, 1);
+  await t.engine.playAll();
+  assert.deepEqual(statuses(t.engine), ['white-noise:playing']);
+  assert.equal(t.created, 1);
+  await t.engine.dispose();
+});
+
 test('activating a sound creates and resumes the context BEFORE anything is read or decoded', async () => {
   const t = setup({ files: { 'rain-a': { seconds: 1 } } });
   await t.engine.selectSound('rain-a');

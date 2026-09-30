@@ -229,6 +229,17 @@ export class DriftAudioEngine {
     this.emit();
   }
 
+  /** Replace the mix in the same engine, paused. A preset never starts or resumes audio. */
+  loadMix(config: { ids: readonly string[]; volumes: Readonly<Record<string, number>>; master: number }): void {
+    if (this.disposed) return;
+    void this.clearAll();
+    this.setMasterVolume(config.master);
+    for (const id of config.ids.slice(0, this.maxSelected)) {
+      if (!this.voices.has(id)) this.addVoice(id, isValidVolume(config.volumes[id]) ? config.volumes[id] : DEFAULT_SOUND_VOLUME);
+    }
+    this.emit();
+  }
+
   // ── Selection ─────────────────────────────────────────────────────────────
 
   /**
