@@ -1,40 +1,48 @@
 /**
  * Where a work's text came from, read back from the extraction notes the text extractor writes
  * (Spanish, as all internal notes): pages recovered by OCR, pages the OCR page cap left out, and
- * pages with no text at all. Used to mark scanned books in the library and in cited evidence.
+ * pages without recovered text. Historical notes do not establish why text is missing.
  */
 export interface TextProvenance {
   /** Pages whose text came from OCR. */
   ocrPages: number;
   /** Pages not processed because the document exceeded the OCR page cap. */
   cappedPages: number;
-  /** The cap those pages exceeded, when the note says. */
+  /** The cap, only when every capped attachment reports the same known limit. */
   cap: number | null;
-  /** Pages with no text that OCR did not recover. */
+  /** Pages without recovered text. Older notes do not establish whether OCR tried them. */
   blankPages: number;
+  /** Pages without recovered text for which OCR did not produce a page result. */
+  unresolvedPages: number;
+  /** The extraction explicitly reported that OCR did not complete. */
+  ocrFailed: boolean;
 }
 
 export function parseTextNotes(notes: string | null | undefined): TextProvenance {
   const text = notes ?? '';
   const sum = (pattern: RegExp) => [...text.matchAll(pattern)].reduce((total, match) => total + Number(match[1]), 0);
   const ocrPages = sum(/(\d+)\s+página\(s\)\s+recuperadas por OCR/g);
-  let cappedPages = sum(/(\d+)\s+página\(s\)\s+no procesadas:\s+superan el límite de OCR/g);
-  let blankPages = sum(/(\d+)\s+página\(s\)\s+sin texto omitidas/g);
-  let cap = Number(/límite de OCR \((\d+) páginas/.exec(text)?.[1] ?? NaN);
-  // Notes written before the cap was reported separately: OCR stopping at a round figure (the
-  // 300 default, or 1,000) with pages still left over means the cap cut the book short.
-  if (!cappedPages && blankPages > 0 && ocrPages >= 300 && ocrPages % 100 === 0) {
-    cappedPages = blankPages;
-    blankPages = 0;
-    cap = ocrPages;
-  }
-  return { ocrPages, cappedPages, cap: Number.isFinite(cap) ? cap : null, blankPages };
+  const cappedNotes = [...text.matchAll(/(\d+)\s+página\(s\)\s+no procesadas:\s+superan el límite de OCR(?:\s+\((\d+) páginas por documento\))?/g)];
+  const cappedPages = cappedNotes.reduce((total, match) => total + Number(match[1]), 0);
+  const caps = new Set(cappedNotes.map((match) => match[2] ? Number(match[2]) : null));
+  const reportedCap = caps.size === 1 ? [...caps][0] : null;
+  // Recovered pages are successes, not the number attempted or the configured limit.
+  // The old "sin texto omitidas" note cannot distinguish a cap from an unreadable page.
+  return {
+    ocrPages,
+    cappedPages,
+    cap: reportedCap !== null && Number.isFinite(reportedCap) && reportedCap > 0 ? reportedCap : null,
+    blankPages: sum(/(\d+)\s+página\(s\)\s+sin texto omitidas/g),
+    unresolvedPages: sum(/(\d+)\s+página\(s\)\s+sin texto recuperado/g),
+    ocrFailed: /OCR no completado\./.test(text),
+  };
 }
 
-/** A work read mostly through OCR: at least half of its known pages. `pageCount` is the highest
- *  page number among its passages, when known. */
+/** At least half of the work's actual total pages were recovered through OCR.
+ * `pageCount` must cover every source, including pages without passages; unknown totals
+ * and inconsistent inventories are not enough to classify a work as scanned. */
 export function isScannedWork(provenance: TextProvenance, pageCount: number | null): boolean {
-  if (!provenance.ocrPages) return false;
-  const pages = Math.max(pageCount ?? 0, provenance.ocrPages + provenance.cappedPages);
-  return provenance.ocrPages / Math.max(1, pages) >= 0.5;
+  if (pageCount === null || !Number.isInteger(pageCount) || pageCount <= 0 || !provenance.ocrPages) return false;
+  const reportedPages = provenance.ocrPages + provenance.cappedPages + provenance.blankPages + provenance.unresolvedPages;
+  return pageCount >= reportedPages && provenance.ocrPages / pageCount >= 0.5;
 }

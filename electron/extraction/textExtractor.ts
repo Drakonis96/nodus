@@ -37,6 +37,8 @@ export interface ExtractedDoc {
    */
   hadTextAttachment?: boolean;
   blockReason?: TextBlockReason | null;
+  /** An incomplete OCR batch must be retried rather than reused from extraction cache. */
+  ocrFailed?: boolean;
   segments?: ExtractedTextSegment[];
 }
 
@@ -363,7 +365,8 @@ export async function extractPdfStreaming(
   extractionDone({ textPages: pageTexts.size, blankPages: blanks.length, lowQualityPages: lowQuality.length });
 
   let ocredPages = 0;
-  let skippedPages = blanks.length;
+  let ocrFailed = false;
+  const ocrReadPages = new Set<number>();
   const ocrCandidates = [...blanks, ...lowQuality].slice(0, opts.ocr.maxPages);
   if (opts.ocr.enabled && ocrCandidates.length) {
     const toOcr = ocrCandidates;
@@ -381,6 +384,7 @@ export async function extractPdfStreaming(
       );
       opts.signal?.throwIfAborted();
       for (const [p, result] of map) {
+        ocrReadPages.add(p);
         const cleaned = cleanExtractedText(result.text ?? '');
         if (cleaned.length >= MIN_CHARS_TEXT_PAGE) {
           const previous = pageTexts.get(p);
@@ -390,15 +394,14 @@ export async function extractPdfStreaming(
           }
         }
       }
-      skippedPages = blanks.filter((page) => !pageTexts.has(page)).length;
-      ocrDone({ recoveredPages: ocredPages, skippedPages });
+      ocrDone({ recoveredPages: ocredPages, skippedPages: blanks.filter((page) => !pageTexts.has(page)).length });
     } catch (e) {
       if (opts.signal?.aborted) {
         await pdf.destroy?.();
         throw e;
       }
       // OCR deps missing or failed — keep whatever digital text we have.
-      skippedPages = blanks.length;
+      ocrFailed = true;
       ocrDone({ status: 'error', error: e instanceof Error ? e.message : String(e) });
     }
   } else if (blanks.length) {
@@ -414,20 +417,26 @@ export async function extractPdfStreaming(
     if (t) parts.push(`[[p. ${p}]]\n${t}`);
   }
 
-  // Pages the OCR page cap left out are not "pages without text": McMurry's 7th edition lost
-  // its last 342 of 1,342 scanned pages to a 1,000-page cap, reported as blank.
-  const ocrAttempted = new Set(opts.ocr.enabled ? ocrCandidates : []);
-  const capped = opts.ocr.enabled ? blanks.filter((page) => !pageTexts.has(page) && !ocrAttempted.has(page)).length : 0;
+  // Selection proves a page was within the cap, but does not prove OCR processed it:
+  // a missing worker or a mid-batch failure can prevent any page results returning.
+  const ocrSelected = new Set(opts.ocr.enabled ? ocrCandidates : []);
+  const unrecovered = blanks.filter((page) => !pageTexts.has(page));
+  const capped = opts.ocr.enabled ? unrecovered.filter((page) => !ocrSelected.has(page)).length : 0;
+  const readWithoutText = unrecovered.filter((page) => ocrReadPages.has(page)).length;
+  const unresolved = unrecovered.length - capped - readWithoutText;
   const notes: string[] = [];
   if (ocredPages) notes.push(`${ocredPages} página(s) recuperadas por OCR.`);
   if (capped) notes.push(`${capped} página(s) no procesadas: superan el límite de OCR (${opts.ocr.maxPages} páginas por documento).`);
-  if (skippedPages - capped > 0) notes.push(`${skippedPages - capped} página(s) sin texto omitidas.`);
+  if (readWithoutText) notes.push(`${readWithoutText} página(s) sin texto omitidas.`);
+  if (unresolved) notes.push(`${unresolved} página(s) sin texto recuperado${opts.ocr.enabled ? '.' : ': OCR desactivado.'}`);
+  if (ocrFailed) notes.push('OCR no completado.');
 
   return {
     text: parts.join('\n\n'),
     sourceType: 'pdf',
     analysis,
     notes: notes.length ? notes.join(' ') : null,
+    ...(ocrFailed ? { ocrFailed: true } : {}),
   };
 }
 
@@ -635,8 +644,10 @@ export async function extractFromPath(
   }
 
   opts.signal?.throwIfAborted();
-  upsertExtractionCache(cacheKey, doc);
-  perfLog('extraction cache write', 0, opts.perf, { file: path.basename(filePath), chars: doc.text.length });
+  if (!doc.ocrFailed) {
+    upsertExtractionCache(cacheKey, doc);
+    perfLog('extraction cache write', 0, opts.perf, { file: path.basename(filePath), chars: doc.text.length });
+  }
   return doc;
 }
 
