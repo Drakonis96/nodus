@@ -1627,9 +1627,12 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
-  assert.equal(manifest.version, '5.7.3', 'the add-on shares the Nodus 5 release version');
+  const pkg = JSON.parse(readSource('package.json'));
+  const serverPkg = JSON.parse(readSource('server/package.json'));
+  assert.equal(manifest.version, serverPkg.version, 'the add-on shares the stable server release version');
+  if (!pkg.version.includes('-')) assert.equal(manifest.version, pkg.version, 'stable desktop and add-on versions agree');
   assert.equal(manifest.license, 'AGPL-3.0-only');
-  assert.match(zip.readAsText('SOURCE_CODE.md'), /releases\/tag\/v5\.7\.2/);
+  assert.ok(zip.readAsText('SOURCE_CODE.md').includes(`/releases/tag/v${pkg.version}\n`), 'the packaged source offer names the current immutable release');
   assert.equal(manifest.icons['64'], 'icons/nodus.svg');
   assert.match(zip.readAsText('icons/nodus.svg'), /M18 48V16L46 48V16/, 'Zotero keeps the normal Nodus N');
   assert.ok(!names.includes('icons/zotero-z.svg'), 'the rotated release-note mark is not shipped as Zotero UI');
