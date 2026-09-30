@@ -43,9 +43,9 @@ assert.match(styles, /\.whats-new-footer-support-group \{[^}]*justify-self: cent
 assert.match(modal, /whats-new-support-icon whats-new-support-icon-kofi/);
 assert.match(icons, /kofi:/);
 assert.match(modal, /<div className="whats-new-release-version">v\{selectedNote\.version\}<\/div>/);
-assert.match(modal, /groupHighlightsByScope\(selectedNote\.highlights\)\.map[\s\S]*<li key=\{i\}>/);
+assert.match(modal, /releaseNoteSections\(selectedNote\)\.map[\s\S]*highlights\.map[\s\S]*<li key=\{i\}>/);
 // The uniform-view grouping clusters highlights by scope and orders clusters by size.
-assert.match(modal, /function groupHighlightsByScope[\s\S]*b\.items\.length - a\.items\.length \|\| a\.index - b\.index/);
+assert.match(await readFile(path.join(root, 'shared/releaseNotesPresentation.ts'), 'utf8'), /function groupHighlightsByScope[\s\S]*b\.items\.length - a\.items\.length \|\| a\.index - b\.index/);
 assert.match(modal, /releaseNotesForMajor\(current\)/);
 assert.match(modal, /if \(showSeenReleaseNotes\) return releaseNotesSince\(null, current\);/);
 assert.match(modal, /releaseNotesSince\(null, current\)\.slice\(0, STARTUP_VERSION_HISTORY_LIMIT\)/);

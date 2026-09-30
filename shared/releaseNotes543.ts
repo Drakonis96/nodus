@@ -8,6 +8,7 @@ import type { ReleaseHighlight } from './releaseNotes';
  */
 export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los resúmenes de las obras dejan de guardarse cortados a mitad de frase. En un modelo con razonamiento, el presupuesto de salida se agotaba pensando y la generación terminaba antes de escribir el final, pero el resumen se guardaba como completado. Ahora el primer intento dispone de más espacio y, si aun así se corta, Nodus lo reintenta una vez con el presupuesto más amplio de la aplicación. Si el modelo vuelve a agotarlo, el resumen se marca como fallido en lugar de guardarse incompleto.',
     en: 'Work summaries are no longer stored cut off mid-sentence. With a reasoning model, the output budget ran out while thinking and generation stopped before the closing lines, yet the summary was saved as completed. The first attempt now gets real headroom and, if it is still cut off, Nodus retries once at the app’s larger budget. If the model exhausts that too, the summary is marked as failed instead of stored incomplete.',
@@ -23,6 +24,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "作業概要が文の途中で切り取られて保存されることがなくなりました。推論モデルでは、考えている間に出力予算がなくなり、終了行の手前で生成が停止しましたが、概要は完了したものとして保存されました。最初の試行で実際のヘッドルームが得られるようになり、それでも切断された場合、Nodus はアプリのより大きな予算で1回再試行します。モデルがそれも使い果たす場合、概要は不完全に保存されるのではなく、失敗としてマークされます。",
   },
   {
+    category: 'fix',
     scope: 'connector',
     es: 'El emparejamiento del navegador deja de esperar en silencio. En macOS, el aviso para emparejar se abría detrás de Chrome, que seguía siendo la aplicación activa, y la petición terminaba sin que nadie llegara a verlo. Ahora Nodus pasa al frente en cuanto recibe la solicitud y, si el sistema rechaza esa activación, pide atención como lo hace la plataforma, con un parpadeo en la barra de tareas o un rebote en el Dock. La señal se apaga en cuanto la ventana recibe el foco o el emparejamiento se resuelve.',
     en: 'Pairing your browser no longer waits in silence. On macOS, the pairing prompt opened behind Chrome, which remained the active app, and the request timed out with nobody seeing it. Nodus now comes to the front as soon as the request arrives and, when the system refuses that activation, asks for attention the way the platform does, with a taskbar flash or a dock bounce. The signal stops as soon as the window takes focus or the pairing is settled.',
@@ -38,6 +40,7 @@ export const RELEASE_5_4_3_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ブラウザのペアリングは、沈黙して待つ必要がなくなりました。 macOS では、アクティブなアプリのままである Chrome の背後でペアリングプロンプトが開き、誰にも表示されずにリクエストがタイムアウトしました。 Nodus はリクエストが到着するとすぐに前面に出てきて、システムがそのアクティブ化を拒否した場合、プラットフォームが行うのと同じように、タスクバーのフラッシュやドックのバウンスで注意を求めます。ウィンドウにフォーカスが移るか、ペアリングが完了するとすぐに信号は停止します。",
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: 'Los resultados JSON de una herramienta dejan de ocupar la conversación como si fueran el entregable. Antes se volcaban en un bloque sin estilo y tan alto como la respuesta, así que una consulta de procedencia parecía salida de depuración junto a la figura que habías pedido. Ahora el JSON queda plegado bajo «Evidencia», a un clic, y la figura conserva el centro del mensaje.',
     en: 'A tool’s JSON results no longer take over the conversation as if they were the deliverable. They used to land in an unstyled block as tall as the answer, so a provenance query looked like debug output next to the figure you had asked for. The JSON now stays folded under “Evidence”, one click away, and the figure keeps the centre of the message.',

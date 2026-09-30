@@ -8,6 +8,7 @@ import type { ReleaseHighlight } from './releaseNotes';
  */
 export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'estudio',
     es: 'El banco de preguntas de Estudio se reconstruye para trabajar en volumen. Preguntas y tarjetas viven en dos pestañas, con búsqueda y filtros por asignatura, tema, nivel cognitivo, fuente, material, documento, etiqueta o colección, ordenación y selección múltiple. Aplica estado, dificultad, categoría, etiquetas, colección y repaso a una selección entera, y crea, edita o borra cada tarjeta con sus propias acciones de repaso espaciado.',
     en: 'The Study question bank is rebuilt for working in volume. Questions and flashcards live in two tabs, with search and filters by subject, topic, cognitive level, source, material, document, tag or collection, sorting and multi-select. Apply status, difficulty, category, tags, collection and review state to a whole selection, and create, edit or delete each flashcard with its own spaced-repetition actions.',
@@ -23,6 +24,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "学習用の質問バンクは、大量に作業できるように再構築されています。質問とフラッシュカードは2つのタブに表示され、主題、トピック、認知レベル、ソース、資料、ドキュメント、タグまたはコレクションによる検索とフィルター、並べ替えと複数選択が可能です。ステータス、難易度、カテゴリ、タグ、コレクションおよびレビュー状態を選択全体に適用し、独自の間隔をあけた繰り返しアクションで各フラッシュカードを作成、編集、または削除します。",
   },
   {
+    category: 'new',
     scope: 'estudio',
     es: 'El banco deja de estar encerrado. Importa y exporta Anki, con paquetes .apkg y TSV, cuestionarios Moodle en XML y GIFT, CSV y el propio JSON de Nodus desde un solo diálogo, que muestra qué va a entrar antes de tocar tus preguntas.',
     en: 'The bank is no longer locked in. Import and export Anki, with .apkg packages and TSV, Moodle quizzes in XML and GIFT, CSV and Nodus’s own JSON from one dialog that shows what will come in before touching your questions.',
@@ -38,6 +40,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "銀行はもうロックインされません。.apkg パッケージと TSV を使用した Anki、XML と GIFT の Moodle クイズ、CSV、および Nodus 独自の JSON を、質問に触れる前に何が表示されるかを示す1つのダイアログからインポートおよびエクスポートします。",
   },
   {
+    category: 'new',
     scope: 'estudio',
     es: 'Las preguntas y tarjetas ya se leen como están escritas. Markdown y las fórmulas LaTeX se componen en el enunciado, las opciones, la respuesta y la explicación en todas las superficies, del banco y la sesión de repaso a la generación con IA, el generador de exámenes y los cuestionarios. Los campos de escritura ganan vista previa y el servidor web también las compone.',
     en: 'Questions and flashcards now read as they were written. Markdown and LaTeX formulas are typeset in the prompt, the options, the answer and the explanation on every surface, from the bank and the review session to AI generation, the exam builder and quizzes. Writing fields gain a preview, and the web server typesets them too.',
@@ -53,6 +56,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "質問とフラッシュカードは、書かれたとおりに読み取られるようになりました。 Markdown と LaTeX の数式は、銀行やレビューセッションから AI 生成、試験ビルダーやクイズに至るまで、プロンプト、オプション、解答、説明のあらゆる面にタイプセットされています。書き込みフィールドはプレビューを取得し、Web サーバーもそれらを植字します。",
   },
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Guardar una respuesta del chat en tus notas conserva de dónde vino. La nota recuerda la conversación, el modelo y las fuentes, y desde la propia nota puedes volver a esa conversación y saltar al mensaje exacto. Al exportar las notas, la procedencia viaja con ellas.',
     en: 'Saving a chat answer to your notes keeps where it came from. The note remembers the conversation, the model and the sources, and from the note itself you can reopen that conversation and jump to the exact message. When you export your notes, the provenance travels with them.',
@@ -68,6 +72,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "チャットの回答をメモに保存すると、その回答の出所が維持されます。メモは会話、モデル、ソースを記憶しており、メモ自体からその会話を再度開いて、正確なメッセージにジャンプすることができます。メモをエクスポートすると、出所も一緒に移動します。",
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'En los diálogos de creación de Deep Research e Immersion, solo Image Atelier se marca como de pago por llamada. Las demás Skills instaladas conservan el límite opcional de SVG Studio y dejan de pedirte un máximo obligatorio para confirmar.',
     en: 'In the Deep Research and Immersion creation dialogs, only Image Atelier is marked as paid per call. Every other installed Skill keeps SVG Studio’s optional ceiling and no longer asks for a mandatory maximum before you can confirm.',
@@ -83,6 +88,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "Deep Research および Immersion 作成ダイアログでは、Image Atelier のみが通話ごとに支払い済みとしてマークされています。インストールされている他のすべてのスキルは、SVG Studio のオプションの上限を維持し、確認する前に必須の最大値を要求することはなくなりました。",
   },
   {
+    category: 'new',
     scope: 'languages',
     es: 'Siete idiomas nuevos para generar contenido. Chino simplificado y tradicional, vietnamita, japonés, ruso, ucraniano y coreano se suman a los selectores de idioma de los prompts, que ya ofrecen quince. La interfaz mantiene sus ocho idiomas.',
     en: 'Seven new languages for generated content. Simplified and traditional Chinese, Vietnamese, Japanese, Russian, Ukrainian and Korean join the prompt language pickers, which now offer fifteen. The interface keeps its eight languages.',
@@ -98,6 +104,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "生成されたコンテンツ用に7つの新しい言語。簡体字および繁体字中国語、ベトナム語、日本語、ロシア語、ウクライナ語、韓国語がプロンプト言語選択ツールに加わり、現在15言語が提供されています。インターフェイスは8つの言語を維持します。",
   },
   {
+    category: 'enhancement',
     scope: 'marketplace',
     es: 'El Marketplace muestra un solo catálogo. Skills, plugins, paquetes firmados y plugins pendientes de revisión comparten una lista y una tarjeta cada uno, con la misma identidad visual, los mismos detalles plegables y un único diálogo de permisos antes de instalar o actualizar.',
     en: 'The Marketplace shows one single catalog. Skills, plugins, signed packages and plugins awaiting review share one list with one card each, the same visual identity, the same collapsible details and one permissions dialog before installing or updating.',
@@ -113,6 +120,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "マーケットプレイスには1つのカタログが表示されます。スキル、プラグイン、署名済みパッケージ、およびレビュー待ちのプラグインは、インストールまたは更新する前に、それぞれ1枚のカードを含む1つのリスト、同じビジュアルアイデンティティ、同じ折りたたみ可能な詳細、および1つの権限ダイアログを共有します。",
   },
   {
+    category: 'fix',
     scope: 'plugin',
     es: 'Los paquetes firmados versión 2 usan su propio canal de ejecución. Sus herramientas dejan de anunciarse por el mecanismo genérico anterior y se ejecutan por la vía de capacidades de confianza que declaran, así que el chat deja de buscar una herramienta que el paquete no expone.',
     en: 'Signed version 2 packages use their own execution channel. Their tools are no longer advertised through the previous generic mechanism and run through the trusted capability path they declare, so a chat no longer reaches for a tool the package does not expose.',
@@ -128,6 +136,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "署名付きバージョン2パッケージは独自の実行チャネルを使用します。彼らのツールは、以前の汎用メカニズムを通じてアドバタイズされなくなり、宣言された信頼できる機能パスを通じて実行されるため、パッケージが公開していないツールにチャットが到達することはなくなりました。",
   },
   {
+    category: 'fix',
     scope: 'browser',
     es: 'El navegador respeta las páginas que no declaran modo oscuro. Su fondo sigue los colores del propio documento en lugar de imponer el tema de la aplicación, así que una página 401 o sin estilos se lee sin seleccionar el texto. Las webs con autenticación básica HTTP ya pueden iniciar sesión desde una barra del navegador, que no guarda tus credenciales.',
     en: 'The browser respects pages that do not declare a dark scheme. Their surface follows the document’s own colours instead of imposing the app theme, so a 401 page or an unstyled document is readable without selecting its text. Sites using HTTP Basic authentication can now sign in through a browser bar that stores none of your credentials.',
@@ -143,6 +152,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ブラウザーは、ダークスキームを宣言していないページを尊重します。表面はアプリのテーマを押し付けるのではなく、ドキュメント自体の色に従っているため、401ページやスタイルのないドキュメントは、テキストを選択しなくても読むことができます。 HTTP 基本認証を使用するサイトは、資格情報を保存しないブラウザバーからサインインできるようになりました。",
   },
   {
+    category: 'fix',
     scope: 'browser',
     es: 'La vista nativa del navegador se alinea con el zoom de la interfaz. Al ampliar o reducir con el zoom del renderizador, la página y su marco dejan de quedar desalineados y el contenido se mantiene en su sitio.',
     en: 'The browser’s native view aligns with the interface zoom. When you zoom in or out with the renderer zoom, the page and its frame stop drifting apart and the content stays in place.',
@@ -158,6 +168,7 @@ export const RELEASE_5_4_2_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ブラウザのネイティブビューはインターフェイスのズームに合わせて調整されます。レンダラーズームを使用してズームインまたはズームアウトすると、ページとそのフレームが離れてしまうことがなくなり、コンテンツは所定の位置に留まります。",
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'El análisis de la biblioteca se recupera mejor de los fallos pasajeros. Si Zotero no responde, el trabajo vuelve a la cola en lugar de darse por «sin texto», el filtro «Incompleto» comprueba los cinco pasos y el estado semántico coincide con el de cada fila, y una fusión interrumpida se reanuda solo por las ideas que faltan.',
     en: 'Library analysis recovers better from transient failures. When Zotero is unreachable, the work returns to the queue instead of being marked as having no text, the Incomplete filter checks all five steps and the semantic state agrees with each row, and an interrupted fusion resumes only the ideas that are missing.',

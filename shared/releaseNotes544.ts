@@ -10,6 +10,7 @@ import type { ReleaseHighlight } from './releaseNotes';
  */
 export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'languages',
     es: 'Nodus Research ya está disponible en chino simplificado.',
     en: 'Nodus Research is now available in Simplified Chinese.',
@@ -25,6 +26,7 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "Nodus Research は簡体字中国語でも利用できるようになりました。",
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los escaneos sobre una pasarela propia dejan de morir por una conexión caída. Un fallo de socket sin estado, el «Connection error.» del SDK o un reinicio de conexión, ahora se trata como recuperable, así que la cola vuelve a intentarlo en lugar de darse por vencida. Nodus también envía al proveedor personalizado el esfuerzo de razonamiento que elijas y pide a un modelo con razonamiento que omita su traza privada en los escaneos de fondo, que era lo que agotaba el presupuesto y alargaba la generación hasta que la pasarela la cortaba.',
     en: 'Scans on a custom gateway stop dying from a dropped connection. A status-less socket failure, the SDK’s “Connection error.” or a connection reset, is now treated as recoverable, so the queue retries instead of giving up. Nodus also forwards the reasoning effort you choose to a custom provider and asks a thinking model to skip its private trace on background scans, which is what exhausted the budget and stretched the generation until the gateway cut it.',
@@ -40,6 +42,7 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "カスタムゲートウェイでのスキャンは、接続の切断による停止を停止します。ステータスのないソケット障害、SDK の「接続エラー」。接続のリセットは回復可能として扱われるようになったため、キューはあきらめずに再試行します。また、Nodus は、ユーザーが選択した推論作業をカスタムプロバイダーに転送し、バックグラウンドスキャンでのプライベートトレースをスキップするように思考モデルに要求します。これにより、予算が使い果たされ、ゲートウェイが予算をカットするまで世代が延長されました。",
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'El Índice documental muestra también los escaneos sueltos. El análisis de una sola obra o la preparación de un Deep Research creaban un trabajo sin campaña que no aparecía en ninguna fila, así que pulsar reintentar encolaba trabajo invisible. Ahora cada uno tiene su fila, con un botón de reintento si falló y otro de cancelación si sigue en marcha, y el panel y el contador de la cabecera lo cuentan como cualquier otro trabajo.',
     en: 'The Documentary Index shows standalone scans too. A single work’s analysis or the preparation of a Deep Research created a job with no campaign that appeared in no row, so pressing retry queued invisible work. Each one now has its own row, with a retry button if it failed and a cancel button if it is still running, and the panel and the header badge count it like any other job.',
@@ -55,6 +58,7 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ドキュメンタリーインデックスにはスタンドアロンスキャンも表示されます。単一の作業の分析またはディープリサーチの準備により、キャンペーンが表示されないジョブが作成され、行が表示されなかったため、再試行を押すと目に見えない作業がキューに入れられました。それぞれに独自の行があり、失敗した場合は再試行ボタン、まだ実行中の場合はキャンセルボタンがあり、パネルとヘッダーバッジは他のジョブと同様にカウントします。",
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Enlazar desde la biblioteca global se refleja al instante. Al llevar obras a una bóveda, su lista de Biblioteca se servía de una caché que el enlace no invalidaba, así que al volver a «Esta bóveda» veías la página anterior. Ahora el enlace refresca la lista. La cola de extracción también deja de mostrar mensajes sin traducir, y una fila solo se pinta en rojo cuando el trabajo ha fallado de verdad.',
     en: 'Linking from the global library shows up right away. When you brought works into a vault, its Library list was served from a cache the link never invalidated, so returning to “This vault” showed the previous page. Linking now refreshes the list. The extraction queue also stops showing untranslated messages, and a row is only painted red when the job really failed.',
@@ -70,6 +74,7 @@ export const RELEASE_5_4_4_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "グローバルライブラリからのリンクはすぐに表示されます。作品を Vault に持ち込むと、そのライブラリリストはリンクが無効化されなかったキャッシュから提供されるため、「この Vault」に戻ると前のページが表示されます。リンクするとリストが更新されます。抽出キューにも未翻訳メッセージの表示が停止され、ジョブが実際に失敗した場合にのみ行が赤く塗られます。",
   },
   {
+    category: 'fix',
     scope: 'server',
     es: 'La imagen de Nodus Server vuelve a arrancar. Su ruta de PDF importaba una dependencia para recortar los glifos chinos que la imagen no instalaba, así que el contenedor se caía nada más iniciarse. La dependencia ya está declarada y la comprobación de salud del arranque pasa.',
     en: 'The Nodus Server image starts again. Its PDF path imported a dependency for subsetting Chinese glyphs that the image never installed, so the container fell over as soon as it started. The dependency is now declared and the startup health check passes.',

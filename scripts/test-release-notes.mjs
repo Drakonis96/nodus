@@ -42,7 +42,7 @@ try {
   // changed and rebuilds the Linux packages on Ubuntu 22.04 for older glibc.
   // 5.7.1 only fixes the indexing welcome's «Yes, start» button, and its What's New
   // modal is the 5.7.0 one, word for word in every language.
-  const release572 = RELEASE_NOTES[0];
+  const release572 = RELEASE_NOTES.find(note => note.version === '5.7.2');
   assert.equal(release572.version, '5.7.2');
   assert.equal(release572.date, '2026-09-29');
   assert.equal(release572.highlights.length, 12);
@@ -254,7 +254,7 @@ try {
 
   assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
   const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-  assert.equal(release572.version, packageVersion);
+  assert.equal(RELEASE_NOTES[0].version, packageVersion);
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.
@@ -759,6 +759,7 @@ try {
     'mcp',
     'nodi',
     'toolkit',
+    'drift',
     'plugin',
     'marketplace',
     'languages',

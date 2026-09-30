@@ -1,6 +1,6 @@
 {
   "name": "nodus",
-  "version": "5.7.2",
+  "version": "5.7.3",
   "description": "Local-first desktop app that turns a Zotero library into a navigable graph of ideas and authors.",
   "author": {
     "name": "Jorge P\u00e9rez Burgue\u00f1o",
@@ -13,7 +13,7 @@
     "url": "https://github.com/Drakonis96/nodus.git"
   },
   "releaseMetadata": {
-    "dateReleased": "2026-09-29",
+    "dateReleased": "2026-09-30",
     "conceptDoi": "10.5281/zenodo.21515531",
     "versionDoi": null
   },
@@ -45,6 +45,7 @@
     "site:sitemap": "node scripts/build-sitemap.mjs",
     "citation:sync": "node scripts/sync-citation.mjs",
     "citation:check": "node scripts/sync-citation.mjs --check",
+    "release:notes": "node scripts/generate-release-notes.mjs",
     "release:verify-source": "node scripts/verify-source-offer.mjs",
     "version": "npm run citation:sync && git add CITATION.cff",
     "test:e2e": "node scripts/e2e-smoke.mjs",

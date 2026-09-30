@@ -13,6 +13,7 @@ import type { ReleaseHighlight } from './releaseNotes';
  */
 export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'library',
     es: 'La Biblioteca puede borrar las obras que tengas seleccionadas en la bóveda actual, con todo lo que deriva de ellas. La acción pide confirmación y nombra las dos mitades: se van las obras y su análisis propio, y se queda el que otras obras comparten con ellas. Una obra que el escaneo está analizando en este momento se rechaza en lugar de borrarse a medias, el lote entero se deshace si algo falla, y las ideas y los temas compartidos sobreviven intactos.',
     en: 'The Library can delete the works you have selected in the current vault, with everything derived from them. The action asks for confirmation and names both halves: the works and their own analysis go, and the analysis other works share with them stays. A work the scanner is analysing right now is refused instead of deleted half-finished, the whole batch is undone if anything fails, and shared ideas and themes survive untouched.',
@@ -28,6 +29,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ライブラリは、現在のVaultで選択した作品を、そこから派生したすべてのものとともに削除できます。このアクションは確認を求め、両方の部分に名前を付けます。作品とその独自の分析は削除され、他の作品が共有する分析は残ります。スキャナーが現在分析中の作業は中途半端に削除されるのではなく拒否され、何かが失敗するとバッチ全体が元に戻され、共有されたアイデアやテーマはそのまま残ります。",
   },
   {
+    category: 'new',
     scope: 'library',
     es: 'Reparar una selección entera de una vez. La barra de selección encola solo los pasos que están incompletos, pendientes o fallidos, y nunca repite lo que ya está hecho, así que revisar doscientas obras deja de ser doscientas visitas a la ficha de cada una. La acción solo aparece mientras quede algo por terminar.',
     en: 'Repair a whole selection in one action. The selection bar queues only the steps that are incomplete, pending or failed, and never repeats what is already done, so checking two hundred works stops being two hundred visits to each row. The action appears only while something is still left to finish.',
@@ -43,6 +45,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "1回の操作で選択範囲全体を修復します。選択バーは、不完全、保留中、または失敗したステップのみをキューに入れ、すでに行われたことを繰り返すことはありません。そのため、200の作業をチェックするのに、各行を200回訪問する必要がなくなります。アクションは、何かがまだ完了していない間のみ表示されます。",
   },
   {
+    category: 'new',
     scope: 'library',
     es: 'El Índice documental estrena un visor de registros. Un fallo del proveedor, una respuesta JSON cortada, una clave que falta o una conexión caída acababan en una sola línea de la fila o en ninguna parte, y la única copia vivía en la consola de desarrollo. El botón Registros abre el registro completo de extracción, OCR, indexación y embeddings, con filtros por nivel, tipo, origen, bóveda y día, búsqueda por código, modelo o identificador, y copia o descarga de una línea o de la vista filtrada.',
     en: 'The Documentary Index gains a log viewer. A provider outage, a truncated JSON answer, a missing key or a dropped socket all ended as a single line in a job row or nowhere at all, and the only copy lived in the developer console. The Logs button opens the full extraction, OCR, indexing and embedding log, filterable by level, type, origin, vault and day, searchable by code, model or id, and one line or the whole filtered view can be copied or downloaded.',
@@ -58,6 +61,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "Documentary Index にはログビューアが追加されました。プロバイダーの停止、JSON の切り捨てられた応答、キーの欠落、またはソケットのドロップはすべて、ジョブ行の1行として終了するか、どこにも存在せず、唯一のコピーが開発者コンソールに存在していました。 [ログ] ボタンをクリックすると、完全な抽出、OCR、インデックス付け、埋め込みログが開きます。レベル、タイプ、発生元、Vault、日付でフィルタリング可能、コード、モデル、または ID で検索可能で、1行またはフィルタリングされたビュー全体をコピーまたはダウンロードできます。",
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Los perfiles documentales dejan de mezclar idiomas y de exagerar su confianza. Las secciones sin encabezado ya no llevan un título en español escrito en el código, porque ahora la interfaz las titula en tu idioma. Un perfil que se publicó a partir de citas literales lo dice en lugar de mostrar un 100 % de apoyo, y una confianza sustituida por el mínimo contractual se marca como tal en vez de parecer una medición.',
     en: 'Document profiles stop mixing languages and stop overstating their confidence. Sections without a heading no longer carry a Spanish title written in the code, because the interface titles them in your language now. A profile published from literal quotes says so instead of showing 100 % support, and a confidence substituted by the contractual floor is marked as such instead of looking like a measurement.',
@@ -73,6 +77,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "文書プロフィールでは、言語の混在をやめ、自信を誇張するのをやめます。見出しのないセクションには、コード内で書かれたスペイン語のタイトルが付けられなくなりました。これは、インターフェイスでセクションのタイトルが言語で付けられるようになったためです。文字通りの引用から公開されたプロファイルは、100% の支持を示す代わりにそのように述べており、契約の下限によって置き換えられた信頼度は、測定値のように見えるのではなく、そのようにマークされます。",
   },
   {
+    category: 'enhancement',
     scope: 'library',
     es: 'El campo para añadir una referencia acepta un enlace. Las direcciones de doi.org, arXiv, PubMed y PMC se resuelven por el identificador que nombran, y cualquier otra página se lee buscando el registro que publica, con sus enlaces al PDF como adjunto. Añadir un artículo de arXiv deja de fallar por el límite de peticiones de su API, porque ahora se resuelve a través de DataCite.',
     en: 'The field for adding a reference takes a link. doi.org, arXiv, PubMed and PMC addresses resolve through the identifier they name, and any other page is read for the record it publishes, with its PDF links as the attachment. Adding an arXiv paper stops failing on its API’s rate limit, because it now resolves through DataCite.',
@@ -88,6 +93,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "参照を追加するフィールドにはリンクが必要です。 doi.org、arXiv、PubMed、および PMC のアドレスは、それらが指定する識別子によって解決され、他のページは、PDF リンクが添付された状態で、そのページが公開するレコードとして読み取られます。 arXiv ペーパーを追加すると、API のレート制限で失敗しなくなります。これは、DataCite を通じて解決されるようになったためです。",
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Detener o pausar un trabajo ya no se registra como un fallo. La cancelación que pediste se guarda como cancelación, las acciones de cada fila apuntan a la bóveda del trabajo aunque hayas cambiado de bóveda, detener una campaña cancela también sus trabajos sueltos, y un trabajo terminado deja de contar tiempo.',
     en: 'Stopping or pausing a job is no longer recorded as a failure. The cancellation you asked for is saved as a cancellation, each row’s actions target the job’s vault even after you switch vaults, stopping a campaign also cancels its standalone jobs, and a finished job stops counting time.',
@@ -103,6 +109,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "ジョブの停止または一時停止は失敗として記録されなくなりました。要求したキャンセルはキャンセルとして保存され、Vaultを切り替えた後でも各行のアクションはジョブのVaultをターゲットにし、キャンペーンを停止するとスタンドアロンジョブもキャンセルされ、完了したジョブは時間のカウントを停止します。",
   },
   {
+    category: 'new',
     scope: 'browser',
     es: 'Los marcadores de Nodus Browser entran y salen del navegador. La página de inicio gana un botón de descarga y otro de subida: la descarga escribe toda la colección como el HTML que leen Chrome, Edge, Firefox, Brave y Opera, y la subida lee ese archivo con la misma vista previa que ya usa el gestor, que nombra los marcadores, las carpetas y los duplicados antes de fusionar nada.',
     en: 'Nodus Browser bookmarks move in and out of your browser. The start page gains a download and an upload action: the download writes the whole collection as the HTML that Chrome, Edge, Firefox, Brave and Opera read, and the upload reads one with the same preview the manager already uses, naming the bookmarks, folders and duplicates before anything is merged.',
@@ -118,6 +125,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "Nodus ブラウザのブックマークはブラウザの内外に移動します。スタートページにはダウンロードとアップロードのアクションが含まれます。ダウンロードでは、Chrome、Edge、Firefox、Brave、Opera が読み取る HTML としてコレクション全体が書き込まれ、アップロードでは、マネージャーが既に使用しているのと同じプレビューを持つものが読み取られ、ブックマーク、フォルダー、重複に名前が付けられてから、何かがマージされます。",
   },
   {
+    category: 'fix',
     scope: 'browser',
     es: 'Cada pestaña del navegador mide lo mismo. Una pestaña con un título largo ya no empuja a las demás y la cuarta pestaña vuelve a ser una posición a la que el ojo regresa. Cuando hay más pestañas que sitio, la tira se desplaza con una flecha en la punta que aún tenga algo que mostrar, y la pestaña activa se trae a la vista sola.',
     en: 'Every browser tab measures the same. A long heading no longer pushes the rest sideways and the fourth tab is a position the eye can return to again. When there are more tabs than room, the strip scrolls with an arrow at whichever end still has something to show, and the active tab is brought into view on its own.',
@@ -133,6 +141,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "すべてのブラウザタブの測定値は同じです。長い見出しが残りを横に押しやることはなくなり、4番目のタブに再び目を戻すことができる位置になります。タブの数がスペースを超えている場合、ストリップは表示すべきものがまだある端に矢印が付いてスクロールし、アクティブなタブが自動的に表示されます。",
   },
   {
+    category: 'fix',
     scope: 'browser',
     es: 'Anterior y Siguiente funcionan en los reproductores que guardan toda la lista dentro de un mismo elemento, como Spotify o YouTube. Ahora se llama a los gestores que la propia página registra para sus controles, algo que una tecla multimedia nunca conseguía, así que Siguiente cambia de pista de verdad y Reproducir vuelve a sonar donde toca.',
     en: 'Previous and Next work on players that keep their whole playlist inside one element, like Spotify or YouTube. The handlers the page itself registers for its controls are called now, which a media key never managed, so Next really changes track and Play brings the sound back where it belongs.',
@@ -148,6 +157,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "Previous と Next は、Spotify や YouTube など、プレイリスト全体を1つの要素内に保持するプレーヤーで動作します。ページ自体がコントロール用に登録したハンドラーが呼び出されますが、これはメディアキーでは決して管理されなかったので、Next は実際にトラックを変更し、Play はサウンドを本来あるべき場所に戻します。",
   },
   {
+    category: 'fix',
     scope: 'languages',
     es: 'Los fallos de la cola aparecen en tu idioma. Un error que llegaba a la pantalla en español con la interfaz en otro idioma ahora se traduce, igual que el estado de un trabajo, el motivo de una pausa y el aviso de guardado, y el filtro de bóveda está por fin junto a nivel, tipo, origen y día.',
     en: 'Queue failures appear in your language. An error that reached the screen in Spanish while the interface was in another language is translated now, as are a job’s status, the reason for a pause and a save warning, and the vault filter finally sits beside level, type, origin and day.',
@@ -163,6 +173,7 @@ export const RELEASE_5_4_5_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: "キュー障害はあなたの言語で表示されます。インターフェイスが別の言語で表示されていたときにスペイン語で画面に表示されたエラーは、ジョブのステータス、一時停止の理由、保存警告と同様に翻訳され、最終的に Vault フィルターがレベル、タイプ、発生元、日の横に表示されます。",
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'Los diálogos de confirmación son opacos en modo oscuro. Estaban pintados con una tarjeta translúcida, así que la lista de detrás se leía a través del texto de la acción que no se puede deshacer, y ahora usan la misma superficie opaca que el resto de diálogos.',
     en: 'Confirmation dialogs are opaque in dark mode. They were painted with a translucent card, so the list behind read through the wording of the action that cannot be undone, and they now use the same opaque surface as the other dialogs.',

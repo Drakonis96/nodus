@@ -7,6 +7,7 @@ import type { ReleaseHighlight } from './releaseNotes';
 // Describe shipped behavior directly in every interface language.
 export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     "scope": "academic",
     "es": "En las bóvedas académicas puedes preparar tus obras para consultar su texto completo sin extraer ideas. El Chat de investigación y Deep Research responden con pasajes de ese texto y con las ideas disponibles, y cada cita apunta al original y conserva la revisión exacta de la fuente. Extraer ideas es un paso aparte y opcional, y el aviso de preparación explica la diferencia.",
     "en": "In academic vaults you can prepare your works to query their full text without extracting ideas. Research Chat and Deep Research answer with passages from that text and with the available ideas, and every citation points at the original and keeps the exact revision of the source. Extracting ideas is a separate, optional step, and the preparation notice explains the difference.",
@@ -22,6 +23,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학술 Vault에서는 아이디어를 추출하지 않고도 문헌을 준비해 전체 텍스트를 검색할 수 있습니다. 연구 채팅과 Deep Research는 해당 본문의 구절과 사용 가능한 아이디어로 답하며, 각 인용은 원문을 가리키고 출처의 정확한 판본을 유지합니다. 아이디어 추출은 별도의 선택 단계이며, 준비 안내가 그 차이를 설명합니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "Los cuadernos de investigación agrupan las fuentes de una conversación: una selección fija de obras, o colecciones de Zotero que se mantienen vinculadas, con sus subcolecciones si lo indicas. El chat de un cuaderno consulta solo esas fuentes y avisa cuando la cobertura documental es parcial. Puedes preparar las fuentes desde el propio cuaderno, sin generar ideas ni perfiles.",
     "en": "Research notebooks group the sources of a conversation: a fixed selection of works, or Zotero collections that stay linked, with their subcollections if you ask for them. A notebook's chat reads only those sources and says so when the documentary coverage is partial. You can prepare the sources from the notebook itself, without generating ideas or profiles.",
@@ -37,6 +39,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 노트북은 대화에 사용할 출처를 모읍니다. 고정된 문헌 선택 또는 연결을 유지하는 Zotero 컬렉션이며, 지정하면 하위 컬렉션도 포함합니다. 노트북의 채팅은 그 출처만 조회하고, 문서 범위가 일부만 덮일 때는 그 사실을 알립니다. 출처는 노트북 안에서 준비할 수 있고, 아이디어나 프로필은 생성하지 않습니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "El globo de Contexto del chat tiene tres interruptores: Ideas, Documentos y Búsqueda web. Una capa desactivada no se consulta, y si desactivas las tres la respuesta se apoya en conocimiento general y no cita nada. El globo de actividad muestra mientras responde qué hace cada capa y con cuántos resultados.",
     "en": "The chat's Context balloon now has three switches: Ideas, Documents and Web search. A layer switched off is not consulted at all, and with all three off the answer relies on general knowledge and cites nothing. The activity balloon shows what each layer is doing, and how many results it found, while the answer is being written.",
@@ -52,6 +55,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "채팅의 컨텍스트 풍선에 세 개의 스위치가 있습니다. 아이디어, 문서, 웹 검색입니다. 꺼진 계층은 조회하지 않으며, 세 개를 모두 끄면 답변은 일반 지식에 기반하고 아무것도 인용하지 않습니다. 활동 풍선은 답변 중에 각 계층이 하는 일과 결과 수를 보여 줍니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "El Chat de investigación puede buscar en la web cuando la biblioteca no basta o cuando se lo pides. Nodus usa un buscador incluido en la aplicación, lee las páginas que encuentra y cita los pasajes con su dirección, igual que una obra. La cita abre la página en el Navegador de Nodus. La búsqueda no rodea bloqueos ni captchas.",
     "en": "Research Chat can search the web when the library is not enough or when you ask it to. Nodus uses a search engine bundled with the application, reads the pages it finds and cites passages with their address, like any work. The citation opens the page in Nodus Browser. The search never works around a block or a CAPTCHA.",
@@ -67,6 +71,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅은 보관함으로 충분하지 않거나 요청할 때 웹을 검색할 수 있습니다. Nodus는 앱에 포함된 검색 엔진을 사용해 찾은 페이지를 읽고, 구절을 주소와 함께 문헌처럼 인용합니다. 인용을 열면 Nodus 브라우저에서 해당 페이지가 열립니다. 검색은 차단이나 캡차를 우회하지 않습니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "Las rutas de síntesis se comprueban con el nombre IUPAC sistemático como referencia. El modelo escribe los nombres y los roles de cada paso, y Nodus deriva y equilibra las estructuras con RDKit. Cuando un paso falla, el aviso ofrece reparar todos los pasos, reparar desde el producto final o reparar un paso concreto. Una revisión del modelo marca la ruta como no verificada si encuentra un problema en una estructura.",
     "en": "Synthesis routes are checked against the systematic IUPAC name as the reference. The model writes the names and the role of every step, and Nodus derives and balances the structures with RDKit. When a step fails, the notice offers to fix all steps, to fix from the final product backwards, or to fix one specific step. A model review marks the route as not verified when it finds a problem in a structure.",
@@ -82,6 +87,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "합성 경로는 체계적 IUPAC 이름을 기준으로 검사합니다. 모델은 각 단계의 이름과 역할을 쓰고, Nodus는 RDKit으로 구조를 도출하고 수지를 맞춥니다. 어느 단계가 실패하면 알림에서 모든 단계 수정, 최종 생성물부터 거꾸로 수정, 특정 단계만 수정을 제안합니다. 모델 검토에서 구조 문제가 발견되면 해당 경로를 미검증으로 표시합니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "Los mapas históricos se dibujan con las divisiones del periodo que pides, obtenidas de OpenHistoricalMap, y el resultado indica el periodo, la licencia y lo que quedó fuera. Las etiquetas que no caben en el marco se omiten sin tapar el mapa. Cuando un dato de la petición no es válido, el aviso nombra la propiedad que hay que corregir.",
     "en": "Historical maps are drawn with the divisions of the period you ask for, retrieved from OpenHistoricalMap, and the result states the period, the licence and what was left out. Labels that do not fit inside the frame are dropped without covering the map. When a value in the request is not valid, the notice names the property to correct.",
@@ -97,6 +103,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "역사 지도는 요청한 시대의 구획을 OpenHistoricalMap에서 가져와 그리며, 결과에는 시대, 라이선스, 제외된 내용을 밝힙니다. 화면에 들어가지 않는 라벨은 지도를 가리지 않도록 생략합니다. 요청의 값이 유효하지 않으면 수정할 속성 이름을 알려 줍니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "Ajustes, Datos incluye Salud del grafo en las bóvedas académicas: comprueba las ideas, los temas y las relaciones, y repara sin IA lo que se puede arreglar después de guardar una copia de la bóveda. La reparación también resuelve los temas que un fallo anterior dejó sueltos y puede volver a analizar las obras afectadas. Los análisis ya no fallan por enlaces a ideas dormidas o a temas borrados.",
     "en": "Settings, Data includes Graph health in academic vaults: it checks the ideas, the themes and the relations, and repairs without AI whatever can be fixed, after saving a copy of the vault. The repair also clears the themes an earlier bug left dangling and can analyse the affected works again. Analyses no longer fail because of links to dormant ideas or to deleted themes.",
@@ -112,6 +119,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "설정의 데이터에 학술 Vault용 그래프 상태가 추가되었습니다. 아이디어, 주제, 관계를 검사하고, Vault 사본을 저장한 뒤 AI 없이 고칠 수 있는 것을 복구합니다. 이전 버그로 떠돌던 주제도 정리하고 영향을 받은 문헌을 다시 분석할 수 있습니다. 분석은 휴면 아이디어나 삭제된 주제로의 연결 때문에 더 이상 실패하지 않습니다."
   },
   {
+    category: 'enhancement',
     "scope": "ai",
     "es": "El nivel de razonamiento se guarda por modelo: al volver a elegir un modelo, el chat abre con el nivel que usaste con él. Un modelo que nunca has usado abre en el nivel intermedio de su propia escala, no en Estándar. El mismo control y la misma memoria están en los formularios de Deep Research y de Inmersión.",
     "en": "The thinking level is remembered per model: when you pick a model again, the chat opens with the level you used with it. A model you have never used opens on the middle level of its own ladder, not on Standard. The same control and the same memory are in the Deep Research and Immersion forms.",
@@ -127,6 +135,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "사고 수준은 모델별로 기억됩니다. 같은 모델을 다시 선택하면 그 모델에서 사용한 수준으로 채팅이 열립니다. 사용한 적 없는 모델은 해당 모델의 단계 중간으로 열리며, 기준이 아닙니다. 같은 조작과 같은 기억이 Deep Research와 몰입 양식에도 있습니다."
   },
   {
+    category: 'fix',
     "scope": "ai",
     "es": "Las conversaciones con modelos Claude ya no fallan cuando el proveedor cambia los parámetros que acepta: Nodus repite la petición una vez sin el parámetro rechazado y recuerda el cambio para las siguientes. Si el modelo rechaza la petición o la respuesta se corta por el límite de tokens, el aviso lo dice con esas palabras en lugar de mostrar una respuesta vacía.",
     "en": "Conversations with Claude models no longer fail when the provider changes the parameters it accepts: Nodus repeats the request once without the rejected parameter and remembers the change for the next ones. If the model declines the request, or the answer is cut off at the token limit, the notice says so in those words instead of showing an empty answer.",
@@ -142,6 +151,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "Claude 모델과의 대화는 제공자가 허용하는 매개변수를 바꿔도 더 이상 실패하지 않습니다. Nodus는 거부된 매개변수를 빼고 요청을 한 번 다시 보내며, 그 변경을 이후를 위해 기억합니다. 모델이 요청을 거절하거나 답변이 토큰 한도에서 잘리면, 빈 답변 대신 그 사실을 그대로 알립니다."
   },
   {
+    category: 'fix',
     "scope": "ai",
     "es": "Al continuar una conversación, Nodus envía al modelo solo el texto que escribió el modelo, no los bloques que añade la aplicación, como los dibujos, los resultados de herramientas o las instrucciones de corrección. En una conversación real esto quitó el 92 % del texto reenviado, y evita que el proveedor lea esas instrucciones como órdenes.",
     "en": "When a conversation continues, Nodus sends the model only the text the model wrote, not the blocks the application adds, such as drawings, tool results or correction instructions. In a real conversation this removed 92 % of the replayed text, and it keeps the provider from reading those instructions as commands.",
@@ -157,6 +167,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "대화를 이어갈 때 Nodus는 앱이 덧붙인 블록(그림, 도구 결과, 수정 지시)을 보내지 않고 모델이 쓴 글만 모델에 보냅니다. 실제 대화에서 다시 보내는 텍스트가 92 % 줄었고, 제공자가 그 지시를 명령으로 읽는 일도 막습니다."
   },
   {
+    category: 'fix',
     "scope": "languages",
     "es": "Los menús nativos siguen el idioma de la interfaz: el menú de cortar, copiar y pegar de los campos de texto y el menú contextual del Navegador de Nodus ya no aparecen en español cuando la interfaz está en otro idioma.",
     "en": "Native menus follow the interface language: the cut, copy and paste menu of text fields and the Nodus Browser context menu no longer appear in Spanish when the interface is in another language.",
@@ -172,6 +183,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "기본 메뉴가 인터페이스 언어를 따릅니다. 텍스트 입력란의 잘라내기, 복사, 붙여넣기 메뉴와 Nodus 브라우저의 오른쪽 클릭 메뉴는 인터페이스가 다른 언어일 때 더 이상 스페인어로 표시되지 않습니다."
   },
   {
+    category: 'fix',
     "scope": "languages",
     "es": "Se corrigieron textos que aparecían en inglés aunque existiera traducción propia: 93 claves en italiano y entre 13 y 14 en las demás lenguas europeas. También se corrigieron traducciones con un sentido equivocado en japonés, coreano, turco e italiano, entre ellas inmersión, estaciones, los tipos de gráfico de las bases de datos y la duración en minutos.",
     "en": "Text that appeared in English although a translation existed was corrected: 93 keys in Italian and between 13 and 14 in the other European languages. Translations with the wrong sense were also corrected in Japanese, Korean, Turkish and Italian, among them immersion, stations, the database chart types and a duration in minutes.",
@@ -187,6 +199,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "번역이 있는데도 영어로 표시되던 문구를 수정했습니다. 이탈리아어 93개 키, 다른 유럽 언어는 13~14개입니다. 일본어, 한국어, 터키어, 이탈리아어에서 뜻이 잘못된 번역도 수정했습니다. 몰입, 스테이션, 데이터베이스 차트 유형, 분 단위 소요 시간 등이 포함됩니다."
   },
   {
+    category: 'enhancement',
     "scope": "languages",
     "es": "La guía de primer inicio ofrece todos los idiomas de la interfaz, incluidos el chino tradicional y el coreano, y cada opción cambia la interfaz a ese idioma. Las diapositivas de orientación sobre modelos están traducidas a los doce idiomas. Además, cada idioma usa un único término para bóveda en toda la interfaz.",
     "en": "The first-run guide offers every interface language, including Traditional Chinese and Korean, and each option switches the interface to that language. The model guidance slides are now translated into all twelve languages. Each language also uses a single term for vault throughout the interface.",
@@ -202,6 +215,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "첫 실행 안내가 모든 인터페이스 언어를 제공하며, 번체 중국어와 한국어도 포함됩니다. 항목을 고르면 인터페이스가 그 언어로 바뀝니다. 모델 안내 슬라이드는 열두 개 언어로 번역되었습니다. 또한 각 언어는 인터페이스 전체에서 Vault를 가리키는 용어를 하나만 사용합니다."
   },
   {
+    category: 'new',
     "scope": "estudio",
     "es": "En las bóvedas de Estudio puedes abrir sesiones de concentración por bloques, con intención por bloque, transiciones manuales y un panel de progreso. El modo concentración cambia la barra lateral por una barra con el temporizador, la asignatura y sus notas y materiales. El modo se puede personalizar por bóveda, se activa al empezar un bloque y se puede desactivar.",
     "en": "In Study vaults you can run focus sessions in blocks, with an intention per block, manual transitions and a progress page. Focus mode replaces the sidebar with a rail holding the timer, the subject and its notes and materials. The mode can be customised per vault, it turns on when you start a block, and you can turn it off.",
@@ -217,6 +231,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학습 Vault에서는 블록 단위로 집중 세션을 진행할 수 있습니다. 블록마다 의도를 적고, 전환은 직접 하며, 진행 페이지를 볼 수 있습니다. 집중 모드는 사이드바를 타이머, 과목, 그 과목의 노트와 자료가 담긴 레일로 바꿉니다. 모드는 Vault별로 설정할 수 있고, 블록을 시작하면 켜지며, 끌 수도 있습니다."
   },
   {
+    category: 'new',
     "scope": "estudio",
     "es": "Las notas del Espacio de trabajo se pueden vincular a cursos, asignaturas, carpetas, temas y materiales concretos. La nota no se copia: sigue en el Espacio de trabajo y aparece también en cada lugar vinculado, con una etiqueta que lo indica. Desde un material se abre un panel con sus notas, y las bóvedas nuevas de Estudio y Docencia muestran el Espacio de trabajo en la barra lateral por defecto.",
     "en": "Workspace notes can be linked to courses, subjects, folders, topics and specific materials. The note is not copied: it stays in the Workspace and also appears in every linked place, with a badge saying so. A material opens a panel with its notes, and new Study and Teaching vaults show the Workspace in the sidebar by default.",
@@ -232,6 +247,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "작업공간 노트는 과정, 과목, 폴더, 주제, 특정 자료에 연결할 수 있습니다. 노트는 복사되지 않고 작업공간에 그대로 남으며, 연결한 모든 위치에도 표시되고 그 사실을 알리는 배지가 붙습니다. 자료를 열면 해당 노트 패널이 나오고, 새 학습 및 교육 Vault는 사이드바에 작업공간을 기본으로 표시합니다."
   },
   {
+    category: 'new',
     "scope": "estudio",
     "es": "El calendario de Estudio y Docencia exporta un evento o el calendario completo a Outlook con un archivo .ics. En macOS puedes elegir un calendario de Apple y activar la sincronización: Nodus crea, actualiza y borra sus propios eventos mientras está abierto, en un solo sentido, de Nodus a Apple. Las importaciones a Outlook son una copia y no se actualizan solas, y Google y Exchange quedan fuera de la sincronización automática.",
     "en": "The Study and Teaching calendar exports one event or the whole calendar to Outlook as an .ics file. On macOS you can choose an Apple calendar and enable sync: Nodus creates, updates and deletes its own events while it is running, in one direction only, from Nodus to Apple. Outlook imports are a copy and do not update themselves, and Google and Exchange stay out of automatic sync.",
@@ -247,6 +263,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학습 및 교육 캘린더는 일정 하나 또는 전체 캘린더를 .ics 파일로 Outlook에 내보낼 수 있습니다. macOS에서는 Apple 캘린더를 골라 동기화를 켤 수 있습니다. Nodus가 실행 중일 때 자체 일정을 만들고, 갱신하고, 삭제하며, 방향은 Nodus에서 Apple로 한쪽뿐입니다. Outlook으로 가져온 것은 사본이라 자동으로 갱신되지 않고, Google과 Exchange는 자동 동기화에서 제외됩니다."
   },
   {
+    category: 'new',
     "scope": "general",
     "es": "La organización del historial del Chat de investigación llega a las bóvedas de bases de datos y worldbuilding, y a Estudio y Docencia: proyectos, carpetas anidadas, cuadernos, conversaciones fijadas, archivo y búsqueda. Las reglas son las mismas en todos los historiales: borrar una carpeta no borra ninguna conversación, una conversación que apunta a una carpeta que ya no existe se recoloca sola y los cambios de carpeta viajan al resto de dispositivos.",
     "en": "Research Chat's history organisation reaches the databases and worldbuilding vaults, and Study and Teaching: projects, nested folders, notebooks, pinned conversations, archive and search. The rules are the same in every history: deleting a folder deletes no conversation, a conversation pointing at a folder that no longer exists is re-filed by itself, and folder changes travel to the other devices.",
@@ -262,6 +279,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅의 기록 구성이 데이터베이스와 worldbuilding Vault, 학습 및 교육으로 확장됩니다. 프로젝트, 중첩 폴더, 노트북, 고정한 대화, 보관, 검색입니다. 규칙은 모든 기록에서 같습니다. 폴더를 삭제해도 대화는 삭제되지 않고, 더 이상 없는 폴더를 가리키는 대화는 스스로 다시 정리되며, 폴더 변경은 다른 기기로 전달됩니다."
   },
   {
+    category: 'enhancement',
     "scope": "general",
     "es": "Los textos de ayuda de los elementos de la interfaz se muestran en una capa propia de Nodus, con el tema claro u oscuro de la aplicación, en lugar del aviso del sistema. Aparecen antes y se colocan dentro de la ventana, y el texto largo se reparte en varias líneas.",
     "en": "The help text of interface elements is shown in a layer of Nodus's own, following the light or dark theme of the application, instead of the system notice. It appears sooner, it is placed inside the window, and long text wraps onto several lines.",
@@ -277,6 +295,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "인터페이스 요소의 도움말 텍스트가 시스템 알림 대신 Nodus 자체 레이어에 앱의 밝은 또는 어두운 테마로 표시됩니다. 더 빨리 나타나고 창 안에 자리하며, 긴 글은 여러 줄로 나뉩니다."
   },
   {
+    category: 'enhancement',
     "scope": "browser",
     "es": "En el Research Atlas cada filtro acepta varios valores a la vez, con casillas de verificación. Los valores de un mismo filtro se suman y los de filtros distintos se combinan. El panel sigue abierto mientras eliges y la píldora resume la selección, por ejemplo 2 seleccionados.",
     "en": "In the Research Atlas each filter now holds several values at once, each with a checkbox. Values of the same filter add up and values of different filters combine. The panel stays open while you choose, and the pill summarises the selection, for example 2 selected.",
@@ -292,6 +311,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "리서치 아틀라스에서 각 필터가 여러 값을 동시에 담을 수 있고, 값마다 체크박스가 있습니다. 같은 필터의 값은 더해지고, 다른 필터의 값은 함께 적용됩니다. 선택하는 동안 패널이 열린 채로 있고, 알약 버튼이 선택 내용을 요약합니다. 예를 들어 2개 선택입니다."
   },
   {
+    category: 'fix',
     "scope": "browser",
     "es": "Las pestañas y los marcadores del Navegador de Nodus vuelven a mostrar el icono de cada sitio, incluidos los marcadores guardados antes. Cuando un sitio solo declara un icono SVG, Nodus busca los iconos habituales del sitio. El globo queda solo para las páginas que no ofrecen ningún icono.",
     "en": "Tabs and bookmarks in Nodus Browser show each site's icon again, including bookmarks saved earlier. When a site declares only an SVG icon, Nodus looks for the site's usual icons. The globe is left only for pages that offer no icon at all.",
@@ -307,6 +327,7 @@ export const RELEASE_5_7_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "Nodus 브라우저의 탭과 북마크가 이전에 저장한 북마크를 포함해 각 사이트의 아이콘을 다시 표시합니다. 사이트가 SVG 아이콘만 선언하면 Nodus가 그 사이트의 일반적인 아이콘을 찾습니다. 지구본 아이콘은 아이콘을 전혀 제공하지 않는 페이지에만 남습니다."
   },
   {
+    category: 'new',
     "scope": "docencia",
     "es": "En Docencia, cada grupo tiene dos pestañas: Estudiantes y Asistencia. La asistencia se marca por día en vista de semana o de mes, con cuatro estados, asiste, falta justificada, falta injustificada y retraso, y un comentario opcional por celda. Puedes marcar a todos presentes y marcar un día como festivo, y copiar el festivo a los grupos que compartan ese día. Los totales por estudiante se exportan a CSV o XLSX por curso, asignatura, grupo o estudiante.",
     "en": "In Teaching, every group has two tabs: Students and Attendance. Attendance is marked per day in a week or month view, with four states, present, excused absence, unexcused absence and late, and an optional comment per cell. You can mark everyone present and mark a day as a holiday, and copy the holiday to the groups that share that day. Per-student totals export to CSV or XLSX for a course, a subject, a group or one student.",

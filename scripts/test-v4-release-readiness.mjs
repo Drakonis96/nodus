@@ -38,7 +38,7 @@ try {
   assert.match(backup, /const supportedVersions = \[1, 2, 3, 4, 5, 6\]/, 'Nodus 4 still opens released 3.x backup formats');
   assert.match(backup, /if \(!descriptor\) return null/, 'a 3.x backup without a Global Library preserves the current local one');
 
-  assert.equal(pluginManifest.version, '5.7.2');
+  assert.equal(pluginManifest.version, '5.7.3');
   assert.match(readerPlugin, /X-Nodus-Zotero-Protocol": "4"/);
   assert.match(readerPlugin, /capabilities\.globalLibrary/, 'plugin v4 omits v4-only Library controls with desktop v3');
   assert.match(readerPlugin, /\/api\/z\/chat/, 'ordinary plugin chat remains available across protocol versions');

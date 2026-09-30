@@ -3,6 +3,7 @@ import type { ReleaseHighlight } from './releaseNotes';
 /** Added since the unpublished 5.3.2 notes, including conversation file attachments. */
 export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Research chat se unifica en los nueve tipos de vault. Encuéntralo en Analizar, con el mismo selector de modelo, acciones de mensaje y paneles plegables de historial y contexto. Conserva las conversaciones anteriores y las fuentes, citas y herramientas propias de cada vault.',
     en: 'Research chat is unified across all nine vault types. Find it under Analyze, with shared model controls, message actions and collapsible history and context panels. Existing conversations and each vault’s sources, citations and tools are preserved.',
@@ -18,6 +19,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "リサーチチャットは9つの Vault タイプすべてで統一されています。これは、共有モデルコントロール、メッセージアクション、折りたたみ可能な履歴およびコンテキストパネルを備えた [分析] の下にあります。既存の会話と各Vaultのソース、引用、ツールは保存されます。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Elige el esfuerzo de razonamiento desde el Research chat. Los niveles disponibles se ajustan a las capacidades del proveedor y del modelo seleccionado, y se aplican a la conversación sin cambiar los ajustes de los demás chats.',
     en: 'Choose reasoning effort directly in Research chat. Available levels follow the selected provider and model’s capabilities and apply to the conversation without changing the settings of other chats.',
@@ -33,6 +35,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "研究チャットで推論の取り組みを直接選択します。利用可能なレベルは、選択したプロバイダーとモデルの機能に従い、他のチャットの設定を変更することなく会話に適用されます。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Acota las fuentes del corpus por autor y por obra. El nuevo selector permite buscar y combinar ambas restricciones, las guarda con la conversación y evita que fuentes excluidas vuelvan a entrar a través del historial. Si la selección no aporta evidencia, el chat lo reconoce.',
     en: 'Narrow corpus sources by author and work. Search and combine both filters, save them with the conversation and keep excluded sources from returning through history. When the selection provides no evidence, the chat acknowledges it.',
@@ -48,6 +51,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "著者および作品ごとにコーパスソースを絞り込みます。両方のフィルターを検索して組み合わせ、会話と一緒に保存し、除外されたソースが履歴に戻らないようにします。選択によって証拠が提供されない場合、チャットはそれを承認します。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Guarda tus propias instrucciones para el Research chat. Crea, busca, edita y selecciona prompts dentro de cada vault para orientar el tono y la estructura de las respuestas. Puedes cambiarlos en una conversación existente sin perder su historial y volver a Default cuando quieras.',
     en: 'Save your own Research chat instructions. Create, search, edit and select prompts within each vault to guide response tone and structure. Switch prompts in an existing conversation without losing its history, or return to Default.',
@@ -63,6 +67,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "独自のリサーチチャット手順を保存します。各Vault内でプロンプトを作成、検索、編集、選択して、応答トーンと構造をガイドします。履歴を失わずに既存の会話のプロンプトを切り替えるか、デフォルトに戻します。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Adjunta archivos al Research chat con el botón + del cuadro de texto o arrastrándolos a la ventana. Lee DOC, DOCX, PDF, hojas de cálculo, CSV, XML, imágenes y otros formatos compatibles usando el proveedor y modelo elegidos, con visión cuando sea necesaria. Los adjuntos se conservan con la conversación y se borran al eliminarla. Sus tarjetas tienen contornos legibles en claro y oscuro y usan el acento del vault.',
     en: 'Attach files to Research chat with the textbox’s + button or by dropping them into the window. Read DOC, DOCX, PDF, spreadsheets, CSV, XML, images and other supported formats with your chosen provider and model, using vision when needed. Files stay with the conversation and are deleted with it. Cards have clear light and dark outlines and use the vault accent.',
@@ -78,6 +83,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "テキストボックスの + ボタンを使用するか、ウィンドウにファイルをドロップして、リサーチチャットにファイルを添付します。必要に応じてビジョンを使用して、選択したプロバイダーとモデルで DOC、DOCX、PDF、スプレッドシート、CSV、XML、画像、その他のサポートされている形式を読み取ります。ファイルは会話に残り、会話とともに削除されます。カードには明暗の輪郭がはっきりしており、Vaultのアクセントが使用されています。",
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Leer y detener una respuesta resulta más cómodo. El Research chat respeta tu posición cuando subes a leer, y las vistas previas de las citas vuelven a abrirse correctamente. Al detener una respuesta, el texto ya recibido se conserva en el historial en lugar de desaparecer.',
     en: 'Reading and stopping answers is smoother. Research chat respects your position when you scroll up, and citation previews open correctly again. Stopping an answer preserves the text already received in history instead of making it disappear.',
@@ -93,6 +99,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "解答を読んだり止めたりするのがスムーズになりました。リサーチチャットは上にスクロールするとあなたの位置を尊重し、引用プレビューが再び正しく開きます。回答を停止すると、すでに受信したテキストが消えるのではなく、履歴に保存されます。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Las Skills visuales llegan a Deep Research e Immersion en escritorio. Elige las que puede usar cada informe y limita sus ejecuciones, con un máximo explícito para las de pago. Añade figuras a informes nuevos o existentes, abre sus recursos interactivos, descarga los resultados y conserva las figuras al exportar a PDF. Puedes retirar los recursos y deshacer el cambio.',
     en: 'Visual Skills come to desktop Deep Research and Immersion. Choose Skills per report and limit their runs, with an explicit ceiling for paid calls. Add figures to new or existing reports, open interactive resources, download results and keep figures in PDF exports. Remove resources and undo the change.',
@@ -108,6 +115,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "ビジュアルスキルがデスクトップのディープリサーチとイマージョンに登場します。レポートごとにスキルを選択し、有料通話の明示的な上限を設定して実行を制限します。新規または既存のレポートに図を追加し、インタラクティブなリソースを開いて、結果をダウンロードし、図を PDF エクスポートに保存します。リソースを削除し、変更を元に戻します。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Los mapas se construyen a partir de datos geográficos reales. Las Skills compatibles pueden usar límites administrativos, capas, rutas, marcadores y leyendas, con sus fuentes y atribuciones. Nodus genera un mapa vectorial descargable a partir de esos datos, sin pedir al modelo que invente fronteras o coordenadas.',
     en: 'Maps are built from real geographic data. Compatible Skills can use administrative boundaries, layers, routes, markers and legends with source attribution. Nodus produces downloadable vector maps from those data without asking the model to invent borders or coordinates.',
@@ -123,6 +131,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "地図は実際の地理データから構築されます。互換性のあるスキルでは、出典の帰属を伴う管理境界、レイヤー、ルート、マーカー、凡例を使用できます。 Nodus は、モデルに境界線や座標を作成させることなく、これらのデータからダウンロード可能なベクターマップを生成します。",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Las Skills compatibles pueden revisar si una imagen responde a tu petición. Usan miniaturas y el modelo con visión seleccionado, con un máximo explícito de llamadas de pago en los informes. Si la revisión no está disponible o no encuentra una imagen adecuada, el resultado lo indica sin presentar una imagen como verificada.',
     en: 'Compatible Skills can review whether an image fits your request. They use thumbnails and the selected vision model, with report controls limiting paid calls. If review is unavailable or finds no suitable image, the result says so instead of presenting an image as verified.',
@@ -138,6 +147,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "互換性のあるスキルは、画像がリクエストに適合するかどうかを確認できます。サムネイルと選択したビジョンモデルを使用し、有料通話を制限するレポートコントロールを使用します。レビューが利用できない場合、または適切な画像が見つからない場合は、画像が検証済みとして表示されるのではなく、結果にその旨が表示されます。",
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los dibujos químicos y SVG toleran mejor las respuestas válidas. Un comentario dentro del dibujo ya no provoca que se descarte, y Chemistry Studio conserva las partes que puede representar cuando no logra verificar toda la propuesta. Las limitaciones siguen visibles y no se presentan como una validación completa.',
     en: 'Chemical drawings and SVG handle valid responses more reliably. Comments inside a drawing no longer cause rejection, and Chemistry Studio keeps the parts it can display when the whole proposal cannot be verified. Limitations remain visible rather than being presented as full validation.',
@@ -153,6 +163,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "化学図面と SVG は有効な応答をより確実に処理します。図面内のコメントが拒否の原因となることはなくなり、提案全体を検証できない場合でも Chemistry Studio は表示できる部分を保持します。制限は完全な検証として表示されるのではなく、表示されたままになります。",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Una búsqueda común para todos los vaults. Encuentra contenido con una consulta que combina coincidencias de texto y búsqueda semántica cuando está disponible. Filtra por los tipos de contenido propios de cada vault y guarda las búsquedas para volver a ellas.',
     en: 'One search experience across all vaults. Find content with a query combining text matches and semantic search when available. Filter by the content types supported by each vault and save searches to return to them.',
@@ -168,6 +179,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "すべての Vault にわたって1つの検索エクスペリエンス。テキスト一致とセマンティック検索を組み合わせたクエリを使用してコンテンツを検索します (利用可能な場合)。各Vaultでサポートされているコンテンツタイプでフィルタリングし、検索を保存して検索に戻ります。",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Más claridad en los controles y la navegación. Las acciones del grafo y el panel del Tutor mejoran sus iconos y contraste, y el selector de contexto del chat respeta el modo claro. Docencia deja de mostrar accesos a secciones todavía no disponibles. También se corrigen el centrado del botón de envío y el fondo del logotipo en claro.',
     en: 'Clearer controls and navigation. Graph actions and the Tutor panel gain improved icons and contrast, and chat context controls respect light mode. Teaching hides sections that are not available yet. The send button is centered and the logo background is corrected in light mode.',
@@ -183,6 +195,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "より明確なコントロールとナビゲーション。グラフアクションと講師パネルのアイコンとコントラストが向上し、チャットコンテキストコントロールはライトモードを尊重します。ティーチングでは、まだ利用できないセクションが非表示になります。ライトモードでは送信ボタンが中央に配置され、ロゴの背景が補正されます。",
   },
   {
+    category: 'new',
     scope: 'marketplace',
     es: 'El Marketplace tiene un acceso propio desde la cabecera de Skills. Las skills y sus paquetes comparten una sola tarjeta, con su orden e identidad visual, botones más claros y errores de instalación traducidos. Es más fácil distinguir lo que tienes instalado de lo que puedes añadir.',
     en: 'The Marketplace has its own entry in the Skills header. Skills and their packages share one card with consistent ordering and visual identity, clearer buttons and translated installation errors. Installed and available items are easier to distinguish.',
@@ -198,6 +211,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "マーケットプレイスには、スキルヘッダーに独自のエントリがあります。スキルとそのパッケージは、一貫した順序と視覚的なアイデンティティ、より明確なボタン、翻訳されたインストールエラーを備えた1つのカードを共有します。インストールされているアイテムと利用可能なアイテムを区別しやすくなります。",
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: 'Los plugins pueden mostrar modelos 3D interactivos y resultados más ricos. Explora modelos, fórmulas, gráficos, comparaciones, mapas, imágenes, audio y documentos ampliables en visores de Nodus. Los recursos locales se conservan con el resultado, y los archivos incluidos en un paquete se verifican antes de usarse.',
     en: 'Plugins can display interactive 3D models and richer results. Explore models, formulas, charts, comparisons, maps, images, audio and zoomable documents in Nodus viewers. Local resources stay with the result, and files included in a package are verified before use.',
@@ -213,6 +227,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "プラグインは、インタラクティブな3D モデルとより豊富な結果を表示できます。 Nodus ビューアでモデル、公式、チャート、比較、地図、画像、オーディオ、ズーム可能なドキュメントを探索します。ローカルリソースは結果とともに残り、パッケージに含まれるファイルは使用前に検証されます。",
   },
   {
+    category: 'fix',
     scope: 'browser',
     es: 'Los marcadores del navegador ocupan menos espacio y se reconocen mejor. Las tarjetas son más compactas y recuperan los iconos de los sitios, también al editar un marcador. Las páginas de inicio y el gestor de marcadores comparten estas mejoras.',
     en: 'Browser bookmarks take less space and are easier to recognize. Cards are more compact and recover site icons, including when editing a bookmark. Start pages and the bookmark manager share these improvements.',
@@ -228,6 +243,7 @@ export const RELEASE_5_4_0_ADDITIONS: ReleaseHighlight[] = [
     ja: "ブラウザのブックマークは、必要なスペースが少なくなり、認識しやすくなります。カードはよりコンパクトになり、ブックマークの編集時を含めてサイトのアイコンを復元します。スタートページとブックマークマネージャーはこれらの改善点を共有します。",
   },
   {
+    category: 'fix',
     scope: 'word',
     es: 'Las alternativas de redacción en Word respetan los espacios de la selección. Aplicar una sugerencia ya no pega palabras vecinas cuando Word incluye un espacio al seleccionar. Si la primera respuesta no aporta suficientes alternativas distintas, Nodus intenta completar la lista sin repetir las ya obtenidas.',
     en: 'Word writing alternatives preserve selection whitespace. Applying a suggestion no longer joins neighboring words when Word includes a space in the selection. If the first response provides too few distinct alternatives, Nodus tries to complete the list without repeating earlier suggestions.',
