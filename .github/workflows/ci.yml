@@ -47,6 +47,9 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-builder install-app-deps
 
+      - name: Package this run's Electron native rebuild
+        run: node scripts/ci-native-artifact.mjs pack
+
       - name: Restore incremental check caches
         uses: actions/cache@v6
         with:
@@ -85,6 +88,8 @@ jobs:
           path: |
             .ci/build.tgz
             .ci/build-manifest.json
+            .ci/native.tgz
+            .ci/native-manifest.json
             .ci/plan.json
           include-hidden-files: true
           if-no-files-found: error
@@ -111,8 +116,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Rebuild native modules for Electron
-        run: npx electron-builder install-app-deps
       - name: Download this run's build
         uses: actions/download-artifact@v8
         with:
@@ -123,6 +126,14 @@ jobs:
         run: |
           tar -xzf .ci/build.tgz
           node scripts/ci-build-artifact.mjs verify
+      - name: Restore and verify the identical Electron native runtime
+        run: |
+          tar -xzf .ci/native.tgz
+          node scripts/ci-native-artifact.mjs verify
+      - name: Check all native dependencies for Electron
+        # Verified rebuild metadata avoids recompiling the shared binaries;
+        # electron-builder still discovers/checks every current dependency.
+        run: npx electron-builder install-app-deps
       - name: Prepare hash-verified local OCR test resource
         run: node scripts/prepare-research-ocr-fixture.mjs
       - name: Unit and integration tests
@@ -155,8 +166,6 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Rebuild native modules for Electron
-        run: npx electron-builder install-app-deps
       - name: Download this run's build
         uses: actions/download-artifact@v8
         with:
@@ -167,6 +176,12 @@ jobs:
         run: |
           tar -xzf .ci/build.tgz
           node scripts/ci-build-artifact.mjs verify
+      - name: Restore and verify the identical Electron native runtime
+        run: |
+          tar -xzf .ci/native.tgz
+          node scripts/ci-native-artifact.mjs verify
+      - name: Check all native dependencies for Electron
+        run: npx electron-builder install-app-deps
       - name: Materialize Electron before real-app checks
         run: node scripts/prepare-electron-tests.mjs
 

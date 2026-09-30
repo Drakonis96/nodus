@@ -118,6 +118,15 @@ try {
   let seen = [];
   ai.completeTextStream = async (options, cb, model) => { seen.push({options,model}); cb('Census total: 42.'); return 'Census total: 42.'; };
   ai.completeText = async (options, model) => { seen.push({options,model}); return 'Census total: 42.'; };
+  // The turn planner calls completeJson directly; replacing completeText does
+  // not intercept its lexical transport reference. Keep the existing literal
+  // planning fallback, without starting subscription CLIs that outlive the test.
+  // Planning and transport behavior have their own dedicated regression suites.
+  const planningCalls = [];
+  ai.completeJson = async (options, guard, model) => {
+    planningCalls.push({ options, model });
+    throw new Error('External inference forbidden in attachment tests');
+  };
   const engines = [
     ['research', chats.createConversation({}), (request) => load('electron/ai/researchAssistant.ts').streamResearchChat({ ...request, messages: [{role:'user',content:'Read the attached census'}], selection: { graphParts: {} } }, ()=>{}), id => chats.deleteConversation(id)],
     ['database', load('electron/db/databaseChatRepo.ts').createDatabaseChatConversation({ title:'Files',databaseIds:[] }), request => load('electron/ai/databaseChat.ts').streamDatabaseChat({...request,question:'Read census',databaseIds:[]},()=>{}), id => load('electron/db/databaseChatRepo.ts').deleteDatabaseChatConversation(id)],
@@ -137,6 +146,13 @@ try {
       await assert.rejects(()=>run({conversationId:chat.id,attachmentIds:[image.id],model:{provider,model:'text-fixture'}}),/no tiene visión/);
     }
     remove(chat.id); assert.equal(fs.existsSync(store.researchAttachmentDirectory(own)),false);
+  }
+  assert.equal(planningCalls.length, providers.length * 3);
+  assert.deepEqual([...new Set(planningCalls.map(call => call.model.provider))], providers);
+  for (const call of planningCalls) {
+    assert.match(call.options.system, /plan the library search/);
+    assert.match(call.options.user, /Read the attached census/);
+    assert.ok(['vision-fixture', 'text-fixture'].includes(call.model.model));
   }
   const helper = load('electron/ai/researchAttachments.ts');
   const scan = await store.importResearchAttachment(own, scanFile);

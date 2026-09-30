@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { createPlan, discoverTests, validatePlan, validateReports } from './ci-test-shards.mjs';
 import { createBuildManifest, verifyBuildManifest } from './ci-build-artifact.mjs';
+import { createNativeManifest, verifyNativeManifest } from './ci-native-artifact.mjs';
 
 const files = ['scripts/test-a.mjs', 'scripts/test-b.mjs', 'scripts/test-c.mjs', 'scripts/test-new.mjs'];
 const commit = 'a'.repeat(40);
@@ -129,5 +130,31 @@ test('build transfer rejects missing outputs, corruption and another commit', ()
     fs.writeFileSync(path.join(root, 'dist/index.html'), 'dist/index.html');
     fs.writeFileSync(path.join(root, 'dist-electron/main.js'), 'dist-electron/main.js');
     assert.throws(() => verifyBuildManifest(root, commit, unsafe), /Invalid artifact path/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('native transfer rejects ABI/runtime drift, incomplete inventory and corruption', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-ci-native-'));
+  const runtime = { commit, lockHash: 'locked', platform: 'darwin', arch: 'arm64', node: '22.23.2', electron: '43.4.0', abi: '148' };
+  const marker = 'node_modules/better-sqlite3/build/Release/.forge-meta';
+  const binary = 'node_modules/better-sqlite3/build/Release/better_sqlite3.node';
+  try {
+    fs.mkdirSync(path.dirname(path.join(root, marker)), { recursive: true });
+    fs.writeFileSync(path.join(root, marker), 'arm64--148');
+    fs.writeFileSync(path.join(root, binary), 'rebuilt SQLite');
+    fs.writeFileSync(path.join(root, 'node_modules/better-sqlite3/package.json'), '{"version":"12.11.1"}');
+    const manifest = createNativeManifest(root, runtime);
+    verifyNativeManifest(root, runtime, manifest);
+    for (const key of ['commit', 'lockHash', 'platform', 'arch', 'node', 'electron', 'abi']) {
+      assert.throws(() => verifyNativeManifest(root, { ...runtime, [key]: 'different' }, manifest), /runtime mismatch/);
+    }
+    const incomplete = clone(manifest); delete incomplete.files[binary];
+    assert.throws(() => verifyNativeManifest(root, runtime, incomplete), /Incomplete native rebuild/);
+    const unsafe = clone(manifest); unsafe.files['node_modules/../outside'] = 'hash';
+    assert.throws(() => verifyNativeManifest(root, runtime, unsafe), /Invalid native artifact path/);
+    fs.appendFileSync(path.join(root, binary), 'corrupt');
+    assert.throws(() => verifyNativeManifest(root, runtime, manifest), /Native hash mismatch/);
+    fs.writeFileSync(path.join(root, marker), 'x64--148');
+    assert.throws(() => createNativeManifest(root, runtime), /ABI mismatch/);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });

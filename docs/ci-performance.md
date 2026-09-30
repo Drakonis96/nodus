@@ -2,7 +2,7 @@
 
 CI builds each commit once on `macos-latest`. Three independent macOS jobs run
 every `scripts/test-*.mjs` file, with the same Node 22 runtime, Electron native
-module rebuild, full Git history, and two-file process concurrency as the original
+module checks, full Git history, and two-file process concurrency as the original
 job. The four existing Electron E2E scripts run in a fourth job against the same
 build. Cross-repository capability checks retain all three platforms.
 
@@ -27,6 +27,20 @@ another commit. TypeScript incremental state and ESLint's
 content cache accelerate checks, but both tools still run against current sources
 on every build; cache misses perform full checks.
 
+The builder also shares its rebuilt native binaries and Electron rebuild metadata
+in a small, separate archive. Consumers install the locked dependencies with
+`npm ci`, verify the exact commit, lockfile hash, OS, architecture, Node version,
+Electron version, ABI and every transferred file hash, and open a real in-memory
+SQLite database under Electron. They still run `electron-builder install-app-deps`
+to check all current native dependencies; valid rebuild metadata avoids repeating
+the same compilation. Runtime mismatches or missing/corrupt binaries fail the job.
+The native archive is never restored from a cross-run dependency cache.
+
+The attachment integration fixture intercepts structured planner inference as well
+as text/stream inference. It retains the literal planning fallback and all format,
+engine and provider assertions, while avoiding subscription CLI processes after
+the checks finish. The planner and transports retain their dedicated test suites.
+
 ## Validate on a pull request
 
 1. Compare with baseline run
@@ -44,7 +58,7 @@ on every build; cache misses perform full checks.
    total runner consumption; faster feedback does not imply fewer runner minutes.
 4. A first execution measures a cold check cache. A later commit with small changes
    can measure restored incremental caches; do not combine the two benchmarks.
-5. Aim for roughly 15 minutes without queueing and compare measured results before
+5. Aim for 14–16 minutes and compare measured results before
    claiming an improvement. Four downstream macOS jobs can compete with other PRs
    for the account's macOS concurrency allowance. Queue time is not guaranteed.
 
@@ -54,6 +68,9 @@ For local orchestration verification use:
 
 ```sh
 node --test scripts/test-ci-quality-gate.mjs
+npx electron-builder install-app-deps
+node scripts/ci-native-artifact.mjs pack
+node scripts/ci-native-artifact.mjs verify
 npm run build:ci
 npm run build:server-web
 node scripts/ci-test-shards.mjs plan
