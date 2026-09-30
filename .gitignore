@@ -46,6 +46,7 @@ release/
 build/NodusDockTile.docktileplugin/
 
 # Local tooling / caches
+.ci/
 .claude/
 __pycache__/
 

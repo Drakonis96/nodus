@@ -1,11 +1,8 @@
 name: CI
 
-# Runs the full quality gate on pull requests and pushes to main: typecheck + renderer
-# and main builds, the unit/integration suite (node --test discovers
-# scripts/test-*.mjs and runs them in parallel; scripts that need better-sqlite3
-# re-exec themselves under Electron-as-Node to match the app ABI), and the e2e
-# smoke that boots the real app. macOS runner: same platform as development,
-# and Electron can open real windows there without xvfb.
+# Build this commit once, run the entire suite in three isolated macOS groups,
+# and boot the real app in parallel. The final `test` check verifies that every
+# discovered test file completed exactly once and all prerequisite jobs passed.
 
 on:
   push:
@@ -20,11 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  build:
     runs-on: macos-latest
-    # Build + two-worker regression suite can exceed 30 minutes before GUI checks.
-    # Keep the existing per-E2E timeouts; allow the complete job to finish.
-    timeout-minutes: 45
+    timeout-minutes: 20
+    outputs:
+      artifact_id: ${{ steps.share-build.outputs.artifact-id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -50,13 +47,21 @@ jobs:
       - name: Rebuild native modules for Electron
         run: npx electron-builder install-app-deps
 
+      - name: Restore incremental check caches
+        uses: actions/cache@v6
+        with:
+          path: .ci/cache
+          key: checks-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'tsconfig*.json', 'electron/tsconfig.json', '.eslintrc.cjs', 'package.json') }}-${{ github.sha }}
+          restore-keys: |
+            checks-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('package-lock.json', 'tsconfig*.json', 'electron/tsconfig.json', '.eslintrc.cjs', 'package.json') }}-
+
       - name: Lint
-        run: npm run lint
+        run: npm run lint:ci
 
       - name: Build (includes typecheck)
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-        run: npm run build
+        run: npm run build:ci
 
       # The Server Web suites drive the compiled app and ask the server for its SPA
       # shell, so without this the published-record routes answer 404 and the
@@ -66,16 +71,104 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
         run: npm run build:server-web
 
+      - name: Assign every test file to exactly one group
+        run: node scripts/ci-test-shards.mjs plan
+
+      - name: Package this commit's build with a SHA-256 manifest
+        run: node scripts/ci-build-artifact.mjs pack
+
+      - name: Share this run's build and complete test plan
+        id: share-build
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-build-${{ github.run_attempt }}
+          path: |
+            .ci/build.tgz
+            .ci/build-manifest.json
+            .ci/plan.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  unit:
+    needs: build
+    strategy:
+      # A failing group must not cancel the others or hide their results.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
+      - name: Download this run's build
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: .ci
+          merge-multiple: true
+      - name: Restore and verify this commit's build
+        run: |
+          tar -xzf .ci/build.tgz
+          node scripts/ci-build-artifact.mjs verify
       - name: Prepare hash-verified local OCR test resource
         run: node scripts/prepare-research-ocr-fixture.mjs
-
       - name: Unit and integration tests
-        # Two files at a time: the heavy tail (Zotero, world databases, Chromium
-        # and Electron-backed suites) already saturates a 3-vCPU/7 GB macOS
-        # runner, and a third concurrent process has killed the whole runner
-        # mid-run with no TAP failure. Two keeps the peak bounded and still
-        # finishes inside the job budget.
-        run: npm run test:ci
+        # Keep the proven two-file memory bound on each independent runner.
+        run: npm run test:ci:shard -- ${{ matrix.shard }}
+      - name: Preserve execution inventory and timing, including failures
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          # A failed-job rerun replaces only this group's report; successful
+          # groups and the successful build remain usable for the same commit.
+          name: ci-tests-${{ matrix.shard }}
+          overwrite: true
+          path: .ci/reports/shard-${{ matrix.shard }}.json
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Rebuild native modules for Electron
+        run: npx electron-builder install-app-deps
+      - name: Download this run's build
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: .ci
+          merge-multiple: true
+      - name: Restore and verify this commit's build
+        run: |
+          tar -xzf .ci/build.tgz
+          node scripts/ci-build-artifact.mjs verify
+      - name: Materialize Electron before real-app checks
+        run: node scripts/prepare-electron-tests.mjs
 
       - name: E2E smoke (real app boot)
         timeout-minutes: 10
@@ -92,6 +185,46 @@ jobs:
       - name: Argument map E2E (isolated demonstration profile)
         timeout-minutes: 5
         run: npm run test:e2e:argument-map
+
+  test:
+    # Preserve the existing check name; a skipped/cancelled prerequisite fails
+    # this gate, even when the matrix never produced a report artifact.
+    if: always()
+    needs: [build, unit, e2e, cross-repo]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every quality-gate job succeeded
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['JOB_RESULTS'])
+          failed = {name: job['result'] for name, job in results.items() if job['result'] != 'success'}
+          if failed:
+              raise SystemExit(f'Incomplete quality gate: {failed}')
+          PY
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Download the complete test plan
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: .ci
+          merge-multiple: true
+      - name: Download all group execution reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-tests-*
+          path: .ci/reports
+          merge-multiple: true
+      - name: Every discovered test file passed exactly once
+        run: node scripts/ci-test-shards.mjs verify
 
   # Capability API v2 is a contract split across two repositories, and everything that can
   # drift between them fails silently in both. This job checks them against each other:
