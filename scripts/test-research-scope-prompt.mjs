@@ -71,3 +71,21 @@ test('the research scope names the turn\'s sources with their authors and counts
     assert.match(assistant, /Never say that you lack tools, that Zotero or its MCP is unavailable or must be enabled/, 'the answer owns the research instead of disowning Zotero');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('the coverage kept with a chat turn lists only consulted sources in a large scope', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-scope-prompt-'));
+  try {
+    await build({ entryPoints: ['shared/researchCorpus.ts'], outfile: path.join(root, 'corpus.cjs'), bundle: true, platform: 'node', format: 'cjs' });
+    const { compactResearchTraversal, STORED_COVERAGE_LIMIT } = require(path.join(root, 'corpus.cjs'));
+    const sourceCoverage = Array.from({ length: 14051 }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`, reasons: ['embeddings_pending'] }));
+    const coverage = { scopeId: 's', sourceCount: 14051, rounds: 2, evidenceTokens: 7000, partial: false, matchedDocumentIds: ['d3', 'd9'], readDocumentIds: ['d40'], sourceCoverage, queries: [] };
+    const kept = compactResearchTraversal(coverage);
+    assert.deepEqual(kept.sourceCoverage.map(s => s.documentId), ['d3', 'd9', 'd40']);
+    assert.equal(kept.sourceCount, 14051, 'the scope size is still reported');
+    assert.ok(Buffer.byteLength(JSON.stringify(kept)) < 2000);
+    const small = { ...coverage, sourceCoverage: sourceCoverage.slice(0, STORED_COVERAGE_LIMIT) };
+    assert.equal(compactResearchTraversal(small), small, 'a small scope is kept as it is');
+    const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
+    assert.match(assistant, /researchTraversal: compactResearchTraversal\(run\.coverage\(\)\)/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

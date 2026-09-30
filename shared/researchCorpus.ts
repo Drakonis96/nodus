@@ -231,6 +231,17 @@ export interface ResearchScopePromptFocus {
 }
 type ScopePromptSource = { title: string; authors?: string[]; year?: number; passages_found: boolean; original_read?: true; notes?: string[] };
 
+/** The coverage record kept with a chat turn. A library-wide scope listed every source (14,051
+ *  entries, ~3 MB per turn in the vault and over IPC). Past `STORED_COVERAGE_LIMIT` only the consulted
+ *  sources are kept; `sourceCount` still gives the whole scope. */
+export const STORED_COVERAGE_LIMIT = 60;
+export function compactResearchTraversal(coverage: ResearchTraversal): ResearchTraversal {
+  const all = coverage.sourceCoverage ?? [];
+  if (all.length <= STORED_COVERAGE_LIMIT) return coverage;
+  const consulted = new Set([...(coverage.matchedDocumentIds ?? []), ...(coverage.readDocumentIds ?? [])]);
+  return { ...coverage, sourceCoverage: all.filter(source => consulted.has(source.documentId)) };
+}
+
 /** The run's coverage as a model should read it: titles and plain descriptions, without
  * identifiers, counters or codes. The stored record keeps the codes for the interface. */
 export function researchScopeForPrompt(coverage: ResearchTraversal, focus?: ResearchScopePromptFocus): { sources: ScopePromptSource[]; other_sources?: { count: number; notes: string[] }; search_may_be_incomplete: boolean; limits?: string[] } {
