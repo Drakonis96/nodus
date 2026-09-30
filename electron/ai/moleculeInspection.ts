@@ -44,7 +44,8 @@ import {
   type StepSupport,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
-import { findStartingSmiles, relevantExcerpt, textbookQueryForClass } from '@shared/synthesisEvidence';
+import { findStartingSmiles, formatStartingMaterialStock, relevantExcerpt, routeStartingMaterials, textbookQueryForClass } from '@shared/synthesisEvidence';
+import { chemistryStockDirectory } from './chemistryStock';
 import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
@@ -759,6 +760,20 @@ async function drawRouteSteps(
   return `\n${lines.join('\n')}\n`;
 }
 
+const STOCK_TOOL = 'check-stock';
+
+/** The stock line for a route's starting materials, or '' without stock lists or the tool. */
+async function startingMaterialStockLine(runner: Runner, labels: RouteSpeciesLabel[][]): Promise<string> {
+  const stockDir = chemistryStockDirectory();
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  if (!stockDir || !provider?.tools.some((tool) => tool.id === STOCK_TOOL)) return '';
+  const starting = routeStartingMaterials(labels);
+  if (!starting.length) return '';
+  const result = await runner.invoke({ provider, toolId: STOCK_TOOL, input: { stockDir, molecules: starting.map((entry) => entry.smiles).slice(0, 64) } });
+  const data = (result.artifacts ?? []).find((entry) => entry.artifactType === 'stock-availability')?.data as { stock?: Record<string, string[]>; lists?: string[] } | undefined;
+  return data ? formatStartingMaterialStock(starting, data.stock ?? {}, data.lists ?? []) : '';
+}
+
 /** The post-answer route check, then one drawing per verified step. Neither rewrites the
  *  answer nor asks the model again; a step the checker refused is reported, not drawn. */
 export async function appendRouteReportAndDrawings(
@@ -811,6 +826,8 @@ export async function appendRouteReportAndDrawings(
       const drawings = precedentDrawings(runner, result.provider, result.precedent, queries);
       return formatReactionPrecedents(result.precedent, { queries, labels, target, drawings, support });
     }).catch(() => '');
+    // Which starting materials the user's vendor stock lists hold (no lists: nothing is said).
+    const stockPromise = startingMaterialStockLine(runner, labels).catch(() => '');
     const review = await reviewPromise;
     const report = formatRouteAudit(audit, labels, review);
     const precedentText = await precedentSection;
@@ -820,7 +837,8 @@ export async function appendRouteReportAndDrawings(
     // alternatives and a textbook passage ride along as evidence.
     const fix = formatNamedRouteFixPrompts(labels, audit, review, support, overrides.unresolved ?? []);
     const sources = await evidenceSources(modelAnswer, steps.length, precedentPromise, queries, support);
-    return `${finalAnswer.trimEnd()}\n\n${report}\n${drawings}${precedentText}${sources}${fix ? `\n${fix}\n` : ''}`;
+    const stockLine = await stockPromise;
+    return `${finalAnswer.trimEnd()}\n\n${report}\n${stockLine ? `${stockLine}\n\n` : ''}${drawings}${precedentText}${sources}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
     if (options.signal?.aborted) return finalAnswer;
     return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable(error instanceof Error ? error.message : 'the route check failed')}\n`;

@@ -21,6 +21,7 @@ import { capabilityRegistry } from '../capabilities/registry';
 import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
 import { reactionIndexService } from '../reactionIndex';
+import { chemistryStockDirectory } from './chemistryStock';
 import { embed } from './aiClient';
 import { chemistryRunner } from './moleculeInspection';
 
@@ -48,6 +49,14 @@ function disconnectProvider() {
 
 type Runner = ReturnType<typeof chemistryRunner>['runner'];
 
+/** The stock directory, for a package whose disconnection tool takes one (older ones reject it). */
+function stockInput(): { stockDir?: string } {
+  const stockDir = chemistryStockDirectory();
+  const provider = disconnectProvider();
+  const accepts = provider?.tools.find((tool) => tool.id === DISCONNECT_TOOL)?.inputSchema?.properties?.stockDir;
+  return stockDir && accepts ? { stockDir } : {};
+}
+
 /** One `propose-disconnections` call on an open runner. Null when the package has no such tool or
  *  the index is not downloaded; throws on a tool failure. */
 export async function invokeDisconnections(runner: Runner, targets: string[], starting: string[], limit = PROPOSALS_PER_TARGET): Promise<TargetDisconnections[] | null> {
@@ -58,7 +67,7 @@ export async function invokeDisconnections(runner: Runner, targets: string[], st
   const result = await runner.invoke({
     provider,
     toolId: DISCONNECT_TOOL,
-    input: { indexDir, targets: targets.slice(0, 16), limit, ...(starting.length ? { startingMaterials: starting.slice(0, 16) } : {}) },
+    input: { indexDir, targets: targets.slice(0, 16), limit, ...(starting.length ? { startingMaterials: starting.slice(0, 16) } : {}), ...stockInput() },
   });
   const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-disconnections');
   return artifact ? normalizeDisconnections(artifact.data, limit) : [];

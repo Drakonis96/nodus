@@ -152,3 +152,32 @@ test('starting materials that imply a textbook method add its textbook search', 
   assert.deepEqual(requestMethodClasses('…starting from 2-methylcyclohexane-1,3-dione and but-3-en-2-one (C=CC(C)=O)…'), ['intramolecular aldol condensation (Robinson annulation)']);
   assert.deepEqual(requestMethodClasses('Propose a synthesis of benzocaine from 4-nitrotoluene.'), []);
 });
+
+test('starting materials are organic reactants no earlier step makes, in first-use order', () => {
+  const { routeStartingMaterials } = evidence;
+  const label = (role, name, smiles, byproduct = false) => ({ role, name, smiles, byproduct });
+  const labels = [
+    [label('reactant', '4-nitrotoluene', 'Cc1ccc([N+](=O)[O-])cc1'), label('reactant', 'potassium permanganate', 'O=[Mn](=O)(=O)[O-].[K+]'), label('product', '4-nitrobenzoic acid', 'O=C(O)c1ccc([N+](=O)[O-])cc1')],
+    [label('reactant', '4-nitrobenzoic acid', 'O=C(O)c1ccc([N+](=O)[O-])cc1'), label('reactant', 'ethanol', 'CCO'), label('product', 'ethyl 4-nitrobenzoate', 'CCOC(=O)c1ccc([N+](=O)[O-])cc1'), label('product', 'water', 'O', true)],
+  ];
+  assert.deepEqual(routeStartingMaterials(labels).map((entry) => entry.name), ['4-nitrotoluene', 'ethanol']);
+});
+
+test('the stock line names each starting material and the lists that hold it; no lists, no line', () => {
+  const { formatStartingMaterialStock } = evidence;
+  const starting = [{ name: '4-nitrotoluene', smiles: 'A' }, { name: 'ethanol', smiles: 'B' }];
+  assert.equal(formatStartingMaterialStock(starting, { A: ['mcule'], B: [] }, ['enamine', 'mcule']),
+    '**Starting materials:** 1 of 2 on your stock lists (enamine, mcule) — 4-nitrotoluene (in stock: mcule); ethanol (not on your stock lists).');
+  assert.equal(formatStartingMaterialStock(starting, {}, []), '');
+});
+
+test('a purchasable disconnection keeps the vendors that stock every precursor', () => {
+  const { normalizeDisconnections } = evidence;
+  const [entry] = normalizeDisconnections({ disconnections: [{ target: 'T', input: 'T', proposals: [
+    { precursors: 'A.B', recorded: 0, available: false, purchasable: true, inStock: { A: ['mcule', 'enamine'], B: ['mcule'] } },
+    { precursors: 'C', recorded: 2, available: true },
+  ] }] });
+  assert.equal(entry.proposals[0].purchasable, true);
+  assert.deepEqual(entry.proposals[0].vendors, ['mcule']);
+  assert.equal('purchasable' in entry.proposals[1], false);
+});

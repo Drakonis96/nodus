@@ -82,6 +82,10 @@ export interface DisconnectionProposal {
   available: boolean;
   /** Whether it is made only from the requested starting materials and routine reagents. */
   fromStarts?: boolean;
+  /** Every organic precursor is on one of the user's imported vendor stock lists. */
+  purchasable?: boolean;
+  /** The stock lists holding them, when purchasable. */
+  vendors?: string[];
 }
 
 export interface TargetDisconnections {
@@ -91,6 +95,13 @@ export interface TargetDisconnections {
   /** ORD reactions that make this molecule, most recorded first. */
   recordedRoutes: Array<{ precursors: string; count: number }>;
   proposals: DisconnectionProposal[];
+}
+
+/** The vendors that stock every precursor of a purchasable proposal. */
+function stockVendors(inStock: unknown): string[] {
+  const lists = Object.values((inStock ?? {}) as Record<string, unknown>).map((vendors) => (Array.isArray(vendors) ? vendors.filter((v): v is string => typeof v === 'string') : []));
+  if (!lists.length) return [];
+  return lists.reduce((common, vendors) => common.filter((vendor) => vendors.includes(vendor)));
 }
 
 const asNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
@@ -126,6 +137,7 @@ export function normalizeDisconnections(data: unknown, perTarget = 6): TargetDis
         recorded: asNumber(proposal.recorded),
         available: proposal.available === true,
         ...(typeof proposal.fromStarts === 'boolean' ? { fromStarts: proposal.fromStarts } : {}),
+        ...(proposal.purchasable === true ? { purchasable: true, vendors: stockVendors(proposal.inStock) } : {}),
       });
       if (proposals.length >= perTarget) break;
     }
@@ -378,4 +390,30 @@ export function synthesisEvidencePayload(evidence: SynthesisEvidence | null): Re
     } : {}),
     ...(evidence.passages.length ? { textbook_passages: evidence.passages } : {}),
   };
+}
+
+/** A route's starting materials: organic reactants no earlier step makes, in first-use order. */
+export function routeStartingMaterials(labels: Array<Array<{ role: string; byproduct: boolean; name: string; smiles: string }>>): Array<{ name: string; smiles: string }> {
+  const made = new Set<string>();
+  const out = new Map<string, { name: string; smiles: string }>();
+  for (const step of labels) {
+    for (const label of step) {
+      if (label.role === 'reactant' && !label.byproduct && /[Cc]/.test(label.smiles) && !made.has(label.smiles) && !out.has(label.smiles)) {
+        out.set(label.smiles, { name: label.name || label.smiles, smiles: label.smiles });
+      }
+    }
+    for (const label of step) if (label.role === 'product') made.add(label.smiles);
+  }
+  return [...out.values()];
+}
+
+/** One line under the route report: which starting materials the user's stock lists hold. */
+export function formatStartingMaterialStock(starting: Array<{ name: string; smiles: string }>, stock: Record<string, string[]>, lists: string[]): string {
+  if (!starting.length || !lists.length) return '';
+  const parts = starting.map(({ name, smiles }) => {
+    const vendors = stock[smiles] ?? [];
+    return vendors.length ? `${name} (in stock: ${vendors.join(', ')})` : `${name} (not on your stock lists)`;
+  });
+  const held = starting.filter(({ smiles }) => (stock[smiles] ?? []).length).length;
+  return `**Starting materials:** ${held} of ${starting.length} on your stock lists (${lists.join(', ')}) — ${parts.join('; ')}.`;
 }
