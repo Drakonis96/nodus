@@ -1516,3 +1516,14 @@ test('a route request asks for backwards, one-step planning without hand-balanci
   // The addendum is still recognised as already applied, so it is never appended twice.
   assert.equal(looksLikeSynthesisRequest(`Propose a synthesis of benzocaine.\n${SYNTHESIS_TEMPLATE_ADDENDUM}`), false);
 });
+
+test('open stereocentres that cannot reach the target pass, and say so', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 2, stereoNotRequired: true,
+    reactants: [], agents: [], products: [{ input: 'd', canonicalSmiles: 'CN1C2CCC1C(C(=O)O)C(=O)C2C(=O)O', skeletonSmiles: 'd', formula: 'C10H13NO5', charge: 0, heavyAtoms: 16, stereocentres: 0, unspecifiedStereocentres: 2 }] }] });
+  assert.equal(audit.steps[0].stereoNotRequired, true);
+  assert.equal(routeStepFailure(audit.steps[0]), null);
+  assert.match(formatRouteAudit(audit), /- Step 1 OK — balanced, 2 open stereocentre\(s\) not required \(lost before the target\)/);
+  // Without the flag the same step still fails.
+  const strict = normalizeRouteAudit({ ...audit, steps: [{ ...audit.steps[0], stereoNotRequired: false }] });
+  assert.match(routeStepFailure(strict.steps[0]) ?? '', /2 unspecified stereocentre/);
+});

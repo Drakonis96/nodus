@@ -105,6 +105,9 @@ export interface RouteStepAudit {
   nameProblems?: string[];
   /** The request declared this step racemic; its open centres are a stated outcome. */
   racemic?: boolean;
+  /** The step's open stereocentres cannot reach the target (requested without stereo), so the
+   *  checker does not require them to be specified or declared. */
+  stereoNotRequired?: boolean;
   /** The equation balances only by assembling a product from more than one substrate. */
   assemblyProblem?: string;
 }
@@ -1229,6 +1232,7 @@ function normalizeRouteStep(entry: unknown, index: number): RouteStepAudit | nul
     unspecifiedStereocentres: numberOr(value.unspecifiedStereocentres, 0),
     ...(stringArray(value.nameProblems).length ? { nameProblems: stringArray(value.nameProblems).map((entry) => entry.slice(0, 300)).slice(0, 24) } : {}),
     ...(value.racemic === true ? { racemic: true } : {}),
+    ...(value.stereoNotRequired === true ? { stereoNotRequired: true } : {}),
     ...(typeof value.assemblyProblem === 'string' && value.assemblyProblem ? { assemblyProblem: value.assemblyProblem.slice(0, 400) } : {}),
   };
 }
@@ -1721,13 +1725,16 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
     const label = `Step ${step.index + 1}`;
     if (!step.ok) { lines.push(`- ${label} FAIL — ${step.error ?? 'could not be parsed'}`); continue; }
     const racemic = step.racemic === true && step.unspecifiedStereocentres > 0;
+    const moot = !racemic && step.stereoNotRequired === true && step.unspecifiedStereocentres > 0;
     const nameFailure = (step.nameProblems?.length ?? 0) > 0;
     const assemblyFailure = Boolean(step.assemblyProblem);
-    const verdict = !nameFailure && !assemblyFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic) ? 'OK' : 'FAIL';
+    const verdict = !nameFailure && !assemblyFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic || moot) ? 'OK' : 'FAIL';
     const stereo = step.unspecifiedStereocentres
       ? racemic
         ? ', declared racemic (stereochemistry not controlled)'
-        : `, ${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
+        : moot
+          ? `, ${step.unspecifiedStereocentres} open stereocentre(s) not required (lost before the target)`
+          : `, ${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
       : '';
     const balance = step.balanced ? 'balanced' : `NOT balanced (${step.differences.join('; ')})`;
     const nameNote = nameFailure ? ` name check failed: ${step.nameProblems!.join('; ')}.` : '';
@@ -1884,7 +1891,7 @@ export function routeStepFailure(step: RouteStepAudit): string | null {
   // assembles a product from more than one substrate. The report already shows this, so the
   // one-click prompts must name it too, or they point at a different step than the checker did.
   if (step.assemblyProblem) return step.assemblyProblem;
-  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) {
+  if (step.unspecifiedStereocentres > 0 && step.racemic !== true && step.stereoNotRequired !== true) {
     // Say where the open centres are, so a model that already named something knows which name.
     const open = step.products.filter((entry) => entry.unspecifiedStereocentres > 0).map((entry) => `${entry.name ? `“${entry.name}”` : `\`${entry.canonicalSmiles}\``} (${entry.unspecifiedStereocentres})`);
     return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)${open.length ? ` in ${open.join(', ')}` : ''} — name the stereoisomer formed (descriptors in its systematic name), or state in this step's own paragraph that the outcome is racemic, that the product is meso, or that its stereochemistry is not controlled (a mixture of diastereomers)`;
