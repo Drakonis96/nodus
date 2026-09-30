@@ -2,8 +2,15 @@
 
 CI builds each commit once on `macos-latest`. Three independent macOS jobs run
 every `scripts/test-*.mjs` file, with the same Node 22 runtime, Electron native
-module checks, full Git history, and two-file process concurrency as the original
-job. The four existing Electron E2E scripts run after the smaller third group,
+module checks, full Git history, and at most two-file process concurrency.
+Files with a static Playwright import run in a first phase at concurrency one;
+other files run afterward at concurrency two, retaining process isolation.
+This reduces competing browser processes on the 7 GB hosted runners. The
+classification changes scheduling only: both phases together execute every
+assigned file, and summaries add the real counts while retaining any failure,
+cancellation or skip from either phase. Browser durations receive twice the
+placement weight to account for their sequential execution. The four existing
+Electron E2E scripts run after the smaller third group,
 against the same build. Cross-repository capability checks retain all three platforms.
 
 `scripts/ci-test-shards.mjs plan` discovers the complete test inventory. Historical

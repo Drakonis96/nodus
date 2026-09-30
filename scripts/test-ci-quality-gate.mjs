@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createPlan, discoverTests, validatePlan, validateReports, fileConcurrency, e2eReservationMs, e2eShard } from './ci-test-shards.mjs';
+import { createPlan, discoverTests, validatePlan, validateReports, fileConcurrency, e2eReservationMs, e2eShard, browserFixtures } from './ci-test-shards.mjs';
 import { createBuildManifest, verifyBuildManifest } from './ci-build-artifact.mjs';
 import { createNativeManifest, verifyNativeManifest } from './ci-native-artifact.mjs';
 import { preparedComponentStyles } from './lib/component-test-styles.mjs';
@@ -122,6 +122,51 @@ test('real child processes report every file, propagate assertion failures, and 
     assert.notEqual(execute('run', String(group)).status, 0);
     fs.writeFileSync(path.join(root, files[0]), "process.exit(3);\n");
     assert.notEqual(execute('run', String(group)).status, 0);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('browser phases serialize processes and retain failures/skips when a later phase passes', { timeout: 30_000 }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-ci-phases-'));
+  const script = fileURLToPath(new URL('./ci-test-shards.mjs', import.meta.url));
+  const env = { ...process.env }; delete env.NODE_TEST_CONTEXT;
+  const execute = () => spawnSync(process.execPath, [script, 'run', '1'], { cwd: root, env, encoding: 'utf8', timeout: 10_000 });
+  const names = ['scripts/test-browser-a.mjs', 'scripts/test-browser-b.mjs', 'scripts/test-plain.mjs', 'scripts/test-c.mjs', 'scripts/test-d.mjs'];
+  const browserSource = "import { chromium } from 'playwright-core'; import test from 'node:test'; import fs from 'node:fs'; import assert from 'node:assert/strict'; import { setTimeout } from 'node:timers/promises'; test('browser fixture', async () => { assert.ok(chromium); const lock = fs.openSync('browser.lock', 'wx'); try { await setTimeout(30); } finally { fs.closeSync(lock); fs.unlinkSync('browser.lock'); } });\n";
+  try {
+    fs.mkdirSync(path.join(root, 'scripts'));
+    fs.mkdirSync(path.join(root, 'node_modules/playwright-core'), { recursive: true });
+    fs.writeFileSync(path.join(root, 'node_modules/playwright-core/package.json'), '{"type":"module","exports":"./index.mjs"}');
+    fs.writeFileSync(path.join(root, 'node_modules/playwright-core/index.mjs'), 'export const chromium = {};');
+    for (const name of names) fs.writeFileSync(path.join(root, name), name.includes('browser') ? browserSource : "import assert from 'node:assert/strict'; assert.equal(1, 1);\n");
+    const browsers = browserFixtures(root, names);
+    assert.deepEqual(browsers, names.slice(0, 2));
+    const weighted = createPlan(names, commit, Object.fromEntries(names.map(name => [name, 1000])), 3, browsers);
+    assert.equal(weighted.shards.reduce((sum, shard) => sum + shard.estimatedMs, 0), 7000 + fileConcurrency * e2eReservationMs);
+    execFileSync('git', ['init', '-q'], { cwd: root });
+    execFileSync('git', ['-c', 'user.name=CI Fixture', '-c', 'user.email=ci@example.invalid', 'commit', '--allow-empty', '-qm', 'fixture'], { cwd: root });
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+    const planned = { schemaVersion: 1, commit: head, files: [...names].sort(), shards: [
+      { index: 1, files: names.slice(0, 3) }, { index: 2, files: [names[3]] }, { index: 3, files: [names[4]] },
+    ] };
+    fs.mkdirSync(path.join(root, '.ci'));
+    fs.writeFileSync(path.join(root, '.ci/plan.json'), JSON.stringify(planned));
+    const result = execute(); assert.equal(result.status, 0, result.stdout + result.stderr);
+    const report = () => JSON.parse(fs.readFileSync(path.join(root, '.ci/reports/shard-1.json'), 'utf8'));
+    const passed = report();
+    assert.deepEqual(passed.phases.map(phase => [phase.name, phase.concurrency, phase.files.length]), [['browser', 1, 2], ['other', 2, 1]]);
+    assert.equal(passed.summary.counts.tests, 3);
+    assert.equal(passed.summary.counts.passed, 3);
+    assert.equal(passed.completed.length, 3);
+    for (const body of ["throw new Error('injected browser-phase failure')", "t.skip('new browser-phase skip')"]) {
+      fs.writeFileSync(path.join(root, names[0]), "import { chromium } from 'playwright-core'; import test from 'node:test'; test('first phase', t => { " + body + "; });\n");
+      assert.notEqual(execute().status, 0);
+      const failed = report();
+      assert.equal(failed.success, false);
+      assert.equal(failed.summary.counts.tests, 3);
+      assert.equal(failed.completed.length, 3, 'Later phases still execute after a failure or skip');
+      assert.ok(failed.completed.find(file => file.file === names[2]).passed);
+    }
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 
