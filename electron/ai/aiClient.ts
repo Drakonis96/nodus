@@ -833,6 +833,20 @@ export async function researchModelContextWindow(model: ModelRef): Promise<{ tok
   if (model.provider === 'deepseek' && model.model === 'deepseek-flash') return { tokens: 1000000, known: true };
   return { tokens: 32768, known: false };
 }
+/** Byte sizes of a request's parts, largest payload fields first, for the overflow log. */
+function requestSizeBreakdown(opts: CallOpts): string {
+  const bytes = (text: string) => new TextEncoder().encode(text).length;
+  const parts = [`system ${bytes(opts.system)}`, `user ${bytes(opts.user)}`, `output ${opts.maxTokens ?? 8000}`];
+  try {
+    const payload = JSON.parse(opts.user) as Record<string, unknown>;
+    const fields = Object.entries(payload).map(([key, value]) => [key, bytes(JSON.stringify(value) ?? '')] as const).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    parts.push(`user fields: ${fields.map(([key, size]) => `${key}=${size}`).join(', ')}`);
+  } catch {
+    /* A plain-text user message has no fields to break down. */
+  }
+  return parts.join('; ');
+}
+
 async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise<void> {
   const active = currentResearchRequestBudget();
   if (!active && !opts.corpusContext) return;
@@ -840,6 +854,8 @@ async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise
   const window = Math.min(effective.tokens, active?.window ?? Infinity);
   const needed = researchPromptUpperBound(opts.system, opts.user, opts.maxTokens ?? 8000);
   if (needed > window) {
+    // Say what is large: the generic message a cloud model gets carries no numbers.
+    console.warn(`[research] request refused before sending: needs ~${needed} (bytes as tokens) > window ${window} for ${model.provider}/${model.model}; ${requestSizeBreakdown(opts)}`);
     active?.onOverflow();
     throw new AiError(isLocalProvider(model.provider) || model.provider === 'nodus'
       ? contextOverflowMessage(model.provider, model.model, window, needed) : genericContextOverflowMessage(), false, true, 'context_overflow');
