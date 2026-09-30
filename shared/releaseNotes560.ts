@@ -7,6 +7,7 @@ import type { ReleaseHighlight } from './releaseNotes';
 // Describe shipped behavior directly in every interface language.
 export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     "scope": "academic",
     "es": "Al crear una bóveda académica puedes elegir entre Auto y Manual. En Manual, importar o sincronizar documentos no genera ideas ni temas automáticamente. La elección se guarda para esa bóveda y no se puede cambiar después de crearla.",
     "en": "When creating an academic vault, you can choose Auto or Manual. In Manual mode, importing or syncing documents does not automatically generate ideas or themes. The choice is saved for that vault and cannot be changed after creation.",
@@ -22,6 +23,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학술 보관함을 만들 때 자동 또는 수동을 선택할 수 있습니다. 수동 모드에서는 문서를 가져오거나 동기화해도 아이디어나 주제가 자동 생성되지 않습니다. 선택은 해당 보관함에 저장되며 생성 후에는 바꿀 수 없습니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "El modo Manual permite escribir ideas y añadir citas, obras, temas y conexiones desde un mismo formulario. Todos esos vínculos son opcionales. Las ideas se indexan localmente para buscarlas, sin IA generativa. Chat de investigación y Deep Research pueden consultarlas cuando los ejecutas.",
     "en": "Manual mode lets you write ideas and add quotations, works, themes and connections in one form. All these links are optional. Ideas are indexed locally for search, without generative AI. Research Chat and Deep Research can use them when you run those tools.",
@@ -37,6 +39,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "수동 모드에서는 하나의 양식에서 아이디어를 작성하고 인용문, 문헌, 주제, 연결을 추가할 수 있습니다. 모든 연결은 선택 사항입니다. 아이디어는 생성형 AI 없이 검색용으로 로컬에서 색인됩니다. 연구 채팅과 Deep Research를 실행하면 이 도구들이 아이디어를 활용할 수 있습니다."
   },
   {
+    category: 'new',
     "scope": "academic",
     "es": "Concilium es una nueva función del Chat de investigación que permite consultar entre dos y cinco modelos con la misma pregunta, fuentes y archivos. El modelo que elijas como coordinador redacta la respuesta final a partir de las respuestas individuales. Puedes abrir cada respuesta y consultar los errores, incluso después de volver a abrir la conversación.",
     "en": "Concilium is a new Research Chat feature that lets you consult two to five models with the same question, sources and files. The model you choose as coordinator writes the final answer from the individual responses. You can open each response and inspect errors, even after reopening the conversation.",
@@ -52,6 +55,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅의 새로운 Concilium 기능으로 같은 질문, 출처, 파일을 사용해 두 개에서 다섯 개의 모델에 답변을 요청할 수 있습니다. 조정자로 선택한 모델이 개별 답변을 바탕으로 최종 답변을 작성합니다. 대화를 다시 연 뒤에도 각 답변과 오류를 확인할 수 있습니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "Los temas del grafo se abren en pestañas independientes. Puedes mostrar el tema completo o las ideas situadas a una, dos o tres conexiones de la idea seleccionada, y limitar las conexiones dibujadas por idea sin ocultar las ideas del conjunto elegido.",
     "en": "Graph themes open in separate tabs. You can show the whole theme or ideas within one, two or three connections of the selected idea, and limit the connections drawn per idea without hiding ideas in the selected set.",
@@ -67,6 +71,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "그래프 주제는 독립된 탭으로 열립니다. 전체 주제 또는 선택한 아이디어에서 한 번, 두 번, 세 번의 연결로 도달하는 아이디어를 표시할 수 있습니다. 선택 범위의 아이디어를 숨기지 않고 아이디어당 그리는 연결 수를 제한할 수도 있습니다."
   },
   {
+    category: 'enhancement',
     "scope": "general",
     "es": "Las actualizaciones se muestran en el aviso de la cabecera, sin abrir un segundo diálogo al iniciar la aplicación. Desde ese aviso puedes consultar el progreso y las acciones disponibles.",
     "en": "Updates appear in the header notice without opening a second dialog when the app starts. The notice shows progress and the available actions.",
@@ -82,6 +87,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "업데이트는 앱 시작 시 두 번째 대화상자를 열지 않고 상단 알림에 표시됩니다. 알림에서 진행 상태와 사용 가능한 작업을 확인할 수 있습니다."
   },
   {
+    category: 'enhancement',
     "scope": "general",
     "es": "El aviso de que falta configurar un modelo de IA aparece en Notificaciones. Desde allí puedes abrir los ajustes necesarios para completar la configuración.",
     "en": "The warning about a missing AI model configuration appears in Notifications. You can open the relevant settings from there to complete the configuration.",
@@ -97,6 +103,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "AI 모델 설정이 누락되었다는 경고는 알림 패널에 표시됩니다. 여기에서 필요한 설정을 열어 구성을 완료할 수 있습니다."
   },
   {
+    category: 'fix',
     "scope": "general",
     "es": "La cabecera del Chat de investigación mantiene sus controles dentro del espacio disponible y elimina acciones duplicadas. Esto facilita su uso cuando la ventana es estrecha.",
     "en": "The Research Chat header keeps its controls within the available space and removes duplicate actions. This makes it easier to use in narrow windows.",
@@ -112,6 +119,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅의 상단 컨트롤이 사용 가능한 공간 안에 배치되고 중복 작업이 제거됩니다. 폭이 좁은 창에서도 사용하기 편리합니다."
   },
   {
+    category: 'enhancement',
     "scope": "estudio",
     "es": "En Estudio y Docencia puedes seleccionar las fuentes del chat por curso, asignatura y carpeta. El buscador encuentra títulos, nombres de archivo, etiquetas y ubicaciones. Puedes seleccionar grupos y conservar la selección al filtrar.",
     "en": "In Study and Teaching, you can select chat sources by course, subject and folder. Search finds titles, filenames, tags and locations. You can select groups and keep your selection while filtering.",
@@ -127,6 +135,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학습과 교육에서 과정, 과목, 폴더별로 채팅 출처를 선택할 수 있습니다. 검색은 제목, 파일 이름, 태그, 위치를 찾습니다. 그룹을 선택하고 필터링 중에도 선택을 유지할 수 있습니다."
   },
   {
+    category: 'enhancement',
     "scope": "estudio",
     "es": "En Estudio y Docencia puedes mover notas y materiales entre ubicaciones desde la lista o la cuadrícula. Se conservan el contenido, las anotaciones, el conocimiento generado y las demás ubicaciones. Las carpetas y los temas usan la misma acción de mover.",
     "en": "In Study and Teaching, you can move notes and materials between locations from the list or grid. Content, annotations, generated knowledge and other locations are preserved. Folders and topics use the same move action.",
@@ -142,6 +151,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "학습과 교육에서 목록 또는 격자를 통해 노트와 자료를 다른 위치로 이동할 수 있습니다. 내용, 주석, 생성된 지식, 다른 저장 위치는 유지됩니다. 폴더와 항목도 같은 이동 작업을 사용합니다."
   },
   {
+    category: 'new',
     "scope": "nodi",
     "es": "Nodi busca en la documentación de Nodus la información relacionada con tus preguntas sobre la aplicación. Así puede explicar funciones, ajustes y procedimientos con información más completa. El selector de Skills también evita el desplazamiento horizontal.",
     "en": "Nodi searches the Nodus documentation for information relevant to your questions about the app. This provides more complete information about features, settings and procedures. The Skills picker also avoids horizontal scrolling.",
@@ -157,6 +167,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "Nodi가 앱 관련 질문에 필요한 정보를 Nodus 문서에서 검색합니다. 기능, 설정, 절차에 관해 더 완전한 정보를 활용할 수 있습니다. Skills 선택기에서도 가로 스크롤이 발생하지 않도록 수정했습니다."
   },
   {
+    category: 'new',
     "scope": "toolkit",
     "es": "Nodus Tools reúne las utilidades y herramientas de investigación en un catálogo con buscador. Puedes abrir una herramienta desde el catálogo y fijarla por separado en la barra lateral.",
     "en": "Nodus Tools brings utilities and research tools together in a searchable catalogue. You can open a tool from the catalogue and pin it individually to the sidebar.",
@@ -172,6 +183,7 @@ export const RELEASE_5_6_0_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "Nodus Tools는 유틸리티와 연구 도구를 검색 가능한 목록으로 제공합니다. 목록에서 도구를 열고 각 도구를 개별적으로 사이드바에 고정할 수 있습니다."
   },
   {
+    category: 'fix',
     "scope": "zotero",
     "es": "El complemento de Zotero cierra su base de datos al salir, aunque hayas cerrado antes la barra lateral. Esto corrige un problema que podía impedir que Zotero terminara de cerrarse y bloquear el siguiente inicio.",
     "en": "The Zotero plugin closes its database on exit, even if you closed the sidebar first. This fixes a problem that could prevent Zotero from shutting down and block the next launch.",

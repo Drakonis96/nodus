@@ -17,6 +17,7 @@ import type { ReleaseHighlight } from './releaseNotes';
  */
 export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'ai',
     es: 'Los modelos locales ya se ejecutan en la tarjeta gráfica en Windows y Linux. El instalador elige la versión del motor que tu equipo puede acelerar, comprueba que detecta un dispositivo y solo recurre a la versión de CPU cuando no lo detecta. Una instalación anterior se actualiza sola en el primer uso, sin volver a descargar ningún modelo, y una actualización cancelada deja el motor anterior funcionando.',
     en: 'Local models now run on your graphics card on Windows and Linux. The installer picks the engine build your machine can accelerate, checks that it detects a device and only falls back to the CPU build when it does not. An existing installation upgrades itself on first use without downloading any model again, and a cancelled upgrade leaves the previous engine working.',
@@ -32,6 +33,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'ローカルモデルは Windows と Linux でグラフィックカードを使って実行されるようになりました。インストーラーはお使いのマシンが高速化できるエンジンビルドを選び、デバイスを検出できるか確認し、検出できない場合にだけ CPU 版に切り替えます。既存のインストールは初回使用時に自動で更新され、どのモデルも再ダウンロードしません。更新をキャンセルしても、以前のエンジンはそのまま動作します。',
   },
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Los ajustes de modelos locales integrados informan del motor instalado en lugar de suponerlo. Muestran el archivo descargado, el backend, el dispositivo y su memoria, cuántas capas llegaron a la GPU, si se detectó un controlador NVIDIA, la última medición de concurrencia y el motivo por el que se eligió el motor de CPU. El botón Revisar motor vuelve a comprobar el equipo e instala la mejor versión disponible.',
     en: 'Settings for integrated local models reports the installed engine instead of assuming it. It shows the downloaded archive, the backend, the device and its memory, how many layers reached the GPU, whether an NVIDIA driver was detected, the last concurrency measurement and the reason the CPU engine was chosen. The Recheck engine button probes the machine again and installs the best build available.',
@@ -47,6 +49,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '統合ローカルモデルの設定は、エンジンを推測せずにインストール済みの内容を報告します。ダウンロードしたアーカイブ、バックエンド、デバイスとそのメモリ、GPU に載ったレイヤー数、NVIDIA ドライバーを検出したかどうか、最後の並列実行の測定値、CPU エンジンを選んだ理由を表示します。エンジンを再確認ボタンはマシンを再調査し、利用できる最良のビルドをインストールします。',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Una ejecución local ya no puede parecer congelada. La concurrencia deja de medirse automáticamente al descargar o elegir un modelo, así que la primera inferencia no espera detrás de una prueba sintética, y medirla sigue disponible como acción aparte. Cada comprobación tiene un límite de tiempo, un fallo de arranque indica su causa, por ejemplo un antivirus que bloquea el binario con la carpeta que hay que excluir, y cada decisión del motor queda escrita en local-ai/runtime.log junto a los modelos.',
     en: 'A local run can no longer look frozen. Concurrency is not measured automatically when a model is downloaded or selected, so the first inference never waits behind a synthetic test, and measuring stays available as its own action. Every check has a time limit, a startup failure names its cause, for example an antivirus blocking the binary with the folder to exclude, and every engine decision is written to local-ai/runtime.log next to the models.',
@@ -62,6 +65,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'ローカル実行が固まったように見えることはなくなりました。モデルをダウンロードまたは選択したときに並列実行が自動測定されないため、最初の推論が合成テストの後ろで待つことはなく、測定は独立した操作として残ります。すべてのチェックには時間制限があり、起動失敗は原因を明示します。たとえばウイルス対策ソフトが実行ファイルを遮断している場合は、除外すべきフォルダーも示します。エンジンのすべての判断はモデルの隣の local-ai/runtime.log に記録されます。',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los modelos que razonan antes de responder ya no pierden la respuesta. El presupuesto de salida de una fusión de ideas y de un lote de juicios, como los temas, las relaciones, los puentes y el tipo de capítulo, paga la traza y el JSON por separado, y una respuesta cortada se reintenta una vez con más espacio. Cuando una respuesta se rechaza, el registro dice el motivo exacto. Granite 4.0 Micro deja de ofrecerse para extracción y fusión y sigue disponible para conversación, resúmenes y perfiles de documento.',
     en: 'Models that reason before answering no longer lose their reply. The output budget of an idea fusion and of a batch of judgements, such as themes, relations, bridges and chapter typing, pays for the trace and the JSON separately, and a cut-off reply is retried once with more room. When a reply is rejected, the log states the exact reason. Granite 4.0 Micro stops being offered for extraction and fusion and stays available for conversation, summaries and document profiles.',
@@ -77,6 +81,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '答える前に推論するモデルが回答を失うことはなくなりました。アイデア融合や判断のバッチ、たとえばテーマ、関係、ブリッジ、章の種類では、出力予算が推論過程と JSON に別々に割り当てられ、途中で切れた回答はより広い余裕で一度だけ再試行されます。回答が拒否されたときは、ログに正確な理由が残ります。Granite 4.0 Micro は抽出と融合では提供されなくなり、会話、要約、ドキュメントプロファイルには引き続き利用できます。',
   },
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Un endpoint propio compatible con OpenAI recibe el tiempo de espera de un modelo local cuando está en tu equipo. La localidad se lee de la dirección que ya escribiste, así que la dirección de bucle local, un rango privado o un nombre de red privada cuentan como locales y una dirección de internet mantiene el límite de la nube. Si una pasarela rechaza un campo opcional con un 400 sin decir cuál, la petición se repite sin ese campo en lugar de dar el escaneo por fallido.',
     en: 'A custom OpenAI-compatible endpoint gets the local time budget when it runs on your own machine. The location is read from the address you already typed, so loopback, a private range or a private network name count as local while an internet address keeps the cloud limit. If a gateway refuses an optional field with a bare 400, the request is replayed without that field instead of failing the scan.',
@@ -92,6 +97,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '自分のマシンで動くカスタム OpenAI 互換エンドポイントは、ローカルモデルの時間予算を受け取ります。場所は入力済みのアドレスから判断し、ループバック、プライベート範囲、プライベートネットワーク名はローカルとして扱われ、インターネット上のアドレスはクラウドの上限を保ちます。ゲートウェイがどのフィールドか示さずに 400 で任意フィールドを拒否した場合、スキャンを失敗させる代わりにそのフィールドを外して再送します。',
   },
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Un aviso rojo marca todos los modelos que se ejecutan en este equipo. Aparece junto al selector del modelo de texto, el de embeddings y el de cada tarea, y al abrirlo explica qué esperar de un modelo local, incluido que Gemma es hoy el recomendado y que Ollama y LM Studio son compatibles. Al crear una bóveda, el asistente ya no preselecciona ningún modelo, así que la elección es tuya.',
     en: 'A red warning marks every model that runs on this machine. It appears next to the text model picker, the embedding picker and each task picker, and opening it explains what to expect from a local model, including that Gemma is the recommended one today and that Ollama and LM Studio are supported. When you create a vault, the wizard no longer preselects a model, so the choice is yours.',
@@ -107,6 +113,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'このマシンで実行されるすべてのモデルに赤い警告が付きます。テキストモデル、埋め込み、タスクごとのモデル選択の横に表示され、開くとローカルモデルに何を期待できるかを説明します。現在は Gemma が推奨であること、Ollama と LM Studio に対応していることも含まれます。Vaultを作成するとき、ウィザードがモデルを事前に選ばなくなり、選択はあなたに委ねられます。',
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'El asistente de investigación puede comprobar moléculas con RDKit cuando Chemistry Studio está activado. Las fórmulas SMILES de tu pregunta se leen en local, sin dibujo ni llamada al modelo, y se envían como contexto verificado, así que la respuesta parte de la estructura real. Si pides una ruta de síntesis, cada paso verificado se dibuja, los pasos rechazados se enumeran y un botón ofrece pedir al modelo que corrija los que fallaron.',
     en: 'The research assistant can check molecules with RDKit when Chemistry Studio is enabled. The SMILES formulas in your question are read locally, with no drawing and no model call, and sent as verified context, so the answer starts from the real structure. If you ask for a synthesis route, every verified step is drawn, rejected steps are listed and a button offers to ask the model to fix the ones that failed.',
@@ -122,6 +129,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'Chemistry Studio を有効にすると、リサーチアシスタントが RDKit で分子を検証できます。質問内の SMILES は図の描画もモデル呼び出しもなくローカルで読み取られ、検証済みのコンテキストとして送信されるため、回答は実際の構造に基づきます。合成経路を尋ねると、検証された各段階が描画され、拒否された段階は一覧になり、失敗した段階の修正をモデルに依頼するボタンが表示されます。',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los recursos visuales de un documento se generan con el modelo que elijas en el diálogo de enriquecimiento, que se abre con el modelo de la tarea y no con el guardado en el informe. Si un documento se queda sin figuras, el aviso dice cuántas propuestas se descartaron y el motivo de cada una, y un reintento vuelve a planificar en lugar de repetir la misma petición.',
     en: 'A document’s visual resources are generated with the model you choose in the enrichment dialog, which opens with the task’s model instead of the one stored on the report. If a document keeps no figures, the notice says how many proposals were discarded and the reason for each one, and a retry plans again instead of repeating the same request.',
@@ -137,6 +145,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'ドキュメントの視覚リソースは、強化ダイアログで選んだモデルで生成されます。このダイアログはレポートに保存されたモデルではなく、タスクのモデルで開きます。図が一つも残らなかった場合は、いくつの提案が破棄されたかとその理由を通知し、再試行は同じ要求を繰り返さずに再計画します。',
   },
   {
+    category: 'new',
     scope: 'general',
     es: 'Puedes elegir la paleta de colores de la aplicación, aparte del modo claro, oscuro o del sistema. Los ajustes de Apariencia incluyen dieciséis paletas, y el editor Crear tema deja definir el acento, el fondo, las superficies y el color del texto con una comprobación de contraste antes de guardar. Un interruptor decide si la misma paleta se usa en todas las bóvedas o una distinta en cada una.',
     en: 'You can choose the app’s colour palette separately from light, dark or system mode. Appearance settings include sixteen palettes, and the Create theme editor lets you set the accent, the background, the surfaces and the text colour with a contrast check before saving. A switch decides whether the same palette is used in every vault or a different one in each.',
@@ -152,6 +161,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'ライト、ダーク、システムのモードとは別に、アプリのカラーパレットを選べます。外観の設定には 16 種類のパレットがあり、テーマを作成エディターでアクセント、背景、サーフェス、文字色を設定し、保存前にコントラストを検査します。同じパレットをすべてのVaultで使うか、Vaultごとに変えるかをスイッチで決められます。',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'La barra de la cola solo avanza. El contador de fragmentos, el porcentaje y los segundos pertenecen a la fase en curso y nunca retroceden. Con varios trabajos a la vez, la barra describe el más antiguo que sigue en marcha en lugar del último que empezó, y la fila cambia solo cuando termina el trabajo que estaba mostrando.',
     en: 'The queue bar only moves forward. The fragment counter, the percentage and the seconds belong to the phase in progress and never go back. With several works at once, the bar describes the oldest one still running instead of the last one that started, and the row changes only when the work it was showing finishes.',
@@ -167,6 +177,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'キューのバーは前にしか進みません。断片のカウンター、パーセント、秒数は進行中のフェーズに属し、決して戻りません。複数の作業が同時に動いているときは、最後に始まったものではなく、まだ実行中の最も古い作業を表示し、その行は表示していた作業が終わったときにだけ切り替わります。',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'El post-procesado del grafo dice qué está haciendo. Su línea muestra el paso en curso y avanza un reloj, el aviso ámbar indica cuándo un reintento está en marcha y qué intento es, y cada lote se limita por el texto que lleva, así que un conjunto de frases largas ya no corta la respuesta del modelo a la mitad.',
     en: 'Graph post-processing says what it is doing. Its line shows the step in progress and ticks a clock, the amber notice says when a retry is running and which attempt it is, and every batch is bounded by the text it carries, so a set of long statements no longer cuts the model’s reply in half.',
@@ -182,6 +193,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'グラフの後処理は何をしているかを示します。行には進行中のステップが表示され時計が進み、琥珀色の通知は再試行中かどうかと何回目かを示し、各バッチは含むテキストで上限が決まるため、長い文の集まりでもモデルの回答が途中で切れることはなくなりました。',
   },
   {
+    category: 'new',
     scope: 'general',
     es: 'Las versiones de Linux añaden un paquete RPM junto al .deb y al AppImage. El archivo Nodus-linux-x86_64.rpm se instala en Fedora, openSUSE y otras distribuciones basadas en RPM.',
     en: 'Linux releases add an RPM package next to the .deb and the AppImage. The Nodus-linux-x86_64.rpm file installs on Fedora, openSUSE and other RPM-based distributions.',
@@ -197,6 +209,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'Linux 版には .deb と AppImage に加えて RPM パッケージが付属します。Nodus-linux-x86_64.rpm は Fedora、openSUSE などの RPM ベースのディストリビューションにインストールできます。',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Los botones de la barra superior usan la ayuda emergente del propio sistema en lugar de desplegar una etiqueta al pasar el ratón. La ayuda muestra el nombre traducido de la acción y, cuando la tiene, su combinación de teclado.',
     en: 'Top bar buttons use the system’s own tooltip instead of expanding a label on hover. The tooltip shows the action’s translated name and, when it has one, its keyboard shortcut.',
@@ -212,6 +225,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '上部バーのボタンは、ホバー時にラベルを展開する代わりにシステム標準のツールチップを使うようになりました。ツールチップには操作の翻訳された名前と、あればキーボードショートカットが表示されます。',
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Una cita abre la página que nombra. El diálogo de la cita convierte cada fila en un botón Ver página N, el panel del pasaje indica su propia página y las acciones abren el archivo en esa página, no en la primera. Vale para el lector integrado, el material de estudio y la ventana flotante de Nodi, y una presentación se abre en su diapositiva.',
     en: 'A citation opens the page it names. The citation dialog turns each row into a View page N button, the passage panel states its own page and the actions open the file at that page instead of the first one. It works in the built-in reader, in study material and in the floating Nodi window, and a slide deck opens on its slide.',
@@ -227,6 +241,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '引用は、それが示すページを開きます。引用ダイアログは各行を「N ページを表示」ボタンに変え、抜粋パネルは自分のページを示し、操作はファイルを先頭ページではなくそのページで開きます。内蔵リーダー、学習資料、Nodi のフローティングウィンドウで同じように働き、スライド資料は該当するスライドで開きます。',
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Los PDF a dos columnas se leen columna a columna. El texto deja de mezclar el final de la columna izquierda con el principio de la derecha, así que las frases y las citas del índice documental son correctas. Los documentos que ya estaban en la biblioteca se extraen de nuevo de forma automática.',
     en: 'Two-column PDFs are read column by column. The text no longer mixes the end of the left column with the start of the right one, so the sentences and the quotes in the Documentary Index are correct. Documents already in the library are extracted again automatically.',
@@ -242,6 +257,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: '2 段組みの PDF は段ごとに読み取られます。左段の末尾と右段の先頭が混ざらなくなり、文とドキュメント索引の引用が正確になります。すでにライブラリにある文書は自動的に再抽出されます。',
   },
   {
+    category: 'fix',
     scope: 'library',
     es: 'Los perfiles documentales se publican en lugar de quedar como fallo. Un perfil parcial se acepta y se marca como parcial, un fragmento demasiado corto se une a su vecino para que una portada no estropee el perfil entero, el índice respeta el idioma de los prompts y los errores de las líneas llegan traducidos. Reprocesar un perfil vuelve a estar disponible.',
     en: 'Document profiles are published instead of ending as a failure. A partial profile is accepted and marked as partial, a chunk that is too short merges into its neighbour so that a title page cannot spoil the whole profile, the index follows your prompt language and the failure lines arrive translated. Reprocessing a profile is available again.',
@@ -257,6 +273,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'ドキュメントプロファイルは失敗で終わらずに公開されます。部分的なプロファイルはそのまま受け入れられ、部分として表示されます。短すぎる断片は隣に統合されるため、表紙ページがプロファイル全体を台無しにしません。索引はプロンプトの言語に従い、エラーの行も翻訳されて表示されます。プロファイルの再処理も再び可能です。',
   },
   {
+    category: 'new',
     scope: 'languages',
     es: 'La interfaz habla doce idiomas. El chino tradicional, el japonés y el coreano se suman a los nueve que ya había, así que puedes usar Nodus en 繁體中文, 日本語 o 한국어 y todas las pantallas, los menús, los diálogos, los registros de la cola y la versión web del servidor siguen el idioma que elijas.',
     en: 'The interface speaks twelve languages. Traditional Chinese, Japanese and Korean join the nine it already had, so you can use Nodus in 繁體中文, 日本語 or 한국어 and every screen, menu, dialog, queue log and the server web version follow the language you pick.',
@@ -272,6 +289,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'インターフェイスは 12 の言語に対応します。繁体字中国語、日本語、韓国語が既存の 9 言語に加わり、Nodus を 繁體中文、日本語、한국어で使えます。すべての画面、メニュー、ダイアログ、キューのログ、サーバーのウェブ版が選んだ言語に従います。',
   },
   {
+    category: 'new',
     scope: 'languages',
     es: 'El conector de Chrome habla trece idiomas. A los doce de la interfaz se suma el ruso, así que el popup, la página de ajustes, la política de privacidad que se abre desde ahí y hasta la lista de tipos de documento que revisas antes de guardar dejan de estar solo en inglés y siguen el idioma de tu navegador.',
     en: 'The Chrome connector speaks thirteen languages. Russian joins the twelve of the interface, so the popup, the settings page, the privacy policy it opens and even the list of document types you review before saving stop being English only and follow your browser language.',
@@ -287,6 +305,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'Chrome コネクタは 13 の言語に対応します。インターフェイスの 12 言語にロシア語が加わり、ポップアップ、設定ページ、そこから開くプライバシーポリシー、保存前に確認する文書タイプの一覧まで、英語だけではなくなりブラウザの言語に従います。',
   },
   {
+    category: 'fix',
     scope: 'connector',
     es: 'Los mensajes que el conector redacta por su cuenta también se traducen. El aviso de que un archivo supera los 64 MiB, el error de una descarga que falla, la página de inicio de sesión que un editor devuelve en lugar del PDF y las etiquetas que se guardan en tu Biblioteca cuando la página no las trae salen ahora del catálogo de tu idioma, así que el conector en español deja de mezclar inglés.',
     en: 'The messages the connector writes by itself are translated too. The notice that a file exceeds 64 MiB, the error of a download that fails, the sign-in page a publisher returns instead of the PDF and the labels saved into your Library when the page brings none now come from the catalog of your language, so the connector stops mixing English into your interface.',
@@ -302,6 +321,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'コネクタが独自に書き込むメッセージも翻訳されます。ファイルが64 MiB を超えているという通知、ダウンロード失敗のエラー、PDF の代わりに発行者が返すサインインページ、ページが何も表示しない場合にライブラリに保存されるラベルは、言語のカタログから取得されるようになったため、コネクタはインターフェイスに英語を混合しなくなりました。',
   },
   {
+    category: 'new',
     scope: 'estudio',
     es: 'Una respuesta del chat se puede guardar como apunte de estudio. El diálogo Guardar en notas añade un destino en el que eliges curso, asignatura, carpeta opcional y tema, y el apunte guarda su procedencia con el título de la conversación, la fecha, el modelo y las fuentes citadas como enlaces.',
     en: 'A chat answer can be saved as a study note. The Save to notes dialog adds a destination where you choose course, subject, optional folder and topic, and the note keeps its provenance with the conversation title, the date, the model and the cited sources as links.',
@@ -317,6 +337,7 @@ export const RELEASE_5_5_0_HIGHLIGHTS: ReleaseHighlight[] = [
     ja: 'チャットの回答を学習ノートとして保存できます。ノートに保存ダイアログに保存先が追加され、コース、科目、任意のフォルダー、トピックを選べます。ノートには会話のタイトル、日付、モデル、リンクとしての引用元が由来として残ります。',
   },
   {
+    category: 'new',
     scope: 'word',
     es: 'Los informes se pueden exportar a Word. El lector de informes, el archivo por lotes y la investigación de bases de datos ofrecen Word (.docx), con las figuras incrustadas en el documento y la bibliografía intacta, para revisar o comentar fuera de Nodus.',
     en: 'Reports can be exported to Word. The report reader, the bulk archive and the database research reader offer Word (.docx), with the figures embedded in the document and the bibliography intact, so you can review or comment outside Nodus.',

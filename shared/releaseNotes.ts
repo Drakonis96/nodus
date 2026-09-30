@@ -15,6 +15,8 @@ import { RELEASE_5_4_5_HIGHLIGHTS } from './releaseNotes545';
 import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 import { RELEASE_5_7_0_HIGHLIGHTS } from './releaseNotes570';
 import { RELEASE_5_7_2_HIGHLIGHTS } from './releaseNotes572';
+import { RELEASE_5_7_3_HIGHLIGHTS } from './releaseNotes573';
+import type { ReleaseCategory } from './releaseNotesPresentation';
 import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 import type { VaultType } from './vaultTypes';
 import { RELEASE_NOTES_IT } from './releaseNotes.it';
@@ -40,6 +42,7 @@ export type ReleaseNoteScope =
   | 'mcp'
   | 'nodi'
   | 'toolkit'
+  | 'drift'
   | 'plugin'
   | 'marketplace'
   | 'languages'
@@ -48,6 +51,8 @@ export type ReleaseNoteScope =
   | 'apple';
 
 interface RawReleaseHighlight {
+  /** Required for v5 and future releases. Earlier history retains its original layout. */
+  category?: ReleaseCategory;
   es: string;
   en: string;
   fr: string;
@@ -59,6 +64,8 @@ interface RawReleaseHighlight {
 }
 
 export interface ReleaseHighlight extends RawReleaseHighlight { it: string; tr: string; 'zh-CN': string; 'zh-TW': string; ja: string; ko: string }
+
+export interface CategorizedReleaseHighlight extends ReleaseHighlight { category: ReleaseCategory }
 
 export interface ReleaseNote {
   version: string;
@@ -1800,6 +1807,7 @@ const RELEASE_4_2_5_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'El modo Automático reparte el trabajo de IA en paralelo y ajusta el ritmo según cada proveedor, modelo y credencial. En las pruebas certificadas, la indexación terminó más del doble de rápido sin perder citas, orden ni controles de integridad. Las barras de proceso muestran ahora el tiempo total y el de cada elemento. Si necesitas limitar la carga, puedes elegir entre 1 y 8 tareas simultáneas.',
     en: 'Automatic mode now runs AI work in parallel and adjusts its pace for each provider, model, and credential. In certified tests, indexing finished more than twice as fast without losing citations, ordering, or integrity checks. Processing bars now show both total time and time per item. If you need to limit the load, you can choose between 1 and 8 simultaneous tasks.',
@@ -1809,6 +1817,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O modo Automático agora distribui o trabalho de IA em paralelo e ajusta o ritmo para cada provedor, modelo e credencial. Nos testes certificados, a indexação terminou mais de duas vezes mais rápido sem perder citações, ordem ou verificações de integridade. As barras de processamento mostram o tempo total e o de cada item. Se precisar limitar a carga, você pode escolher entre 1 e 8 tarefas simultâneas.',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los modelos de LM Studio, Ollama y Nodus tienen ahora tiempo suficiente para completar análisis exigentes. Si un fragmento resulta demasiado pesado, Nodus lo divide y continúa en lugar de abandonar todo el documento. Los errores explican su causa en el idioma de la interfaz y el selector general permite cargar y guardar modelos sin volver al asistente inicial.',
     en: 'Models from LM Studio, Ollama, and Nodus now have enough time to complete demanding analyses. If a passage is too heavy, Nodus splits it and continues instead of abandoning the whole document. Errors explain their cause in the interface language, and the general selector can load and save models without returning to the initial setup wizard.',
@@ -1818,6 +1827,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os modelos do LM Studio, Ollama e Nodus agora têm tempo suficiente para concluir análises exigentes. Se um trecho for pesado demais, o Nodus o divide e continua em vez de abandonar o documento inteiro. Os erros explicam a causa no idioma da interface, e o seletor geral permite carregar e salvar modelos sem voltar ao assistente inicial.',
   },
   {
+    category: 'enhancement',
     scope: 'zotero',
     es: 'La importación recorre completas las bibliotecas personales y de grupo, incluidos adjuntos, notas, colecciones, documentos independientes y metadatos bibliográficos. Nodus verifica cada copia, repara archivos incompletos y permite reanudar una importación cancelada sin dar por terminado un trabajo defectuoso. Los nombres de archivo largos ya no detienen el proceso y los errores de conexión indican cómo resolverlos. El asistente distingue visualmente Nodus Library y Zotero, y conecta directamente con la API local correcta.',
     en: 'Import now traverses complete personal and group libraries, including attachments, notes, collections, standalone documents, and bibliographic metadata. Nodus verifies every copy, repairs incomplete files, and lets a cancelled import resume without marking faulty work as complete. Long filenames no longer stop the process, and connection errors explain how to fix them. The setup wizard visually distinguishes Nodus Library from Zotero and connects directly to the correct local API.',
@@ -1827,6 +1837,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A importação agora percorre bibliotecas pessoais e de grupo completas, incluindo anexos, notas, coleções, documentos independentes e metadados bibliográficos. O Nodus verifica cada cópia, repara arquivos incompletos e permite retomar uma importação cancelada sem marcar um trabalho defeituoso como concluído. Nomes de arquivo longos não interrompem mais o processo, e os erros de conexão explicam como resolvê-los. O assistente diferencia visualmente Nodus Library e Zotero e se conecta diretamente à API local correta.',
   },
   {
+    category: 'enhancement',
     scope: 'server',
     es: 'La interfaz web se acerca mucho más a la aplicación de escritorio en navegación, edición, búsqueda, Deep Research y compatibilidad con los distintos tipos de bóveda. También se han corregido los ajustes, los indicadores de carga, el acceso a bibliotecas sin publicar y varios textos que aparecían sin traducir. Las imágenes de servidor vuelven a arrancar correctamente y mantienen soporte para AMD64 y ARM64.',
     en: 'The web interface now matches the desktop app much more closely in navigation, editing, search, Deep Research, and support for the different vault types. Settings, loading feedback, access to unpublished libraries, and several untranslated labels have also been fixed. Server images start correctly again and continue to support both AMD64 and ARM64.',
@@ -1836,6 +1847,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A interface web agora se aproxima muito mais do aplicativo para desktop em navegação, edição, busca, Deep Research e compatibilidade com os diferentes tipos de cofre. Também foram corrigidas as configurações, os indicadores de carregamento, o acesso a bibliotecas não publicadas e vários textos que apareciam sem tradução. As imagens do servidor voltam a iniciar corretamente e mantêm suporte para AMD64 e ARM64.',
   },
   {
+    category: 'enhancement',
     scope: 'library',
     es: 'Una guía breve explica la diferencia entre «Este vault» y «Global», cómo importar, monitorizar y procesar colecciones, y dónde encontrar el índice documental. Ese índice pasa a ser opcional para cada obra y su ausencia ya no reduce el estado de finalización. También desaparece la pregunta sobre comprensión documental que interrumpía el inicio de la aplicación.',
     en: 'A short guide explains the difference between “This vault” and “Global”, how to import, monitor, and process collections, and where to find the Documentary Index. That index is now optional for each work, and its absence no longer lowers completion status. The document-understanding question that interrupted application startup has also been removed.',
@@ -1845,6 +1857,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Um guia breve explica a diferença entre “Este cofre” e “Global”, como importar, monitorar e processar coleções e onde encontrar o Índice documental. Esse índice agora é opcional para cada obra, e sua ausência não reduz mais o estado de conclusão. Também foi removida a pergunta sobre compreensão documental que interrompia a inicialização do aplicativo.',
   },
   {
+    category: 'new',
     scope: 'databases',
     es: 'Deep Research adopta en las bóvedas de Bases de datos el mismo flujo claro de biblioteca, composición, cola y lectura que ya tenía el modo académico. Incluye configuración local automática, trabajo con varias bases, estado de lectura persistente, anotaciones y exportaciones. Las opciones de roles y edición previa del informe siguen disponibles como ajustes avanzados.',
     en: 'Deep Research in Database vaults now uses the same clear library, composer, queue, and reading flow as the academic mode. It includes automatic local setup, work across multiple databases, persistent reading state, annotations, and exports. Role options and report preview editing remain available as advanced settings.',
@@ -1854,6 +1867,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Deep Research agora usa nos cofres de Bancos de dados o mesmo fluxo claro de biblioteca, composição, fila e leitura do modo acadêmico. Ele inclui configuração local automática, trabalho com vários bancos, estado de leitura persistente, anotações e exportações. As opções de funções e a edição prévia do relatório continuam disponíveis como configurações avançadas.',
   },
   {
+    category: 'enhancement',
     scope: 'word',
     es: 'Ideas, Pasajes y Sinónimos permiten elegir su propio modelo. La generación de sinónimos entiende mejor la frase completa y devuelve alternativas válidas incluso cuando el proveedor cambia el formato de la respuesta. La cinta de Word incorpora accesos directos a Edición con IA, Sinónimos y Chat, y el selector de estilos ya no aparece desplegado al abrir el complemento.',
     en: 'Ideas, Passages, and Synonyms can each use their own selected model. Synonym generation understands the full sentence better and returns valid alternatives even when the provider changes its response format. The Word ribbon adds shortcuts to AI Edit, Synonyms, and Chat, and the style picker no longer opens expanded when the add-in starts.',
@@ -1863,6 +1877,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Ideias, Passagens e Sinônimos permitem escolher seu próprio modelo. A geração de sinônimos entende melhor a frase completa e retorna alternativas válidas mesmo quando o provedor muda o formato da resposta. A faixa de opções do Word ganha atalhos para Edição com IA, Sinônimos e Chat, e o seletor de estilos não aparece mais expandido ao abrir o suplemento.',
   },
   {
+    category: 'enhancement',
     scope: 'connector',
     es: 'La extensión de Chrome pasa a llamarse Nodus Research Connector y enlaza directamente con la web del proyecto. La vinculación con la aplicación utiliza ahora un diálogo claro y traducido, con la opción de cancelar en primer lugar y sin depender de una alerta nativa del sistema.',
     en: 'The Chrome extension is now called Nodus Research Connector and links directly to the project website. Pairing with the application now uses a clear, translated dialog that puts the cancel option first and no longer depends on a native system alert.',
@@ -1881,6 +1896,7 @@ const RELEASE_5_1_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   ...RELEASE_5_1_0_HIGHLIGHTS,
   {
+    category: 'fix',
     scope: 'zotero',
     es: 'El botón Actualizar del encabezado ahora solo sincroniza el catálogo de las colecciones de Zotero que monitorizas. Los artículos nuevos aparecen en la Biblioteca sin iniciar ni encolar análisis. También se corrige la versión cero que devolvía Zotero 10 y que podía hacer que toda la biblioteca pareciera modificada de golpe.',
     en: 'The Update button in the header now only refreshes the catalog for the Zotero collections you monitor. New items appear in the Library without starting or queuing analysis. This also fixes Zotero 10 returning item version zero, which could make the entire library appear to have changed at once.',
@@ -1893,6 +1909,7 @@ const RELEASE_5_1_1_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RELEASE_5_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'apple',
     es: 'Nodus para macOS se distribuye ahora firmado con Developer ID y notarizado por Apple. Hardened Runtime protege la aplicación y Gatekeeper verifica la firma y el ticket antes de abrirla. Todos los helpers, frameworks, módulos nativos y binarios incluidos se firman con los permisos mínimos que necesitan.',
     en: 'Nodus for macOS is now distributed with a Developer ID signature and Apple notarization. Hardened Runtime protects the application, and Gatekeeper verifies its signature and ticket before opening it. Every bundled helper, framework, native module, and executable is signed with only the permissions it needs.',
@@ -1902,6 +1919,7 @@ const RELEASE_5_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus para macOS agora é distribuído com assinatura Developer ID e notarização da Apple. O Hardened Runtime protege o aplicativo e o Gatekeeper verifica a assinatura e o tíquete antes de abri-lo. Todos os auxiliares, frameworks, módulos nativos e executáveis incluídos são assinados apenas com as permissões necessárias.',
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     es: 'El Diccionario reparte ahora las fuentes entre distintas obras y autorías en vez de dejar que una sola domine la selección. Combina búsqueda semántica y léxica, identifica el origen de ideas, citas y relaciones, y avisa si una definición no cubre suficientes fuentes o autores.',
     en: 'The Dictionary now spreads evidence across different works and authors instead of letting one source dominate the selection. It combines semantic and lexical search, identifies the origin of ideas, quotations, and relationships, and warns when a definition does not cover enough sources or authors.',
@@ -1920,6 +1938,7 @@ const RELEASE_5_1_3_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   ...RELEASE_5_1_1_HIGHLIGHTS,
   {
+    category: 'enhancement',
     scope: 'word',
     es: 'Nodus Copilot para Word cambia Sinónimos por Alternativas para trabajar también con expresiones y frases completas. La pestaña espera a que pulses Generar y respeta el modelo elegido. Ideas, Pasajes, Edición con IA, Alternativas y Chat comparten ahora un selector de modelos con búsqueda y control por teclado.',
     en: 'Nodus Copilot for Word replaces Synonyms with Alternatives so it can also work with expressions and complete phrases. The tab waits for you to press Generate and respects the model you choose. Ideas, Passages, AI Edit, Alternatives, and Chat now share a searchable model picker with keyboard control.',
@@ -1929,6 +1948,7 @@ const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus Copilot para Word substitui Sinônimos por Alternativas para trabalhar também com expressões e frases completas. A aba espera você clicar em Gerar e respeita o modelo escolhido. Ideias, Passagens, Edição com IA, Alternativas e Chat agora compartilham um seletor de modelos com busca e controle pelo teclado.',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los modelos locales ya pueden vectorizar pasajes largos dentro de su límite de contexto sin fallar al superar 512 tokens. Los resúmenes terminados siguen disponibles si falla una tarea opcional posterior. Cuando el propio resumen falla, Nodus guarda y muestra el motivo para que puedas corregirlo y reintentar.',
     en: 'Local models can now embed long passages within their context limit without failing above 512 tokens. Completed summaries remain available if an optional follow-up task fails. When the summary itself fails, Nodus saves and shows the reason so you can correct it and try again.',
@@ -1938,6 +1958,7 @@ const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os modelos locais agora podem criar embeddings de passagens longas dentro do limite de contexto sem falhar acima de 512 tokens. Os resumos concluídos continuam disponíveis se uma tarefa opcional posterior falhar. Quando o próprio resumo falha, o Nodus salva e mostra o motivo para você corrigi-lo e tentar novamente.',
   },
   {
+    category: 'fix',
     scope: 'zotero',
     es: 'Los títulos de Zotero con cursivas, superíndices, subíndices u otro formato enriquecido vuelven a mostrarse como texto limpio en la Biblioteca, la búsqueda y los mensajes de progreso. Nodus conserva el marcado original para reconocer cambios reales y evita que un título formateado desestabilice la sincronización.',
     en: 'Zotero titles with italics, superscripts, subscripts, or other rich formatting now appear as clean text in the Library, search, and progress messages. Nodus preserves the original markup when checking for real changes so a formatted title no longer destabilizes synchronization.',
@@ -1947,6 +1968,7 @@ const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os títulos do Zotero com itálico, sobrescrito, subscrito ou outra formatação enriquecida agora aparecem como texto limpo na Biblioteca, na busca e nas mensagens de progresso. O Nodus preserva a marcação original ao verificar mudanças reais para que um título formatado não desestabilize mais a sincronização.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'La primera bóveda y los Ajustes explican ahora la misma regla para la contraseña maestra. Debe tener al menos ocho caracteres y puede ser una frase larga sin números ni símbolos obligatorios. La validación señala enseguida si falta longitud o si la confirmación no coincide, y la misma regla se aplica al crear la copia protegida.',
     en: 'Your first vault and Settings now explain the same master-password rule. It must contain at least eight characters and can be a long passphrase without mandatory numbers or symbols. Validation immediately identifies a short or mismatched confirmation, and the same rule is enforced when the protected copy is created.',
@@ -1965,6 +1987,7 @@ const RELEASE_5_1_2_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'plugin',
     es: 'Nodus Copilot estrena Sinónimos y Chat. Sinónimos lee la frase completa alrededor de tu selección, propone cinco alternativas ajustadas al contexto y sustituye solo el término elegido. El Chat responde usando la página actual o el documento completo, da prioridad al texto seleccionado y permite detener, regenerar, editar y copiar respuestas. Cada documento conserva su propio historial.',
     en: 'Nodus Copilot gains Synonyms and Chat. Synonyms reads the full sentence around your selection, suggests five context-aware alternatives, and replaces only the chosen term. Chat answers using the current page or the full document, prioritizes selected text, and lets you stop, regenerate, edit, and copy replies. Every document keeps its own history.',
@@ -1974,6 +1997,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus Copilot ganha Sinônimos e Chat. Sinônimos lê a frase completa ao redor da seleção, sugere cinco alternativas adequadas ao contexto e substitui apenas o termo escolhido. O Chat responde usando a página atual ou o documento completo, prioriza o texto selecionado e permite interromper, gerar novamente, editar e copiar respostas. Cada documento mantém seu próprio histórico.',
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: 'Nodus para Zotero trabaja con el contenido completo de todos los adjuntos seleccionados y encuentra evidencia tanto por palabras como por significado con un índice local. Las respuestas enlazan pasajes, páginas y secciones exactas, indican qué afirmaciones necesitan más apoyo y conservan una auditoría revisable al reabrir la conversación. También puede interpretar páginas, tablas, figuras y documentos escaneados mediante capturas y OCR, mientras el chat muestra la respuesta a medida que se genera. La instalación y las actualizaciones del plugin quedan integradas en el paquete oficial de cada versión.',
     en: 'Nodus for Zotero works with the complete content of every selected attachment and finds evidence both by words and by meaning with a local index. Answers link to exact passages, pages, and sections, identify claims that need more support, and preserve a reviewable audit when the conversation is reopened. It can also interpret pages, tables, figures, and scanned documents through captures and OCR while chat displays the answer as it is generated. Plugin installation and updates are now integrated into every official release package.',
@@ -1983,6 +2007,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus para Zotero trabalha com o conteúdo completo de todos os anexos selecionados e encontra evidências tanto por palavras quanto por significado com um índice local. As respostas levam a trechos, páginas e seções exatos, indicam quais afirmações precisam de mais apoio e preservam uma auditoria revisável ao reabrir a conversa. Ele também interpreta páginas, tabelas, figuras e documentos digitalizados por meio de capturas e OCR, enquanto o chat mostra a resposta à medida que ela é gerada. A instalação e as atualizações do plugin ficam integradas ao pacote oficial de cada versão.',
   },
   {
+    category: 'new',
     scope: 'plugin',
     es: 'El conector de Chrome permite revisar y corregir título, autores, fecha, publicación, identificadores y tipo de documento antes de guardar. Puedes elegir colección, etiquetas, archivos y una copia legible de la página, además de importar varios resultados en una sola operación. Las transferencias grandes continúan aunque cierres el panel y las capturas repetidas se reúnen en una sola ficha en lugar de llenar la Biblioteca de duplicados.',
     en: 'The Chrome connector lets you review and correct the title, authors, date, publication, identifiers, and document type before saving. You can choose a collection, tags, files, and a readable copy of the page, as well as import several results in one operation. Large transfers continue after you close the panel, and repeated captures are brought together in one record instead of filling Library with duplicates.',
@@ -1992,6 +2017,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O conector do Chrome permite revisar e corrigir título, autores, data, publicação, identificadores e tipo de documento antes de salvar. Você pode escolher coleção, etiquetas, arquivos e uma cópia legível da página, além de importar vários resultados em uma única operação. Transferências grandes continuam mesmo depois de fechar o painel, e capturas repetidas são reunidas em uma única ficha em vez de encher a Biblioteca de duplicatas.',
   },
   {
+    category: 'new',
     scope: 'browser',
     es: 'Nodus Bookmarks adopta tarjetas más compactas que se abren al pulsar en cualquier zona útil. Cada marcador y carpeta incorpora una acción de borrado con confirmación, y eliminar una carpeta avisa claramente de que también desaparecerá su contenido.',
     en: 'Nodus Bookmarks adopts more compact cards that open when you click anywhere useful. Every bookmark and folder gains a confirmed deletion action, and deleting a folder clearly warns that its contents will be removed too.',
@@ -2001,6 +2027,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus Bookmarks adota cards mais compactos que abrem ao clicar em qualquer área útil. Cada favorito e pasta ganha uma ação de exclusão com confirmação, e excluir uma pasta avisa claramente que seu conteúdo também será removido.',
   },
   {
+    category: 'new',
     scope: 'databases',
     es: 'Las bóvedas de Bases de datos estrenan Deep Research de datos. Formula una pregunta sobre tus tablas, elige bases, vistas, roles y profundidad, y revisa el esquema y el coste antes de iniciar el análisis. Nodus fija un snapshot reproducible, contrasta hipótesis, calcula resultados y vincula cada conclusión con su evidencia. El informe muestra limitaciones, objeciones y fuentes verificables, avisa si los datos han cambiado y se puede exportar en Markdown, PDF o ZIP. Los valores sensibles se ocultan de forma predeterminada y el snapshot bruto solo se incluye con confirmación expresa.',
     en: 'Database vaults gain Data Deep Research. Ask a question about your tables, choose databases, views, roles, and depth, and review the outline and cost before starting the analysis. Nodus freezes a reproducible snapshot, tests hypotheses, calculates results, and links every conclusion to its evidence. The report shows limitations, objections, and verifiable sources, warns when the data has changed, and exports to Markdown, PDF, or ZIP. Sensitive values are hidden by default, and the raw snapshot is included only after explicit confirmation.',
@@ -2010,6 +2037,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os cofres de Bancos de dados ganham Deep Research de dados. Faça uma pergunta sobre suas tabelas, escolha bancos, visualizações, funções e profundidade e revise o esquema e o custo antes de iniciar a análise. O Nodus fixa um snapshot reproduzível, confronta hipóteses, calcula resultados e vincula cada conclusão às suas evidências. O relatório mostra limitações, objeções e fontes verificáveis, avisa se os dados mudaram e pode ser exportado em Markdown, PDF ou ZIP. Valores sensíveis ficam ocultos por padrão, e o snapshot bruto só é incluído após confirmação expressa.',
   },
   {
+    category: 'enhancement',
     scope: 'toolkit',
     es: 'Compass reconoce mejor las búsquedas por autor. Tolera acentos, iniciales y distintos órdenes del nombre, consulta perfiles de autor reales y evita confundir una mención en el título con una autoría. Los resultados explican cuándo coinciden con la persona solicitada y ahora se pueden limpiar de una vez para comenzar una búsqueda nueva.',
     en: 'Compass recognizes author searches more accurately. It tolerates diacritics, initials, and different name orders, queries real author profiles, and avoids mistaking a title mention for authorship. Results explain when they match the requested person and can now be cleared at once to begin a new search.',
@@ -2019,6 +2047,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Compass reconhece melhor as buscas por autor. Ele tolera diacríticos, iniciais e diferentes ordens do nome, consulta perfis reais de autores e evita confundir uma menção no título com autoria. Os resultados explicam quando correspondem à pessoa solicitada e agora podem ser limpos de uma só vez para iniciar uma nova busca.',
   },
   {
+    category: 'new',
     scope: 'estudio',
     es: 'Los prompts personalizados de mejora ya se pueden editar y eliminar. Al editar se conservan el modelo, la creatividad, el nivel y la longitud configurados. Al eliminar, Nodus muestra el nombre del prompt, pide confirmación y lo retira también de la barra de escritura. Los prompts incluidos permanecen protegidos.',
     en: 'Custom improvement prompts can now be edited and deleted. Editing preserves the configured model, creativity, level, and length. When deleting, Nodus shows the prompt name, asks for confirmation, and removes it from the writing toolbar too. Included prompts remain protected.',
@@ -2038,6 +2067,7 @@ const RELEASE_5_0_6_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_5_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: 'Mejoras generales en Nodus Copilot para Word y LibreOffice. El panel conserva la propuesta que ha generado, sigue tu selección por su cuenta y estrena el aspecto de Nodus.',
     en: 'General improvements to Nodus Copilot for Word and LibreOffice. The pane keeps the proposal it generated, follows your selection on its own and adopts the Nodus look.',
@@ -2055,6 +2085,7 @@ const RELEASE_5_0_5_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'general',
     es: 'Nodus Server estrena una interfaz web adaptable para trabajar desde el móvil o cualquier navegador. Reproduce el aspecto de la aplicación y abre los espacios de trabajo compartidos, junto con conversaciones, notas, anotaciones y archivos personales que solo ve su propietario.',
     en: 'Nodus Server gains a responsive web interface for working from a phone or any browser. It mirrors the desktop experience and opens shared workspaces alongside conversations, notes, annotations, and personal files that only their owner can see.',
@@ -2064,6 +2095,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus Server ganha uma interface web responsiva para trabalhar pelo celular ou por qualquer navegador. Ela reproduz a experiência do aplicativo e abre os espaços de trabalho compartilhados, junto com conversas, notas, anotações e arquivos pessoais que só o proprietário pode ver.',
   },
   {
+    category: 'new',
     scope: 'general',
     es: 'Cada cuenta del servidor puede configurar sus propios proveedores, modelos y credenciales de IA. Las claves se guardan cifradas y nunca vuelven al navegador, los trabajos y resultados permanecen privados y las preferencias te acompañan entre dispositivos sin romper la compatibilidad con Desktop ni con las bóvedas conectadas.',
     en: 'Each server account can configure its own AI providers, models, and credentials. Keys are stored encrypted and never returned to the browser, jobs and results stay private, and preferences follow you across devices without breaking Desktop or Connected Vault compatibility.',
@@ -2073,6 +2105,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Cada conta do servidor pode configurar seus próprios provedores, modelos e credenciais de IA. As chaves ficam criptografadas e nunca voltam ao navegador, os trabalhos e resultados permanecem privados e as preferências acompanham você entre dispositivos sem quebrar a compatibilidade com o Desktop nem com os cofres conectados.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'El servidor aplica ahora la propiedad y los permisos a cada cambio, archivo y tarea antes de aceptar una operación. También refuerza el inicio de sesión, evita que secretos aparezcan en registros, publicaciones o copias y añade copias de seguridad verificadas con restauración para las instalaciones Docker.',
     en: 'The server now enforces ownership and permissions for every change, file, and job before accepting an operation. It also hardens sign-in, keeps secrets out of logs, publications, and backups, and adds verified backup and restore tooling for Docker installations.',
@@ -2082,6 +2115,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O servidor agora aplica propriedade e permissões a cada alteração, arquivo e tarefa antes de aceitar uma operação. Ele também reforça o login, impede que segredos apareçam em registros, publicações ou backups e adiciona ferramentas de backup verificado e restauração para instalações Docker.',
   },
   {
+    category: 'new',
     scope: 'estudio',
     es: 'Word Copilot añade una cuarta pestaña para los estilos de escritura guardados en tu espacio. Elige un estilo y un modelo, transforma el texto seleccionado y revisa la propuesta en el panel antes de copiarla o sustituir el fragmento original.',
     en: 'Word Copilot adds a fourth tab for the writing styles saved in your workspace. Choose a style and model, transform the selected text, and review the proposal in the pane before copying it or replacing the original passage.',
@@ -2091,6 +2125,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Word Copilot adiciona uma quarta aba para os estilos de escrita salvos no seu espaço. Escolha um estilo e um modelo, transforme o texto selecionado e revise a proposta no painel antes de copiá-la ou substituir o trecho original.',
   },
   {
+    category: 'enhancement',
     scope: 'estudio',
     es: 'Las cuatro pestañas de Word ocupan menos espacio y solo la activa despliega su nombre. Referencias conserva su anchura compacta, cada solicitud de escritura mantiene aislado su propio resultado y el texto de Word no cambia hasta que pulsas la acción de reemplazo.',
     en: 'The four Word tabs use less space and only the active one expands its label. References keeps its compact width, each writing request keeps its own result isolated, and the Word text does not change until you choose the replace action.',
@@ -2100,6 +2135,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As quatro abas do Word ocupam menos espaço e só a ativa expande o nome. Referências mantém a largura compacta, cada solicitação de escrita preserva seu próprio resultado isolado e o texto do Word só muda quando você escolhe a ação de substituição.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Nodus conserva solo las dos copias verificadas más recientes que crea antes de migrar cada bóveda. La limpieza se hace en segundo plano y deja intactos informes, archivos desconocidos, pares incompletos, backups y datos especiales de recuperación, evitando que las migraciones antiguas sigan ocupando disco sin límite.',
     en: 'Nodus keeps only the two most recent verified snapshots it creates before migrating each vault. Cleanup runs in the background and leaves reports, unknown files, incomplete pairs, backups, and special recovery data untouched, preventing old migrations from consuming disk space without limit.',
@@ -2109,6 +2145,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus mantém apenas os dois snapshots verificados mais recentes que cria antes de migrar cada cofre. A limpeza ocorre em segundo plano e deixa intactos relatórios, arquivos desconhecidos, pares incompletos, backups e dados especiais de recuperação, evitando que migrações antigas continuem ocupando disco sem limite.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'El contador público de descargas de la web vuelve a estar al día y su actualización puede lanzarse manualmente cuando haga falta. Así las cifras visibles no dependen únicamente de la ejecución programada.',
     en: 'The public website download counter is current again and its refresh can now be started manually when needed. Visible totals no longer depend only on the scheduled run.',
@@ -2126,6 +2163,7 @@ const RELEASE_5_0_4_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'toolkit',
     es: 'Compass ya no necesita credenciales para buscar. Consulta directamente un catálogo mucho más amplio de literatura académica y fuentes primarias abiertas, adapta la búsqueda a cada disciplina y combina los resultados con una clasificación más sólida. La interpretación con IA sigue siendo opcional y apagada de forma predeterminada.',
     en: 'Compass no longer needs credentials to search. It queries a much broader catalogue of scholarly literature and open primary sources directly, adapts each search to its discipline, and combines the results with stronger ranking. AI interpretation remains optional and off by default.',
@@ -2135,6 +2173,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Compass não precisa mais de credenciais para pesquisar. Ele consulta diretamente um catálogo muito mais amplo de literatura acadêmica e fontes primárias abertas, adapta cada busca à área e combina os resultados com uma classificação mais robusta. A interpretação por IA continua opcional e desativada por padrão.',
   },
   {
+    category: 'enhancement',
     scope: 'toolkit',
     es: 'Compass conserva búsquedas y candidatos, explica qué proveedor aportó cada resultado y distingue archivos abiertos verificados de simples páginas de referencia. La importación comprueba duplicados, completa metadatos y puede adjuntar archivos disponibles, mientras la cola informa de límites temporales, trabajo parcial y elementos omitidos.',
     en: 'Compass keeps searches and candidates, explains which provider supplied each result, and distinguishes verified open files from reference pages. Import checks duplicates, completes metadata, and can attach available files, while the queue reports rate limits, partial work, and skipped items.',
@@ -2144,6 +2183,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Compass preserva buscas e candidatos, informa qual provedor trouxe cada resultado e diferencia arquivos abertos verificados de simples páginas de referência. A importação verifica duplicatas, completa metadados e pode anexar arquivos disponíveis, enquanto a fila informa limites temporários, trabalho parcial e itens ignorados.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'Deep Research vuelve a usar la versión 1 de forma predeterminada para reducir coste y riesgo en una primera ejecución. La versión 2 continúa disponible cuando quieras su análisis más exigente, y las solicitudes de la aplicación y de clientes MCP respetan siempre la versión que elijas de forma explícita.',
     en: 'Deep Research uses version 1 by default again to reduce cost and risk on a first run. Version 2 remains available whenever you want its more demanding analysis, and requests from the app and MCP clients always honour the version you choose explicitly.',
@@ -2153,6 +2193,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Deep Research volta a usar a versão 1 por padrão para reduzir custo e risco em uma primeira execução. A versão 2 continua disponível quando você quiser a análise mais exigente, e as solicitações do aplicativo e de clientes MCP sempre respeitam a versão escolhida explicitamente.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'El Diccionario ya no sustituye una definición sintetizada por un texto extractivo degradado. Reintenta respuestas truncadas, mal formadas o sin citas verificables, conserva intacta la versión anterior y muestra el motivo y el número de intentos. Un resultado degradado queda en el historial para diagnóstico, pero nunca se aplica como definición.',
     en: 'The Dictionary no longer replaces a synthesized definition with degraded extractive text. It retries truncated, malformed, or unverifiable responses, keeps the previous version intact, and shows the reason plus attempt count. A degraded result remains in history for diagnosis but is never applied as the definition.',
@@ -2162,6 +2203,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Dicionário não substitui mais uma definição sintetizada por texto extrativo degradado. Ele repete respostas truncadas, malformadas ou sem citações verificáveis, mantém intacta a versão anterior e mostra o motivo e o número de tentativas. Um resultado degradado fica no histórico para diagnóstico, mas nunca é aplicado como definição.',
   },
   {
+    category: 'enhancement',
     scope: 'estudio',
     es: 'La barra de escritura explica al instante sus trece transformaciones de texto. Cada botón muestra un tooltip localizado con el efecto concreto de Académico, Claro, Conciso, Ortografía, Cohesión, Resumen y las demás opciones, sin obligarte a probar una acción para descubrir qué hará.',
     en: 'The writing toolbar now explains its thirteen text transformations immediately. Every button shows a localized tooltip describing the exact effect of Academic, Clear, Concise, Proofread, Cohesion, Summary, and the other options, so you do not have to run an action to discover what it will do.',
@@ -2171,6 +2213,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A barra de escrita agora explica imediatamente suas treze transformações de texto. Cada botão mostra uma dica localizada com o efeito exato de Acadêmico, Claro, Conciso, Revisão, Coesão, Resumo e das demais opções. Você não precisa mais testar uma ação para descobrir o que ela fará.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Las confirmaciones de borrado muestran el nombre de la bóveda que vas a eliminar, tanto en la primera pregunta como en la confirmación final. Así puedes comprobar el destino exacto antes de una acción irreversible, incluso cuando administras varias bóvedas parecidas.',
     en: 'Deletion confirmations now show the name of the vault you are about to remove in both the first prompt and the final confirmation. You can therefore verify the exact target before an irreversible action, even when you manage several similar vaults.',
@@ -2180,6 +2223,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As confirmações de exclusão agora mostram o nome do cofre que será removido, tanto na primeira pergunta quanto na confirmação final. Assim você pode verificar o destino exato antes de uma ação irreversível, mesmo quando administra vários cofres parecidos.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'La interfaz distingue ahora Compass de Estado del arte con iconos propios. Las acciones de las tarjetas de Deep Research e Inmersión permanecen alineadas en la parte inferior aunque cambie la longitud del contenido, por lo que las galerías mantienen un ritmo visual estable.',
     en: 'The interface now gives Compass and State of the Art distinct icons. Actions on Deep Research and Immersion cards remain aligned at the bottom even when content lengths differ, so their galleries keep a stable visual rhythm.',
@@ -2189,6 +2233,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A interface agora diferencia o Compass do Estado da arte com ícones próprios. As ações dos cards de Deep Research e Imersão permanecem alinhadas na parte inferior mesmo quando o conteúdo tem tamanhos diferentes, mantendo um ritmo visual estável nas galerias.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'La web pública estrena metadatos coherentes para buscadores, enlaces canónicos, una imagen social de alta resolución y una página de cita generada desde una única fuente. También publica una comparación más legible entre Nodus y NotebookLM y actualiza el total público de descargas de GitHub.',
     en: 'The public website gains consistent search metadata, canonical links, a high-resolution social image, and a citation page generated from one source of truth. It also publishes a clearer Nodus versus NotebookLM comparison and refreshes the public GitHub download total.',
@@ -2206,6 +2251,7 @@ const RELEASE_5_0_3_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'fix',
     scope: 'academic',
     es: 'Deep Research vuelve a completar los informes desde la interfaz aunque cambies de pestaña. El trabajo pesado sale del camino que dibuja la ventana, los fallos transitorios o de formato se reparan y reintentan, y la cola muestra una sola animación junto a su título y números que se actualizan con la posición real.',
     en: 'Deep Research completes reports from the interface again even when you change tabs. Heavy work leaves the path that draws the window, transient or formatting failures are repaired and retried, and the queue shows one animation beside its title plus numbers that update with each report’s real position.',
@@ -2215,6 +2261,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Deep Research volta a concluir relatórios pela interface mesmo quando você muda de aba. O trabalho pesado sai do caminho que desenha a janela, falhas transitórias ou de formato são reparadas e repetidas, e a fila mostra uma única animação ao lado do título e números atualizados conforme a posição real.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'Los formularios del Diccionario vuelven a aceptar texto y los botones muestran de inmediato que han respondido. Regenerar y actualizar conservan una alineación estable, reparan respuestas incompletas del modelo y reintentan de forma controlada cuando el resultado no se puede interpretar, sin llenar la interfaz de errores repetidos.',
     en: 'Dictionary forms accept text again and their buttons immediately show that they responded. Regenerate and Update keep a stable alignment, repair incomplete model responses, and retry in a controlled way when a result cannot be interpreted, without filling the interface with repeated errors.',
@@ -2224,6 +2271,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os formulários do Dicionário voltam a aceitar texto e os botões mostram imediatamente que responderam. Regenerar e Atualizar mantêm um alinhamento estável, reparam respostas incompletas do modelo e repetem de forma controlada quando o resultado não pode ser interpretado, sem encher a interface de erros repetidos.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'El lector abre de nuevo el PDF dentro de Nodus al cambiar desde el Markdown limpio. La aplicación resuelve el adjunto local antes de entregarlo al visor y ya no deja una respuesta de servidor vacía en pantalla, mientras que Abrir fuera de Nodus conserva el acceso directo al archivo original.',
     en: 'The reader opens the PDF inside Nodus again when you switch from clean Markdown. The app resolves the local attachment before handing it to the viewer and no longer leaves an empty server response on screen, while Open outside Nodus keeps its direct route to the original file.',
@@ -2233,6 +2281,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O leitor volta a abrir o PDF dentro do Nodus ao mudar do Markdown limpo. O aplicativo resolve o anexo local antes de entregá-lo ao visualizador e não deixa mais uma resposta vazia do servidor na tela, enquanto Abrir fora do Nodus mantém o acesso direto ao arquivo original.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'El índice documental informa del trabajo que realmente avanza. La campaña y la tira inferior comparten los mismos recuentos, cada obra conserva su lugar mientras muestra el progreso de sus secciones, y Reintentar explica si cambió el texto o el modelo correcto. El modal también recupera sus colores de modo claro.',
     en: 'The documentary index now reports the work that is actually moving. The campaign and lower strip share the same counts, each work keeps its place while section progress advances, and Retry explains whether the text or the correct model changed. The modal also restores its proper light-mode colours.',
@@ -2242,6 +2291,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O índice documental agora mostra o trabalho que realmente avança. A campanha e a faixa inferior compartilham as mesmas contagens, cada obra mantém seu lugar enquanto as seções progridem, e Tentar novamente explica se mudou o texto ou o modelo correto. O modal também recupera as cores adequadas no modo claro.',
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     es: 'Ideas y Argument map comparten ahora el mismo lenguaje visual. Los puntos de tipo usan los mismos colores en ambas listas, las filas de Ideas ganan el margen vertical que les faltaba y títulos, descripciones y columnas permanecen alineados incluso en una ventana estrecha.',
     en: 'Ideas and Argument map now share the same visual language. Type dots use the same colours in both lists, Ideas rows gain the vertical breathing room they were missing, and titles, descriptions, and columns remain aligned even in a narrow window.',
@@ -2251,6 +2301,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Ideias e Mapa de argumentos agora compartilham a mesma linguagem visual. Os pontos de tipo usam as mesmas cores nas duas listas, as linhas de Ideias ganham o espaço vertical que faltava e títulos, descrições e colunas permanecem alinhados mesmo em uma janela estreita.',
   },
   {
+    category: 'new',
     scope: 'toolkit',
     es: 'Nodus Compass llega a Herramientas para descubrir literatura académica en fuentes abiertas. Busca en varios catálogos a la vez, combina duplicados, explica por qué recomienda cada resultado y permite guardar candidatos o importarlos a la Biblioteca con comprobación de duplicados y procedencia visible.',
     en: 'Nodus Compass arrives in Tools to discover academic literature across open sources. It searches several catalogues at once, merges duplicates, explains why each result is recommended, and lets you save candidates or import them into the Library with duplicate checks and visible provenance.',
@@ -2267,6 +2318,7 @@ const RELEASE_5_0_2_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'academic',
     es: 'El Diccionario guía mejor cada definición. Al crear una entrada puedes elegir entre seis enfoques, añadir instrucciones propias y revisar la evidencia que Nodus usará. La entrada abierta, la búsqueda y los filtros se conservan al salir y volver, y regenerar una definición mantiene una versión recuperable.',
     en: 'The Dictionary now guides each definition more clearly. When creating an entry you can choose among six approaches, add your own instructions, and review the evidence Nodus will use. The open entry, search, and filters remain when you leave and return, and regenerating a definition keeps a recoverable version.',
@@ -2276,6 +2328,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Dicionário agora orienta melhor cada definição. Ao criar uma entrada você pode escolher entre seis abordagens, adicionar instruções próprias e revisar as evidências que o Nodus usará. A entrada aberta, a busca e os filtros são preservados ao sair e voltar, e uma definição regenerada mantém uma versão recuperável.',
   },
   {
+    category: 'new',
     scope: 'academic',
     es: 'También puedes generar varias entradas del Diccionario a la vez. La cola procesa conceptos en paralelo hasta el límite de llamadas configurado, muestra el progreso y el resultado de cada entrada y permite reintentar solo las que fallen. Puedes seguir usando el Diccionario mientras el trabajo continúa.',
     en: 'You can also generate several Dictionary entries at once. The queue processes concepts in parallel up to the configured request limit, shows the progress and result of every entry, and lets you retry only the ones that fail. You can keep using the Dictionary while the work continues.',
@@ -2285,6 +2338,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Também é possível gerar várias entradas do Dicionário ao mesmo tempo. A fila processa conceitos em paralelo até o limite de solicitações configurado, mostra o progresso e o resultado de cada entrada e permite repetir apenas as que falharem. Você pode continuar usando o Dicionário durante o processamento.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'La Biblioteca académica y la Biblioteca global conservan con más fiabilidad la búsqueda, los filtros, la posición y el documento abierto al navegar. Los adjuntos vinculados y de bibliotecas de grupo vuelven a abrirse desde su ruta real, las acciones no se aplican a una selección antigua y las citas de fuentes mantienen su destino exacto.',
     en: 'The academic Library and Global Library now preserve search, filters, position, and the open document more reliably while you navigate. Linked and group-library attachments open again from their real path, actions no longer apply to a stale selection, and source citations keep their exact destination.',
@@ -2294,6 +2348,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A Biblioteca acadêmica e a Biblioteca global agora preservam com mais segurança a busca, os filtros, a posição e o documento aberto durante a navegação. Anexos vinculados e de bibliotecas de grupo voltam a abrir pelo caminho real, ações não afetam mais uma seleção antiga e citações mantêm o destino exato.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'La comprensión documental recupera campañas interrumpidas sin atascarse en un estado antiguo y mantiene visibles los perfiles ya publicados mientras repara o repite el trabajo pendiente. Los estados y errores que llegan desde procesos en segundo plano aparecen en el idioma de la interfaz, y las fuentes que cambian durante un análisis se vuelven a poner en cola de forma segura.',
     en: 'Document understanding now recovers interrupted campaigns without getting stuck in an old state and keeps published profiles visible while pending work is repaired or retried. Status and errors arriving from background processes use the interface language, and sources that change during analysis are safely queued again.',
@@ -2303,6 +2358,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A compreensão documental recupera campanhas interrompidas sem ficar presa em um estado antigo e mantém os perfis publicados visíveis enquanto o trabalho pendente é reparado ou repetido. Estados e erros de processos em segundo plano aparecem no idioma da interface, e fontes alteradas durante uma análise voltam à fila com segurança.',
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     es: 'Deep Research usa ahora una única cola duradera para los informes iniciados en la aplicación y por clientes MCP. Un informe pendiente o en curso se puede quitar con confirmación, la cola sobrevive a un reinicio y recupera trabajos antiguos que habían quedado atascados. Al terminar, el borrador aparece en la galería sin duplicados ni informes fantasma.',
     en: 'Deep Research now uses one durable queue for reports started in the app and by MCP clients. A queued or running report can be removed with confirmation, the queue survives a restart, and it recovers older jobs that had become stuck. When work finishes, its draft appears in the gallery without duplicates or ghost reports.',
@@ -2312,6 +2368,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Deep Research agora usa uma única fila durável para relatórios iniciados no aplicativo e por clientes MCP. Um relatório pendente ou em andamento pode ser removido com confirmação, a fila sobrevive a uma reinicialização e recupera trabalhos antigos que ficaram travados. Ao terminar, o rascunho aparece na galeria sem duplicatas nem relatórios fantasmas.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'Abrir Ajustes ya no puede congelar Nodus mientras inspecciona copias previas a una migración o limpia copias automáticas. Las comprobaciones de archivos y SQLite se ejecutan fuera del proceso de la ventana, tienen límites claros y descartan resultados que hayan quedado obsoletos si cambias de vault o de carpeta durante la operación.',
     en: 'Opening Settings can no longer freeze Nodus while it inspects pre-migration copies or cleans automatic backups. File and SQLite checks run outside the window process, use clear limits, and discard results that became stale if you change vault or folder during the operation.',
@@ -2321,6 +2378,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Abrir as Configurações não pode mais travar o Nodus enquanto ele inspeciona cópias anteriores a uma migração ou limpa backups automáticos. As verificações de arquivos e SQLite rodam fora do processo da janela, têm limites claros e descartam resultados obsoletos se você trocar de vault ou pasta durante a operação.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'Ajustes explica ahora para qué sirve cada modelo y cada control de IA con una descripción breve y uniforme. Si intentas iniciar una tarea de IA sin un modelo configurado, Nodus muestra un aviso pequeño en modo claro u oscuro y te lleva directamente a Ajustes y Modelos. El mensaje está disponible en los ocho idiomas de la interfaz.',
     en: 'Settings now explains what every model and AI control is for with a short, consistent description. If you try to start an AI task without a configured model, Nodus shows a small light or dark mode notice and takes you directly to Settings and Models. The message is available in all eight interface languages.',
@@ -2338,6 +2396,7 @@ const RELEASE_5_0_1_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'academic',
     es: 'El vault académico estrena Diccionario. Puedes crear conceptos desde la evidencia del corpus, buscar y filtrar entradas, editar definiciones, consultar sus citas y relaciones y recuperar versiones anteriores. Nodus detecta nueva evidencia y conserva la versión previa cuando actualizas o regeneras una entrada.',
     en: 'The academic vault gains a Dictionary. You can create concepts from corpus evidence, search and filter entries, edit definitions, inspect their citations and relations, and restore earlier versions. Nodus detects new evidence and preserves the previous version when you update or regenerate an entry.',
@@ -2347,6 +2406,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O cofre acadêmico ganha um Dicionário. Você pode criar conceitos a partir das evidências do corpus, pesquisar e filtrar entradas, editar definições, consultar citações e relações e recuperar versões anteriores. O Nodus detecta novas evidências e preserva a versão anterior ao atualizar ou gerar novamente uma entrada.',
   },
   {
+    category: 'new',
     scope: 'academic',
     es: 'Nodus entiende cada documento por niveles. Crea perfiles con secciones y resúmenes, enlaza el análisis con el texto exacto y amplía solo las fuentes que hacen falta. La indexación ocurre en segundo plano después de pedir permiso una vez y se puede pausar, reanudar, detener o reintentar desde la Biblioteca sin perder el progreso.',
     en: 'Nodus now understands each document in layers. It builds profiles with sections and summaries, ties analysis to the exact text, and expands only the sources that matter. Indexing runs in the background after one clear consent request and can be paused, resumed, stopped, or retried from Library without losing progress.',
@@ -2356,6 +2416,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus agora compreende cada documento em camadas. Ele cria perfis com seções e resumos, liga a análise ao texto exato e aprofunda somente as fontes necessárias. A indexação roda em segundo plano após um pedido claro de consentimento e pode ser pausada, retomada, interrompida ou repetida na Biblioteca sem perder o progresso.',
   },
   {
+    category: 'new',
     scope: 'academic',
     es: 'Deep Research v2 parte de ideas, relaciones y evidencia antes de abrir documentos completos. Deja de perseguir una longitud prefijada y termina cuando las fuentes y proposiciones ya sostienen la respuesta. Añade controles equilibrados, salida en un solo bloque y metadatos reproducibles, mientras los informes anteriores siguen abriéndose con su versión original.',
     en: 'Deep Research v2 starts from ideas, relationships, and evidence before opening full documents. It stops chasing a preset length and finishes when the sources and propositions support the answer. It adds balanced controls, continuous single-block output, and reproducible metadata, while earlier reports still open with their original version.',
@@ -2365,6 +2426,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Deep Research v2 parte de ideias, relações e evidências antes de abrir documentos completos. Ele deixa de perseguir um tamanho predefinido e termina quando as fontes e proposições sustentam a resposta. Traz controles equilibrados, saída contínua em bloco único e metadados reproduzíveis, enquanto relatórios antigos abrem com sua versão original.',
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: 'El archivo local vuelve a ser la fuente de verdad para cada obra, incluidos los adjuntos enlazados y las bibliotecas de grupo. Las citas abren el adjunto y la página que realmente contienen la evidencia. Un texto truncado se divide y reintenta, un reescaneo sobrevive al reinicio y un fallo conserva el análisis anterior en vez de ocultarlo.',
     en: 'The local file is once again the source of truth for each work, including linked attachments and group libraries. Citations open the attachment and page that actually contain the evidence. Truncated text splits and retries, a queued rescan survives a restart, and a failure preserves the previous analysis instead of hiding it.',
@@ -2374,6 +2436,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O arquivo local volta a ser a fonte de verdade de cada obra, incluindo anexos vinculados e bibliotecas de grupo. As citações abrem o anexo e a página que realmente contêm a evidência. Um texto truncado é dividido e repetido, uma nova análise na fila sobrevive à reinicialização e uma falha preserva a análise anterior.',
   },
   {
+    category: 'enhancement',
     scope: 'browser',
     es: 'Nodus Browser ya controla reproductores personalizados y audio web cuando una página no ofrece un elemento multimedia normal. Pausa y Reanudar siguen al reproductor activo sin accionar botones ambiguos. También corregimos el tema del permiso de análisis, el desbordamiento de acciones en Zotero y la alineación de los marcadores de tipo de idea.',
     en: 'Nodus Browser can now control custom players and web audio when a page exposes no standard media element. Pause and Resume follow the active player without pressing ambiguous controls. We also fixed the analysis-consent theme, overflowing actions in Zotero, and the vertical alignment of idea type markers.',
@@ -2383,6 +2446,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Nodus Browser agora controla players personalizados e áudio da web quando uma página não apresenta um elemento de mídia normal. Pausar e Retomar seguem o player ativo sem acionar controles ambíguos. Também corrigimos o tema do consentimento de análise, as ações que transbordavam no Zotero e o alinhamento dos marcadores de tipo de ideia.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'Una carpeta de recuperación en iCloud, OneDrive o cualquier proveedor lento ya no puede bloquear el arranque. Nodus consulta un índice pequeño con un plazo estricto y continúa si el proveedor no responde. Las inspecciones manuales también tienen límite, y la pantalla de protección muestra el logotipo de Nodus con el color del vault mientras termina.',
     en: 'A recovery folder in iCloud, OneDrive, or any slow provider can no longer block startup. Nodus checks a small index under a strict deadline and continues if the provider does not answer. Manual inspections are bounded too, and the protection screen shows the Nodus mark in the vault colour while it finishes.',
@@ -2392,6 +2456,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Uma pasta de recuperação no iCloud, OneDrive ou em qualquer provedor lento não pode mais bloquear a inicialização. O Nodus consulta um índice pequeno com prazo rígido e continua se o provedor não responder. As inspeções manuais também têm limite, e a tela de proteção mostra a marca do Nodus na cor do cofre enquanto termina.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'Las acciones enviadas desde una bóveda conectada llegan también cuando usas el Nodus Server clásico. El escritorio puede reclamarlas y procesarlas con el mismo contrato seguro de Cloudflare, incluido regenerar la síntesis de un autor, y el servidor las conserva hasta que el equipo confirma su resultado.',
     en: 'Actions sent from a connected vault now arrive when you use the classic Nodus Server too. Desktop can claim and process them with the same safe contract used by Cloudflare, including regenerating an author synthesis, and the server keeps them until the computer confirms the result.',
@@ -2401,6 +2466,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As ações enviadas por um cofre conectado agora chegam também com o Nodus Server clássico. O aplicativo de desktop pode assumi-las e processá-las com o mesmo contrato seguro do Cloudflare, incluindo gerar novamente a síntese de um autor, e o servidor as guarda até o computador confirmar o resultado.',
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: 'La documentación pública se ha puesto al día con la interfaz actual. El README y la guía de inicio usan capturas nuevas de los vaults de demostración en inglés, explican la navegación vigente y muestran accesos más claros a la descarga, la documentación y la licencia.',
     en: 'The public documentation now matches the current interface. The README and getting-started guide use new captures of the English demo vaults, explain the current navigation, and provide clearer paths to downloads, documentation, and the license.',
@@ -2421,6 +2487,7 @@ const RELEASE_5_0_0_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'enhancement',
     scope: 'ai',
     es: 'Las instrucciones que Nodus envía a la IA están ahora escritas de forma nativa en los ocho idiomas de la interfaz. Antes casi todas se redactaban en español y solo pedían al modelo que contestara en otro idioma, lo que se notaba en la calidad de la respuesta y en los términos que elegía. Ahora cada tarea tiene su propio contrato de instrucciones en tu idioma, desde el análisis del corpus hasta Deep Research, el Tutor, el Taller de escritura, el Diccionario y Nodi. Las claves del protocolo, los identificadores y las reglas de cita se mantienen intactas.',
     en: 'The instructions Nodus sends to the AI are now written natively in all eight interface languages. Almost all of them used to be drafted in Spanish and merely asked the model to answer in another language, which showed in the quality of the answer and in the terms it chose. Every task now has its own instruction contract in your language, from corpus analysis to Deep Research, the Tutor, the Writing Workshop, the Dictionary and Nodi. Protocol keys, identifiers and citation rules are left untouched.',
@@ -2430,6 +2497,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As instruções que o Nodus envia à IA agora são escritas de forma nativa nos oito idiomas da interface. Quase todas eram redigidas em espanhol e apenas pediam ao modelo que respondesse em outro idioma, o que aparecia na qualidade da resposta e nos termos escolhidos. Cada tarefa tem agora seu próprio contrato de instruções no seu idioma, da análise do corpus ao Deep Research, ao Tutor, à Oficina de escrita, ao Dicionário e ao Nodi. As chaves do protocolo, os identificadores e as regras de citação continuam intactos.',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los textos que la aplicación genera fuera de la interfaz dejan de salir en español. Los avisos del complemento de Word, los mensajes del servidor web, los diálogos nativos del sistema y la documentación de Nodi siguen ahora el idioma que tengas configurado. Si tenías Nodus en inglés y veías advertencias en español, eso ya no ocurre.',
     en: 'Text the application generates outside the interface no longer comes out in Spanish. Word add-in warnings, server web messages, native system dialogs and Nodi documentation now follow the language you have set. If you ran Nodus in English and kept seeing Spanish warnings, that is over.',
@@ -2439,6 +2507,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os textos que o aplicativo gera fora da interface não aparecem mais em espanhol. Os avisos do suplemento do Word, as mensagens do servidor web, as caixas de diálogo nativas do sistema e a documentação do Nodi agora seguem o idioma que você configurou. Se você usava o Nodus em português e continuava vendo avisos em espanhol, isso acabou.',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Los modelos locales terminan los análisis exigentes. Nodus separa ahora la ventana de contexto del máximo de salida y calcula ese máximo para cada tarea, en vez de aplicar un tope fijo que cortaba la respuesta a medias. Los lotes se adaptan solos, se comprueba que la respuesta esté completa y, si no lo está, se reintenta con un plan menor. Ajustes estrena un control de ventana de contexto con modo automático y una ficha de la última petición local para ver qué se envió de verdad.',
     en: 'Local models finish demanding analyses. Nodus now separates the context window from the output budget and works that budget out per task, instead of applying a fixed ceiling that cut answers in half. Batches adapt on their own, each answer is checked for completeness and, when it is not complete, the work is retried with a smaller plan. Settings gains a context-window control with an automatic mode and a card showing the last local request, so you can see what was really sent.',
@@ -2448,6 +2517,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os modelos locais terminam as análises exigentes. O Nodus agora separa a janela de contexto do orçamento de saída e calcula esse orçamento para cada tarefa, em vez de aplicar um teto fixo que cortava a resposta pela metade. Os lotes se adaptam sozinhos, a resposta é verificada e, se estiver incompleta, o trabalho é refeito com um plano menor. As Configurações estreiam um controle de janela de contexto com modo automático e um card da última requisição local, para você ver o que foi realmente enviado.',
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: 'Renovar el análisis de una obra ya no puede dejarte sin nada. Si la renovación falla o la cancelas, el análisis anterior sigue intacto y visible. Si termina bien, se sustituyen ideas, vectores, relaciones, grafo y perfil sin dejar restos del análisis viejo. La cola también deja de mostrar «Pendiente» o «Analizando» en obras que ya no lo están.',
     en: 'Refreshing a work’s analysis can no longer leave you with nothing. If the refresh fails or you cancel it, the previous analysis stays intact and visible. If it succeeds, ideas, vectors, relationships, graph and profile are replaced without leaving any remains of the old analysis behind. The queue also stops showing “Pending” or “Analysing” on works that are neither.',
@@ -2457,6 +2527,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Renovar a análise de uma obra não pode mais deixar você sem nada. Se a renovação falhar ou você cancelá-la, a análise anterior continua intacta e visível. Se terminar bem, ideias, vetores, relações, grafo e perfil são substituídos sem deixar restos da análise antiga. A fila também deixa de mostrar “Pendente” ou “Analisando” em obras que já não estão nesse estado.',
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     es: 'El perfil del documento reconoce ahora hipótesis y hallazgos como campos propios, con sus reglas de procedencia y de cobertura. Y la fusión de ideas deja de decidirse por un umbral de parecido entre vectores: el modelo tiene que justificar en cada caso si dos ideas son la misma, una variante o algo nuevo, y Nodus rechaza la fusión si la idea elegida no estaba entre las candidatas que se le ofrecieron.',
     en: 'The document profile now recognises hypotheses and findings as fields of their own, with their own provenance and coverage rules. And idea fusion is no longer decided by a vector-similarity threshold: the model has to justify in each case whether two ideas are the same, a variant or something new, and Nodus rejects the merge when the chosen idea was not among the candidates it was offered.',
@@ -2466,6 +2537,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O perfil do documento agora reconhece hipóteses e achados como campos próprios, com suas regras de proveniência e de cobertura. E a fusão de ideias deixa de ser decidida por um limiar de semelhança entre vetores: o modelo precisa justificar em cada caso se duas ideias são a mesma, uma variante ou algo novo, e o Nodus rejeita a fusão quando a ideia escolhida não estava entre as candidatas oferecidas.',
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     es: 'El tutorial del vault académico se ha rehecho entero. Los catorce pasos antiguos, que señalaban botones que ya no existen, dejan paso a nueve pasos tranquilos que recorren una sola ruta: Biblioteca, Ideas y Grafo. Explica la diferencia entre Global y Este vault, por qué conviene analizar una sola fuente al principio, cómo verificar la evidencia de una idea y por qué el grafo tarda en poblarse. Está completo en los ocho idiomas.',
     en: 'The academic vault tour has been rebuilt from scratch. The old fourteen steps, which pointed at buttons that no longer exist, give way to nine calm steps along a single path: Library, Ideas and Graph. It explains the difference between Global and This vault, why it is better to analyse a single source at first, how to verify the evidence behind an idea and why the graph takes a while to fill up. It is complete in all eight languages.',
@@ -2475,6 +2547,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O tutorial do cofre acadêmico foi refeito por completo. Os catorze passos antigos, que apontavam para botões que não existem mais, dão lugar a nove passos tranquilos ao longo de um único percurso: Biblioteca, Ideias e Grafo. Explica a diferença entre Global e Este cofre, por que convém analisar uma só fonte no começo, como verificar a evidência por trás de uma ideia e por que o grafo demora a encher. Está completo nos oito idiomas.',
   },
   {
+    category: 'enhancement',
     scope: 'library',
     es: 'La Biblioteca añade las fechas de Zotero como columnas ordenables. Puedes ordenar por fecha de incorporación, de modificación y de consulta, y las fichas antiguas que no las guardaban siguen funcionando igual.',
     en: 'The Library adds Zotero’s dates as sortable columns. You can sort by date added, date modified and access date, and older records that never stored them keep working exactly as before.',
@@ -2484,6 +2557,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'A Biblioteca acrescenta as datas do Zotero como colunas ordenáveis. Você pode ordenar por data de inclusão, de modificação e de consulta, e as fichas antigas que não as guardavam continuam funcionando como antes.',
   },
   {
+    category: 'fix',
     scope: 'zotero',
     es: 'El complemento de Zotero deja de acumular memoria. El motor de embeddings locales se apaga tras cinco minutos sin uso y también al cerrar el complemento o al cancelar la última petición. Los índices de evidencia antiguos se compactan la primera vez que se leen, sin perder textos, vectores, OCR ni citas. En el perfil diagnosticado el índice pasó de unos 168 MB a unos 13 MB.',
     en: 'The Zotero add-on stops piling up memory. The local embedding engine shuts down after five minutes of inactivity, and also when the add-on unloads or the last request is cancelled. Older evidence indexes are compacted the first time they are read, without losing text, vectors, OCR or citations. On the profile we diagnosed, the index went from about 168 MB down to about 13 MB.',
@@ -2503,6 +2577,7 @@ const RELEASE_5_1_4_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_1_7_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'fix',
     scope: 'languages',
     es: 'Generar una definici\u00f3n del diccionario ya no parece un fallo. La l\u00ednea de estado anunciaba que la operaci\u00f3n no se pudo completar mientras la definici\u00f3n se escrib\u00eda sin problemas. Ahora muestra el progreso real en tu idioma: en cola, analizando corpus y generando definici\u00f3n.',
     en: 'Generating a dictionary definition no longer looks like a failure. The status line announced that the operation could not be completed while the definition was being written just fine. It now shows the real progress in your language: queued, analysing corpus and generating definition.',
@@ -2522,6 +2597,7 @@ const RELEASE_5_1_7_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'fix',
     scope: 'languages',
     es: 'Las barras de progreso hablan ya tu idioma. Las líneas de indexación, embeddings, pasajes, cola e importación de Zotero se muestran traducidas en los ocho idiomas. Además dejan de aparecer avisos de error cuando todo va bien y conservan los nombres de tus bibliotecas y obras tal como son.',
     en: 'Progress bars now speak your language. Indexing, embeddings, passages, queue and Zotero import lines appear translated in all eight languages. False error notices no longer show up when everything is fine, and your library and work names stay exactly as they are.',
@@ -2531,6 +2607,7 @@ const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As barras de progresso agora falam o seu idioma. As linhas de indexação, embeddings, trechos, fila e importação do Zotero aparecem traduzidas nos oito idiomas. Os falsos avisos de erro não aparecem mais quando está tudo bem, e os nomes das suas bibliotecas e obras continuam exatamente como são.',
   },
   {
+    category: 'fix',
     scope: 'languages',
     es: 'Los errores del proceso principal llegan ya traducidos a tu idioma. Más de mil mensajes que antes salían en español o como un aviso genérico explican ahora su causa real. La prueba de conexión lo muestra claro. Si Ollama no responde, verás su dirección, el código HTTP y la pregunta de si está en marcha.',
     en: 'Main-process errors now arrive translated into your language. More than a thousand messages that used to appear in Spanish or as a generic notice now explain their real cause. The connection test shows it clearly. If Ollama does not answer, you will see its address, the HTTP code and the question of whether it is running.',
@@ -2540,6 +2617,7 @@ const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Os erros do processo principal agora chegam traduzidos para o seu idioma. Mais de mil mensagens que apareciam em espanhol ou como um aviso genérico agora explicam sua causa real. O teste de conexão mostra isso bem. Se o Ollama não responder, você verá seu endereço, o código HTTP e a pergunta sobre se ele está em execução.',
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Ajustes estrena un proveedor personalizado compatible con la API de OpenAI. Escribe la dirección exacta de tu servidor, sin que Nodus añada nada a la ruta, y conecta otros proveedores o un proxy propio. Puedes escribir tus modelos a mano, descubrir los que publica el servidor y comprobar la conexión antes de usarlos. La clave es opcional y se guarda como el resto de credenciales.',
     en: 'Settings gains a custom provider compatible with the OpenAI API. Type the exact address of your server, with Nodus adding nothing to the path, and connect other providers or your own proxy. You can type your models by hand, discover the ones your server publishes and test the connection before using them. The key is optional and is stored like the other credentials.',
@@ -2553,6 +2631,7 @@ const RELEASE_5_1_6_HIGHLIGHTS: RawReleaseHighlight[] = [
 // v5.2.0: approved user-facing highlights in their modal scope order.
 const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'academic',
     "es": "Estrenamos Stellar, el nuevo grafo de ideas. Busca una idea y explora sus conexiones paso a paso o mediante reproducción automática. Puedes avanzar, retroceder y consultar las fuentes y evidencias de cada relación mientras recorres el grafo. Disponible en el corpus, las obras, Estudio, Inmersión y los espacios publicados de Nodus Server.",
     "en": "Introducing Stellar, the new idea graph. Search for an idea and explore its connections step by step or with automatic playback. Move forward, go back and consult the sources and evidence for each relationship as you explore the graph. Available in the corpus, works, Study, Immersion and published Nodus Server spaces.",
@@ -2562,6 +2641,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Apresentamos o Stellar, o novo grafo de ideias. Busque uma ideia e explore suas conexões passo a passo ou com reprodução automática. Você pode avançar, voltar e consultar as fontes e evidências de cada relação enquanto percorre o grafo. Disponível no corpus, nas obras, no Estudo, na Imersão e nos espaços publicados do Nodus Server.",
   },
   {
+    category: 'new',
     scope: 'academic',
     "es": "Varios grafos abiertos a la vez. Cada pestaña conserva sus ideas, posiciones, recorrido y panel de evidencias durante la sesión. Añade ideas desde el buscador, retíralas del lienzo o abre otra exploración sin sustituir la anterior. También puedes trabajar a pantalla completa.",
     "en": "Several graphs open at once. Each tab keeps its own ideas, positions, exploration history and evidence panel during the session. Add ideas from search, remove them from the canvas or open another exploration without replacing the previous one. You can also work in full screen.",
@@ -2571,6 +2651,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Vários grafos abertos ao mesmo tempo. Cada aba conserva suas ideias, posições, percurso e painel de evidências durante a sessão. Adicione ideias pela busca, remova-as da tela ou abra outra exploração sem substituir a anterior. Você também pode trabalhar em tela cheia.",
   },
   {
+    category: 'new',
     scope: 'academic',
     "es": "Un mapa de argumentos visual. Explora la idea central y sus ramas mediante tarjetas desplegables, filtra los tipos de relación y abre sus evidencias. El zoom automático te acerca al argumento seleccionado y puedes volver al encuadre anterior sin cerrar las ramas. La vista de esquema sigue disponible.",
     "en": "A visual argument map. Explore the central idea and its branches through expandable cards, filter relationship types and open their evidence. Automatic zoom brings the selected argument closer, and you can return to the previous view without closing branches. The outline view remains available.",
@@ -2580,6 +2661,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Um mapa de argumentos visual. Explore a ideia central e seus ramos com cartões expansíveis, filtre os tipos de relação e abra suas evidências. O zoom automático aproxima o argumento selecionado e você pode voltar ao enquadramento anterior sem fechar os ramos. A visualização em esquema continua disponível.",
   },
   {
+    category: 'new',
     scope: 'academic',
     "es": "Pestañas en Deep Research e Inmersión. Mantén abiertos varios informes o sesiones y cambia entre ellos desde una barra de pestañas, con acceso directo a la galería. Deep Research recuerda además el punto de lectura de cada informe al alternar entre ellos.",
     "en": "Tabs in Deep Research and Immersion. Keep several reports or sessions open and switch between them from a tab bar, with direct access to the gallery. Deep Research also remembers your reading position in each report as you switch between them.",
@@ -2589,6 +2671,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Abas no Deep Research e na Imersão. Mantenha vários relatórios ou sessões abertos e alterne entre eles em uma barra de abas, com acesso direto à galeria. O Deep Research também lembra o ponto de leitura de cada relatório ao alternar entre eles.",
   },
   {
+    category: 'enhancement',
     scope: 'academic',
     "es": "Ideas y evidencias más fáciles de leer. Las conexiones y los resúmenes tienen una presentación más sencilla, con menos recuadros anidados. El diálogo de ideas de una obra utiliza ahora un fondo opaco para que el contenido de detrás no interfiera con la lectura.",
     "en": "Ideas and evidence are easier to read. Connections and summaries have a simpler presentation, with fewer nested boxes. The ideas dialog for a work now uses an opaque background so the content behind it does not interfere with reading.",
@@ -2598,6 +2681,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Ideias e evidências mais fáceis de ler. As conexões e os resumos têm uma apresentação mais simples, com menos caixas dentro de outras caixas. A janela de ideias de uma obra agora usa um fundo opaco para que o conteúdo atrás não atrapalhe a leitura.",
   },
   {
+    category: 'fix',
     scope: 'academic',
     "es": "El diccionario muestra el estado correcto al terminar. Cuando se completa una definición, el indicador de generación da paso al estado real de la entrada. Las entradas activas ya no se quedan mostrando «Generado» durante el resto de la sesión.",
     "en": "The Dictionary shows the correct status when finished. Once a definition is complete, the generation indicator gives way to the entry's actual status. Active entries no longer keep showing “Generated” for the rest of the session.",
@@ -2607,6 +2691,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "O Dicionário mostra o estado correto ao terminar. Quando uma definição é concluída, o indicador de geração dá lugar ao estado real da entrada. As entradas ativas deixam de mostrar “Gerado” durante o restante da sessão.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     "es": "Un inicio renovado. Las tarjetas de las pantallas de inicio tienen una presentación más clara y se adaptan al espacio disponible. Mejoran el contraste en los temas claro y oscuro y mantienen los colores de cada bóveda para identificar sus secciones y estados.",
     "en": "A refreshed home. Cards on home screens have a clearer presentation and adapt to the available space. They improve contrast in light and dark themes and retain each vault's colors to identify its sections and statuses.",
@@ -2616,6 +2701,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Um início renovado. Os cartões das telas iniciais têm uma apresentação mais clara e se adaptam ao espaço disponível. Melhoram o contraste nos temas claro e escuro e mantêm as cores de cada cofre para identificar suas seções e estados.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     "es": "Toda la actividad, en la barra superior. La cola de procesamiento y los indicadores de progreso se reúnen en un panel desplegable. Consulta las tareas activas y pendientes y sigue su avance desde un mismo lugar, dejando más espacio para trabajar.",
     "en": "All activity in the top bar. The processing queue and progress indicators come together in a dropdown panel. Check active and pending tasks and follow their progress in one place, leaving more room to work.",
@@ -2625,6 +2711,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Toda a atividade na barra superior. A fila de processamento e os indicadores de progresso se reúnem em um painel suspenso. Consulte as tarefas ativas e pendentes e acompanhe seu avanço no mesmo lugar, deixando mais espaço para trabalhar.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     "es": "Tú decides cuándo instalar las actualizaciones. Nodus descarga la nueva versión en segundo plano y te permite elegir entre «Instalar y reiniciar» o «Más tarde». La descarga ya no provoca un reinicio automático, y la instalación conserva la comprobación de la copia de seguridad previa.",
     "en": "You decide when to install updates. Nodus downloads the new version in the background and lets you choose “Install and restart” or “Later”. Downloading no longer triggers an automatic restart, and installation retains the pre-update backup check.",
@@ -2634,6 +2721,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Você decide quando instalar as atualizações. O Nodus baixa a nova versão em segundo plano e permite escolher entre “Instalar e reiniciar” e “Mais tarde”. O download não provoca mais uma reinicialização automática e a instalação mantém a verificação do backup prévio.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     "es": "Ajustes recuerda dónde estabas. Al volver a abrir Ajustes, recuperas la última pestaña que estabas consultando. Los accesos directos a una sección concreta siguen llevándote a su destino.",
     "en": "Settings remembers where you were. When you reopen Settings, you return to the last tab you were viewing. Shortcuts to a specific section still take you to their intended destination.",
@@ -2643,6 +2731,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "As Configurações lembram onde você estava. Ao reabrir as Configurações, você recupera a última aba que estava consultando. Os atalhos para uma seção específica continuam levando ao destino correto.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     "es": "Citas mejor presentadas. Las citas enlazadas y sus paréntesis permanecen juntos al cambiar de línea, evitando signos sueltos en los informes y las respuestas de los chats.",
     "en": "Better citation formatting. Linked citations and their parentheses stay together when a line wraps, avoiding stray punctuation in reports and chat responses.",
@@ -2652,6 +2741,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Citações mais bem apresentadas. As citações com link e seus parênteses permanecem juntos nas quebras de linha, evitando sinais soltos nos relatórios e nas respostas dos chats.",
   },
   {
+    category: 'new',
     scope: 'ai',
     "es": "Skills para personalizar tus conversaciones. Activa instrucciones reutilizables para estudiar, escribir, desarrollar ideas, comparar opciones o revisar un argumento. Puedes crear tus propias skills, importar archivos Markdown o JSON y editar las incluidas. Los chats comparten la configuración. Nodi mantiene su propia selección.",
     "en": "Skills to personalize your conversations. Enable reusable instructions for studying, writing, developing ideas, comparing options or reviewing an argument. You can create your own skills, import Markdown or JSON files and edit the included ones. Chats share the configuration. Nodi keeps its own selection.",
@@ -2661,6 +2751,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Skills para personalizar suas conversas. Ative instruções reutilizáveis para estudar, escrever, desenvolver ideias, comparar opções ou revisar um argumento. Você pode criar suas próprias skills, importar arquivos Markdown ou JSON e editar as incluídas. Os chats compartilham a configuração. O Nodi mantém sua própria seleção.",
   },
   {
+    category: 'new',
     scope: 'ai',
     "es": "Diagramas e imágenes directamente en el chat. SVG Studio crea diagramas vectoriales e Image Atelier genera imágenes con el proveedor y modelo configurados en Ajustes. Puedes ampliar, copiar y descargar los resultados, consultar el código SVG o ver las instrucciones utilizadas para generar una imagen. Ambas skills vienen activadas de inicio.",
     "en": "Diagrams and images directly in chat. SVG Studio creates vector diagrams, and Image Atelier generates images with the provider and model configured in Settings. Enlarge, copy and download the results, inspect the SVG code or view the instructions used to generate an image. Both skills are enabled by default.",
@@ -2670,6 +2761,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Diagramas e imagens diretamente no chat. O SVG Studio cria diagramas vetoriais e o Image Atelier gera imagens com o provedor e o modelo definidos nas Configurações. Você pode ampliar, copiar e baixar os resultados, consultar o código SVG ou ver as instruções usadas para gerar uma imagem. Ambas as skills vêm ativadas por padrão.",
   },
   {
+    category: 'enhancement',
     scope: 'ai',
     "es": "Elegir modelo es más cómodo. Los selectores de modelos utilizan menús con búsqueda y una apariencia integrada con el tema de la aplicación. La búsqueda admite distintas formas de escribir el nombre y los desplegables se ajustan al espacio disponible.",
     "en": "Choosing a model is easier. Model selectors use searchable menus with a look that matches the app's theme. Search accepts different ways of writing the name, and dropdowns adapt to the available space.",
@@ -2679,6 +2771,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Escolher um modelo ficou mais fácil. Os seletores de modelos usam menus com busca e uma aparência integrada ao tema do aplicativo. A busca aceita diferentes formas de escrever o nome e os menus se adaptam ao espaço disponível.",
   },
   {
+    category: 'new',
     scope: 'toolkit',
     "es": "Tus utilidades favoritas, a mano. Fija herramientas del Toolkit en la barra lateral mediante la chincheta de cada tarjeta. Abre directamente las que más utilizas y retira sus accesos cuando quieras.",
     "en": "Your favorite utilities close at hand. Pin Toolkit tools to the sidebar using the pin on each card. Open the ones you use most directly and remove their shortcuts whenever you like.",
@@ -2696,6 +2789,7 @@ const RELEASE_5_2_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   ...RELEASE_5_4_0_ADDITIONS,
   {
+    category: 'new',
     scope: 'marketplace',
     es: "Chemistry Studio, Legalize y AlphaGenome ya son paquetes oficiales que instalas tú. Aparecen en Skills con su editor verificado, sus permisos, su tamaño y las plataformas en las que funcionan, y puedes instalarlos, actualizarlos, volver a la versión anterior o quitarlos cuando quieras. Lo que hacen no ha cambiado.",
     en: "Chemistry Studio, Legalize and AlphaGenome are now official packages you install yourself. They appear in Skills with their verified publisher, their permissions, their size and the platforms they run on, and you can install, update, roll back or remove any of them whenever you like. What they do has not changed.",
@@ -2705,6 +2799,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Chemistry Studio, Legalize e AlphaGenome agora são pacotes oficiais que você instala. Aparecem em Skills com o editor verificado, as permissões, o tamanho e as plataformas em que funcionam, e você pode instalar, atualizar, voltar à versão anterior ou remover quando quiser. O que eles fazem não mudou.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: "Tu configuración se muda sola al actualizar. Si tenías Chemistry Studio activado, o una clave de AlphaGenome guardada, o una skill tuya que necesita una de estas capacidades, Nodus instala el paquete que corresponde y adopta la skill conservando su sitio en la lista, dónde la tenías activada y las instrucciones que hubieras editado. Funciona sin conexión porque los paquetes viajan dentro de la propia actualización.",
     en: "Your setup moves across on its own when you update. If Chemistry Studio was switched on, or you had an AlphaGenome key saved, or a skill of your own needs one of these capabilities, Nodus installs the matching package and adopts the skill with its place in the list, the surfaces it was enabled on and any instructions you had edited. It works with no connection because the packages travel inside the update itself.",
@@ -2714,6 +2809,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Sua configuração se muda sozinha ao atualizar. Se o Chemistry Studio estava ligado, havia uma chave do AlphaGenome salva ou uma skill sua precisa dessas capacidades, o Nodus instala o pacote correspondente e adota a skill mantendo seu lugar na lista, as superfícies onde estava ligada e as instruções que você tenha editado. Funciona sem conexão porque os pacotes viajam dentro da própria atualização.",
   },
   {
+    category: 'enhancement',
     scope: 'general',
     es: "Nodus ocupa menos si no dibujas moléculas. Los motores químicos, el compilador de TeX y el resto de dependencias de estas tres áreas ya no viajan con la aplicación, sino dentro del paquete que las necesita. Una instalación limpia no descarga ni carga ninguna de las tres mientras no las pidas.",
     en: "Nodus takes up less room if you do not draw molecules. The chemistry engines, the TeX compiler and the rest of the dependencies these three areas need no longer travel with the application, only inside the package that needs them. A clean install neither downloads nor loads any of the three until you ask for one.",
@@ -2723,6 +2819,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "O Nodus ocupa menos espaço se você não desenha moléculas. Os motores de química, o compilador de TeX e as demais dependências dessas três áreas não viajam mais com o aplicativo, apenas dentro do pacote que precisa delas. Uma instalação limpa não baixa nem carrega nenhuma das três enquanto você não pedir.",
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: "Cada paquete se configura en su propia ficha. La clave de AlphaGenome, la aceptación de sus términos y la instalación de su runtime de Python están ahora dentro del paquete, no repartidas por los ajustes de Nodus. Tu clave se guarda en el almacén de credenciales del sistema y llega al intérprete por su entrada estándar, nunca en una línea de comandos ni en un registro.",
     en: "Every package configures itself on its own card. The AlphaGenome key, accepting its terms and installing its Python runtime now live inside the package rather than scattered through the Nodus settings. Your key is kept in the system credential store and reaches the interpreter through its standard input, never on a command line or in a log.",
@@ -2732,6 +2829,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Cada pacote se configura no seu próprio cartão. A chave do AlphaGenome, a aceitação dos seus termos e a instalação do seu runtime de Python agora ficam dentro do pacote, em vez de espalhadas pelas configurações do Nodus. Sua chave fica no armazenamento de credenciais do sistema e chega ao interpretador pela entrada padrão, nunca em uma linha de comando nem em um log.",
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: "Un paquete solo llega firmado por NodusResearch. Nodus comprueba la firma y la huella exacta de lo que descarga antes de abrirlo, rechaza una versión más antigua que la instalada y rechaza un contenido distinto publicado con el mismo número. Una actualización que pida más permisos de los que aprobaste espera a que la revises en lugar de aplicarse sola.",
     en: "A package only arrives signed by NodusResearch. Nodus checks the signature and the exact fingerprint of what it downloads before opening it, refuses a version older than the one installed, and refuses different content published under the same number. An update that asks for more than you approved waits for you to review it instead of applying itself.",
@@ -2741,6 +2839,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Um pacote só chega assinado pela NodusResearch. O Nodus verifica a assinatura e a impressão digital exata do que baixa antes de abri-lo, recusa uma versão mais antiga do que a instalada e recusa um conteúdo diferente publicado com o mesmo número. Uma atualização que peça mais do que você aprovou espera pela sua revisão em vez de se aplicar sozinha.",
   },
   {
+    category: 'new',
     scope: 'ai',
     es: "Los resultados se guardan junto a la conversación y cada paquete decide qué ve el modelo. Una predicción de AlphaGenome sigue sin salir de tu dispositivo, y ahora esa regla la declara el propio paquete en lugar de estar escrita dentro de Nodus. Si desinstalas un paquete, los resultados que ya tenías en tus chats se conservan y puedes volver a instalarlo desde el propio mensaje.",
     en: "Results are stored beside the conversation and each package decides what the model sees. An AlphaGenome prediction still never leaves your device, and that rule is now declared by the package itself instead of being written into Nodus. If you uninstall a package, the results already in your chats are kept and you can reinstall it from the message itself.",
@@ -2750,6 +2849,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Os resultados ficam guardados junto da conversa e cada pacote decide o que o modelo vê. Uma previsão do AlphaGenome continua não saindo do seu dispositivo, e essa regra agora é declarada pelo próprio pacote em vez de estar escrita dentro do Nodus. Se você desinstalar um pacote, os resultados que já tinha nos seus chats são mantidos e você pode reinstalá-lo a partir da própria mensagem.",
   },
   {
+    category: 'enhancement',
     scope: 'toolkit',
     es: "Las carpetas del PDF Presenter ahora son etiquetas, que es lo que siempre fueron. Al pulsar una verás solo las presentaciones que la llevan, y al volver a pulsarla las verás todas otra vez. Borrar una etiqueta te pregunta antes y nunca se lleva sus presentaciones por delante. Solo dejan de estar etiquetadas. Las estanterías que organizaste antes de esta actualización se abren tal y como las dejaste.",
     en: "The PDF Presenter's folders are now tags, which is what they always were. Clicking one shows only the presentations that carry it, and clicking it again shows them all. Deleting a tag asks first and never takes its presentations with it. They simply stop being tagged. Shelves you organised before this update open exactly as you left them.",
@@ -2759,6 +2859,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "As pastas do PDF Presenter agora são etiquetas, que é o que sempre foram. Clicar em uma mostra apenas as apresentações que a têm, e clicar de novo mostra todas. Excluir uma etiqueta pergunta antes e nunca leva as apresentações junto. Elas simplesmente deixam de ter etiqueta. As estantes que você organizou antes desta atualização abrem exatamente como você as deixou.",
   },
   {
+    category: 'new',
     scope: 'toolkit',
     es: "Una presentación ya puede salir de la biblioteca. Descargar PDF guarda donde tú quieras la copia que Nodus conserva, así que una presentación que importaste desde PowerPoint o Keynote es tuya en PDF aunque ya no tengas el original. La copia de tu estantería se queda donde está.",
     en: "A presentation can now leave the library. Download PDF saves the copy Nodus keeps wherever you choose, so a deck you imported from PowerPoint or Keynote is yours as a PDF even if you no longer have the original. The copy on your shelf stays where it is.",
@@ -2768,6 +2869,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Uma apresentação já pode sair da biblioteca. Baixar PDF salva onde você quiser a cópia que o Nodus mantém, então uma apresentação que você importou do PowerPoint ou do Keynote é sua em PDF mesmo que não tenha mais o original. A cópia da sua estante continua onde está.",
   },
   {
+    category: 'enhancement',
     scope: 'toolkit',
     es: "El importador de notas lee un segundo tipo de archivo TXT. Además del formato que exporta Nodus, ahora acepta archivos de notas recuperadas que solo listan las diapositivas que tienen nota. Nodus toma el número de diapositivas de la cabecera del propio archivo, así que un archivo con notas para 130 de 140 ya no parece un descuadre.",
     en: "The notes importer reads a second kind of TXT file. Alongside the format Nodus exports, it now accepts recovered notes files that list only the slides that have a note. Nodus takes the deck length from the file's own header, so a file with notes for 130 slides out of 140 no longer looks like a mismatch.",
@@ -2789,6 +2891,7 @@ const RELEASE_5_4_0_HIGHLIGHTS: RawReleaseHighlight[] = [
  */
 const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'fix',
     scope: 'marketplace',
     es: "El Marketplace ya sabe qué skills tienes. Las skills incluidas en Nodus aparecen como instaladas en vez de ofrecerse otra vez, un filtro Todas / Instaladas / Disponibles revisa tu biblioteca desde el catálogo y cada skill instalada se puede quitar desde su tarjeta. Instalar una entrada que Nodus ya incluye restaura la versión de tu instalación en lugar de añadir un duplicado, y limpia el duplicado que hubiera dejado una versión anterior.",
     en: "The Marketplace now knows which skills you already have. Skills included in Nodus appear as installed instead of being offered again, an All / Installed / Available filter reviews your library from the catalog, and every installed skill can be removed from its card. Installing an entry Nodus already includes restores the version shipped with your build instead of adding a duplicate, and clears out a duplicate an earlier build had installed.",
@@ -2798,6 +2901,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "O Marketplace agora sabe quais skills você já tem. As skills incluídas no Nodus aparecem como instaladas em vez de serem oferecidas de novo, um filtro Todas / Instaladas / Disponíveis revisa sua biblioteca a partir do catálogo e cada skill instalada pode ser removida no seu cartão. Instalar uma entrada que o Nodus já inclui restaura a versão do seu build em vez de acrescentar uma duplicata, e limpa a duplicata deixada por uma versão anterior.",
   },
   {
+    category: 'enhancement',
     scope: 'marketplace',
     es: "Ahora te enteras antes de instalar si un plugin necesita un Nodus más nuevo. La pantalla de revisión compara tu versión con la que el plugin exige y lo indica encima del botón de instalar, y la confirmación lo repite. Un plugin que ya está esperando indica en su tarjeta la versión que necesita, en lugar de mostrar su propia descripción sin explicar nada.",
     en: "You find out before installing when a plugin needs a newer Nodus. The review screen compares your build with the version the plugin requires and says so above the install button, and the confirmation repeats it. A plugin that is already waiting now names the version it needs on its card, instead of showing its own description with no reason given.",
@@ -2807,6 +2911,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Você descobre antes de instalar se um plugin precisa de um Nodus mais novo. A tela de revisão compara sua versão com a exigida pelo plugin e informa isso acima do botão de instalar, e a confirmação repete a mensagem. Um plugin que já está aguardando agora indica no seu cartão a versão de que precisa, em vez de mostrar a própria descrição sem explicar nada.",
   },
   {
+    category: 'new',
     scope: 'plugin',
     es: "Las skills ya pueden llegar como plugins. Un plugin es un paquete con versión que agrupa varias skills junto a sus propias herramientas aisladas. Esas herramientas se ejecutan en una sesión temporal de Chromium sin acceso a tus archivos, a Nodus ni a la red, y solo salen al exterior por las direcciones HTTPS que declara el paquete. Las claves que configures las inserta Nodus en la petición y nunca son visibles para el código del plugin.",
     en: "Skills can now arrive as plugins. A plugin is one versioned package that bundles several skills together with sandboxed tools of their own. Those tools run in a temporary Chromium session with no access to your files, to Nodus or to the network, and they reach the outside only through the HTTPS addresses the package declares. Keys you configure are inserted by Nodus into the request and are never visible to the plugin's code.",
@@ -2816,6 +2921,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "As skills agora podem chegar como plugins. Um plugin é um pacote versionado que reúne várias skills junto com suas próprias ferramentas isoladas. Essas ferramentas rodam em uma sessão temporária do Chromium sem acesso aos seus arquivos, ao Nodus nem à rede, e só alcançam o exterior pelos endereços HTTPS que o pacote declara. As chaves que você configurar são inseridas pelo Nodus na requisição e nunca ficam visíveis para o código do plugin.",
   },
   {
+    category: 'enhancement',
     scope: 'plugin',
     es: "Los plugins se actualizan como una unidad y siempre se pueden deshacer. Una actualización que pide más de lo que aprobaste espera tu aprobación, las instrucciones que hayas editado sobreviven como una capa que puedes restablecer y la versión anterior sigue disponible. Un plugin que dejes en la carpeta del perfil se lista para revisarlo con los permisos exactos que pide, y nada suyo se ejecuta antes de que lo apruebes. Las herramientas locales tienen ahora su propio cupo de dieciséis llamadas por respuesta, aparte de las cuatro de todo lo que sale a la red o toca tus claves.",
     en: "Plugins update as one unit and can always be undone. An update that asks for more than you approved waits for your approval, instructions you edited locally survive as an overlay you can reset, and the previous version stays available. A plugin dropped into the profile folder is listed for review with the exact permissions it requests, and nothing in it runs before you approve it. Local tools now have their own allowance of sixteen calls per reply, apart from the four for anything that reaches the network or your keys.",
@@ -2825,6 +2931,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "Os plugins são atualizados como uma unidade e sempre podem ser desfeitos. Uma atualização que pede mais do que você aprovou fica aguardando sua aprovação, as instruções que você editou sobrevivem como uma camada que pode ser restaurada e a versão anterior continua disponível. Um plugin colocado na pasta do perfil é listado para revisão com as permissões exatas que pede, e nada dele é executado antes de você aprovar. As ferramentas locais agora têm sua própria cota de dezesseis chamadas por resposta, separada das quatro de tudo o que sai para a rede ou toca nas suas chaves.",
   },
   {
+    category: 'fix',
     scope: 'academic',
     es: "Deep Research respeta el número de secciones que eliges. El máximo que fijas es ahora un techo y no un mínimo, y no se pierde ninguna evidencia al compactar el plan para ajustarse a él. La nueva Extensión orientativa de cada sección ofrece Automático, 2.500, 5.000, 10.000, 15.000 y 20.000 palabras o la cifra que quieras. Cuenta palabras y no tokens, es una orientación editorial y no una cuota, y se guarda con el informe para volver contigo al reutilizar un prompt.",
     en: "Deep Research respects the number of sections you choose. The maximum you set is now a ceiling instead of a floor, and no evidence is dropped when the plan is compacted to fit it. A new Guideline section length offers Auto, 2,500, 5,000, 10,000, 15,000 and 20,000 words or a figure of your own. It counts words and not tokens, it is editorial guidance rather than a quota, and it is stored with the report so reusing a prompt brings it back.",
@@ -2834,6 +2941,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "O Deep Research respeita o número de seções que você escolhe. O máximo que você define agora é um teto e não um mínimo, e nenhuma evidência é perdida ao compactar o plano para caber nele. A nova Extensão orientativa de cada seção oferece Automático, 2.500, 5.000, 10.000, 15.000 e 20.000 palavras ou o valor que você quiser. Ela conta palavras e não tokens, é orientação editorial e não uma cota, e fica salva com o relatório para voltar quando você reutilizar um prompt.",
   },
   {
+    category: 'fix',
     scope: 'ai',
     es: "El selector de contexto del corpus del asistente se abre donde has hecho clic. Síntesis y los demás modos aparecen ahora en un globo anclado a su botón, en lugar de una ventana que tapa la conversación. Se cierra con Escape o con un clic fuera, y se coloca encima del botón cuando no hay sitio debajo.",
     en: "The assistant's corpus context picker opens where you clicked. Synthesis and the other modes now appear in a balloon anchored to their button, instead of a window covering the conversation. It closes with Escape or a click outside, and it flips above the button when there is no room below.",
@@ -2843,6 +2951,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "O seletor de contexto do corpus do assistente abre onde você clicou. Síntese e os demais modos agora aparecem em um balão ancorado ao seu botão, em vez de uma janela que cobre a conversa. Ele fecha com Escape ou com um clique fora, e se posiciona acima do botão quando não há espaço embaixo.",
   },
   {
+    category: 'fix',
     scope: 'languages',
     es: "El italiano se ofrece allí donde se elige el idioma de un informe. El selector del Laboratorio de escritura escribía sus opciones a mano y solo listaba siete de los ocho idiomas admitidos. Todos los compositores usan ahora la misma lista compartida, así que ya no puede faltar un idioma en uno de ellos.",
     en: "Italian is offered everywhere a report language is chosen. The Writing Workshop picker spelled out its options by hand and listed only seven of the eight supported languages. Every composer now renders the same shared list, so a language cannot go missing from one picker again.",
@@ -2852,6 +2961,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': "O italiano é oferecido em todos os lugares onde se escolhe o idioma de um relatório. O seletor do Laboratório de escrita escrevia suas opções à mão e listava apenas sete dos oito idiomas suportados. Todos os compositores agora mostram a mesma lista compartilhada, então não pode mais faltar um idioma em um deles.",
   },
   {
+    category: 'fix',
     scope: 'general',
     es: "También corregimos tres detalles visibles. Salir del grafo Stellar mientras se dibuja ya no provoca un error. El panel de skills de Nodi mantiene visible la pista de cada interruptor y sus barras de desplazamiento siguen los temas claro y oscuro. Y un dibujo químico que no se puede verificar del todo se muestra ahora con sus etiquetas en lugar de descartarse.",
     en: "We also fixed three visible details. Leaving the Stellar graph while it is still drawing no longer raises an error. Nodi's skills panel keeps the track of every switch visible and its scrollbars follow the light and dark themes. And a chemical drawing that cannot be fully verified is now shown with its labels instead of being discarded.",
@@ -2864,6 +2974,7 @@ const RELEASE_5_3_1_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: 'marketplace',
     es: 'Estrenamos el Marketplace de Skills. Desde Skills puedes explorar el catálogo oficial, revisar el contenido y las capacidades de cada paquete antes de instalarlo y añadir otros repositorios públicos de GitHub. Actualizar un catálogo no cambia lo que ya tienes instalado, y quitar una fuente tampoco borra sus skills.',
     en: 'Introducing the Skills Marketplace. From Skills you can explore the official catalog, review the contents and capabilities of every package before installing it, and add other public GitHub repositories. Updating a catalog does not change what you already have installed, and removing a source does not delete its skills either.',
@@ -2873,6 +2984,7 @@ const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'Estreia o Marketplace de Skills. Em Skills você pode explorar o catálogo oficial, revisar o conteúdo e as capacidades de cada pacote antes de instalá-lo e adicionar outros repositórios públicos do GitHub. Atualizar um catálogo não altera o que já está instalado, e remover uma fonte também não apaga suas skills.',
   },
   {
+    category: 'new',
     scope: 'marketplace',
     es: 'Las skills ya pueden incluir herramientas JavaScript para cálculos, transformaciones y generadores. Se ejecutan en un entorno aislado sin acceso a tus archivos, credenciales, red ni datos de Nodus. También puedes importar y exportar paquetes completos, mientras el Asistente y Nodi conservan activaciones independientes.',
     en: 'Skills can now include JavaScript tools for calculations, transformations and generators. They run in an isolated environment without access to your files, credentials, network or Nodus data. You can also import and export complete packages, while the Assistant and Nodi keep independent activation settings.',
@@ -2882,6 +2994,7 @@ const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'As skills agora podem incluir ferramentas JavaScript para cálculos, transformações e geradores. Elas são executadas em um ambiente isolado sem acesso aos seus arquivos, credenciais, rede nem dados do Nodus. Você também pode importar e exportar pacotes completos, enquanto o Assistente e o Nodi mantêm ativações independentes.',
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'AlphaGenome llega como skill opcional para investigación no comercial. Tras añadir tu propia clave e instalar el cliente oficial, puedes pedir predicciones regulatorias de variantes GRCh38 desde los chats de Nodus. Los resultados y sus gráficas se guardan solo en este equipo, y las exportaciones conservan la atribución y las condiciones de uso.',
     en: 'AlphaGenome arrives as an optional skill for non-commercial research. After adding your own key and installing the official client, you can request regulatory predictions for GRCh38 variants from Nodus chats. Results and plots are stored only on this computer, and exports preserve attribution and the applicable terms of use.',
@@ -2891,6 +3004,7 @@ const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O AlphaGenome chega como skill opcional para pesquisa não comercial. Depois de adicionar sua própria chave e instalar o cliente oficial, você pode pedir previsões regulatórias de variantes GRCh38 nos chats do Nodus. Os resultados e gráficos ficam armazenados apenas neste computador, e as exportações preservam a atribuição e os termos de uso.',
   },
   {
+    category: 'new',
     scope: 'ai',
     es: 'Legalize permite consultar legislación de 32 repositorios nacionales y de la Unión Europea desde cualquier chat. Indica el país, la norma o su identificador y, si quieres, el artículo. Nodus recupera el texto real con su fuente oficial, revisión y atribuciones. No necesitas Git, cuenta ni clave de API.',
     en: 'Legalize lets you consult legislation from 32 reviewed national and European Union repositories in any chat. Name the country, the law or its identifier and, if needed, the article. Nodus retrieves the real text with its official source, revision and attribution. No Git installation, account or API key is required.',
@@ -2900,6 +3014,7 @@ const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
     'pt-BR': 'O Legalize permite consultar legislação de 32 repositórios nacionais e da União Europeia revisados em qualquer chat. Informe o país, a lei ou seu identificador e, se necessário, o artigo. O Nodus obtém o texto real com a fonte oficial, revisão e atribuições. Você não precisa de Git, conta nem chave de API.',
   },
   {
+    category: 'fix',
     scope: 'general',
     es: 'También pulimos tres detalles visibles. Las importaciones temporales dejan de fallar en Windows al guardar los archivos con seguridad. El control Contexto del grafo permanece en su sitio al activarlo. Y el tutorial de PDF Presenter recupera un icono y un degradado propios de una presentación.',
     en: 'We also polished three visible details. Temporary imports no longer fail on Windows when files are saved safely. The graph’s Context control stays in place when enabled. And the PDF Presenter tutorial now uses an icon and gradient that clearly identify it as a presentation.',
@@ -2912,6 +3027,7 @@ const RELEASE_5_3_0_HIGHLIGHTS: RawReleaseHighlight[] = [
 
 const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
   {
+    category: 'new',
     scope: "ai",
     "es": "Chemistry Studio llega al chat. Crea estructuras moleculares a partir de SMILES, diagramas de Lewis y dibujos ChemFig, con controles para ampliar y descargar el resultado. La interfaz está traducida y las instrucciones personalizadas de tus habilidades se conservan.",
     "en": "Chemistry Studio comes to chat. Create molecular structures from SMILES, Lewis diagrams and ChemFig drawings, with controls to enlarge and download the result. The interface is translated and your customized skill instructions are preserved.",
@@ -2921,6 +3037,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "O Chemistry Studio chega ao chat. Crie estruturas moleculares a partir de SMILES, diagramas de Lewis e desenhos ChemFig, com controles para ampliar e baixar o resultado. A interface está traduzida e as instruções personalizadas das suas habilidades são preservadas.",
   },
   {
+    category: 'enhancement',
     scope: "ai",
     "es": "Dibujos químicos con comprobaciones explícitas. Nodus valida la identidad molecular y admite proyecciones Fischer, Haworth y Newman y reglas acotadas de SN2, E2, aldol, Diels–Alder y resonancia de amidas. Puedes descargar las evidencias y el ChemFig comprobado. Si no puede verificar una propuesta, lo indica en lugar de inventar un dibujo.",
     "en": "Chemical drawings gain explicit checks. Nodus validates molecular identity and supports Fischer, Haworth and Newman projections and bounded rules for SN2, E2, aldol, Diels–Alder and amide resonance. Download the evidence and checked ChemFig. When a proposal cannot be verified, Nodus says so instead of inventing a drawing.",
@@ -2930,6 +3047,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Os desenhos químicos passam a ter verificações explícitas. O Nodus valida a identidade molecular e aceita projeções Fischer, Haworth e Newman e regras limitadas de SN2, E2, aldol, Diels–Alder e ressonância de amidas. Baixe as evidências e o ChemFig verificado. Quando não consegue verificar uma proposta, informa isso em vez de inventar um desenho.",
   },
   {
+    category: 'enhancement',
     scope: "ai",
     "es": "Esquemas de reacción completos y equilibrados. Se conservan las especies declaradas, los contraiones y los coeficientes, y los agentes se muestran aparte. Se comprueban elementos, isótopos, hidrógenos y carga, y se compila la exportación ChemFig completa. Un esquema equilibrado no implica un mecanismo verificado ni predice que la reacción sea viable. También mejora la estabilidad al renderizar varios dibujos.",
     "en": "Complete, balanced reaction schemes preserve declared species, counterions and coefficients, with agents shown separately. Nodus checks elements, isotopes, hydrogens and charge and compiles the complete ChemFig export. A balanced scheme does not mean a verified mechanism or predict reaction feasibility. Rendering several drawings is also more stable.",
@@ -2939,6 +3057,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Os esquemas de reação completos e balanceados preservam as espécies declaradas, contraíons e coeficientes, com os agentes apresentados separadamente. O Nodus verifica elementos, isótopos, hidrogênios e carga e compila a exportação ChemFig completa. Um esquema balanceado não significa um mecanismo verificado nem prevê a viabilidade da reação. A renderização de vários desenhos também está mais estável.",
   },
   {
+    category: 'fix',
     scope: "ai",
     "es": "Menos errores al pedir respuestas a la IA. Las solicitudes se adaptan a los parámetros admitidos por cada modelo, incluidos Claude 4.7 y posteriores, GPT-5, GPT-6 y la serie o. La corrección se aplica tanto a respuestas completas como a las que aparecen mientras se generan, conservando la compatibilidad con modelos anteriores.",
     "en": "Fewer errors when requesting AI answers. Requests adapt to the parameters each model accepts, including Claude 4.7 and later, GPT-5, GPT-6 and o-series models. The fix covers both complete and streaming responses while preserving compatibility with older models.",
@@ -2948,6 +3067,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Menos erros ao pedir respostas à IA. As solicitações se adaptam aos parâmetros aceitos por cada modelo, incluindo Claude 4.7 e posteriores, GPT-5, GPT-6 e a série o. A correção abrange respostas completas e progressivas, preservando a compatibilidade com modelos anteriores.",
   },
   {
+    category: 'new',
     scope: "academic",
     "es": "El grafo se abre en un mapa de temas permanente. Entra en un tema y ajusta la profundidad y las relaciones visibles por idea, o abre exploraciones independientes en otras pestañas. Puedes añadir y quitar ideas del mapa y conservar cada exploración al cambiar de vista. Mejoran el zoom, las etiquetas, la selección y los controles, con los colores de tu bóveda en modo claro y oscuro.",
     "en": "The graph opens on a permanent themes hub. Enter a theme and adjust depth and visible relationships per idea, or open independent explorations in other tabs. Add and remove ideas in the hub and preserve each exploration when navigating. Zoom, captions, selection and controls are clearer, with your vault colors in light and dark mode.",
@@ -2957,6 +3077,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "O grafo abre em um mapa de temas permanente. Entre em um tema e ajuste a profundidade e as relações visíveis por ideia, ou abra explorações independentes em outras abas. Adicione e remova ideias do mapa e preserve cada exploração ao navegar. O zoom, as legendas, a seleção e os controles ficam mais claros, com as cores do cofre nos modos claro e escuro.",
   },
   {
+    category: 'new',
     scope: "academic",
     "es": "Ve tu grafo dentro del corpus. Activa un fondo de contexto con intensidad ajustable en el mapa de temas y las exploraciones. Las conexiones externas destacan y puedes pulsar una idea del fondo para incorporarla al trabajo. El contexto no altera el recorrido ni sus recuentos. El total del corpus cuenta ideas únicas, también cuando varios temas las comparten, y la mejora llega a los grafos publicados en Nodus Server.",
     "en": "See your graph within the corpus. Enable a context background with adjustable intensity in the themes hub and explorations. External connections stand out, and clicking a background idea adds it to your work. Context does not alter playback or working counts. Corpus totals count unique ideas even across overlapping themes, and published Nodus Server graphs gain the same improvements.",
@@ -2966,6 +3087,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Veja o grafo no contexto do corpus. Ative um fundo com intensidade ajustável no mapa de temas e nas explorações. As conexões externas se destacam e você pode clicar em uma ideia do fundo para incorporá-la ao trabalho. O contexto não altera o percurso nem as contagens de trabalho. O total conta ideias únicas mesmo entre temas sobrepostos. Os grafos publicados no Nodus Server recebem as mesmas melhorias.",
   },
   {
+    category: 'enhancement',
     scope: "library",
     "es": "Búsquedas más ágiles en bibliotecas grandes. La consulta de los perfiles de documentos encuentra cada obra mediante su identificador, evitando recorrer repetidamente todos los perfiles. Se mantienen los resultados y mejora el rendimiento a medida que crece la biblioteca.",
     "en": "Faster searches in large libraries. Document profile queries find each work by its identifier, avoiding repeated scans of all profiles. Results stay the same while performance improves as the library grows.",
@@ -2975,6 +3097,7 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
     "pt-BR": "Buscas mais rápidas em bibliotecas grandes. A consulta dos perfis de documentos encontra cada obra pelo identificador, evitando percorrer todos os perfis repetidamente. Os resultados são mantidos e o desempenho melhora conforme a biblioteca cresce.",
   },
   {
+    category: 'new',
     scope: "general",
     "es": "Un nuevo tutorial de PDF Presenter te ayuda a descubrir la herramienta. Está disponible en Funciones, en la web y en la wiki, con título y descripción en doce idiomas. Tras las novedades aparece un aviso con el vídeo, sin reproducción automática. Al cerrarlo queda marcado como visto y no vuelve a aparecer en los siguientes inicios.",
     "en": "A new PDF Presenter tutorial helps you discover the tool. Find it in Features, on the website and in the wiki, with title and description in twelve languages. An announcement shows the video after the release notes without autoplay. Dismissing it marks it as seen so it does not return on later launches.",
@@ -2986,6 +3109,11 @@ const RELEASE_5_2_2_HIGHLIGHTS: RawReleaseHighlight[] = [
 ];
 
 const RAW_RELEASE_NOTES: RawReleaseNote[] = [
+  {
+    version: '5.7.3',
+    date: '2026-09-30',
+    highlights: RELEASE_5_7_3_HIGHLIGHTS,
+  },
   // 5.7.2 turns Research Chat into an agent that plans the turn and looks up the
   // catalogue, stops a question from freezing the window, speeds up document
   // preparation, keeps library records and citations on the right passage, scopes

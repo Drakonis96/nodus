@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { releaseNotesForMajor, releaseNotesSince, type ReleaseNote, type ReleaseNoteScope } from '@shared/releaseNotes';
+import { releaseNoteSections, RELEASE_SECTION_LABELS, RELEASE_EMPTY_SECTION } from '@shared/releaseNotesPresentation';
 import { NODUS_SOCIAL_LINKS } from '@shared/socialLinks';
 import type { AppLanguage, AppSettings, VaultType } from '@shared/types';
 import { VAULT_TYPE_COLORS } from '@shared/vaultTypes';
@@ -47,6 +48,7 @@ const RELEASE_SCOPE_META: Record<ReleaseNoteScope, { icon: string | null; color:
   // prosopography vault, and the two scopes appear side by side from v3.0.0 on.
   mcp: { icon: 'plug', color: '#1e3a8a', label: 'Servidor MCP' },
   nodi: { icon: 'nodi', color: '#d4af37', label: 'Mascota Nodi' },
+  drift: { icon: 'drift', color: '#0d9488', label: 'Nodus Drift' },
   toolkit: { icon: 'tools', color: '#059669', label: 'Herramientas' },
   plugin: { icon: 'puzzle', color: '#0ea5e9', label: 'Plugins' },
   marketplace: { icon: null, color: '#6366f1', label: 'Marketplace de Skills' },
@@ -99,29 +101,6 @@ function ZoteroReleaseIcon({ size = 13 }: { size?: number }) {
 /** Marketplace news keeps the same basket-and-N mark used by its catalogue. */
 function MarketplaceReleaseIcon({ size = 15 }: { size?: number }) {
   return <img aria-hidden="true" src={marketplaceIcon} width={size} height={size} />;
-}
-
-// Present every release uniformly: cluster its highlights by scope and order the
-// clusters by how many changes each carries (most first), keeping a stable
-// first-appearance order for ties and preserving each cluster's internal order.
-// Applied at render time so the whole history — not just the newest release —
-// reads the same way, regardless of how the raw notes happen to be authored.
-function groupHighlightsByScope<T extends { scope: ReleaseNoteScope }>(highlights: readonly T[]): T[] {
-  const order: ReleaseNoteScope[] = [];
-  const groups = new Map<ReleaseNoteScope, T[]>();
-  for (const h of highlights) {
-    let bucket = groups.get(h.scope);
-    if (!bucket) {
-      bucket = [];
-      groups.set(h.scope, bucket);
-      order.push(h.scope);
-    }
-    bucket.push(h);
-  }
-  return order
-    .map((scope, index) => ({ items: groups.get(scope)!, index }))
-    .sort((a, b) => b.items.length - a.items.length || a.index - b.index)
-    .flatMap((group) => group.items);
 }
 
 function readLastSeen(): string | null {
@@ -330,7 +309,7 @@ export function WhatsNewModal({
     onSettled?.();
   };
 
-  // Every highlight carries all three languages, so the UI language indexes directly.
+  // Every highlight carries every interface language.
   const lang = uiLanguage;
   const confetti = Array.from({ length: 14 }, (_, index) => ({
     left: `${8 + ((index * 17) % 86)}%`,
@@ -376,36 +355,42 @@ export function WhatsNewModal({
           </div>
           <section key={selectedNote.version} className="whats-new-release-card" data-testid="whats-new-selected-release">
             <div className="whats-new-release-version">v{selectedNote.version}</div>
-            <ul>
-              {groupHighlightsByScope(selectedNote.highlights).map((h, i) => {
-                const scope = h.scope;
-                const scopeMeta = RELEASE_SCOPE_META[scope];
-                const scopeLabel = t(scopeMeta.label);
-                const tooltipId = `whats-new-scope-label-${selectedNote.version.replaceAll('.', '-')}-${i}`;
-                return (
-                  <li key={i}>
-                    <span
-                      className={`whats-new-scope whats-new-scope-${scope}`}
-                      data-testid={`whats-new-scope-${scope}`}
-                      style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
-                      tabIndex={0}
-                      aria-label={scopeLabel}
-                      aria-describedby={tooltipId}
-                    >
-                      {scope === 'apple'
-                        ? <AppleReleaseIcon size={13} />
-                        : scope === 'marketplace'
-                          ? <MarketplaceReleaseIcon size={15} />
-                        : scope === 'zotero'
-                          ? <ZoteroReleaseIcon size={13} />
-                          : <Icon name={scopeMeta.icon!} size={13} />}
-                      <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
-                    </span>
-                    <span>{h[lang] ?? h.en}</span>
-                  </li>
-                );
-              })}
-            </ul>
+            {releaseNoteSections(selectedNote).map(({ category, highlights }) => (
+              <section key={category ?? 'legacy'} className="whats-new-release-section" data-category={category ?? undefined}>
+                {category && <h3 className="whats-new-category-title">{RELEASE_SECTION_LABELS[lang][category]}</h3>}
+                {highlights.length === 0 && <p className="whats-new-category-empty">{RELEASE_EMPTY_SECTION[lang]}</p>}
+                <ul>
+                  {highlights.map((h, i) => {
+                    const scope = h.scope;
+                    const scopeMeta = RELEASE_SCOPE_META[scope];
+                    const scopeLabel = t(scopeMeta.label);
+                    const tooltipId = `whats-new-scope-label-${selectedNote.version.replaceAll('.', '-')}-${category ?? 'legacy'}-${i}`;
+                    return (
+                      <li key={i}>
+                        <span
+                          className={`whats-new-scope whats-new-scope-${scope}`}
+                          data-testid={`whats-new-scope-${scope}`}
+                          style={{ '--wn-scope-color': scopeMeta.color } as CSSProperties}
+                          tabIndex={0}
+                          aria-label={scopeLabel}
+                          aria-describedby={tooltipId}
+                        >
+                          {scope === 'apple'
+                            ? <AppleReleaseIcon size={13} />
+                            : scope === 'marketplace'
+                              ? <MarketplaceReleaseIcon size={15} />
+                            : scope === 'zotero'
+                              ? <ZoteroReleaseIcon size={13} />
+                              : <Icon name={scopeMeta.icon!} size={13} />}
+                          <span id={tooltipId} role="tooltip" className="whats-new-scope-tooltip">{scopeLabel}</span>
+                        </span>
+                        <span>{h[lang] ?? h.en}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
           </section>
 
           <aside

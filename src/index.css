@@ -5973,3 +5973,8 @@ html.theme-active.light .library-theme .text-indigo-100 { color: var(--a-700); }
 .light .md .guide-callout-selfcheck { --callout-accent: #0e7490; }
 .light .md .guide-callout-web { --callout-accent: #475569; }
 .light .md :is(.guide-callout-ai-example, .guide-callout-ai-analogy, .guide-callout-ai-mistake) { --callout-accent: #b45309; }
+
+/* Release sections are shared by every v5 release and future versions. */
+.whats-new-category-title { margin: 14px 0 0; padding: 10px 0 6px; font-size: 14px; font-weight: 700; color: var(--wn-text); }
+.whats-new-release-section + .whats-new-release-section { border-top: 1px solid var(--wn-border); margin-top: 6px; }
+.whats-new-category-empty { padding: 8px 0 12px; font-size: 12px; color: var(--wn-text); opacity: .7; }

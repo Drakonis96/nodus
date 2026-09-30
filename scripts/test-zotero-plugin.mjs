@@ -1627,7 +1627,7 @@ test('#9: build-zotero-xpi produces a valid xpi + updates.json', () => {
   ]) {
     assert.ok(names.includes(need), `xpi contains ${need}`);
   }
-  assert.equal(manifest.version, '5.7.2', 'the add-on shares the Nodus 5 release version');
+  assert.equal(manifest.version, '5.7.3', 'the add-on shares the Nodus 5 release version');
   assert.equal(manifest.license, 'AGPL-3.0-only');
   assert.match(zip.readAsText('SOURCE_CODE.md'), /releases\/tag\/v5\.7\.2/);
   assert.equal(manifest.icons['64'], 'icons/nodus.svg');

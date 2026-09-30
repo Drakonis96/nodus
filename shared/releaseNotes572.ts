@@ -7,6 +7,7 @@ import type { ReleaseHighlight } from './releaseNotes';
 // Describe shipped behavior directly in every interface language.
 export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
   {
+    category: 'new',
     "scope": "academic",
     "es": "El Chat de investigación ahora planifica cada turno. Reescribe tu pregunta como un objetivo que se entiende por sí solo, mantiene el tema de la conversación, busca en el catálogo de la biblioteca los autores y títulos que mencionas, con los acentos unificados y un error de escritura tolerado, y lee varias fuentes antes de responder. Si la respuesta se apoya en menos de tres fuentes independientes y todavía quedan candidatas por leer, la rechaza y te dice cuáles son.",
     "en": "Research Chat now plans each turn. It rewrites your question as a goal that stands on its own, keeps the topic of the conversation, looks up the authors and titles you mention in the library catalogue with accents folded and one typo tolerated, and reads several sources before answering. If an answer rests on fewer than three independent sources while candidates remain unread, it rejects the answer and names those candidates.",
@@ -22,6 +23,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅이 이제 각 턴을 계획합니다. 질문을 그 자체로 이해되는 목표로 다시 쓰고, 대화의 주제를 유지하며, 언급한 저자와 제목을 보관함 카탈로그에서 찾습니다. 악센트는 통일하고 오타 하나는 허용합니다. 답하기 전에 여러 출처를 읽습니다. 독립 출처가 세 개 미만이고 읽지 않은 후보가 남아 있으면 그 답변을 거부하고 후보를 알려 줍니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "Las preguntas de seguimiento conservan el hilo. Las citas anteriores vuelven a la conversación, la respuesta enumera solo las fuentes que han participado, con autor y año, y explica con palabras llanas qué buscó, qué consultó y qué leyó. Ya no dice que una obra indexada no tiene índice ni afirma que Zotero no está disponible.",
     "en": "Follow-up questions keep the thread. Earlier citations come back to the conversation, the answer lists only the sources that took part with their author and year, and it explains in plain words what it searched, looked up and read. It no longer says an indexed work has no index, and it no longer states that Zotero is unavailable.",
@@ -37,6 +39,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "이어지는 질문은 맥락을 유지합니다. 이전 인용이 대화로 돌아오고, 답변은 참여한 출처만 저자와 연도와 함께 나열하며, 무엇을 검색하고 확인하고 읽었는지 쉬운 말로 설명합니다. 색인이 있는 문헌을 색인 없다고 말하지 않고, Zotero를 쓸 수 없다고도 말하지 않습니다."
   },
   {
+    category: 'fix',
     "scope": "academic",
     "es": "El Chat de investigación responde sin congelar la ventana. En una biblioteca de 1.229 fuentes, el bloqueo más largo de la interfaz bajó de unos cinco segundos a menos de uno. Una pregunta tampoco falla ya cuando una de las ideas guardadas no tiene enunciado.",
     "en": "Research Chat answers without freezing the window. On a library of 1,229 sources the longest block of the interface fell from about five seconds to under one. A question also no longer fails when one of the stored ideas has no statement.",
@@ -52,6 +55,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "연구 채팅은 창을 멈추지 않고 답합니다. 1,229개 출처가 있는 보관함에서 인터페이스가 가장 오래 멈춘 시간이 약 5초에서 1초 미만으로 줄었습니다. 또한 저장된 아이디어에 진술이 없어도 질문이 실패하지 않습니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "La preparación de documentos es más rápida y ocupa menos. Se preparan dos documentos a la vez, cada documento mantiene hasta cuatro lotes de vectores en curso, los vectores remotos se piden en paralelo, la fuente se comprueba como mucho cada cinco segundos en lugar de en cada página y los vectores se guardan una sola vez en un formato compacto. El almacén se compacta en segundo plano y la búsqueda semántica es más rápida.",
     "en": "Preparing documents is faster and takes less space. Two documents are prepared at the same time, each document keeps up to four batches of vectors in flight, remote embeddings are requested in parallel, the source is checked at most every five seconds instead of on every page, and vectors are stored once in a compact format. The store is compacted in the background and semantic search is faster.",
@@ -67,6 +71,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "문서 준비가 더 빠르고 공간도 덜 씁니다. 문서 두 개를 동시에 준비하고, 문서마다 최대 네 개의 벡터 묶음을 동시에 처리하며, 원격 벡터는 병렬로 요청합니다. 출처 확인은 페이지마다가 아니라 최대 5초에 한 번 하고, 벡터는 한 번만 압축된 형식으로 저장합니다. 저장소는 백그라운드에서 정리되고 의미 검색도 더 빠릅니다."
   },
   {
+    category: 'fix',
     "scope": "academic",
     "es": "Solo los escaneos reales esperan al OCR. Un libro digital ya no se manda a OCR porque tenga una sola página de imagen, y la vista previa de la preparación y la preparación usan ahora la misma regla.",
     "en": "Only real scans wait for OCR. A digital book is no longer sent to OCR because it has a single image-only page, and the preparation preview and the preparation itself now use the same rule.",
@@ -82,6 +87,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "실제 스캔만 OCR를 기다립니다. 디지털 도서는 이미지 페이지만 한 장 있다는 이유로 OCR로 보내지지 않으며, 준비 미리보기와 준비 자체가 이제 같은 규칙을 씁니다."
   },
   {
+    category: 'enhancement',
     "scope": "academic",
     "es": "La salud del grafo, en Ajustes, Datos, detecta también las relaciones de una idea consigo misma y las repara.",
     "en": "Graph health in Settings, Data now also detects relations from an idea to itself and repairs them.",
@@ -97,6 +103,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "설정의 데이터에 있는 그래프 상태가 이제 아이디어가 자기 자신을 가리키는 관계도 찾아 복구합니다."
   },
   {
+    category: 'fix',
     "scope": "library",
     "es": "Una cita se apoya ahora en el pasaje que contiene el texto citado, dentro de su propia fuente y lo más cerca posible de su página. Los apoyos publicados antes se recolocan una vez por bóveda.",
     "en": "A citation now rests on the passage that holds the quoted text, inside its own source and as close as possible to its page. Supports published earlier are re-pointed once per vault.",
@@ -112,6 +119,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "인용은 이제 인용된 문장을 담은 구절에 근거합니다. 인용 자신의 출처이면서 해당 페이지에 가장 가까운 구절입니다. 이전에 게시된 근거는 Vault마다 한 번 다시 배치됩니다."
   },
   {
+    category: 'fix',
     "scope": "library",
     "es": "El rango de páginas de una sección se queda dentro de su propia fuente. Ya no termina en la página del siguiente archivo adjunto.",
     "en": "A section's page range stays inside its own source. It no longer ends on the page of the next attachment.",
@@ -127,6 +135,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "섹션의 페이지 범위는 자기 출처 안에서 끝납니다. 더 이상 다음 첨부 파일의 페이지에서 끝나지 않습니다."
   },
   {
+    category: 'fix',
     "scope": "library",
     "es": "Los registros de la biblioteca quedan más limpios. Una idea ya no puede relacionarse consigo misma, dos ideas del mismo escaneo con el mismo enunciado se unen en una sola, y los puntos de control de un trabajo fallido se descartan cuando otro posterior tiene éxito.",
     "en": "Library records are cleaner. An idea can no longer be related to itself, two ideas from the same scan with the same statement are joined into one, and the checkpoints of a failed job are dropped when a later one succeeds.",
@@ -142,6 +151,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "보관함 기록이 더 깨끗해졌습니다. 아이디어는 더 이상 자기 자신과 연결될 수 없고, 같은 스캔에서 진술이 같은 두 아이디어는 하나로 합쳐지며, 실패한 작업의 체크포인트는 이후 작업이 성공하면 버려집니다."
   },
   {
+    category: 'fix',
     "scope": "library",
     "es": "El texto extraído llega completo. Los caracteres que hacían que la consulta dejara de leer ahí se sustituyen, así que un pasaje ya no informa de una longitud más corta ni de un fragmento recortado. Además, una obra cuya ficha documental ha fallado ya no aparece en rojo como si no tuviera ficha, sino que se indica que ha fallado y se ofrece el reintento.",
     "en": "Extracted text arrives complete. The characters that made a query stop reading at that point are replaced, so a passage no longer reports a shorter length or a cut-off snippet. A work whose document profile failed no longer appears in red as if it had no profile at all, and the row now says the profile failed and offers the retry.",
@@ -157,6 +167,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "추출한 텍스트가 온전히 전달됩니다. 조회가 그 지점에서 읽기를 멈추게 하던 문자를 바꾸므로, 구절이 더 짧은 길이나 잘린 일부를 보고하지 않습니다. 또한 문서 프로필이 실패한 문헌은 프로필이 없는 것처럼 빨갛게 표시되지 않고, 실패했음을 알리고 다시 시도를 제공합니다."
   },
   {
+    category: 'fix',
     "scope": "ai",
     "es": "Después de un reprocesado, solo se vuelven a convertir en vectores las ideas cuyo texto de temas ha cambiado, y una sola vez cada una, en lugar de toda la biblioteca. Esto vale para el pase automático y para las dos acciones manuales de reprocesado.",
     "en": "After a reprocess pass, only the ideas whose theme text changed are converted into vectors again, once each, instead of the whole library. This applies to the automatic pass and to both manual reprocess actions.",
@@ -172,6 +183,7 @@ export const RELEASE_5_7_2_HIGHLIGHTS: ReleaseHighlight[] = [
     "ko": "다시 처리한 뒤에는 보관함 전체가 아니라 주제 문장이 바뀐 아이디어만 벡터로 다시 변환하며, 각각 한 번만 변환합니다. 자동 처리와 두 가지 수동 재처리 동작에 적용됩니다."
   },
   {
+    category: 'fix',
     "scope": "general",
     "es": "Los paquetes de Linux vuelven a arrancar en Ubuntu 22.04, Debian 12 y otros sistemas con glibc anterior a 2.38. La versión 5.7.1 se detenía antes de su primera ventana con el aviso GLIBC_2.38 not found. Los paquetes de Linux se compilan ahora en Ubuntu 22.04 y la publicación falla si alguna biblioteca incluida necesita una glibc más reciente.",
     "en": "The Linux packages start again on Ubuntu 22.04, Debian 12 and other systems with glibc older than 2.38. Version 5.7.1 stopped before its first window with the message GLIBC_2.38 not found. Linux packages are now built on Ubuntu 22.04, and the release fails if any bundled library needs a newer glibc.",

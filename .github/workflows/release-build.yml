@@ -37,6 +37,22 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_TAG: ${{ inputs.tag }}
     steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Node for release notes
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Generate required English modal notes
+        run: |
+          npm ci --ignore-scripts
+          node scripts/generate-release-notes.mjs "$RELEASE_TAG" "$RUNNER_TEMP/nodus-release-notes.md"
+
       - name: Create or reuse the single draft release
         run: |
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
@@ -45,12 +61,14 @@ jobs:
               echo "::error::Release $RELEASE_TAG already exists and is not a draft"
               exit 1
             fi
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$RUNNER_TEMP/nodus-release-notes.md"
           else
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --draft \
-              --title "${RELEASE_TAG#v}"
+              --title "${RELEASE_TAG#v}" \
+              --notes-file "$RUNNER_TEMP/nodus-release-notes.md"
           fi
 
   release:
@@ -495,10 +513,26 @@ jobs:
           fi
           unzip -t "$verify_dir/nodus-zotero.xpi" >/dev/null
 
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Set up Node for release notes
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Generate required English modal notes
+        run: |
+          npm ci --ignore-scripts
+          node scripts/generate-release-notes.mjs "$RELEASE_TAG" "$RUNNER_TEMP/nodus-release-notes.md"
+
       - name: Publish stable release
         if: inputs.channel == 'latest'
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest --notes-file "$RUNNER_TEMP/nodus-release-notes.md"
 
       - name: Publish beta prerelease
         if: inputs.channel == 'beta'
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false --notes-file "$RUNNER_TEMP/nodus-release-notes.md"
