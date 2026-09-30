@@ -15,6 +15,8 @@ export type PassageKind = 'prose' | 'scheme' | 'references' | 'index';
 const SCHEME_TOKEN = new RegExp([
   String.raw`^[-–+]?(?:\(?(?:[A-Z][a-z]?\d*)+\)?\d*)+[-–+]?[,;]?$`,
   String.raw`^[-–]?\d+(?:[.,]\d+)?%?[,;]?$`,
+  // The tail of a formula a subscript split off: "H 2NCH3" is H₂NCH₃.
+  String.raw`^\d+(?:[A-Z][a-z]?\d*)+[,;]?$`,
   String.raw`^(?:equiv|eq|mol%|e\.e\.|ee|d\.r\.|dr|h|min|°C|rt|g|mg|mL|mmol|M|cat\.|[a-z]|[ivx]+|\d+[a-z]|[a-z]\d*)[,;.]?$`,
   String.raw`^[→⇌+=/\-–−:;,.()\[\]{}|]+$`,
 ].join('|'));
@@ -71,7 +73,24 @@ export function stripSchemeRuns(text: string): string {
     else { flush(); out.push(part); }
   }
   flush();
-  return out.join('').replace(/\s*\[scheme\]\s*(?:\[scheme\]\s*)*/g, ' [scheme] ').replace(/\s{2,}/g, ' ').trim();
+  // A few scheme tokens right beside a cut scheme belong to it ("+ H 2NCH3 [scheme]"): too short
+  // to be a run of their own, but a label of the same drawing, not prose.
+  const parts = out.join('').split(/(\s+)/);
+  const marker = (index: number) => parts[index]?.trim() === '[scheme]';
+  for (let index = 0; index < parts.length; index += 1) {
+    if (!marker(index)) continue;
+    for (const step of [-1, 1]) {
+      let at = index + step, taken = 0;
+      while (at >= 0 && at < parts.length && taken < 5) {
+        if (!parts[at].trim()) { at += step; continue; }
+        if (!SCHEME_TOKEN.test(parts[at]) || parts[at] === '[scheme]') break;
+        parts[at] = '';
+        taken += 1;
+        at += step;
+      }
+    }
+  }
+  return parts.join('').replace(/\s*\[scheme\]\s*(?:\[scheme\]\s*)*/g, ' [scheme] ').replace(/\s{2,}/g, ' ').trim();
 }
 
 /** Passage kinds worth sending to a model as evidence. */

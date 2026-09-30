@@ -37,3 +37,12 @@ test('a formula inside a sentence is not a scheme', () => {
   assert.equal(stripSchemeRuns(PROSE), PROSE, '"using PBr 3" stays');
   assert.equal(evidenceText(PROSE), PROSE);
 });
+
+test('a short formula fragment beside a cut scheme goes with it (Carey & Sundberg B, p. 171, Robinson tropinone)', () => {
+  const robinson = 'The earliest example of the use of the Mannich reaction in this way was Sir Robert Robinson’s successful synthesis of tropinone, a derivative of the alkaloid tropine, in 1917. + H 2NCH3 + OCH3N CO 2 – CO2 – OCH3N CH2CH O CH2CH O OC CH2 CH2 CO2 – CO2 – Ref. 191 As with aldol and Mukaiyama addition reactions, the Mannich reaction is subject to enantioselective catalysis in several related systems.';
+  const cleaned = evidenceText(robinson);
+  assert.match(cleaned, /tropine, in 1917\. \[scheme\] Ref\. 191 As with aldol/);
+  assert.doesNotMatch(cleaned, /2NCH3|OCH3N|CO 2/);
+  const prose = 'using PBr 3 and Ph 3 P–Cl 2 in the reaction of H 2O with the alcohol gives the bromide cleanly.';
+  assert.equal(stripSchemeRuns(prose), prose, 'formulas inside a sentence stay');
+});
