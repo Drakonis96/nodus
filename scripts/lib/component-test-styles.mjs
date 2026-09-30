@@ -7,7 +7,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,14 +20,28 @@ for (const input of CONTENT) digest.update(readFileSync(path.join(repoRoot, inpu
 digest.update(readFileSync(path.join(repoRoot, 'node_modules/tailwindcss/package.json')));
 const published = path.join(os.tmpdir(), `nodus-component-styles-${digest.digest('hex').slice(0, 16)}.css`);
 
+const buildStyles = output => execFileSync(path.join(repoRoot, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', output, '--minify'],
+  { cwd: repoRoot, stdio: 'pipe' });
+
+/** CI verifies the artifact's commit and hash before starting these consumers.
+ * A missing/empty configured artifact must fail, never silently use a temp cache.
+ */
+export function preparedComponentStyles(file) {
+  const stat = statSync(file);
+  if (!stat.isFile() || stat.size === 0) throw new Error(`Prepared component stylesheet is empty or invalid: ${file}`);
+  return file;
+}
+
 /** Path to the shared stylesheet, built on first use and reused afterwards. */
 export function componentStyles() {
+  if (process.env.NODUS_CI_COMPONENT_STYLES) {
+    return preparedComponentStyles(path.resolve(repoRoot, process.env.NODUS_CI_COMPONENT_STYLES));
+  }
   if (existsSync(published) && statSync(published).size > 0) return published;
   // A private staging file keeps a parallel reader from ever seeing a half-written
   // stylesheet: the published name only appears once the build is complete.
   const staged = `${published}.${process.pid}.staging`;
-  execFileSync(path.join(repoRoot, 'node_modules/.bin/tailwindcss'), ['-i', 'src/index.css', '-o', staged, '--minify'],
-    { cwd: repoRoot, stdio: 'pipe' });
+  buildStyles(staged);
   try {
     renameSync(staged, published);
   } catch (error) {
@@ -37,4 +51,15 @@ export function componentStyles() {
     if (existsSync(staged)) unlinkSync(staged);
   }
   return published;
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv[2] !== 'prepare-ci') throw new Error('Usage: node scripts/lib/component-test-styles.mjs prepare-ci');
+  const output = path.join(repoRoot, '.ci/component-styles.css');
+  mkdirSync(path.dirname(output), { recursive: true });
+  // Always compile this checkout, including every scanned TS/TSX content file.
+  // The local temp-cache digest deliberately does not determine CI freshness.
+  buildStyles(output);
+  preparedComponentStyles(output);
+  console.log('Prepared the current checkout component stylesheet for the verified build artifact.');
 }

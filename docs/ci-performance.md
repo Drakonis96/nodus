@@ -36,6 +36,13 @@ to check all current native dependencies; valid rebuild metadata avoids repeatin
 the same compilation. Runtime mismatches or missing/corrupt binaries fail the job.
 The native archive is never restored from a cross-run dependency cache.
 
+The builder compiles the component fixtures' stylesheet with the same Tailwind
+command, once from the current checkout. It includes the CSS in the commit-bound
+build hash manifest. Consumers use that verified file and fail if it is missing
+or empty, avoiding duplicate compilation at parallel test startup. All browser
+assertions still inspect the real generated stylesheet. Local tests retain their
+existing stylesheet preparation unless the CI artifact path is explicitly set.
+
 The attachment integration fixture intercepts structured planner inference as well
 as text/stream inference. It retains the literal planning fallback and all format,
 engine and provider assertions, while avoiding subscription CLI processes after
@@ -71,6 +78,7 @@ node --test scripts/test-ci-quality-gate.mjs
 npx electron-builder install-app-deps
 node scripts/ci-native-artifact.mjs pack
 node scripts/ci-native-artifact.mjs verify
+node scripts/lib/component-test-styles.mjs prepare-ci
 npm run build:ci
 npm run build:server-web
 node scripts/ci-test-shards.mjs plan

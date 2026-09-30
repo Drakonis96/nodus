@@ -11,9 +11,9 @@ import { commitAt } from './ci-test-shards.mjs';
 // those alongside the bundles so they see the same prepared tree as the former
 // single job, including when a generator changes before its snapshots do.
 const generated = ['cloudflare/src/generated', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts'];
-const outputs = ['dist', 'dist-electron', 'server/dist/web', 'cloudflare/dist', ...generated];
+const outputs = ['dist', 'dist-electron', 'server/dist/web', 'cloudflare/dist', ...generated, '.ci/component-styles.css'];
 const required = ['dist/index.html', 'dist-electron/main.js', 'server/dist/web/index.html', 'cloudflare/dist/worker.mjs',
-  'cloudflare/src/generated/mutableTables.mjs', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts'];
+  'cloudflare/src/generated/mutableTables.mjs', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts', '.ci/component-styles.css'];
 const hash = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const walk = (root, folder) => fs.readdirSync(path.join(root, folder), { withFileTypes: true }).flatMap(entry => {
   const name = `${folder}/${entry.name}`;

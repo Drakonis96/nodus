@@ -8,6 +8,7 @@ import test from 'node:test';
 import { createPlan, discoverTests, validatePlan, validateReports } from './ci-test-shards.mjs';
 import { createBuildManifest, verifyBuildManifest } from './ci-build-artifact.mjs';
 import { createNativeManifest, verifyNativeManifest } from './ci-native-artifact.mjs';
+import { preparedComponentStyles } from './lib/component-test-styles.mjs';
 
 const files = ['scripts/test-a.mjs', 'scripts/test-b.mjs', 'scripts/test-c.mjs', 'scripts/test-new.mjs'];
 const commit = 'a'.repeat(40);
@@ -113,7 +114,7 @@ test('build transfer rejects missing outputs, corruption and another commit', ()
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-ci-build-'));
   try {
     for (const file of ['dist/index.html', 'dist-electron/main.js', 'server/dist/web/index.html', 'cloudflare/dist/worker.mjs',
-      'cloudflare/src/generated/mutableTables.mjs', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts']) {
+      'cloudflare/src/generated/mutableTables.mjs', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts', '.ci/component-styles.css']) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), file);
     }
     const manifest = createBuildManifest(root, commit);
@@ -121,6 +122,9 @@ test('build transfer rejects missing outputs, corruption and another commit', ()
     fs.appendFileSync(path.join(root, 'electron/serverSync/generatedMutableTables.ts'), '\nchanged generator output');
     assert.throws(() => verifyBuildManifest(root, commit, manifest), /hash mismatch/);
     fs.writeFileSync(path.join(root, 'electron/serverSync/generatedMutableTables.ts'), 'electron/serverSync/generatedMutableTables.ts');
+    fs.appendFileSync(path.join(root, '.ci/component-styles.css'), '\nchanged styles');
+    assert.throws(() => verifyBuildManifest(root, commit, manifest), /hash mismatch/);
+    fs.writeFileSync(path.join(root, '.ci/component-styles.css'), '.ci/component-styles.css');
     assert.throws(() => verifyBuildManifest(root, 'b'.repeat(40), manifest), /different commit/);
     fs.appendFileSync(path.join(root, 'dist-electron/main.js'), '\ncorrupted');
     assert.throws(() => verifyBuildManifest(root, commit, manifest), /hash mismatch/);
@@ -130,6 +134,19 @@ test('build transfer rejects missing outputs, corruption and another commit', ()
     fs.writeFileSync(path.join(root, 'dist/index.html'), 'dist/index.html');
     fs.writeFileSync(path.join(root, 'dist-electron/main.js'), 'dist-electron/main.js');
     assert.throws(() => verifyBuildManifest(root, commit, unsafe), /Invalid artifact path/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('prepared component styles fail closed instead of falling back to a temp cache', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-ci-styles-'));
+  const file = path.join(root, 'styles.css');
+  try {
+    assert.throws(() => preparedComponentStyles(file), /ENOENT/);
+    fs.writeFileSync(file, '');
+    assert.throws(() => preparedComponentStyles(file), /empty or invalid/);
+    assert.throws(() => preparedComponentStyles(root), /empty or invalid/);
+    fs.writeFileSync(file, '.text-green-700{color:green}');
+    assert.equal(preparedComponentStyles(file), file);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
 

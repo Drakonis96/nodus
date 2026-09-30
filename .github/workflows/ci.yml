@@ -77,6 +77,9 @@ jobs:
       - name: Assign every test file to exactly one group
         run: node scripts/ci-test-shards.mjs plan
 
+      - name: Compile component test styles once from current sources
+        run: node scripts/lib/component-test-styles.mjs prepare-ci
+
       - name: Package this commit's build with a SHA-256 manifest
         run: node scripts/ci-build-artifact.mjs pack
 
@@ -97,6 +100,8 @@ jobs:
 
   unit:
     needs: build
+    env:
+      NODUS_CI_COMPONENT_STYLES: .ci/component-styles.css
     strategy:
       # A failing group must not cancel the others or hide their results.
       fail-fast: false
