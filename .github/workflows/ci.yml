@@ -169,23 +169,23 @@ jobs:
         if: matrix.shard == 3
         run: node scripts/prepare-electron-tests.mjs
       - name: E2E smoke (real app boot)
-        if: matrix.shard == 3
         timeout-minutes: 10
+        if: matrix.shard == 3
         run: npm run test:e2e
 
       - name: Stellar canvas E2E (isolated demonstration profile)
-        if: matrix.shard == 3
         timeout-minutes: 5
+        if: matrix.shard == 3
         run: npm run test:e2e:stellar
 
       - name: Graph tabs E2E (isolated demonstration profile)
-        if: matrix.shard == 3
         timeout-minutes: 5
+        if: matrix.shard == 3
         run: npm run test:e2e:stellar-tabs
 
       - name: Argument map E2E (isolated demonstration profile)
-        if: matrix.shard == 3
         timeout-minutes: 5
+        if: matrix.shard == 3
         run: npm run test:e2e:argument-map
 
       - name: Preserve execution inventory and timing, including failures
