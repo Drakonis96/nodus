@@ -60,7 +60,7 @@ export async function gatherRouteEvidence(draft: string, options: { model?: Mode
         const name = classNames.find((entry) => textbookQueryForClass(entry) === passage.retrievedFor);
         if (!name) continue;
         const excerpt = relevantExcerpt(name, passage.text, EXCERPT_CHARS);
-        for (const step of byClass.get(name) ?? []) evidence[step].textbook = { title: passage.work.title, location: passage.location, about: name, excerpt };
+        for (const step of byClass.get(name) ?? []) evidence[step].textbook = { title: passage.work.title, location: passage.location ?? '', about: name, excerpt };
       }
     })().catch((error) => console.warn('[route-evidence] textbook lookup failed:', error instanceof Error ? error.message : String(error)));
     // The web is asked about the steps with the least support first.

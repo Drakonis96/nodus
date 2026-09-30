@@ -44,7 +44,7 @@ export function formatEvidenceBrief(evidence: StepEvidence[]): string {
         : `not recorded${item.ord.closest ? `; closest recorded reaction ${Math.round(item.ord.closest * 100)}% similar` : ''}`;
       lines.push(`- Open Reaction Database: ${recorded}${classes}`);
     }
-    if (item.textbook) lines.push(`- Textbook (${item.textbook.title}, ${item.textbook.location}) on ${item.textbook.about}: "${item.textbook.excerpt}"`);
+    if (item.textbook) lines.push(`- Textbook (${[item.textbook.title, item.textbook.location].filter(Boolean).join(', ')}) on ${item.textbook.about}: "${item.textbook.excerpt}"`);
     for (const result of item.web ?? []) lines.push(`- Web: ${result.title} (${result.url}): ${result.snippet}`);
     return lines.join('\n');
   });
