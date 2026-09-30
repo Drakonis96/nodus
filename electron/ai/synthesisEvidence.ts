@@ -7,6 +7,7 @@ import {
   isIndexLikePassage,
   isSynthesisEvidenceWork,
   normalizeDisconnections,
+  requestMethodClasses,
   passageFitsQuery,
   secondLevelTargets,
   synthesisEvidenceQueries,
@@ -179,7 +180,9 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   const disconnections = await ordDisconnections(target, startingMaterials, options);
   let passages: EvidencePassage[] = [];
   try {
-    const queries = synthesisEvidenceQueries(findTargetName(question), disconnectionClasses(disconnections, 6));
+    // The methods the request's own starting materials imply come first: ORD need not propose them.
+    const classes = [...new Set([...requestMethodClasses(question), ...disconnectionClasses(disconnections, 6)])];
+    const queries = synthesisEvidenceQueries(findTargetName(question), classes);
     passages = await textbookPassages(queries, synthesisEvidenceWorkIds(), options.signal);
   } catch (error) {
     if (options.signal?.aborted) throw error;

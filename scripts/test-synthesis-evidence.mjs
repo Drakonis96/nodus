@@ -141,3 +141,14 @@ test('a textbook passage must actually discuss the reaction class, and is quoted
   assert.equal(passageFitsQuery('malonic ester synthesis acetoacetic ester synthesis', 'The malonic ester synthesis alkylates the enolate of diethyl malonate.'), true);
   assert.equal(passageFitsQuery('caprolactam synthesis', 'Nylon 6 is made by ring-opening polymerisation.'), false);
 });
+
+test('starting materials that imply a textbook method add its textbook search', () => {
+  const { requestMethodClasses, synthesisEvidenceQueries } = evidence;
+  const malonic = 'Propose a synthesis of 2-methylbutanoic acid (SMILES: CCC(C)C(=O)O), starting from diethyl malonate (CCOC(=O)CC(=O)OCC), iodomethane and bromoethane.';
+  assert.deepEqual(requestMethodClasses(malonic), ['enolate alkylation (malonic or acetoacetic ester synthesis)']);
+  assert.ok(synthesisEvidenceQueries('2-methylbutanoic acid', requestMethodClasses(malonic)).includes('malonic ester synthesis acetoacetic ester synthesis'));
+  // By SMILES alone, and for methyl vinyl ketone → Robinson annulation.
+  assert.deepEqual(requestMethodClasses('Make X (SMILES: CC) from COC(=O)CC(C)=O.'), ['enolate alkylation (malonic or acetoacetic ester synthesis)']);
+  assert.deepEqual(requestMethodClasses('…starting from 2-methylcyclohexane-1,3-dione and but-3-en-2-one (C=CC(C)=O)…'), ['intramolecular aldol condensation (Robinson annulation)']);
+  assert.deepEqual(requestMethodClasses('Propose a synthesis of benzocaine from 4-nitrotoluene.'), []);
+});

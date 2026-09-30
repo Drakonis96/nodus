@@ -180,6 +180,33 @@ const CLASS_QUERIES: Record<string, string | null> = {
   'rearrangement or isomerization': null,
 };
 
+/** Methods a request's own starting materials imply. The ORD disconnections of a target need
+ *  not propose the textbook route: for 2-methylbutanoic acid from diethyl malonate they
+ *  proposed alkylations and ester hydrolyses but no malonic ester synthesis (the index holds
+ *  two records making diethyl methylmalonate), so the textbook search never asked for it. */
+const STARTING_MATERIAL_METHODS: Array<{ pattern: RegExp; smiles: string[]; className: string }> = [
+  { pattern: /\b(?:diethyl|dimethyl)\s+(?:malonate|propanedioate)\b|\bmalonic ester\b/i, smiles: ['CCOC(=O)CC(=O)OCC', 'COC(=O)CC(=O)OC'], className: 'enolate alkylation (malonic or acetoacetic ester synthesis)' },
+  { pattern: /\b(?:ethyl|methyl)\s+(?:acetoacetate|3-oxobutanoate)\b|\bacetoacetic ester\b/i, smiles: ['CCOC(=O)CC(C)=O', 'COC(=O)CC(C)=O'], className: 'enolate alkylation (malonic or acetoacetic ester synthesis)' },
+  { pattern: /\bbut-3-en-2-one\b|\bmethyl vinyl ketone\b/i, smiles: ['C=CC(C)=O', 'CC(=O)C=C'], className: 'intramolecular aldol condensation (Robinson annulation)' },
+];
+
+export function requestMethodClasses(question: string): string[] {
+  // SMILES as written in the request: whitespace-separated, without a sentence's full stop or the
+  // parentheses a SMILES is often wrapped in ("(CCOC(=O)CC(=O)OCC)").
+  const balance = (text: string) => [...text].reduce((depth, character) => depth + (character === '(' ? 1 : character === ')' ? -1 : 0), 0);
+  const written = new Set(question.split(/\s+/).map((token) => {
+    let smiles = token.replace(/[.,;:]+$/, '');
+    while (smiles.startsWith('(') && balance(smiles) > 0) smiles = smiles.slice(1);
+    while (smiles.endsWith(')') && balance(smiles) < 0) smiles = smiles.slice(0, -1);
+    return smiles.replace(/[.,;:]+$/, '');
+  }).filter((token) => token.length >= 3));
+  const out: string[] = [];
+  for (const method of STARTING_MATERIAL_METHODS) {
+    if ((method.pattern.test(question) || method.smiles.some((smiles) => written.has(smiles))) && !out.includes(method.className)) out.push(method.className);
+  }
+  return out;
+}
+
 /** The textbook queries for a route request: the target by name, then each reaction class the
  *  ORD disconnections name, as its textbook name. Short queries on purpose: the lexical lane
  *  ranks by how many query roots a passage covers, and generic words dilute a named reaction. */
