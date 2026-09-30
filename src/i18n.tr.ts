@@ -65,6 +65,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
+import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
@@ -122,6 +123,7 @@ export const TR: Record<string, string> = {
   ...DEEP_RESEARCH_APPROACH_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS.tr,
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.tr,
+  ...STALE_MODEL_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,
   ...LIBRARY_ONBOARDING_TRANSLATIONS.tr,

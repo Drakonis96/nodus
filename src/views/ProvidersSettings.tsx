@@ -27,6 +27,7 @@ import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../c
 import { codexReasoningLabel } from '../components/ModelPicker';
 import { withCodexReasoning } from '@shared/codexReasoning';
 import { t, tx } from '../i18n';
+import { replaceModelPatch, staleFavorites, tasksUsingModel, type ModelCatalogues } from '@shared/staleModels';
 
 export function ProvidersSettings({
   settings,
@@ -41,6 +42,10 @@ export function ProvidersSettings({
 
   const favorites = settings.favorites ?? [];
   const isFav = (m: ModelRef) => favorites.some((f) => sameModel(f, m));
+  // Filled by "Check availability": each favourite provider's live model list (null = unreadable).
+  const [catalogues, setCatalogues] = useState<ModelCatalogues | null>(null);
+  const stale = catalogues ? staleFavorites(favorites, catalogues) : [];
+  const isStale = (m: ModelRef) => stale.some((f) => sameModel(f, m));
 
   const toggleFav = async (m: ModelRef) => {
     const currentlyFav = isFav(m);
@@ -94,13 +99,18 @@ export function ProvidersSettings({
 
       {/* Favorites feed every independent workload/feature selector. */}
       <div className="mb-4 text-sm">
-        <div className="text-neutral-400">{t('Modelos favoritos para los selectores independientes')}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-neutral-400">{t('Modelos favoritos para los selectores independientes')}</div>
+          {favorites.length > 0 && <FavoriteAvailabilityButton favorites={favorites} onChecked={setCatalogues} />}
+        </div>
         {favorites.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {favorites.map((m) => (
               <span
                 key={`${m.provider}::${m.model}`}
-                className="flex items-center gap-1 rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
+                className={`flex items-center gap-1 rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300${isStale(m) ? ' ring-1 ring-amber-500' : ''}`}
+                title={isStale(m) ? tx('{provider} ya no ofrece este modelo', { provider: PROVIDER_LABELS[m.provider] ?? m.provider }) : undefined}
+                data-stale={isStale(m) ? 'true' : undefined}
               >
                 <Icon name="star" size={12} className="shrink-0 fill-current text-amber-400" />
                 <span>{modelLabel(m)}</span>
@@ -110,6 +120,9 @@ export function ProvidersSettings({
               </span>
             ))}
           </div>
+        )}
+        {catalogues && (
+          <StaleFavoritesPanel settings={settings} stale={stale} catalogues={catalogues} favorites={favorites} onChange={onChange} />
         )}
       </div>
 
@@ -1453,4 +1466,100 @@ function ModelList({
     );
   }
   return <div>{rows}</div>;
+}
+
+/** Reads each favourite provider's live model list. A provider that cannot be read (no key,
+ *  offline, an error) is recorded as null and never marks a favourite stale. */
+function FavoriteAvailabilityButton({ favorites, onChecked }: { favorites: ModelRef[]; onChecked: (catalogues: ModelCatalogues) => void }) {
+  const [checking, setChecking] = useState(false);
+  const check = async () => {
+    setChecking(true);
+    const providers = [...new Set(favorites.map((m) => m.provider))];
+    const results = await Promise.all(providers.map(async (provider) => {
+      try {
+        return [provider, new Set((await window.nodus.listModels(provider)).map((m) => m.id))] as const;
+      } catch {
+        return [provider, null] as const;
+      }
+    }));
+    onChecked(new Map(results));
+    setChecking(false);
+  };
+  return (
+    <button className="btn btn-ghost border border-neutral-300 px-2 py-0.5 text-xs dark:border-neutral-700" onClick={() => void check()} disabled={checking} data-testid="check-favorite-availability">
+      {checking ? t('Comprobando…') : t('Comprobar disponibilidad')}
+    </button>
+  );
+}
+
+const refKey = (m: ModelRef) => `${m.provider}::${m.model}`;
+
+/** The replacement offered first: a model of the same provider whose id shares the stale id's
+ *  last word (deepseek-v4-flash → deepseek-flash), else the provider's first live model. */
+function suggestedReplacement(model: ModelRef, catalogues: ModelCatalogues, favorites: ModelRef[], stale: ModelRef[]): ModelRef | null {
+  const live = [...(catalogues.get(model.provider) ?? [])];
+  const tail = model.model.split(/[-/:]/).filter(Boolean).pop() ?? '';
+  const sameFamily = live.find((id) => id !== model.model && tail && id.split(/[-/:]/).includes(tail));
+  if (sameFamily) return { provider: model.provider, model: sameFamily };
+  const favorite = favorites.find((f) => f.provider === model.provider && !stale.some((s) => sameModel(s, f)));
+  if (favorite) return favorite;
+  return live[0] ? { provider: model.provider, model: live[0] } : null;
+}
+
+function StaleFavoritesPanel({ settings, stale, catalogues, favorites, onChange }: {
+  settings: AppSettings;
+  stale: ModelRef[];
+  catalogues: ModelCatalogues;
+  favorites: ModelRef[];
+  onChange: () => Promise<unknown>;
+}) {
+  const [choice, setChoice] = useState<Record<string, string>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+  const unreadable = [...catalogues].filter(([, listed]) => listed === null).map(([provider]) => PROVIDER_LABELS[provider as AiProvider] ?? provider);
+  const apply = async (from: ModelRef, to: ModelRef | null) => {
+    const tasks = tasksUsingModel(settings, from).length;
+    await window.nodus.updateSettings(replaceModelPatch(settings, from, to));
+    await onChange();
+    setNotice(to && tasks ? tx('Sustituido en {n} tareas.', { n: tasks }) : null);
+  };
+  return (
+    <div className="mt-3 space-y-2 text-xs" data-testid="stale-favorites">
+      {unreadable.length > 0 && <div className="text-neutral-500">{tx('No se pudo comprobar: {providers}', { providers: unreadable.join(', ') })}</div>}
+      {stale.length === 0 ? (
+        <div className="text-emerald-600 dark:text-emerald-400">{notice ?? t('Todos los favoritos siguen disponibles.')}</div>
+      ) : (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700/60 dark:bg-amber-950/20">
+          <div className="font-medium text-amber-900 dark:text-amber-200">{t('Ya no los ofrece su proveedor')}</div>
+          <p className="mt-1 leading-5 text-amber-800 dark:text-neutral-400">{t('Estos favoritos ya no aparecen en la lista de modelos de su proveedor. Sustitúyelos en las tareas que los usan o quítalos.')}</p>
+          <div className="mt-2 space-y-2">
+            {stale.map((model) => {
+              const key = refKey(model);
+              const tasks = tasksUsingModel(settings, model).length;
+              const options: ModelRef[] = [
+                ...[...(catalogues.get(model.provider) ?? [])].sort().map((id) => ({ provider: model.provider, model: id })),
+                ...favorites.filter((f) => f.provider !== model.provider && !stale.some((s) => sameModel(s, f))),
+              ];
+              const suggested = suggestedReplacement(model, catalogues, favorites, stale);
+              const selected = choice[key] ?? (suggested ? refKey(suggested) : '');
+              const target = options.find((option) => refKey(option) === selected) ?? null;
+              return (
+                <div key={key} className="flex flex-wrap items-center gap-2" data-testid={`stale-favorite-${model.model}`}>
+                  <span className="min-w-40 font-medium text-neutral-800 dark:text-neutral-200">{modelLabel(model)}</span>
+                  <span className="text-neutral-500">{tasks ? tx('Lo usan {n} tareas', { n: tasks }) : t('Ninguna tarea lo usa')}</span>
+                  {options.length > 0 && (
+                    <select className="input py-0.5 text-xs" aria-label={t('Sustituir por…')} value={selected} onChange={(e) => setChoice({ ...choice, [key]: e.target.value })}>
+                      {options.map((option) => <option key={refKey(option)} value={refKey(option)}>{modelLabel(option)}</option>)}
+                    </select>
+                  )}
+                  {target && <button className="btn btn-primary px-2 py-0.5 text-xs" onClick={() => void apply(model, target)}>{t('Sustituir')}</button>}
+                  <button className="btn btn-ghost px-2 py-0.5 text-xs text-red-600 dark:text-red-400" onClick={() => void apply(model, null)}>{t('Quitar')}</button>
+                </div>
+              );
+            })}
+          </div>
+          {notice && <div className="mt-2 text-emerald-700 dark:text-emerald-400">{notice}</div>}
+        </div>
+      )}
+    </div>
+  );
 }
