@@ -54,7 +54,8 @@ export function completeGuideReportInput(
   const language = (draft.brief.language ?? 'es') as PromptLanguage;
   const deep = DEEP_LABELS[language] ?? DEEP_LABELS.es;
   const labels = completeGuideLabels(language);
-  const reference = new Set([labels.howToUse, labels.syllabusMap, labels.glossary, labels.formulaSheet, labels.timeline, labels.conflicts, labels.coverage, labels.sourceIndex, labels.webSources]);
+  // The parts that are not chapters. The last three titles are the ones older guides carry.
+  const reference = new Set([labels.howToUse, labels.glossary, labels.formulaSheet, labels.timeline, labels.conflicts, labels.webSources, labels.sourcesAndCoverage, labels.syllabusMap, labels.coverage, labels.sourceIndex]);
   const body = figures?.markdown ?? stripLeadingAbstract(draft.draftMarkdown, draft.abstract);
   const sections: ProfessionalReportSection[] = guideParts(body).map((part, index) => {
     const rendered = guideMarkdownToHtml(part.markdown, `part-${index + 1}`, figures?.resolve);
@@ -83,7 +84,8 @@ export function completeGuideReportInput(
     imageCredit: image.credit,
     contentsLabel: deep.contents,
     metrics: [
-      { value: String(draft.outline.length), label: deep.sections },
+      // Topics (chapters), not parts: the contents lists every part, references included.
+      { value: String(draft.outline.length), label: labels.units },
       { value: String(guide?.sources.length ?? draft.stats.selectedWorks), label: deep.sources },
       { value: words.toLocaleString(language), label: deep.words },
     ],

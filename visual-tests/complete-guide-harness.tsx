@@ -64,62 +64,61 @@ const nodus = {
 
 const SAMPLE = `## Tema 1 · Gases
 
-**Qué debes saber**
+### Resumen del tema
 
-- Presión
-- Ley de los gases ideales
+Un gas se describe con cuatro magnitudes: presión, volumen, temperatura y cantidad de sustancia. La ley de Boyle relaciona presión y volumen cuando la temperatura no cambia, y la ecuación de los gases ideales las reúne todas en una sola expresión que solo vale a baja presión y alta temperatura. ([A1 · p. 1](nodus://study/material/gases?page=1&e=K0001); [A1 · p. 2](nodus://study/material/gases?page=2&e=K0002))
 
 ### Variables de estado
 
-La presión, el volumen y la temperatura describen el estado de un gas. ([A1 · p. 1](nodus://study/material/gases?page=1&e=K0001))
+La **presión** es la fuerza que actúa perpendicularmente sobre una superficie dividida por el área de esa superficie, $P = \\dfrac{F}{S}$, y en el SI se mide en pascales. Por eso la misma fuerza produce más presión cuanto menor es la superficie. ([A1 · p. 1](nodus://study/material/gases?page=1&e=K0001))
 
-> [!definition] Definición · Presión
-> Fuerza por unidad de superficie, $P = \\dfrac{F}{A}$, medida en pascales.
->
-> [A1 · p. 1](nodus://study/material/gases?page=1&e=K0001)
+Las cuatro magnitudes no son independientes. En un gas ideal, la ecuación
 
-> [!formula] Fórmula · Gases ideales
-> $$
-> PV = nRT
-> $$
->
-> Válida a baja presión y alta temperatura; $T$ siempre en kelvin.
->
-> [A1 · p. 2](nodus://study/material/gases?page=2&e=K0002)
+$$
+PV = nRT
+$$
 
-> [!example] Ejemplo de los materiales
-> 2 mol a 300 K en 10 L: $P = \\dfrac{2 \\cdot 0{,}082 \\cdot 300}{10} = 4{,}9$ atm.
+liga presión, volumen, moles y temperatura absoluta. Aquí $R = 0{,}082\\ \\text{atm·L/(mol·K)}$ para cualquier gas, de modo que la presión debe ir en atmósferas, el volumen en litros y la temperatura en kelvin. Si conoces tres de ellas, la cuarta queda fijada; y la ecuación solo describe bien al gas a baja presión y alta temperatura. ([A1 · p. 2](nodus://study/material/gases?page=2&e=K0002))
+
+> [!example] Ejemplo de los materiales · Presión de 2 mol en 10 L
+> 2 mol de gas ideal a 300 K ocupan 10 L: $P = \\dfrac{2 \\cdot 0{,}082 \\cdot 300}{10} = 4{,}92$ atm.
 >
 > [A1 · p. 3](nodus://study/material/gases?page=3&e=K0003)
 
-> [!ai-analogy] Analogía elaborada por IA
-> Piensa en un globo al sol: al calentarse, las moléculas golpean más fuerte las paredes.
+> [!ai-analogy] Analogía (IA) · El precio por unidad
+> El cociente $PV/(nT)$ vale siempre $R$, como el precio por unidad de un producto no cambia aunque compres más o menos; deja de valer cuando el gas se aparta del modelo ideal.
 >
 > *Elaborado por IA: no procede de tus materiales.*
 
 > [!mistake] Error frecuente
-> Usar grados Celsius en la ecuación de estado.
+> Usar grados Celsius en la ecuación de estado: la temperatura debe ir en kelvin, $T(\\text{K}) = T(\\text{°C}) + 273{,}15$.
 >
-> [A1 · p. 4](nodus://study/material/gases?page=4&e=K0004)
+> [A1 · p. 3](nodus://study/material/gases?page=3&e=K0004)
 
 | Magnitud | Unidad SI | Fuente |
 | --- | --- | --- |
 | Presión | Pa | [A1 · p. 1](nodus://study/material/gases?page=1&e=K0001) |
 | Temperatura | K | [A1 · p. 2](nodus://study/material/gases?page=2&e=K0002) |
 
-> [!memorize] Para memorizar
-> - $R = 0{,}082$ atm·L/(mol·K)
-> - $\\ce{2H2 + O2 -> 2H2O}$
->
-> [D1 · § Resumen](nodus://study/doc/resumen?from=0&e=K0005)
+La combustión del hidrógeno, $\\ce{2H2 + O2 -> 2H2O}$, ilustra que el volumen de gases cambia con la cantidad de sustancia. ([D1 · § Resumen](nodus://study/doc/resumen?from=0&e=K0005))
 
-> [!selfcheck] Autoevaluación 1
-> ¿Por qué la temperatura debe expresarse en kelvin?
+### Pon a prueba lo que sabes
+
+> [!selfcheck] Autoevaluación
+>
+> 1. ¿Por qué la temperatura debe expresarse en kelvin al usar $PV = nRT$?
+> 2. Si se duplica el volumen a temperatura y cantidad constantes, ¿qué le pasa a la presión?
+
+**Respuestas de autoevaluación**
+
+**1.** Porque $T$ es la temperatura absoluta; los grados Celsius darían resultados sin sentido. ([A1 · p. 3](nodus://study/material/gases?page=3&e=K0004))
+
+**2.** Se reduce a la mitad, porque $P_1 V_1 = P_2 V_2$. ([A1 · p. 1](nodus://study/material/gases?page=1&e=K0001))
 `;
 
 const META = {
   version: 1, runId: 'cg', config: { selection: { nodes: [], excludedSourceKeys: [] }, instructions: '', aiExamples: true, webText: false, webImages: false, verification: 'standard', maxCostUsd: null },
-  snapshotAt: '', promptVersion: 'cg-1',
+  snapshotAt: '', promptVersion: 'cg-3',
   sources: [
     { sourceKey: 'material:gases', kind: 'material', alias: 'A1', title: 'Apuntes de gases.pdf', path: '2º Bachillerato / Química / Tema 1 · Gases', passagesTotal: 42, passagesRead: 42, pages: { total: 44, withText: 42, empty: [13, 14] }, itemsExtracted: 96, itemsUsed: 94, duplicates: 0, unreadRanges: [] },
     { sourceKey: 'transcript:clase3', kind: 'transcript', alias: 'G1', title: 'Clase 3 · pH', path: '2º Bachillerato / Química / Tema 2', passagesTotal: 18, passagesRead: 16, itemsExtracted: 22, itemsUsed: 20, duplicates: 0, unreadRanges: ['12:00–18:00'] },

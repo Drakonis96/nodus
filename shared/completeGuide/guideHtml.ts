@@ -94,6 +94,7 @@ export const GUIDE_PRINT_CSS = `
   math { font-family: "STIX Two Math", "Cambria Math", "Latin Modern Math", "Noto Sans Math", "DejaVu Serif", serif; font-size: 1.05em; }
   .gm-display { margin: 2.5mm 0; text-align: center; break-inside: avoid; }
   .gm-display math { display: inline-block; font-size: 1.12em; }
+  .guide-prose .gm-display + p { text-indent: 0; }
   .gc { margin: 3mm 0; padding: 2.4mm 3.6mm 2.6mm; border: .3mm solid #c7d2fe; border-left: 1.2mm solid var(--gc, #4f46e5); border-radius: 1.6mm;
         background: color-mix(in srgb, var(--gc, #4f46e5) 7%, white); break-inside: avoid; print-color-adjust: exact; -webkit-print-color-adjust: exact; text-indent: 0; }
   .gc p { text-indent: 0 !important; margin: 1mm 0; }

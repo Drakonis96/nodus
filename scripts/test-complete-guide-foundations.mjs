@@ -253,6 +253,8 @@ test('estimate: the ceiling covers the measured live campaign run', () => {
   assert.ok(estimate.usd.max >= 1.0813, `the ceiling must cover the measured first run: ${JSON.stringify(estimate.usd)}`);
   assert.ok(estimate.expected.items >= 20, `the measured extraction found 29 items, the estimate says ${estimate.expected.items}`);
   const verify = estimate.stages.find((stage) => stage.stage === 'verify');
+  assert.ok(verify.calls >= (estimate.expected.items + estimate.expected.sections + estimate.expected.units * 3) * 4,
+    'standard verification budgets the prose, answers and summaries, not only suspicious quantities');
   const cost = (stage) => (stage.inputTokens * 0.3 + stage.outputTokens * 1.2) / 1e6;
   const price = estimate.stages.filter((stage) => stage.stage !== 'embed').reduce((sum, stage) => sum + cost(stage), 0);
   assert.ok(cost(verify) / price > 0.5, `the audit carried 76 % of the measured run: ${(cost(verify) / price).toFixed(2)}`);

@@ -4,9 +4,14 @@
  *
  *   0 snapshot (given) → 1 reconnaissance map per source → 2 chapters from the user's
  *   units → 3 exhaustive anchored extraction → 4 chapter plans with code-checked
- *   coverage → 5 section writing in typed blocks → 6 verification (KaTeX, numbers,
- *   premise audit) → 7 syllabus map, glossary, formula sheet, timeline, conflicts,
- *   review sheet, coverage and source index → assembled Markdown.
+ *   coverage → 5 section writing as prose (boxes only for examples, warnings, AI and web)
+ *   plus one summary per chapter → 6 verification (KaTeX, numbers, premise audit) →
+ *   7 overview, glossary, formula sheet, timeline, conflicts, review sheet, coverage and
+ *   source index → assembled Markdown.
+ *
+ * A chapter opens with what code builds from the verified items (its chronology and its key
+ * concepts) and the model's cited summary; then come the sections, and the chapter ends with
+ * its self-check questions, mixed across the sections, and the answers.
  */
 import type { ResearchAuditSource } from '@shared/researchClaimAudit';
 import type { PromptLanguage } from '@shared/types';
@@ -27,22 +32,33 @@ import {
 import { completeGuideLabels, type CompleteGuideLabels } from '@shared/completeGuide/labels';
 import { citationLink, citationUrl, locatorLabel, readMoreRanges } from '@shared/completeGuide/locators';
 import {
+  capAiBlocks,
   coveredItemIds,
   normalizeWrittenBlocks,
   renderBlock,
+  renderPractice,
+  sanitizeModelMarkdown,
+  tidyAuditedMarkdown,
   validWrittenBlocks,
   type CompleteGuideBlock,
+  type PracticeEntry,
 } from '@shared/completeGuide/blocks';
 import { normalizeChapterPlan, validChapterPlan, type CompleteGuideChapterPlan, type CompleteGuideSectionPlan } from '@shared/completeGuide/plan';
 import { invalidMath, latexError, neutralizeInvalidMath } from '@shared/completeGuide/math';
 import {
+  chapterProfile,
+  chronologyOf,
+  renderChronology,
   renderCheatSheet,
   renderCoverage,
   renderFormulaSheet,
   renderGlossary,
+  renderKeyConcepts,
   renderSourceIndex,
-  renderTimeline,
+  renderTimelineEntries,
   validCheatSheetSelection,
+  type ChapterKind,
+  type DatedEntry,
   type SourceCoverage,
 } from '@shared/completeGuide/reference';
 import type { CompleteGuideStage } from '@shared/completeGuide/estimate';
@@ -58,6 +74,7 @@ import {
   RECOVER_SYSTEM,
   REPAIR_LATEX_SYSTEM,
   REVISE_SYSTEM,
+  SUMMARY_SYSTEM,
   WRITE_SYSTEM,
 } from './prompts';
 
@@ -125,6 +142,10 @@ export interface CompleteGuideChapterResult {
   unitKey: string;
   title: string;
   overview: string;
+  /** What the chapter is about, from its items; it steered the writer. */
+  kind: ChapterKind;
+  /** The cited summary that follows the chapter's chronology and key concepts. */
+  summary: CompleteGuideBlock[];
   sections: Array<{ id: string; title: string; purpose: string; blocks: CompleteGuideBlock[] }>;
 }
 
@@ -142,6 +163,8 @@ export interface CompleteGuideResult {
     windows: number; failedWindows: number; items: number; itemsUsed: number; blocks: number; aiBlocks: number;
     droppedUnsupported: number; auditedBlocks: number; removedSentences: number; repairedBlocks: number;
     invalidLatex: number; conflicts: number; cacheHits: number; figures: number; webBlocks: number; webImages: number;
+    /** AI additions beyond the one allowed per section, and "to memorize" lists the prose already covers. */
+    droppedAi: number; droppedRedundant: number; summaries: number;
   };
   syllabus: { overview: string; connections: Array<{ from: string; to: string; relation: string }> };
   warnings: string[];
@@ -207,6 +230,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   const counts: CompleteGuideResult['counts'] = {
     windows: 0, failedWindows: 0, items: 0, itemsUsed: 0, blocks: 0, aiBlocks: 0, droppedUnsupported: 0,
     auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0, webBlocks: 0, webImages: 0,
+    droppedAi: 0, droppedRedundant: 0, summaries: 0,
   };
   const guard = () => deps.checkpoint?.();
   const sourcesByKey = new Map(snapshot.sources.map((source) => [source.sourceKey, source]));
@@ -409,6 +433,9 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     deps.progress?.({ stage: 'plan', done: ++planDone, total: chaptersWithItems.length, detail: chapter.title });
   }
 
+  // What each chapter is about, from its items: it steers the writer and the summary.
+  const profiles = new Map(chaptersWithItems.map((chapter) => [chapter.unitKey, chapterProfile(chapter.items)]));
+
   // ── Optional web complement: one search per chapter, labelled and cited apart ───
   const webByUnit = new Map<string, CompleteGuideWebPassage[]>();
   const webById = new Map<string, CompleteGuideWebPassage>();
@@ -434,6 +461,8 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
 
   // ── Pass 5 + 6: write and verify every section ─────────────────────────────────
   const sectionTasks = plans.flatMap((plan) => plan.sections.map((section, index) => ({ plan, section, index })));
+  const summaryTasks = plans.filter((plan) => plan.sections.length);
+  const writeTotal = sectionTasks.length + summaryTasks.length;
   let writeDone = 0;
   const writeSection = async (plan: CompleteGuideChapterPlan, section: CompleteGuideSectionPlan, index: number): Promise<CompleteGuideBlock[]> => {
     const stored = deps.checkpointGet<CompleteGuideBlock[]>('section', section.id);
@@ -471,6 +500,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       section: { title: section.title, purpose: section.purpose, position: `${index + 1}/${plan.sections.length}` },
       previousSection: plan.sections[index - 1]?.title ?? null,
       nextSection: plan.sections[index + 1]?.title ?? null,
+      profile: { kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual' },
       aiExamples: config.aiExamples,
       ...(input.instructions ? { studentInstructions: input.instructions } : {}),
     };
@@ -482,6 +512,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     const normalized = normalizeWrittenBlocks(first, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
     const blocks = normalized.blocks;
     counts.droppedUnsupported += normalized.dropped.unsupported;
+    counts.droppedRedundant += normalized.dropped.redundant;
     // Coverage-driven continuation: re-prompt with the items still uncovered.
     for (let round = 0; round < 2; round += 1) {
       const covered = coveredItemIds(blocks);
@@ -494,9 +525,15 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       }).catch((error) => { if (isAbort(error)) throw error; return { blocks: [] }; });
       const extra = normalizeWrittenBlocks(more, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
       counts.droppedUnsupported += extra.dropped.unsupported;
+      counts.droppedRedundant += extra.dropped.redundant;
       if (!extra.blocks.length) break;
       blocks.push(...extra.blocks);
     }
+    // One AI addition per section, the first the writer produced; it never covers an item. A
+    // chapter about events takes no analogy and no invented example, only a warning about a confusion.
+    const capped = capAiBlocks(blocks, 1, profiles.get(plan.unitKey)?.kind === 'narrative' ? ['ai_example', 'ai_analogy'] : []);
+    counts.droppedAi += capped.dropped;
+    blocks.splice(0, blocks.length, ...capped.blocks);
     // Nothing extracted is lost: whatever is still uncovered becomes a cited table.
     const covered = coveredItemIds(blocks);
     const leftover = sectionItems.filter((item) => !covered.has(item.id));
@@ -508,7 +545,7 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     }
     const verified = await verifySection(blocks, sectionItems);
     deps.checkpointPut('section', section.id, verified);
-    deps.progress?.({ stage: 'write', done: ++writeDone, total: sectionTasks.length, detail: section.title });
+    deps.progress?.({ stage: 'write', done: ++writeDone, total: writeTotal, detail: section.title });
     return verified;
   };
 
@@ -525,10 +562,13 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     // and never the guide's rendered link: `[título]([A1 · p. 2](nodus://…))` is a link inside
     // a link, which Markdown refuses to parse and the reader, the PDF and Word printed as
     // literal `[título](` text with a stray bracket.
+    // The label is the guide's own citation label (`A1 · p. 2`): the audit prints it after every
+    // sentence it verifies, and a page reference reads as a citation where an item title reads
+    // as noise between the sentences of a paragraph.
     const first = item.evidence[0];
     const passage = first ? passagesById.get(first.passageId) : undefined;
     const source = first ? sourcesByKey.get(first.sourceKey) : undefined;
-    return [{ id, label: item.title, citation: passage && source ? citationUrl(source, passage.locator, id) : id, text: [item.statement, item.latex ? `LaTeX: ${item.latex}` : '', item.solution ?? '', ...(item.conditions ?? []), passages].filter(Boolean).join('\n') }];
+    return [{ id, label: passage && source ? `${source.alias} · ${locatorLabel(passage.locator, labels)}` : item.title, citation: passage && source ? citationUrl(source, passage.locator, id) : id, text: [item.statement, item.latex ? `LaTeX: ${item.latex}` : '', item.solution ?? '', ...(item.conditions ?? []), passages].filter(Boolean).join('\n') }];
   });
 
   const numbersSupported = (block: CompleteGuideBlock): boolean => {
@@ -563,17 +603,17 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       }
       for (const block of blocks) for (const field of ['markdown', 'answer', 'question'] as const) if (block[field]) block[field] = neutralizeInvalidMath(block[field]!).markdown;
     }
-    // Premise audit: numbers that do not occur in the evidence always trigger it;
-    // an exhaustive guide audits every block that claims to come from the materials.
+    // Connected prose and practice answers can invent a condition without inventing a
+    // number. Audit them even in standard mode, including the chapter summaries.
     if (!deps.audit) return blocks;
     const targets = blocks
-      .map((block, index) => ({ block, index }))
+      .map((block) => ({ block, field: block.kind === 'selfcheck' ? 'answer' as const : 'markdown' as const }))
       // Web blocks are always audited against their own passages.
-      .filter(({ block }) => block.markdown && (block.provenance === 'web' || (block.provenance === 'materials' && (config.verification === 'exhaustive' || !numbersSupported(block)))));
-    await settlePool(targets, concurrency.verify, async ({ block }) => {
+      .filter(({ block, field }) => block[field] && (block.provenance === 'web' || block.provenance === 'derived' || (block.provenance === 'materials' && (block.kind === 'explanation' || config.verification === 'exhaustive' || !numbersSupported(block)))));
+    const audited = await settlePool(targets, concurrency.verify, async ({ block, field }) => {
       guard();
       const sources = auditSources(block);
-      const first = await deps.audit!(block.markdown, sources);
+      const first = await deps.audit!(block[field]!, sources);
       counts.auditedBlocks += 1;
       block.audit = { checked: true, removedSentences: 0, repaired: false };
       if (!first.removed) return;
@@ -581,25 +621,28 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       const revised = await deps.json<{ markdown: string }>({
         stage: 'verify', system: REVISE_SYSTEM, maxTokens: 4_000, temperature: 0.1,
         validate: (value): value is { markdown: string } => Boolean(value && typeof (value as { markdown?: unknown }).markdown === 'string'),
-        user: JSON.stringify({ block: block.markdown, sources: sources.map((source) => ({ id: source.id, text: source.text })) }),
-      }).catch(() => null);
+        user: JSON.stringify({ block: block[field], ...(field === 'answer' ? { question: block.question } : {}), sources: sources.map((source) => ({ id: source.id, text: source.text })) }),
+      }).catch((error) => { if (isAbort(error)) throw error; return null; });
       if (revised?.markdown) {
-        const second = await deps.audit!(revised.markdown, sources);
+        const second = await deps.audit!(sanitizeModelMarkdown(revised.markdown), sources);
         if (second.removed < first.removed) {
-          block.markdown = second.markdown;
+          block[field] = tidyAuditedMarkdown(second.markdown);
           block.audit = { checked: true, removedSentences: second.removed, repaired: true };
           counts.repairedBlocks += 1;
           counts.removedSentences += second.removed;
           return;
         }
       }
-      block.markdown = first.markdown;
+      block[field] = tidyAuditedMarkdown(first.markdown);
       block.audit = { checked: true, removedSentences: first.removed, repaired: false };
       counts.removedSentences += first.removed;
     });
+    // An audit outage must not publish the unchecked prose. The section has not been
+    // checkpointed yet, so a retry can resume it after the provider recovers.
+    for (const result of audited) if (!result.ok) throw result.error;
     void sectionItems;
     // A block the audit emptied has nothing left to teach.
-    return blocks.filter((block) => block.kind === 'selfcheck' || block.kind === 'table' || block.markdown.trim());
+    return blocks.filter((block) => block.kind === 'selfcheck' ? Boolean(block.answer?.trim()) : block.kind === 'table' || block.markdown.trim());
   };
 
   const written = await settlePool(sectionTasks, concurrency.write, ({ plan, section, index }) => writeSection(plan, section, index));
@@ -611,10 +654,57 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     throw settled.error instanceof Error ? settled.error : new Error(String(settled.error));
   });
 
+  // ── Chapter summaries: the cited overview after the chronology and the key concepts ──
+  // Fail-soft: a chapter without a summary is still a complete chapter.
+  const summaryBlocks = new Map<string, CompleteGuideBlock[]>();
+  const validSummary = (value: unknown): value is { paragraphs: unknown[] } => Boolean(value && typeof value === 'object' && Array.isArray((value as { paragraphs?: unknown }).paragraphs));
+  const summarize = async (plan: CompleteGuideChapterPlan): Promise<CompleteGuideBlock[]> => {
+    const stored = deps.checkpointGet<CompleteGuideBlock[]>('summary', plan.unitKey);
+    if (stored) return stored;
+    const chapterItems = items.filter((item) => item.unitKey === plan.unitKey && item.importance !== 'detail');
+    if (!chapterItems.length) return [];
+    guard();
+    const raw = await deps.json<{ paragraphs: unknown[] }>({
+      stage: 'write', system: SUMMARY_SYSTEM, maxTokens: 4_000, temperature: 0.2, validate: validSummary,
+      user: JSON.stringify({
+        unit: plan.title,
+        profile: { kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual' },
+        sections: plan.sections.map((section) => section.title),
+        items: chapterItems.slice(0, 80).map((item) => ({
+          id: item.id, type: item.type, title: item.title, importance: item.importance, statement: item.statement.slice(0, 400),
+          ...(item.date ? { date: item.date } : {}), ...(item.latex ? { latex: item.latex } : {}),
+        })),
+        ...(input.instructions ? { studentInstructions: input.instructions } : {}),
+      }),
+    });
+    const paragraphs = raw.paragraphs.flatMap((entry) => {
+      const paragraph = entry as { markdown?: unknown; itemIds?: unknown };
+      return typeof paragraph?.markdown === 'string' ? [{ kind: 'explanation', markdown: paragraph.markdown, itemIds: paragraph.itemIds }] : [];
+    });
+    const normalized = normalizeWrittenBlocks({ blocks: paragraphs }, { validItemIds: new Set(chapterItems.map((item) => item.id)), items: itemsById, aiExamples: false });
+    counts.droppedUnsupported += normalized.dropped.unsupported;
+    const verified = await verifySection(normalized.blocks, chapterItems);
+    deps.checkpointPut('summary', plan.unitKey, verified);
+    return verified;
+  };
+  const summarized = await settlePool(summaryTasks, concurrency.write, async (plan) => {
+    const blocks = await summarize(plan);
+    deps.progress?.({ stage: 'write', done: ++writeDone, total: writeTotal, detail: plan.title });
+    return blocks;
+  });
+  summarized.forEach((settled, index) => {
+    const { unitKey } = summaryTasks[index];
+    if (settled.ok) { summaryBlocks.set(unitKey, settled.value); if (settled.value.length) counts.summaries += 1; return; }
+    if (isAbort(settled.error)) throw settled.error;
+    warnings.push(`summary:${unitKey}`);
+  });
+
   // ── Pass 7: report-level synthesis ─────────────────────────────────────────────
   deps.progress?.({ stage: 'finalize', done: 0, total: 3 });
   const chapters: CompleteGuideChapterResult[] = plans.map((plan) => ({
     unitKey: plan.unitKey, title: plan.title, overview: plan.overview,
+    kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual',
+    summary: summaryBlocks.get(plan.unitKey) ?? [],
     sections: plan.sections.map((section) => ({ id: section.id, title: section.title, purpose: section.purpose, blocks: sectionBlocks.get(section.id) ?? [] })),
   }));
   let syllabus = deps.checkpointGet<CompleteGuideResult['syllabus']>('final', 'map');
@@ -623,7 +713,15 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     const raw = await deps.json<CompleteGuideResult['syllabus']>({
       stage: 'finalize', system: MAP_SYSTEM, maxTokens: 2_500, temperature: 0.2,
       validate: (value): value is CompleteGuideResult['syllabus'] => Boolean(value && typeof (value as { overview?: unknown }).overview === 'string'),
-      user: JSON.stringify({ units: chapters.map((chapter) => ({ title: chapter.title, overview: chapter.overview || chapter.sections.map((section) => section.title).join('; ') })) }),
+      // Grounded in what was extracted (concept titles and section headings), not in the
+      // model's own chapter overviews, which nothing checks.
+      user: JSON.stringify({
+        units: chapters.map((chapter) => ({
+          title: chapter.title,
+          concepts: items.filter((item) => item.unitKey === chapter.unitKey && item.importance === 'core' && item.type !== 'example' && item.type !== 'mistake' && item.type !== 'figure').map((item) => item.title).slice(0, 12),
+          sections: chapter.sections.map((section) => section.title),
+        })),
+      }),
     }).catch((error) => { if (isAbort(error)) throw error; return { overview: '', connections: [] }; });
     const titles = new Set(chapters.map((chapter) => chapter.title));
     syllabus = {
@@ -728,33 +826,54 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     const site = passage.site.replace(/[[\]]/g, '').trim();
     return `[${page.alias}${site ? ` · ${site}` : ''}](nodus://passage/${encodeURIComponent(id)})`;
   };
+  // The AI notice is written in full once, on the first AI block of the guide.
+  const context = { labels, cite, citeWeb, state: { aiNoticeShown: false } };
   const parts: string[] = [];
-  parts.push(`## ${labels.howToUse}\n\n${labels.howToUseBody}`);
-  if (syllabus.overview || syllabus.connections.length) {
-    parts.push([`## ${labels.syllabusMap}`, syllabus.overview, syllabus.connections.map((edge) => `- **${edge.from}** → **${edge.to}**: ${edge.relation}`).join('\n')].filter(Boolean).join('\n\n'));
-  }
+  // The overview is the abstract (cover and reader); here go how to read the guide and how the
+  // topics relate, when they do.
+  parts.push([
+    `## ${labels.howToUse}`,
+    labels.howToUseBody,
+    syllabus.connections.length ? `**${labels.unitRelations}**\n\n${syllabus.connections.map((edge) => `- **${edge.from}** → **${edge.to}**: ${edge.relation}`).join('\n')}` : '',
+  ].filter(Boolean).join('\n\n'));
+  const datedByChapter: DatedEntry[][] = [];
   for (const chapter of chapters) {
     const chapterParts: string[] = [`## ${chapter.title}`];
     if (!chapter.sections.length) { chapterParts.push(`*${labels.unitNotCovered}*`); parts.push(chapterParts.join('\n\n')); continue; }
-    if (chapter.overview) chapterParts.push(chapter.overview);
     const chapterItems = items.filter((item) => item.unitKey === chapter.unitKey);
-    const essentials = chapterItems.filter((item) => item.importance === 'core').slice(0, 10);
-    if (essentials.length) chapterParts.push(`**${labels.whatToKnow}**\n\n${essentials.map((item) => `- ${item.title}`).join('\n')}`);
-    const answers: string[] = [];
-    let selfCheckNumber = 0;
+    // What code builds from the verified items: the chronology and the key concepts.
+    const dated = chronologyOf(chapterItems, { quoteYears: profiles.get(chapter.unitKey)?.quoteYears ?? false });
+    datedByChapter.push(dated);
+    if (dated.length >= 3) chapterParts.push(`### ${labels.timeline}\n\n${renderChronology(dated, cite, labels)}`);
+    const concepts = renderKeyConcepts(chapterItems, cite, labels);
+    if (concepts) chapterParts.push(`### ${labels.keyConcepts}\n\n${concepts}`);
+    if (chapter.summary.length) {
+      chapterParts.push(`### ${labels.chapterSummary}\n\n${chapter.summary.map((block) => renderBlock(block, context).markdown).join('\n\n')}`);
+      for (const block of chapter.summary) block.itemIds.forEach((id) => usedItems.add(id));
+    }
+    const practice: PracticeEntry[][] = [];
+    // A chapter about events takes one warning about a confusion at most, not one per section.
+    let aiLeft = chapter.kind === 'narrative' ? 1 : Number.POSITIVE_INFINITY;
     for (const section of chapter.sections) {
       chapterParts.push(`### ${section.title}`);
+      const questions: PracticeEntry[] = [];
       for (const block of section.blocks) {
-        const rendered = renderBlock(block, { labels, cite, citeWeb }, block.kind === 'selfcheck' ? ++selfCheckNumber : undefined);
-        chapterParts.push(rendered.markdown);
-        if (rendered.answer) answers.push(rendered.answer);
+        if (block.provenance === 'ai') {
+          if (aiLeft < 1) { counts.droppedAi += 1; continue; }
+          aiLeft -= 1;
+        }
+        const rendered = renderBlock(block, context);
+        if (rendered.practice) questions.push(rendered.practice);
+        else chapterParts.push(rendered.markdown);
         counts.blocks += 1;
         if (block.provenance === 'ai') counts.aiBlocks += 1;
         if (block.provenance === 'web') counts.webBlocks += 1;
         if (block.provenance === 'materials' || block.provenance === 'derived') block.itemIds.forEach((id) => usedItems.add(id));
       }
+      practice.push(questions);
     }
-    if (answers.length) chapterParts.push(`**${labels.selfCheckAnswers}**\n\n${answers.join('\n\n')}`);
+    const practiceMarkdown = renderPractice(practice, labels);
+    if (practiceMarkdown) chapterParts.push(`### ${labels.practice}\n\n${practiceMarkdown}`);
     const readMore = readMoreRanges(snapshot.sources, chapterItems.flatMap((item) => item.evidence.map((evidence) => passagesById.get(evidence.passageId)!).filter(Boolean)), labels);
     if (readMore.length) chapterParts.push(`**${labels.readMore}:** ${readMore.map(({ source, ranges }) => `${source.alias} — ${source.title} (${ranges})`).join(' · ')}`);
     parts.push(chapterParts.join('\n\n'));
@@ -764,8 +883,9 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
   if (glossary) parts.push(`## ${labels.glossary}\n\n${glossary}`);
   const formulas = renderFormulaSheet(chapterItemGroups, cite, labels);
   if (formulas) parts.push(`## ${labels.formulaSheet}\n\n${formulas}`);
-  const timeline = renderTimeline(items, cite, labels);
-  if (timeline) parts.push(`## ${labels.timeline}\n\n${timeline}`);
+  // A chapter carries its own chronology; a guide-wide one is for dates that span chapters.
+  const allDated = datedByChapter.flat().sort((a, b) => a.year - b.year || a.item.order - b.item.order);
+  if (datedByChapter.filter((entries) => entries.length).length >= 2 && allDated.length >= 3) parts.push(`## ${labels.timeline}\n\n${renderTimelineEntries(allDated, cite, labels)}`);
   if (conflictsMarkdown) parts.push(`## ${labels.conflicts}\n\n${conflictsMarkdown}`);
   const cheatSheet = renderCheatSheet(chaptersWithItems.map((chapter) => ({ title: chapter.title, items: chapter.items, points: cheat.get(chapter.unitKey) ?? [] })), cite, labels);
   if (cheatSheet) parts.push(`## ${labels.reviewSheet}\n\n${cheatSheet}`);
@@ -785,11 +905,9 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
       unreadRanges,
     };
   });
-  parts.push(`## ${labels.coverage}\n\n${renderCoverage(coverage, labels)}`);
   const index = readMoreRanges(snapshot.sources, items.flatMap((item) => item.evidence.map((evidence) => passagesById.get(evidence.passageId)!).filter(Boolean)), labels);
   const indexed = new Set(index.map((entry) => entry.source.sourceKey));
   const sourceIndex = [...index, ...snapshot.sources.filter((source) => !indexed.has(source.sourceKey)).map((source) => ({ source, ranges: '' }))];
-  parts.push(`## ${labels.sourceIndex}\n\n${renderSourceIndex(sourceIndex)}`);
   // Web images join the list with their confirmed licence and author.
   for (const figure of figures) {
     const credit = figure.attribution;
@@ -802,6 +920,8 @@ export async function runCompleteGuide(input: CompleteGuideInput, deps: Complete
     const href = (url: string) => url.replace(/[()\s]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
     parts.push(`## ${labels.webSources}\n\n*${labels.webNote}*\n\n${webSources.map((page) => `- **${page.alias}** — [${escape(page.title) || page.url}](${href(page.url)})${page.site ? ` · ${escape(page.site)}` : ''}`).join('\n')}`);
   }
+  // What was read and where it comes from close the guide as one appendix.
+  parts.push(`## ${labels.sourcesAndCoverage}\n\n**${labels.sourceIndex}**\n\n${renderSourceIndex(sourceIndex)}\n\n**${labels.coverage}**\n\n${renderCoverage(coverage, labels)}`);
 
   const limitations: string[] = [];
   for (const row of coverage) {

@@ -67,10 +67,25 @@ test('the guide becomes the professional report: one numbered section per part, 
   assert.match(input.sections[0].html, /<style>[\s\S]*\.gc \{/, 'guide styles travel with the first section');
   assert.equal(input.objective, 'Prioriza fórmulas');
   assert.equal(input.metrics[1].value, '2');
+  // The first metric counts topics (the chapters), not the numbered parts the contents lists.
+  assert.deepEqual(input.metrics[0], { value: '1', label: 'temas' });
   const html = renderProfessionalReportHtml(input);
-  assert.match(html, /class="cover"/);
+  // Without a picture the cover is typography only; the decorative motif that said nothing is gone.
+  assert.match(html, /class="cover cover-plain"/);
+  assert.doesNotMatch(html, /cover-motif/);
+  assert.match(renderProfessionalReportHtml({ ...input, imageDataUrl: 'data:image/png;base64,AAAA' }), /class="cover"[\s\S]*class="cover-image"/);
   assert.match(html, /Variables de estado/, 'chapter headings reach the table of contents');
   assert.match(completeGuideMarkdown(draft), /^# Guía de estudio: Gases\n\nResumen del temario\.\n\n## Cómo usar esta guía/);
+});
+
+test('the reference parts are not chapters: no page break, the reference class; old guides keep their titles', () => {
+  const markdown = ['## Cómo usar esta guía', '', 'x', '', '## Tema 1 · Gases', '', 'y', '', '## Fuentes y cobertura', '', 'z', '', '## Cobertura y limitaciones', '', 'w', '', '## Índice de fuentes', '', 'v'].join('\n');
+  const draft = { title: 'G', abstract: '', generatedAt: '2026-09-28T10:00:00.000Z', draftMarkdown: markdown, brief: { kind: 'deep_research', objective: 'x', language: 'es' }, outline: [{ id: 't' }], stats: { selectedWorks: 1 } };
+  const sections = completeGuideReportInput(draft).sections;
+  assert.deepEqual(sections.map((section) => [section.title, section.className, Boolean(section.pageBreakBefore)]), [
+    ['Cómo usar esta guía', 'guide-reference', false], ['Tema 1 · Gases', 'guide-chapter', true], ['Fuentes y cobertura', 'guide-reference', false],
+    ['Cobertura y limitaciones', 'guide-reference', false], ['Índice de fuentes', 'guide-reference', false],
+  ]);
 });
 
 test('Word export: native equations (OMML), tables, callout boxes and a table of contents', async () => {

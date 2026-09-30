@@ -62,8 +62,11 @@ try {
     await page.waitForFunction(() => /asignaturas/.test(document.querySelector('[data-testid="complete-guide-estimate"]')?.textContent ?? ''));
 
     // Reader: callouts are cards, math renders, \ce{} renders, AI boxes are labelled.
-    assert.equal(await page.locator('aside.guide-callout').count(), 7);
+    // Prose first: only the example, the AI analogy, the warning and the questions are boxes.
+    assert.equal(await page.locator('aside.guide-callout').count(), 4);
     assert.equal(await page.locator('aside.guide-callout-ai-analogy').count(), 1);
+    assert.equal(await page.locator('aside.guide-callout-definition, aside.guide-callout-formula, aside.guide-callout-rule, aside.guide-callout-memorize').count(), 0, 'definitions and formulas are prose');
+    assert.match(await page.locator('aside.guide-callout-ai-analogy .guide-callout-title').innerText(), /\(IA\)/u, 'the AI mark is in the title');
     assert.ok(await page.locator('.katex').count() >= 6, 'KaTeX rendered the formulas');
     assert.equal(await page.locator('.katex-error').count(), 0, 'no formula failed, including \\ce{}');
     assert.match(await page.getByTestId('complete-guide-coverage').innerText(), /A1[\s\S]*G1/u);
@@ -92,7 +95,7 @@ try {
   const printPage = await context.newPage();
   await printPage.goto(pathToFileURL(path.join(tmp, 'report.html')).href);
   assert.ok(await printPage.locator('math').count() >= 5, 'formulas are MathML in the printed document');
-  assert.equal(await printPage.locator('aside.gc').count(), 7, 'callouts are cards in the printed document');
+  assert.equal(await printPage.locator('aside.gc').count(), 4, 'the four callouts are cards in the printed document');
   const pdf = await printPage.pdf({ format: 'A4', printBackground: true });
   assert.ok(pdf.length > 20_000, 'a real PDF was printed');
   await printPage.locator('#part-2').screenshot({ path: path.join(shotDir, 'complete-guide-pdf-chapter.png') });

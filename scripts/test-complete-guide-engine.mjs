@@ -124,6 +124,15 @@ function fakeModel(options = {}) {
       }
       return { blocks };
     }
+    if (call.system === prompts.SUMMARY_SYSTEM) {
+      if (options.failSummary) throw new Error('summary provider down');
+      const ids = user.items.map((item) => item.id);
+      // One paragraph that relies on real items and one that names an item that does not exist.
+      return { paragraphs: [
+        { itemIds: ids.slice(0, 2), markdown: `Este tema (${user.profile.kind}) reúne ${user.items.slice(0, 2).map((item) => item.title).join(' y ')}.` },
+        { itemIds: ['K9999'], markdown: 'Un párrafo que no se apoya en ningún ítem.' },
+      ] };
+    }
     if (call.system === prompts.REPAIR_LATEX_SYSTEM) return { fixes: user.formulas.map((formula) => ({ index: formula.index, latex: '\\frac{a}{b}' })) };
     if (call.system === prompts.REVISE_SYSTEM) return { markdown: user.block.replace(/INVENTADO[^.]*\./g, '').trim() };
     if (call.system === prompts.MAP_SYSTEM) return { overview: 'Los gases preparan el estudio de los ácidos.', connections: [{ from: user.units[0].title, to: user.units.at(-1).title, relation: 'Prepara' }, { from: 'Inventada', to: 'Nada', relation: 'x' }] };
@@ -182,11 +191,16 @@ test('provenance labels come from data: AI blocks are labelled and never cite ma
   const ai = callouts.filter((block) => /^> \[!ai-(example|analogy|mistake)\]/.test(block));
   assert.ok(ai.length >= 2);
   for (const block of ai) {
-    const body = block.split('\n\n')[0];
     assert.ok(!/nodus:\/\/study/.test(block.split(/\n(?!>)/)[0]), 'AI callouts carry no material links');
-    assert.match(body, /elaborad[oa] por IA|sugerido por IA/);
+    // The mark in the title says it every time; the full sentence only the first time.
+    assert.match(block.split('\n')[0], /^> \[!ai-(example|analogy|mistake)\] (Ejemplo|Analogía|Error frecuente) \(IA\)/);
   }
-  assert.match(result.markdown, /> \[!definition\] Definición/);
+  assert.equal(result.markdown.split('Elaborado por IA: no procede de tus materiales.').length - 1, 1, 'the full notice is printed once in the whole guide');
+  assert.ok(ai[0].includes('Elaborado por IA: no procede de tus materiales.'), 'and it is on the first AI block');
+  assert.ok(result.counts.droppedAi >= 1, 'the writer offered more AI additions than a section may carry');
+  for (const chunk of result.markdown.split(/\n(?=### )/)) assert.ok((chunk.match(/^> \[!ai-/gm) ?? []).length <= 1, 'at most one AI box per section');
+  assert.ok(!/^> \[!(definition|formula|rule|procedure|memorize)\]/m.test(result.markdown), 'definitions, formulas and rules are prose, not boxes');
+  assert.match(result.markdown, /\nDefinición: la presión se define como la fuerza por unidad de superficie\. \(\[A1 · p\. 1\]\(nodus:\/\/study\/material\/gases\?page=1&e=K\d{4}\)\)/, 'a definition is a cited paragraph');
   assert.match(result.markdown, /\[A1 · p\. \d+\]\(nodus:\/\/study\/material\/gases\?page=\d+&e=K\d{4}\)/, 'citations carry page and item');
   assert.match(result.markdown, /\[D1 · § Resumen\]\(nodus:\/\/study\/doc\/note\?from=\d+&e=K\d{4}\)/);
   assert.match(result.markdown, /\*\*Respuestas de autoevaluación\*\*/);
@@ -199,9 +213,16 @@ test('LaTeX is valid everywhere; reference sections and the review sheet are bui
   const result = await core.runCompleteGuide(input(), memoryDeps(fakeModel()));
   assert.deepEqual(invalidMath(result.markdown), []);
   assert.ok(result.counts.invalidLatex >= 1, 'broken LaTeX was detected and repaired');
-  for (const heading of ['## Cómo usar esta guía', '## Mapa del temario', '## Glosario', '## Formulario', '## Ficha de repaso', '## Cobertura y limitaciones', '## Índice de fuentes']) {
+  for (const heading of ['## Cómo usar esta guía', '## Glosario', '## Formulario', '## Ficha de repaso', '## Fuentes y cobertura']) {
     assert.ok(result.markdown.includes(heading), heading);
   }
+  // The overview is the abstract, printed once; the connections between topics go in the how-to; the
+  // two appendices about the sources are one part.
+  assert.ok(!result.markdown.includes('## Mapa del temario') && !result.markdown.includes('## Cobertura y limitaciones') && !result.markdown.includes('## Índice de fuentes'));
+  assert.equal(result.abstract, 'Los gases preparan el estudio de los ácidos.');
+  assert.ok(!result.markdown.includes(result.abstract));
+  assert.match(result.markdown, /\*\*Cómo se relacionan los temas\*\*\n\n- \*\*Tema 1 · Gases\*\* → \*\*Tema 2 · Ácidos\*\*: Prepara/);
+  assert.match(result.markdown, /## Fuentes y cobertura\n\n\*\*Índice de fuentes\*\*\n\n- \*\*A1\*\*[\s\S]*\*\*Cobertura y limitaciones\*\*\n\nLo que se leyó[\s\S]*\| Fuente \| Título \| Leído/);
   assert.match(result.cheatSheetMarkdown, /PV = nRT/);
   assert.ok(!result.markdown.includes('Inventada'), 'map edges between unknown units are dropped');
   assert.equal(result.coverage.find((row) => row.source.sourceKey === 'material:gases').passagesRead, snapshot.passages.filter((passage) => passage.sourceKey === 'material:gases').length);
@@ -214,8 +235,45 @@ test('audit removes unsupported sentences after a repair attempt', async () => {
   assert.ok(result.counts.repairedBlocks > 0);
 });
 
+test('standard verification audits prose, summaries and answers even when no new number triggers it', async () => {
+  const model = fakeModel();
+  const original = model.json;
+  const unsupported = 'INVENTADO: esta condición es exclusiva.';
+  const badAnswer = 'INVENTADO: la fuente contradicha demuestra la corrección.';
+  model.json = async (call) => {
+    const result = await original(call);
+    if (call.system === prompts.WRITE_SYSTEM || call.system === prompts.CONTINUE_SYSTEM) {
+      for (const block of result.blocks) {
+        if (block.kind === 'explanation' && block.itemIds?.length) block.markdown += ` ${unsupported}`;
+        if (block.kind === 'selfcheck') block.answer = badAnswer;
+      }
+    }
+    if (call.system === prompts.SUMMARY_SYSTEM) {
+      for (const paragraph of result.paragraphs) paragraph.markdown += ` ${unsupported}`;
+    }
+    // If repair cannot supply an answer from the cited evidence, the question must go.
+    if (call.system === prompts.REVISE_SYSTEM && JSON.parse(call.user).question) return { markdown: badAnswer };
+    return result;
+  };
+  const seen = [];
+  const deps = memoryDeps(model);
+  const audit = deps.audit;
+  deps.audit = async (markdown, sources) => {
+    seen.push({ markdown, sources });
+    return audit(markdown, sources);
+  };
+  const result = await core.runCompleteGuide(input({ config: { ...config, verification: 'standard' } }), deps);
+  assert.ok(seen.some(({ markdown }) => markdown.includes(unsupported)), 'unsupported prose without new quantities is audited');
+  assert.ok(seen.some(({ markdown }) => markdown === badAnswer), 'answers are audited independently of their questions');
+  assert.ok(seen.every(({ sources }) => sources.length), 'every audit uses the block own evidence');
+  assert.ok(!result.markdown.includes('INVENTADO'), 'the summary, body and answers retain no unsupported sentence');
+  assert.ok(!result.markdown.includes('¿Qué es la presión?'), 'a question without a supported answer is removed');
+  assert.ok(result.counts.auditedBlocks > 0);
+});
+
 test('the audit is handed a citation URL, so its own links never nest inside a Markdown link', async () => {
   const seen = [];
+  const labelsSeen = [];
   const deps = memoryDeps(fakeModel(), undefined, {
     // What the real audit does with what it is given: `applyResearchProseVerdicts` wraps every
     // sentence it verifies as `[label](citation)`. That is a link when the caller passes a URL
@@ -224,7 +282,7 @@ test('the audit is handed a citation URL, so its own links never nest inside a M
     audit: async (markdown, sources) => {
       const sentences = markdown.split(/(?<=\.)\s+/);
       const kept = sentences.filter((sentence) => !/INVENTADO/.test(sentence));
-      if (sources.length) seen.push(...sources.map((source) => source.citation));
+      if (sources.length) { seen.push(...sources.map((source) => source.citation)); labelsSeen.push(...sources.map((source) => source.label)); }
       const cited = sources.map((source) => `[${source.label}](${source.citation})`).join(' ');
       return { markdown: [kept.join(' '), cited].filter(Boolean).join(' '), removed: sentences.length - kept.length };
     },
@@ -232,8 +290,16 @@ test('the audit is handed a citation URL, so its own links never nest inside a M
   const result = await core.runCompleteGuide(input({ config: { ...config, verification: 'exhaustive' } }), deps);
   assert.ok(seen.length, 'the audit ran on at least one block');
   for (const citation of seen) assert.match(citation, /^nodus:\/\/study\//, `a citation URL, never a rendered link: ${citation}`);
+  // The audit prints its label after every sentence it verifies: the guide's own citation label, not an item title.
+  for (const label of labelsSeen) assert.match(label, /^[AD]\d · (p\. \d+|§ .+)$/, `a locator label: ${label}`);
   assert.ok(!result.markdown.includes('](['), 'nothing renders as a link inside a link');
   assert.match(result.markdown, /\]\(nodus:\/\/study\/material\//, 'the verified sentence carries a single link to its material');
+});
+
+test('an audit outage fails the section instead of publishing unverified prose', async () => {
+  const deps = memoryDeps(fakeModel(), undefined, { audit: async () => { throw new Error('audit provider unavailable'); } });
+  await assert.rejects(core.runCompleteGuide(input(), deps), /audit provider unavailable/);
+  assert.ok(![...deps.stores.checkpoints.keys()].some((key) => key.startsWith('section|')), 'failed sections are not checkpointed as verified');
 });
 
 test('a second version reuses the reading cache; an interrupted run resumes from checkpoints', async () => {
@@ -365,4 +431,136 @@ test('web images illustrate core concepts without material figures, attributed a
 test('settlePool keeps siblings running when one task fails', async () => {
   const results = await core.settlePool([1, 2, 3, 4], 2, async (value) => { if (value === 2) throw new Error('x'); return value * 2; });
   assert.deepEqual(results.map((result) => (result.ok ? result.value : 'error')), [2, 'error', 6, 8]);
+});
+
+// ── A chapter about events over time: chronology, key concepts, summary, questions ───────────────
+
+const historyOrganization = {
+  courses: [{ id: 'c', name: 'Bachillerato', position: 0 }],
+  subjects: [{ id: 'hist', name: 'Historia de España', courseId: 'c', position: 0 }],
+  folders: [],
+  topics: [
+    { id: 'h6', name: 'Tema 6 · El liberalismo', subjectId: 'hist', folderId: null, parentId: null, position: 0 },
+    { id: 'h7', name: 'Tema 7 · La Restauración', subjectId: 'hist', folderId: null, parentId: null, position: 1 },
+  ],
+};
+const historyPages = {
+  liberalism: [
+    'La invasión napoleónica comenzó en 1808 y desató la guerra de Independencia.',
+    'Las Cortes de Cádiz aprobaron la Constitución de 1812. Fernando VII restauró el absolutismo en 1814.',
+  ],
+  restoration: [
+    'La Restauración borbónica comenzó en 1874 con el pronunciamiento de Martínez Campos en Sagunto.',
+    'La Constitución de 1876 estuvo vigente hasta 1923. El turno pacífico alternaba a conservadores y liberales.',
+    'El desastre de 1898 supuso la pérdida de Cuba, Puerto Rico y Filipinas. El caciquismo garantizaba los resultados electorales.',
+  ],
+};
+const historyCatalog = [
+  { sourceKey: 'material:liberalism', kind: 'material', sourceId: 'liberalism', title: 'El liberalismo', placements: [scope({ subjectId: 'hist', topicId: 'h6' })], available: true },
+  { sourceKey: 'material:restoration', kind: 'material', sourceId: 'restoration', title: 'La Restauración', placements: [scope({ subjectId: 'hist', topicId: 'h7' })], available: true },
+];
+const historyConfig = normalizeCompleteGuideConfig({ runId: 'cg-history-run', selection: { nodes: [{ kind: 'subject', id: 'hist' }], excludedSourceKeys: [] } });
+const historySnapshot = buildCompleteGuideSnapshot(resolveCompleteGuideSelection(historyConfig.selection, historyCatalog, historyOrganization).sources.map((source) => ({
+  source, updatedAt: '2026-01-01', text: markers(historyPages[source.sourceId]),
+})), historyOrganization);
+
+/** What the real extraction did with a history unit: every sentence a definition, none with a `date`. */
+function historyModel(options = {}) {
+  const calls = [];
+  const json = async (call) => {
+    calls.push(call);
+    const user = JSON.parse(call.user);
+    if (call.system === prompts.RECON_SYSTEM) return { outline: [{ title: user.source.title, firstPassage: user.passages[0].id, lastPassage: user.passages.at(-1).id, summary: 'Resumen.' }], keyTerms: [] };
+    if (call.system === prompts.EXTRACT_SYSTEM || call.system === prompts.RECOVER_SYSTEM) {
+      return { items: user.passages.flatMap((passage) => sentences(passage.text).map((sentence) => ({ type: 'definition', title: sentence.split(' ').slice(0, 4).join(' '), statement: sentence, importance: 'core', passageId: passage.id, quote: sentence }))) };
+    }
+    if (call.system === prompts.PLAN_SYSTEM) {
+      const ids = user.items.map((item) => item.id);
+      const half = Math.ceil(ids.length / 2);
+      return { overview: 'Un tema.', sections: [{ title: `Antecedentes de ${user.unit}`, purpose: 'Entender.', itemIds: ids.slice(0, half) }, { title: `Desarrollo de ${user.unit}`, purpose: 'Aplicar.', itemIds: ids.slice(half) }] };
+    }
+    if (call.system === prompts.WRITE_SYSTEM || call.system === prompts.CONTINUE_SYSTEM) {
+      const ids = user.items.map((item) => item.id);
+      return { blocks: [
+        ...user.items.map((item) => ({ kind: 'explanation', itemIds: [item.id], markdown: item.statement })),
+        // The prompt asks a narrative chapter for none of these; code drops the analogy and keeps one warning per chapter.
+        { kind: 'ai_analogy', itemIds: [ids[0]], markdown: 'Una analogía que no debería estar en un capítulo narrativo.' },
+        { kind: 'mistake', itemIds: [ids[0]], markdown: `Un error típico de ${user.section.title}.` },
+        { kind: 'selfcheck', itemIds: [ids[0]], question: `¿Qué ocurrió en «${user.section.title}»?`, answer: user.items[0].statement },
+      ] };
+    }
+    if (call.system === prompts.SUMMARY_SYSTEM) {
+      if (options.failSummary) throw new Error('summary provider down');
+      return { paragraphs: [{ itemIds: user.items.map((item) => item.id).slice(0, 3), markdown: `Relato de ${user.unit} en orden cronológico.` }] };
+    }
+    if (call.system === prompts.MAP_SYSTEM) return { overview: 'Del liberalismo a la Restauración.', connections: [] };
+    if (call.system === prompts.CHEAT_SYSTEM) return { points: [] };
+    throw new Error(`unexpected prompt ${call.system.slice(0, 40)}`);
+  };
+  return { json, calls };
+}
+const historyInput = (overrides = {}) => ({ config: historyConfig, snapshot: historySnapshot, organization: historyOrganization, language: 'es', modelKey: 'fake/history', promptVersion: 'test', instructions: '', windows: { reconChars: 4_000, extractChars: 4_000 }, concurrency: { read: 2, write: 2, verify: 2 }, ...overrides });
+
+test('a chapter about events opens with its chronology, its key concepts and a cited summary, and ends with its questions', async () => {
+  const model = historyModel();
+  const result = await core.runCompleteGuide(historyInput(), memoryDeps(model));
+  const chapter = result.markdown.split(/\n(?=## )/).find((part) => part.startsWith('## Tema 7 · La Restauración\n'));
+  assert.ok(chapter);
+  const headings = [...chapter.matchAll(/^### (.+)$/gm)].map((match) => match[1]);
+  assert.deepEqual(headings, ['Cronología', 'Conceptos clave', 'Resumen del tema', 'Antecedentes de Tema 7 · La Restauración', 'Desarrollo de Tema 7 · La Restauración', 'Pon a prueba lo que sabes']);
+  // The model typed every sentence a definition and gave no date: the years come from the anchored quotes.
+  const chronology = /### Cronología\n\n((?:- .+\n?)+)/.exec(chapter)[1].trim().split('\n');
+  assert.deepEqual(chronology.map((line) => Number(line.match(/^- \*\*(\d+)\*\*/)[1])), [1874, 1876, 1898]);
+  assert.match(chronology[0], /\(\[A\d · p\. 1\]\(nodus:\/\/study\/material\/restoration\?page=1&e=K\d{4}\)\)$/, 'every line of the chronology is cited');
+  assert.equal(/### Conceptos clave\n\n((?:- .+\n?)+)/.exec(chapter)[1].trim().split('\n').length, 5, 'the concepts of the chapter, one line each');
+  assert.match(chapter, /### Resumen del tema\n\nRelato de Tema 7 · La Restauración en orden cronológico\. \(\[A\d · p\. \d\]/);
+  assert.ok(!chapter.includes('Un párrafo que no se apoya'), 'a summary paragraph needs items');
+  assert.equal(result.chapters.find((entry) => entry.title.startsWith('Tema 7')).kind, 'narrative');
+  assert.equal(result.counts.summaries, 2);
+  // Questions: one box, numbered, then the answers.
+  const practice = chapter.split('### Pon a prueba lo que sabes\n\n')[1];
+  assert.match(practice, /^> \[!selfcheck\] Autoevaluación\n>\n> 1\. ¿Qué ocurrió en «Antecedentes de Tema 7 · La Restauración»\?\n> 2\. ¿Qué ocurrió en «Desarrollo de Tema 7 · La Restauración»\?\n\n\*\*Respuestas de autoevaluación\*\*\n\n\*\*1\.\*\* /);
+  assert.equal((chapter.match(/\[!selfcheck\]/g) ?? []).length, 1);
+  // A narrative chapter is told without analogies, and the writer is told what kind of chapter it is.
+  const writer = model.calls.filter((call) => call.system === prompts.WRITE_SYSTEM).map((call) => JSON.parse(call.user));
+  assert.ok(writer.length === 4 && writer.every((request) => request.profile.kind === 'narrative'));
+  // Events over time: no analogy at all, and one warning about a confusion for the whole chapter, not one per section.
+  assert.ok(!chapter.includes('[!ai-analogy]') && !chapter.includes('[!ai-example]'));
+  assert.equal((chapter.match(/\[!ai-mistake\]/g) ?? []).length, 1);
+  assert.equal(result.counts.aiBlocks, 2, 'one per chapter');
+  assert.equal(result.counts.droppedAi, 6, 'per chapter: two analogies (never) and one of the two warnings');
+});
+
+test('a guide-wide chronology appears only when dates span several chapters', async () => {
+  const result = await core.runCompleteGuide(historyInput(), memoryDeps(historyModel()));
+  const global = result.markdown.split(/\n(?=## )/).find((part) => part.startsWith('## Cronología\n'));
+  assert.ok(global, 'two chapters with dates share one timeline');
+  const years = [...global.matchAll(/^\| (\d{4}) \|/gm)].map((match) => Number(match[1]));
+  assert.deepEqual(years, [1808, 1812, 1814, 1874, 1876, 1898].filter((year) => years.includes(year)));
+  assert.ok(years.length >= 5 && years.every((year, index) => index === 0 || year >= years[index - 1]));
+  // The chemistry guide has no dates: no chronology anywhere.
+  const chemistry = await core.runCompleteGuide(input(), memoryDeps(fakeModel()));
+  assert.ok(!/^### Cronología$/m.test(chemistry.markdown) && !/^## Cronología$/m.test(chemistry.markdown));
+  // One dated chapter: its own chronology is enough.
+  const single = await core.runCompleteGuide(historyInput({
+    config: { ...historyConfig, selection: { nodes: [{ kind: 'topic', id: 'h7' }], excludedSourceKeys: [] } },
+    snapshot: buildCompleteGuideSnapshot(resolveCompleteGuideSelection({ nodes: [{ kind: 'topic', id: 'h7' }], excludedSourceKeys: [] }, historyCatalog, historyOrganization).sources.map((source) => ({ source, updatedAt: '2026-01-01', text: markers(historyPages[source.sourceId]) })), historyOrganization),
+  }), memoryDeps(historyModel()));
+  assert.ok(/^### Cronología$/m.test(single.markdown) && !/^## Cronología$/m.test(single.markdown));
+});
+
+test('a summary that cannot be written is a warning, not a failed guide', async () => {
+  const result = await core.runCompleteGuide(historyInput(), memoryDeps(historyModel({ failSummary: true })));
+  assert.deepEqual(result.warnings.filter((warning) => warning.startsWith('summary:')).sort(), ['summary:topic:h6', 'summary:topic:h7']);
+  assert.ok(!result.markdown.includes('### Resumen del tema'));
+  assert.ok(result.markdown.includes('### Cronología') && result.markdown.includes('### Pon a prueba lo que sabes'));
+  assert.equal(result.counts.summaries, 0);
+  // The stated keys of the cache/checkpoints: a run resumed after the summary failed writes it then.
+  const stores = { cache: new Map(), checkpoints: new Map() };
+  await core.runCompleteGuide(historyInput(), memoryDeps(historyModel({ failSummary: true }), stores));
+  const resumed = historyModel();
+  const again = await core.runCompleteGuide(historyInput(), memoryDeps(resumed, stores));
+  assert.ok(again.markdown.includes('### Resumen del tema'));
+  assert.equal(resumed.calls.filter((call) => call.system === prompts.SUMMARY_SYSTEM).length, 2, 'only the summaries are asked again');
+  assert.equal(resumed.calls.filter((call) => call.system === prompts.WRITE_SYSTEM).length, 0, 'sections are checkpointed');
 });

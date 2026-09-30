@@ -3,6 +3,12 @@
  * them. Labels, callout markers and citation links are produced here from data: a
  * block is "from your materials" only if it names extracted items, an AI example is
  * labelled as such and never links to a material, and web blocks only cite the web.
+ *
+ * A guide is prose first. Explanations, definitions, rules, formulas and procedures
+ * render as ordinary paragraphs (a box on everything signals nothing); a box marks a
+ * different mode of reading: a worked example, a warning about an error, an addition
+ * by the AI or a page from the web. The AI notice is written in full on the first AI
+ * block of the guide; every later one carries only the short mark in its title.
  */
 import type { CompleteGuideItem } from './items';
 import type { CompleteGuideLabels } from './labels';
@@ -30,7 +36,7 @@ export interface CompleteGuideBlock {
   audit?: { checked: boolean; removedSentences: number; repaired: boolean };
 }
 
-export interface WrittenBlocksResult { blocks: CompleteGuideBlock[]; dropped: { unsupported: number; aiDisabled: number; malformed: number } }
+export interface WrittenBlocksResult { blocks: CompleteGuideBlock[]; dropped: { unsupported: number; aiDisabled: number; malformed: number; redundant: number } }
 
 const KINDS = new Set<string>(COMPLETE_GUIDE_BLOCK_KINDS);
 const MATERIAL_KINDS = new Set<CompleteGuideBlockKind>(['explanation', 'definition', 'formula', 'rule', 'procedure', 'example', 'table', 'memorize']);
@@ -46,6 +52,9 @@ export function validWrittenBlocks(value: unknown): value is { blocks: unknown[]
  */
 export function sanitizeModelMarkdown(value: string): string {
   return value
+    // Models fall back to LaTeX's own delimiters; the guide's formulas are `$…$` and `$$…$$`.
+    .replace(/(?<!\\)\\\(([\s\S]+?)(?<!\\)\\\)/g, (_match, tex: string) => `$${tex.trim()}$`)
+    .replace(/(?<!\\)\\\[([\s\S]+?)(?<!\\)\\\]/g, (_match, tex: string) => `$$${tex.trim()}$$`)
     .replace(/<\/?[a-z][^>]*>/gi, '')
     .replace(/\[[^\]]*\]\((?:nodus|file|javascript):[^)]*\)/gi, '')
     .replace(/\[(?:[ADGKW]\d+(?:\.\d+)?(?:\s*[,;·]\s*[^\]]{0,30})?)\]\([^)]*\)/g, '')
@@ -85,7 +94,7 @@ export function normalizeWrittenBlocks(
   raw: unknown,
   options: { validItemIds: ReadonlySet<string>; items: ReadonlyMap<string, CompleteGuideItem>; aiExamples: boolean; webIds?: ReadonlySet<string> },
 ): WrittenBlocksResult {
-  const dropped = { unsupported: 0, aiDisabled: 0, malformed: 0 };
+  const dropped = { unsupported: 0, aiDisabled: 0, malformed: 0, redundant: 0 };
   const blocks: CompleteGuideBlock[] = [];
   const list = validWrittenBlocks(raw) ? raw.blocks : [];
   for (const entry of list) {
@@ -96,6 +105,9 @@ export function normalizeWrittenBlocks(
     const title = typeof input.title === 'string' ? sanitizeModelMarkdown(input.title).replace(/\n/g, ' ').slice(0, 160) : '';
     const markdown = typeof input.markdown === 'string' ? sanitizeModelMarkdown(input.markdown).slice(0, 8_000) : '';
     const base = { kind, itemIds, ...(title ? { title } : {}) };
+    // A "to memorize" list restates what the prose already said; the review sheet is the
+    // guide's place for what to remember.
+    if (kind === 'memorize') { dropped.redundant += 1; continue; }
     if (kind === 'web') {
       // Only passages actually recorded for this guide; a web block never cites materials.
       const webPassageIds = [...new Set((Array.isArray(input.webPassageIds) ? input.webPassageIds : []).map(String).map((id) => id.trim()).filter((id) => options.webIds?.has(id)))];
@@ -147,42 +159,145 @@ export function coveredItemIds(blocks: CompleteGuideBlock[]): Set<string> {
   return covered;
 }
 
+/**
+ * At most one AI addition per section, the first the writer produced, and none of the
+ * `forbidden` kinds. The prompt asks for the same; this is the guarantee. Interesting but
+ * unnecessary additions cost the student attention (the coherence principle), and in a chapter
+ * about events an invented scenario or an analogy is decoration, not history.
+ */
+export function capAiBlocks(blocks: CompleteGuideBlock[], limit = 1, forbidden: readonly CompleteGuideBlockKind[] = []): { blocks: CompleteGuideBlock[]; dropped: number } {
+  let kept = 0;
+  let dropped = 0;
+  const result = blocks.filter((block) => {
+    if (block.provenance !== 'ai') return true;
+    if (forbidden.includes(block.kind) || kept >= limit) { dropped += 1; return false; }
+    kept += 1;
+    return true;
+  });
+  return { blocks: result, dropped };
+}
+
+/**
+ * The audit removes sentences from lists and bold runs; what is left can be a list that
+ * counts 1, 2, 3, 6 or a `**` with nothing to close. Both are repaired here, after the
+ * audit, so the plain Markdown and Word exports read as well as the reader does.
+ */
+export function renumberOrderedLists(markdown: string): string {
+  const counters = new Map<number, number>();
+  return markdown.split('\n').map((line) => {
+    if (!line.trim()) return line;
+    // Steps are numbered 1, 2, 3…: a line that opens with a year ("1874. La Restauración…") is a sentence, not a step.
+    const ordered = line.match(/^(\s*)(\d{1,2})([.)])(\s+)/);
+    const indent = (line.match(/^\s*/)?.[0].length) ?? 0;
+    if (ordered) {
+      for (const key of [...counters.keys()]) if (key > indent) counters.delete(key);
+      const next = counters.get(indent);
+      counters.set(indent, (next ?? Number(ordered[2])) + 1);
+      return next === undefined ? line : `${ordered[1]}${next}${ordered[3]}${ordered[4]}${line.slice(ordered[0].length)}`;
+    }
+    // Text at the margin ends every list; an indented line continues the current one.
+    for (const key of [...counters.keys()]) if (key >= indent && (indent === 0 || !/^\s*[-*+]\s/.test(line) || key > indent)) counters.delete(key);
+    return line;
+  }).join('\n');
+}
+
+/** One `**` that opens nothing or closes nothing, judged by its flanking characters. */
+export function removeStrayBold(line: string): string {
+  if (!line.includes('**')) return line;
+  const masked = line.replace(/`[^`]*`|\$[^$]*\$/g, (part) => 'x'.repeat(part.length));
+  const marks = [...masked.matchAll(/\*\*/g)].map((match) => match.index ?? 0);
+  if (marks.length % 2 === 0) return line;
+  const space = /[\s]/;
+  const closes = (at: number) => at > 0 && !space.test(masked[at - 1]) && (at + 2 >= masked.length || space.test(masked[at + 2]) || /[.,;:!?)»\]]/.test(masked[at + 2]));
+  const opens = (at: number) => at + 2 < masked.length && !space.test(masked[at + 2]) && (at === 0 || space.test(masked[at - 1]) || /[(«[¿¡]/.test(masked[at - 1]));
+  let open: number | null = null;
+  let stray: number | null = null;
+  for (const at of marks) {
+    if (open === null) {
+      if (opens(at)) open = at;
+      else { stray = at; break; }
+    } else if (closes(at)) open = null;
+    else if (opens(at)) { stray = open; break; }
+  }
+  if (stray === null) stray = open;
+  if (stray === null) return line;
+  return `${line.slice(0, stray)}${line.slice(stray + 2)}`.replace(/(?<=\S)[ \t]{2,}/g, ' ');
+}
+
+export function tidyAuditedMarkdown(markdown: string): string {
+  return renumberOrderedLists(markdown).split('\n').map(removeStrayBold).join('\n');
+}
+
 export interface RenderContext {
   labels: CompleteGuideLabels;
   /** Citation links for an item's evidence, e.g. `[A1 · p. 12](nodus://…)`. */
   cite: (itemId: string) => string[];
   /** Web blocks: links to their recorded web passages. */
   citeWeb?: (webPassageId: string) => string | null;
+  /**
+   * Guide-wide render state. The AI notice is written in full on the first AI block and
+   * flips this flag; without state every AI block carries the full notice (the safe default).
+   */
+  state?: { aiNoticeShown: boolean };
 }
 
+export interface RenderedBlock {
+  markdown: string;
+  /** Self-check blocks: printed together at the end of the chapter (see `renderPractice`). */
+  practice?: PracticeEntry;
+}
+
+export interface PracticeEntry { question: string; answer: string }
+
+/** Boxes are kept for what changes the mode of reading; everything else is prose. */
 const CALLOUT: Partial<Record<CompleteGuideBlockKind, { type: string; label: keyof CompleteGuideLabels }>> = {
-  definition: { type: 'definition', label: 'definition' },
-  formula: { type: 'formula', label: 'formula' },
-  rule: { type: 'rule', label: 'rule' },
-  procedure: { type: 'procedure', label: 'procedure' },
   example: { type: 'example', label: 'example' },
-  ai_example: { type: 'ai-example', label: 'aiExample' },
-  ai_analogy: { type: 'ai-analogy', label: 'aiAnalogy' },
-  memorize: { type: 'memorize', label: 'memorize' },
+  ai_example: { type: 'ai-example', label: 'aiExampleShort' },
+  ai_analogy: { type: 'ai-analogy', label: 'aiAnalogyShort' },
   web: { type: 'web', label: 'webSources' },
 };
+const PROSE_KINDS = new Set<CompleteGuideBlockKind>(['explanation', 'definition', 'formula', 'rule', 'procedure', 'memorize']);
 
 /** Display math on its own lines: `$$x$$` inline in a sentence renders as small inline math. */
 export function displayMathOnOwnLines(markdown: string): string {
   return markdown.replace(/[ \t]*\$\$([\s\S]+?)\$\$[ \t]*/g, (_match, tex: string) => `\n\n$$\n${tex.trim()}\n$$\n\n`).replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/** Inside a numbered question a formula stays in the line: `$$x$$` → `$x$`. */
+function inlineMath(markdown: string): string {
+  return markdown.replace(/\$\$([\s\S]+?)\$\$/g, (_match, tex: string) => `$${tex.replace(/\s+/g, ' ').trim()}$`).replace(/\s*\n+\s*/g, ' ').trim();
+}
+
 function quoteLines(markdown: string): string {
   return markdown.split('\n').map((line) => (line.trim() ? `> ${line}` : '>')).join('\n');
 }
 
+/**
+ * Item evidence to cite after a block. Sentences the audit verified already carry a link
+ * to their item's evidence (`e=K0012`); only the items no link points to are added, so
+ * an audited paragraph is not cited twice and no item goes uncited.
+ */
 function citations(block: CompleteGuideBlock, context: RenderContext): string {
   if (block.provenance === 'web') {
     const links = (block.webPassageIds ?? []).map((id) => context.citeWeb?.(id)).filter((link): link is string => Boolean(link));
     return links.join('; ');
   }
   if (block.provenance !== 'materials' && block.provenance !== 'derived') return '';
-  return [...new Set(block.itemIds.flatMap((id) => context.cite(id)))].join('; ');
+  const linked = new Set([...`${block.markdown}\n${block.answer ?? ''}`.matchAll(/[?&]e=(K\d{4,})/g)].map((match) => match[1]));
+  return [...new Set(block.itemIds.filter((id) => !linked.has(id)).flatMap((id) => context.cite(id)))].join('; ');
+}
+
+/**
+ * Citations after a paragraph go in parentheses on its last line; after a list, a table,
+ * a fenced block or a displayed formula they would end up inside the wrong construct, so
+ * they take a line of their own.
+ */
+export function appendCitations(markdown: string, cites: string): string {
+  const text = markdown.trimEnd();
+  if (!cites) return text;
+  const last = text.split('\n').pop() ?? '';
+  const ownLine = /^\s*(?:[-*+]\s|\d+[.)]\s|\||```|>)/.test(last) || /\$\$\s*$/.test(last);
+  return ownLine ? `${text}\n\n(${cites})` : `${text} (${cites})`;
 }
 
 export function renderTable(table: CompleteGuideTable): string {
@@ -193,35 +308,84 @@ export function renderTable(table: CompleteGuideTable): string {
   ].join('\n');
 }
 
+const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /**
- * One block as Markdown. Callouts use the Obsidian syntax `> [!type] Label · title`,
- * which the reader, the PDF and Word render as cards and plain Markdown keeps legible.
- * Self-check answers are returned separately so they can be printed at chapter end.
+ * The box already says what it is («Ejemplo (IA)»); a title that starts by saying it again
+ * («Ejemplo: convertir 0,5 atm») keeps only what is specific.
  */
-export function renderBlock(input: CompleteGuideBlock, context: RenderContext, selfCheckNumber?: number): { markdown: string; answer?: string } {
+export function boxTitle(title: string | undefined, label: string): string {
+  const clean = (title ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const lead = fold(label).split(/[\s(（]/)[0];
+  if (!lead || !fold(clean).startsWith(lead)) return clean;
+  const split = clean.match(/^([^:：\-–—]{1,40})\s*[:：\-–—]\s*(\S[\s\S]*)$/);
+  if (split && split[1].trim().split(/\s+/).length <= 4) return split[2].trim();
+  return clean.split(/\s+/).length <= 3 ? '' : clean;
+}
+
+/** A bold lead-in for the legacy block kinds that carried a title; explanations never do. */
+function leadIn(title: string | undefined, markdown: string): string {
+  if (!title || /^\*\*/.test(markdown)) return markdown;
+  return /^(\$\$|\s*(?:[-*+]|\d+[.)])\s)/.test(markdown) ? `**${title}.**\n\n${markdown}` : `**${title}.** ${markdown}`;
+}
+
+/**
+ * One block as Markdown. Prose is plain paragraphs; the few boxes use the Obsidian
+ * syntax `> [!type] Label · title`, which the reader, the PDF and Word render as cards
+ * and plain Markdown keeps legible. Self-check questions are returned separately so they
+ * can be printed together, mixed across sections, at the end of the chapter.
+ */
+export function renderBlock(input: CompleteGuideBlock, context: RenderContext): RenderedBlock {
   const { labels } = context;
-  const block = { ...input, markdown: displayMathOnOwnLines(input.markdown), ...(input.question ? { question: displayMathOnOwnLines(input.question) } : {}), ...(input.answer ? { answer: displayMathOnOwnLines(input.answer) } : {}) };
+  const block = { ...input, markdown: displayMathOnOwnLines(input.markdown), ...(input.question ? { question: inlineMath(input.question) } : {}), ...(input.answer ? { answer: displayMathOnOwnLines(input.answer) } : {}) };
   const cites = citations(block, context);
-  const citeLine = cites ? `\n\n${cites}` : '';
   if (block.kind === 'selfcheck') {
-    const number = selfCheckNumber ?? 1;
-    return {
-      markdown: `> [!selfcheck] ${labels.selfCheck} ${number}\n${quoteLines(block.question ?? '')}`,
-      answer: `**${number}.** ${block.answer ?? ''}${cites ? ` (${cites})` : ''}`,
-    };
+    return { markdown: '', practice: { question: block.question ?? '', answer: `${block.answer ?? ''}${cites ? ` (${cites})` : ''}` } };
   }
   if (block.kind === 'table' && block.table) {
     const heading = `**${block.title || labels.summaryTable}**`;
     return { markdown: [heading, block.markdown, renderTable(block.table), block.citationsInRows ? '' : cites].filter(Boolean).join('\n\n') };
   }
-  if (block.kind === 'mistake') {
-    const type = block.provenance === 'ai' ? 'ai-mistake' : 'mistake';
-    const label = block.provenance === 'ai' ? labels.aiMistake : labels.mistake;
-    const note = block.provenance === 'ai' ? `\n\n*${labels.aiNote}*` : '';
-    return { markdown: `> [!${type}] ${label}${block.title ? ` · ${block.title}` : ''}\n${quoteLines(`${block.markdown}${note}${citeLine}`)}` };
+  const box = (type: string, label: string, body: string): RenderedBlock => {
+    const specific = boxTitle(block.title, label);
+    return { markdown: `> [!${type}] ${specific ? `${label} · ${specific}` : label}\n${quoteLines(body)}` };
+  };
+  if (block.provenance === 'ai') {
+    // The full notice once; afterwards the mark in the title is the whole label.
+    const full = !context.state || !context.state.aiNoticeShown;
+    if (context.state) context.state.aiNoticeShown = true;
+    const body = `${block.markdown}${full ? `\n\n*${labels.aiNote}*` : ''}`;
+    if (block.kind === 'mistake') return box('ai-mistake', labels.aiMistakeShort, body);
+    return box(CALLOUT[block.kind]?.type ?? 'ai-example', labels[CALLOUT[block.kind]?.label ?? 'aiExampleShort'], body);
   }
+  const citeLine = cites ? `\n\n${cites}` : '';
+  if (block.kind === 'mistake') return box('mistake', labels.mistake, `${block.markdown}${citeLine}`);
   const callout = CALLOUT[block.kind];
-  if (!callout) return { markdown: `${block.markdown}${cites ? ` (${cites})` : ''}` };
-  const note = block.provenance === 'ai' ? `\n\n*${labels.aiNote}*` : block.provenance === 'web' ? `\n\n*${labels.webNote}*` : '';
-  return { markdown: `> [!${callout.type}] ${labels[callout.label]}${block.title ? ` · ${block.title}` : ''}\n${quoteLines(`${block.markdown}${note}${citeLine}`)}` };
+  if (callout) {
+    const note = block.provenance === 'web' ? `\n\n*${labels.webNote}*` : '';
+    return box(callout.type, labels[callout.label], `${block.markdown}${note}${citeLine}`);
+  }
+  if (PROSE_KINDS.has(block.kind)) {
+    const title = block.kind === 'explanation' ? undefined : block.kind === 'memorize' ? labels.memorize : block.title;
+    return { markdown: appendCitations(leadIn(title, block.markdown), cites) };
+  }
+  return { markdown: appendCitations(block.markdown, cites) };
+}
+
+/**
+ * The chapter's self-check questions, printed together after the explanation and mixed
+ * across its sections (one from each in turn): retrieval practice works when the student
+ * has to decide what a question is about, and the answers follow so the attempt comes first.
+ */
+export function renderPractice(groups: PracticeEntry[][], labels: CompleteGuideLabels): string {
+  const queue = groups.map((group) => [...group]).filter((group) => group.length);
+  const entries: PracticeEntry[] = [];
+  while (queue.some((group) => group.length)) for (const group of queue) { const next = group.shift(); if (next) entries.push(next); }
+  if (!entries.length) return '';
+  return [
+    `> [!selfcheck] ${labels.selfCheck}\n>\n${entries.map((entry, index) => `> ${index + 1}. ${entry.question}`).join('\n')}`,
+    `**${labels.selfCheckAnswers}**`,
+    ...entries.map((entry, index) => `**${index + 1}.** ${entry.answer}`),
+  ].join('\n\n');
 }

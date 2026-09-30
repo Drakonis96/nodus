@@ -118,10 +118,17 @@ export function estimateCompleteGuide(input: CompleteGuideEstimateInput): Comple
   const units = Math.max(1, input.unitCount ?? 1);
   const sections = Math.max(units, Math.ceil(items / ITEMS_PER_SECTION));
   const multiplier = effortMultiplier(input.effort);
-  const writeCalls = Math.ceil(sections * 2);
-  const writeOutput = Math.round(sections * 5_000 * multiplier);
+  // Two calls per section (the section and, at times, a continuation) plus one summary per chapter.
+  const writeCalls = Math.ceil(sections * 2) + units;
+  const writeOutput = Math.round(sections * 5_000 * multiplier) + units * 900;
   const sentences = writeOutput / 25;
-  const auditedBlocks = Math.ceil(Math.max(1, Math.round(items * BLOCKS_PER_ITEM)) * (input.verification === 'exhaustive' ? 1 : AUDITED_BLOCK_SHARE));
+  const historicalAudits = Math.ceil(Math.max(1, Math.round(items * BLOCKS_PER_ITEM)) * (input.verification === 'exhaustive' ? 1 : AUDITED_BLOCK_SHARE));
+  // Standard mode now audits the prose and practice answers too. Keep the measured
+  // per-audit allowance, with a floor for one paragraph per item, one answer per
+  // section and three summary paragraphs per chapter. This is a planning allowance,
+  // not a newly measured provider price or a guarantee about model output length.
+  const proseAudits = items + sections + units * 3;
+  const auditedBlocks = Math.max(historicalAudits, proseAudits);
   const auditCalls = auditedBlocks * AUDIT_CALLS_PER_BLOCK;
   const auditInput = Math.round(auditCalls * AUDIT_INPUT_PER_CALL * multiplier);
   const auditOutput = Math.round(auditCalls * AUDIT_OUTPUT_PER_CALL * multiplier);
@@ -130,7 +137,7 @@ export function estimateCompleteGuide(input: CompleteGuideEstimateInput): Comple
     { stage: 'recon', calls: reconCalls, inputTokens: Math.round(uncached * 1.1 + reconCalls * 1_500), outputTokens: Math.round(uncached * 0.04 + reconCalls * 600) },
     { stage: 'extract', calls: extractCalls, inputTokens: Math.round(uncached + extractCalls * 2_500), outputTokens: Math.round(uncached * 0.35) },
     { stage: 'plan', calls: units * 2, inputTokens: Math.round(items * 45 + units * 4_000), outputTokens: units * 3_000 },
-    { stage: 'write', calls: writeCalls, inputTokens: writeCalls * 4_000, outputTokens: writeOutput },
+    { stage: 'write', calls: writeCalls, inputTokens: writeCalls * 4_000 + units * 2_000, outputTokens: writeOutput },
     { stage: 'verify', calls: sections * 3 + auditCalls, inputTokens: sections * 3 * 8_000 + auditInput, outputTokens: Math.round(sentences * 12 + auditOutput) },
     { stage: 'finalize', calls: units + 4, inputTokens: (units + 4) * 6_000, outputTokens: (units + 4) * 1_500 },
   ];

@@ -22,7 +22,11 @@
  *
  * Checks: every readable passage is read; the twelve seeded facts reach the guide with
  * their exact page or slide; the excluded material and its unique fact never appear;
- * no AI block cites a material; all LaTeX compiles; the review sheet carries formulas;
+ * no AI block cites a material; the AI notice is printed in full once and every AI block
+ * carries the short mark; at most one AI box per section; definitions, rules and formulas
+ * are prose, not boxes; most of the words are outside a box; every chapter opens with its
+ * chronology (when it has dates) and a summary and ends with its questions; all LaTeX
+ * compiles; the review sheet carries formulas;
  * PDF, review-sheet PDF, DOCX (native equations) and Markdown exports are produced (with
  * PNG snapshots for visual review); a second version reuses ≥ 90 % of the reading
  * passes; the pre-run estimate is ≥ the real cost. Exits 1 when a check fails.
@@ -89,6 +93,8 @@ const { normalizeCompleteGuideConfig } = await load('shared/completeGuide/types.
 const { estimateCompleteGuide } = await load('shared/completeGuide/estimate.ts');
 const { invalidMath, strayDollar } = await load('shared/completeGuide/math.ts');
 const { completeGuideReportInput, completeGuideReviewSheetHtml, completeGuideMarkdown } = await load('shared/completeGuide/reportInput.ts');
+const { completeGuideLabels } = await load('shared/completeGuide/labels.ts');
+const { guideShape } = await load('shared/completeGuide/shape.ts');
 const { renderProfessionalReportHtml } = await load('shared/professionalReport.ts');
 const { completeGuideDocx } = await load('electron/export/completeGuideDocx.ts', ['docx']);
 
@@ -339,8 +345,30 @@ try {
   const stray = [first.markdown, first.cheatSheetMarkdown].flatMap((value) => value.split(/\n\s*\n/)).filter((paragraph) => strayDollar(paragraph));
   check('all LaTeX compiles in KaTeX (mhchem included) and no formula is cut', badMath.length === 0 && stray.length === 0, [...badMath.map((span) => span.tex), ...stray].slice(0, 3).join(' | '));
   check('the review sheet carries the formulas', /\$[^$]*(PV|pH|K_w|\\ce)/.test(first.cheatSheetMarkdown));
+
+  // The shape of the guide: prose first, boxes for what changes the mode of reading, the AI said once.
+  const labels = completeGuideLabels('es');
+  const shape = guideShape(first.markdown, labels.aiNote);
+  const mark = labels.aiExampleShort.match(/\([^)]*\)/)[0];
+  check('the AI notice is printed in full once, and every AI block carries the short mark', shape.aiNotices === 1 && shape.aiCallouts > 1 && aiCallouts.every((block) => block.split('\n')[0].includes(mark)),
+    `${shape.aiNotices} notice(s), ${shape.aiCallouts} AI blocks`);
+  const chunks = first.markdown.split(/\n(?=### )/);
+  check('at most one AI box per section', chunks.every((chunk) => (chunk.match(/^> \[!ai-/gm) ?? []).length <= 1), `${first.counts.droppedAi} extra AI additions dropped`);
+  check('definitions, rules, formulas and procedures are prose, not boxes', !/^> \[!(definition|formula|rule|procedure|memorize)\]/m.test(first.markdown), Object.entries(shape.byKind).map(([kind, count]) => `${kind} ${count}`).join(', '));
+  check('most of the words are outside a box', shape.proseShare >= 0.5, `${Math.round(shape.proseShare * 100)} % prose, ${Math.round(shape.boxedShare * 100)} % boxed, ${Math.round(shape.aiShare * 100)} % AI`);
+  const chapterText = (title) => first.markdown.split(/\n(?=## )/).find((part) => part.startsWith(`## ${title}\n`)) ?? '';
+  const chapterTitles = first.chapters.map((chapter) => chapter.title);
+  check('every chapter has its summary and ends with its questions', chapterTitles.every((title) => {
+    const text = chapterText(title);
+    return text.includes(`### ${labels.chapterSummary}`) && text.includes(`### ${labels.practice}`) && (text.match(/^> \[!selfcheck\]/gm) ?? []).length === 1;
+  }), chapterTitles.map((title) => `${title}: ${/### Resumen del tema/.test(chapterText(title)) ? 'summary' : 'no summary'}`).join('; '));
+  const history = chapterText('Tema 7 · La Restauración');
+  const chronology = /### Cronología\n\n((?:- \*\*[^\n]+\n?)+)/.exec(history)?.[1] ?? '';
+  const years = [...chronology.matchAll(/^- \*\*(\d{3,4})/gm)].map((match) => Number(match[1]));
+  check('the history chapter opens with its chronology, oldest first', years.length >= 3 && years.every((year, index) => index === 0 || year >= years[index - 1]) && history.indexOf('### Cronología') < history.indexOf(`### ${labels.chapterSummary}`), `${years.join(', ')}`);
+  check('the history chapter is told in prose: no analogy from the AI and no scientific notation', !/\[!ai-analogy\]/.test(history) && !/\$/.test(history) && !history.includes('[!formula]'), '', true);
   check('the contradiction between the note and the slides is reported', first.counts.conflicts >= 1, `${first.counts.conflicts} conflicts`, true);
-  check('the history unit uses no scientific callouts it has no content for', !/## Tema 7 · La Restauración[\s\S]*?(?=\n## )/.exec(first.markdown)?.[0].includes('[!formula]'), '', true);
+  check('the history unit uses no scientific callouts it has no content for', !/## Tema 7 · La Restauración[\s\S]*?(?=\n## )/.exec(first.markdown)?.[0].includes('[!formula]') && !/\$/.test(chapterText('Tema 7 · La Restauración')), '', true);
 
   // Second version and cost
   const reading = (run) => metrics.calls.filter((call) => call.run === run && (call.stage === 'recon' || call.stage === 'extract')).length;
@@ -393,7 +421,7 @@ try {
     mode: simulated ? 'simulated' : 'real', models: { chat: CHAT_MODEL, embeddings: EMBEDDING_MODEL }, limitUsd, root,
     ledgerUsd: { before: startingLedgerUsd, after: ledgerUsd() },
     estimate: estimate && { usd: estimate.usd, calls: estimate.calls, stages: estimate.stages },
-    runs: { first: { stages: stageTotals('first'), counts: first?.counts, warnings: first?.warnings, refusals: metrics.refusals.first ?? 0 }, second: { stages: stageTotals('second'), counts: second?.counts, refusals: metrics.refusals.second ?? 0 } },
+    runs: { first: { stages: stageTotals('first'), counts: first?.counts, shape: first && guideShape(first.markdown, completeGuideLabels('es').aiNote), warnings: first?.warnings, refusals: metrics.refusals.first ?? 0 }, second: { stages: stageTotals('second'), counts: second?.counts, refusals: metrics.refusals.second ?? 0 } },
     coverage: first?.coverage.map((row) => ({ alias: row.source.alias, title: row.source.title, read: row.passagesRead, total: row.passagesTotal, itemsExtracted: row.itemsExtracted, itemsUsed: row.itemsUsed, unread: row.unreadRanges })),
     checks,
   }, null, 2));
@@ -426,13 +454,26 @@ function scriptedUpstream() {
       return { overview: `Qué trata ${user.unit}.`, sections: [{ title: 'Conceptos básicos', purpose: 'Entender', itemIds: ids.slice(0, half) }, { title: 'Aplicaciones', purpose: 'Aplicar', itemIds: ids.slice(half) }].filter((section) => section.itemIds.length) };
     }
     if (system === prompts.WRITE_SYSTEM || system === prompts.CONTINUE_SYSTEM) {
-      const blocks = user.items.map((item) => ({ kind: item.type === 'formula' ? 'formula' : item.type === 'definition' ? 'definition' : item.type === 'example' ? 'example' : 'explanation', itemIds: [item.id],
+      // The writer the prompt asks for: prose paragraphs, a worked example only where an item is one.
+      const blocks = user.items.map((item) => ({ kind: item.type === 'example' ? 'example' : 'explanation', ...(item.type === 'example' ? { title: 'Ejemplo resuelto' } : {}), itemIds: [item.id],
         markdown: `${item.statement}${item.latex && !item.statement.includes('$') ? ` $$${item.latex}$$` : ''}` }));
       if (system === prompts.WRITE_SYSTEM && user.items.length) {
-        blocks.push({ kind: 'ai_example', itemIds: [user.items[0].id], markdown: 'Piensa en una situación cotidiana que ilustre esta idea.' });
+        // Several AI additions and a "to memorize" list on purpose: the engine keeps one AI block
+        // per section and drops the list, so the free run covers both rules. A narrative chapter
+        // is told without analogies, as the prompt asks.
+        if (user.profile?.kind !== 'narrative') {
+          blocks.push({ kind: 'ai_example', itemIds: [user.items[0].id], markdown: 'Piensa en una situación cotidiana que ilustre esta idea.' });
+          blocks.push({ kind: 'ai_analogy', itemIds: [user.items[0].id], markdown: 'Es como seguir un mapa: cada paso conduce al siguiente.' });
+        }
+        blocks.push({ kind: 'memorize', itemIds: [user.items[0].id], markdown: `- ${user.items[0].statement}` });
         blocks.push({ kind: 'selfcheck', itemIds: [user.items[0].id], question: `¿Qué dice «${user.items[0].title}»?`, answer: user.items[0].statement });
       }
       return { blocks };
+    }
+    if (system === prompts.SUMMARY_SYSTEM) {
+      const half = Math.ceil(user.items.length / 2);
+      return { paragraphs: [user.items.slice(0, half), user.items.slice(half)].filter((group) => group.length)
+        .map((group) => ({ itemIds: group.map((item) => item.id), markdown: group.map((item) => item.statement).join(' ') })) };
     }
     if (system === prompts.REPAIR_LATEX_SYSTEM) return { fixes: [] };
     if (system === prompts.REVISE_SYSTEM) return { markdown: user.block };
