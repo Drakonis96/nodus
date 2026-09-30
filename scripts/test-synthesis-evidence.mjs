@@ -114,7 +114,7 @@ test('a route correction keeps Chemistry Studio and gets chemistry-focused corpu
   assert.match(source, /const chemistryRoute = chemistryEnabled && !genealogy && \(routeRequest \|\| isRouteFixPrompt\(question\)\);/);
   assert.match(source, /message\.role === 'user' && !isRouteFixPrompt\(message\.content\)/);
   // The corpus path (5.7 academic chat) uses it too, and drops library-wide gaps and contradictions.
-  assert.match(source, /await run\.investigate\(retrievalQuestion, request\.model\)/);
+  assert.match(source, /await run\.investigate\(chemistryRoute \? retrievalQuestion : plan\.goal, request\.model\)/);
   assert.match(source, /contradicciones: request\.selection\.contradictions && !chemistryRoute/);
   assert.match(source, /huecos: request\.selection\.gaps && !chemistryRoute/);
   const skills = await readFile(path.join(root, 'electron/chatSkills.ts'), 'utf8');
