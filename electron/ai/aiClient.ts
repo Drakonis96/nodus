@@ -829,8 +829,7 @@ export async function researchModelContextWindow(model: ModelRef): Promise<{ tok
   if (local) return { tokens: local, known: true };
   const advertised = cachedModelContextWindow(model.provider, model.model);
   if (advertised) return { tokens: advertised, known: true };
-  // A window the provider documents but its model list does not report (DeepSeek, incl. the
-  // legacy `deepseek-v4-flash` name for the same model as `deepseek-flash`).
+  // Exact provider/model contracts for catalogues that omit token limits.
   const documented = documentedContextWindow(model.provider, model.model);
   if (documented) return { tokens: documented, known: true };
   return { tokens: 32768, known: false };

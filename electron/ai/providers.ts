@@ -11,6 +11,7 @@ import { DEFAULT_LOCAL_BASE_URLS, normalizeCustomBaseUrl, normalizeCustomModels 
 import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodusLocalAi';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 import { researchTestProviderBase, researchTestProviderModels } from '../qa/researchProviderProxy';
+import { cachedModelContextWindow as cachedCatalogueWindow, rememberModelContextWindows } from './modelContextCache';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
@@ -345,17 +346,13 @@ function byId(a: ModelInfo, b: ModelInfo): number {
  * Fetch the live model list for a provider using its stored key. Sorted
  * alphabetically; OpenRouter is additionally grouped/sorted by upstream provider.
  */
-const modelContextCache = new Map<string, { value: number; at: number }>();
-const modelContextKey = (provider: AiProvider, model: string) => JSON.stringify([provider, model, openAiCompatBase(provider)]);
 export function cachedModelContextWindow(provider: AiProvider, model: string): number | null {
-  const cached = modelContextCache.get(modelContextKey(provider, model));
-  return cached && Date.now() - cached.at < 300000 ? cached.value : null;
+  return cachedCatalogueWindow(provider, model, openAiCompatBase(provider));
 }
 export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const endpoint = openAiCompatBase(provider);
   const models = researchTestProviderModels(provider, 'chat') ?? await fetchModels(provider, key, signal);
-  for (const model of models) if (Number.isSafeInteger(model.contextLength) && model.contextLength! >= 1024) {
-    modelContextCache.set(modelContextKey(provider, model.id), { value: model.contextLength!, at: Date.now() });
-  }
+  rememberModelContextWindows(provider, models, endpoint);
   return models;
 }
 async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
@@ -377,7 +374,7 @@ async function fetchModels(provider: AiProvider, key: string | null, signal?: Ab
     case 'groq':
       return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true, { signal });
     case 'cerebras':
-      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true, { signal });
+      return listCerebras(key, signal);
     case 'gemini':
       return listGemini(key);
     case 'xiaomi':
@@ -568,6 +565,8 @@ async function listOpenAiStyle(
       name?: string;
       context_window?: number;
       max_context_length?: number;
+      context_length?: number;
+      max_model_len?: number;
       capabilities?: { vision?: boolean; reasoning?: boolean };
       supported_parameters?: string[];
       effort?: { supported_levels?: ModelInfo['researchReasoningLevels'] };
@@ -576,7 +575,8 @@ async function listOpenAiStyle(
   let models = (data.data ?? []).map((m) => ({
     id: m.id,
     name: m.name,
-    contextLength: m.context_window ?? m.max_context_length,
+    contextLength: [m.context_window, m.max_context_length, m.context_length, m.max_model_len]
+      .find(limit => Number.isSafeInteger(limit) && limit! >= 1024),
     researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.effort?.supported_levels }),
     vision: m.capabilities?.vision,
     reasoning: m.capabilities?.reasoning ?? (m.supported_parameters ?? []).includes('reasoning'),
@@ -588,6 +588,30 @@ async function listOpenAiStyle(
     models = models.filter((m) => !exclude.test(m.id));
   }
   return models.sort(byId);
+}
+
+/** The authenticated list controls availability; the public catalogue supplies
+ * limits, not additional models. Enrichment is best-effort and never receives
+ * the user's credential. https://inference-docs.cerebras.ai/api-reference/models/public-models */
+async function listCerebras(key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+  const models = await listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true, { signal });
+  try {
+    const deadline = AbortSignal.timeout(5000);
+    const res = await fetch('https://api.cerebras.ai/public/v1/models', {
+      signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
+    });
+    if (!res.ok) return models;
+    const data = await res.json() as { data?: { id: string; limits?: { max_context_length?: number } }[] };
+    const limits = new Map((data.data ?? []).map(model => [model.id, model.limits?.max_context_length]));
+    return models.map(model => {
+      const limit = limits.get(model.id);
+      return model.contextLength == null && Number.isSafeInteger(limit) && limit! >= 1024
+        ? { ...model, contextLength: limit } : model;
+    });
+  } catch {
+    signal?.throwIfAborted();
+    return models;
+  }
 }
 
 async function listOpenAiEmbeddingModels(key: string | null): Promise<ModelInfo[]> {
@@ -645,11 +669,13 @@ async function listGemini(key: string | null): Promise<ModelInfo[]> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1000`);
   if (!res.ok) throw new Error(`Gemini /models HTTP ${res.status}`);
   const data = (await res.json()) as {
-    models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
+    models?: { name: string; displayName?: string; inputTokenLimit?: number; supportedGenerationMethods?: string[] }[];
   };
   return (data.models ?? [])
     .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
-    .map((m) => ({ id: m.name.replace(/^models\//, ''), name: m.displayName }))
+    .map((m) => ({ id: m.name.replace(/^models\//, ''), name: m.displayName,
+      ...(Number.isSafeInteger(m.inputTokenLimit) && m.inputTokenLimit! >= 1024 ? { contextLength: m.inputTokenLimit } : {}),
+    }))
     .sort(byId);
 }
 
