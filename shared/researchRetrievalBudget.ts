@@ -44,9 +44,12 @@ export class ResearchRetrievalBudget {
 
 /** Output tokens for one Research Chat answer. A turn with skills writes artefacts (an SVG,
  * a figure brief) on top of its prose and gets the larger allowance; a known window caps
- * either at 30% of what remains after a 5% margin, never below 320 tokens. */
+ * either at 30% of what remains after a 5% margin, never below 320 tokens. Prose got 6,000
+ * until the chat's agent began reading several sources a turn: each citation link is about
+ * 170 characters, and a definition drawn from seven works was cut at 16,000 characters and
+ * lost whole. */
 export function researchAnswerTokens(window: number | null | undefined, withSkills: boolean): number {
-  const allowance = withSkills ? 10_000 : 6000;
+  const allowance = withSkills ? 10_000 : 8000;
   if (window == null) return allowance;
   const margin = Math.max(96, Math.round(window * 0.05));
   return Math.min(allowance, Math.max(320, Math.floor((window - margin) * 0.3)));

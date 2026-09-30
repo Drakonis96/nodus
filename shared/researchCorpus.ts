@@ -23,6 +23,19 @@ export const RETRIEVAL_PRESETS: Readonly<Record<Exclude<RetrievalPreset, 'custom
   deep: { preset: 'deep', candidates: 120, passagesPerRound: 24, evidenceTokens: 16000, rounds: 8, autoExpand: true, threshold: { mode: 'automatic' } },
 };
 
+/** Research Chat's agent, when neither the user nor a notebook chose limits. `balanced`
+ * left it one or two decisions and one document read per turn: a definition asked of a
+ * library holding a dozen works on the genre was answered from a single source. Each
+ * search, catalogue lookup and read is a step; the answer model is not charged for them. */
+export const RESEARCH_CHAT_AGENT_SETTINGS: Readonly<RetrievalSettings> = {
+  preset: 'custom', candidates: 60, passagesPerRound: 12, evidenceTokens: 32000, rounds: 14, autoExpand: true, threshold: { mode: 'automatic' },
+};
+/** A turn the user asked to keep light (thinking off or minimal) still reads more than one source. */
+export const RESEARCH_CHAT_LIGHT_AGENT_SETTINGS: Readonly<RetrievalSettings> = { ...RETRIEVAL_PRESETS.balanced, preset: 'custom', rounds: 6 };
+/** Bytes the chat agent's own decisions may spend: each is a separate provider call and
+ * must not be bounded by the evidence the answer needs. About eight decisions. */
+export const RESEARCH_CHAT_AGENT_DECISION_BYTES = 128_000;
+
 export function validateRetrievalSettings(input: RetrievalSettings): RetrievalSettings {
   if (!input || !['fast', 'balanced', 'deep', 'custom'].includes(input.preset)) throw new Error('Invalid retrieval preset');
   const bounds: Array<[keyof RetrievalSettings, number, number]> = [
@@ -206,17 +219,49 @@ const RESEARCH_LIMITATION_NOTES: Readonly<Record<string, string>> = {
 export function describeResearchLimitation(code: string): string {
   return RESEARCH_LIMITATION_NOTES[code] ?? 'Another retrieval limit applied to this research.';
 }
+/** Research Chat names the sources that took part in the turn, with who wrote them; the
+ * rest of the library is counted, not listed. Listing all 1,223 sources of a library,
+ * each with the same repeated notes and no author, made a 310,000-character prompt in
+ * which the answer said indexed works had no index and that the list gave no authors. */
+export interface ResearchScopePromptFocus {
+  /** Sources the agent found in the catalogue, in addition to those with passages or reads. */
+  documentIds: Iterable<string>;
+  documents: ReadonlyArray<{ id: string; authors: string[]; year: number | null }>;
+  limit?: number;
+}
+type ScopePromptSource = { title: string; authors?: string[]; year?: number; passages_found: boolean; original_read?: true; notes?: string[] };
+
 /** The run's coverage as a model should read it: titles and plain descriptions, without
  * identifiers, counters or codes. The stored record keeps the codes for the interface. */
-export function researchScopeForPrompt(coverage: ResearchTraversal): { sources: Array<{ title: string; passages_found: boolean; original_read?: true; notes?: string[] }>; search_may_be_incomplete: boolean; limits?: string[] } {
+export function researchScopeForPrompt(coverage: ResearchTraversal, focus?: ResearchScopePromptFocus): { sources: ScopePromptSource[]; other_sources?: { count: number; notes: string[] }; search_may_be_incomplete: boolean; limits?: string[] } {
   const matched = new Set(coverage.matchedDocumentIds ?? []);
   const read = new Set(coverage.readDocumentIds ?? []);
   const limits = [...new Set(coverage.limitations ?? [])].map(describeResearchLimitation);
+  const all = coverage.sourceCoverage ?? [];
   // Only a positive original read is stated: indexed passages are already the source's own
   // text, and "original not read" was taken by answers to mean "only summaries were seen".
-  return { sources: (coverage.sourceCoverage ?? []).map(source => ({ title: source.title, passages_found: matched.has(source.documentId), ...(read.has(source.documentId) ? { original_read: true as const } : {}),
-    ...(source.reasons.length ? { notes: [...new Set(source.reasons)].map(describeResearchLimitation) } : {}) })),
-  search_may_be_incomplete: coverage.partial, ...(limits.length ? { limits } : {}) };
+  const describe = (source: NonNullable<ResearchTraversal['sourceCoverage']>[number]): ScopePromptSource => {
+    const document = focus?.documents.find(item => item.id === source.documentId);
+    return { title: source.title, ...(document?.authors.length ? { authors: document.authors.slice(0, 4) } : {}), ...(document?.year != null ? { year: document.year } : {}),
+      passages_found: matched.has(source.documentId), ...(read.has(source.documentId) ? { original_read: true as const } : {}),
+      ...(source.reasons.length ? { notes: [...new Set(source.reasons)].map(describeResearchLimitation) } : {}) };
+  };
+  const search = { search_may_be_incomplete: coverage.partial, ...(limits.length ? { limits } : {}) };
+  if (!focus) return { sources: all.map(describe), ...search };
+  // A catalogue find the turn did not reach says so: without it, an answer blamed a missing
+  // index for a work that was indexed and simply not read within the turn's limits.
+  const unreached = (source: ScopePromptSource) => source.passages_found || source.original_read ? source
+    : { ...source, notes: [...(source.notes ?? []), 'Found in the library catalogue; this turn did not read it within its limits.'] };
+  const wanted = new Set([...read, ...matched, ...focus.documentIds]);
+  // Read first, then passages found, then catalogue finds: the cap drops the least involved.
+  const rank = (id: string) => read.has(id) ? 0 : matched.has(id) ? 1 : 2;
+  const listed = all.filter(source => wanted.has(source.documentId)).sort((a, b) => rank(a.documentId) - rank(b.documentId)).slice(0, focus.limit ?? 40);
+  const shown = new Set(listed.map(source => source.documentId));
+  const rest = all.filter(source => !shown.has(source.documentId));
+  const counts = new Map<string, number>();
+  for (const source of rest) for (const reason of new Set(source.reasons)) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  const notes = [...counts].sort((a, b) => b[1] - a[1]).map(([reason, count]) => `${count} of them: ${describeResearchLimitation(reason)}`);
+  return { sources: listed.map(source => unreached(describe(source))), ...(rest.length ? { other_sources: { count: rest.length, notes } } : {}), ...search };
 }
 
 export type ResearchDocumentRead =
@@ -299,7 +344,8 @@ export interface ResearchIndexRequestResult {
 export interface ResearchCorpusApi {
   getResearchPreparationPolicy(): Promise<ResearchPreparationPolicy>;
   setResearchPreparationPolicy(input: { welcomeVersion?: number; decision?: ResearchPreparationPolicy['decision']; futureAdditions?: boolean }): Promise<ResearchPreparationPolicy>;
-  previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[] }): Promise<ResearchPreparationPreview>;
+  /** `inspect: false` skips the per-file preflight (it opens every unindexed PDF) for callers that do not show it. */
+  previewResearchPreparation(input: { scope: 'vault' | 'selection'; documentIds?: string[]; inspect?: boolean }): Promise<ResearchPreparationPreview>;
   startResearchPreparationCampaign(input: { previewId: string; mode: 'embeddings' | 'text'; documentIds?: string[] }): Promise<string>;
   getResearchPreparationProgress(): Promise<ResearchPreparationProgress>;
   onResearchPreparationProgress(listener: (progress: ResearchPreparationProgress) => void): () => void;

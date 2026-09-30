@@ -652,10 +652,13 @@ export function addEdge(input: NewEdgeInput): string | null {
   const basis = normalizeEdgeBasis(input.basis);
   const confidence = clampConfidence(input.confidence);
   const endpoints = input.source_work === 'manual' ? { from_id: input.from_id, to_id: input.to_id } : canonicalEdgeEndpoints(input.from_id, input.to_id, type);
+  // An idea related to itself is never a relation: it happens when fusion maps two
+  // labels of one scan onto the same existing idea.
+  if (endpoints.from_id === endpoints.to_id) return null;
   const db = getDb();
   const existing = db
-    .prepare('SELECT id, confidence FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
-    .get(endpoints.from_id, endpoints.to_id, type) as { id: string; confidence: number } | undefined;
+    .prepare('SELECT id, confidence, source_work FROM edges WHERE from_id = ? AND to_id = ? AND type = ?')
+    .get(endpoints.from_id, endpoints.to_id, type) as { id: string; confidence: number; source_work: string | null } | undefined;
   if (existing) {
     if (confidence > existing.confidence) {
       db.prepare('UPDATE edges SET confidence = ?, basis = ? WHERE id = ?').run(
@@ -664,7 +667,17 @@ export function addEdge(input: NewEdgeInput): string | null {
         existing.id
       );
     }
-    if (input.trace) upsertEdgeTrace(existing.id, input.trace);
+    // Ownership and provenance must move together: purgeDeepData deletes a work's
+    // edges by source_work and recomputable ones by trace method, so an owner that
+    // disagrees with its trace is either never cleaned up or cleaned up by the wrong
+    // purge. A scan that re-finds an unowned (derived) edge claims it; a derived pass
+    // that re-finds an owned edge leaves the owner's trace alone.
+    if (existing.source_work == null && input.source_work != null) {
+      db.prepare('UPDATE edges SET source_work = ? WHERE id = ?').run(input.source_work, existing.id);
+      if (input.trace) upsertEdgeTrace(existing.id, input.trace);
+    } else if (!(existing.source_work != null && input.source_work == null) && input.trace) {
+      upsertEdgeTrace(existing.id, input.trace);
+    }
     return existing.id;
   }
   const id = input.id ?? uuid();

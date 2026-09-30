@@ -1,10 +1,13 @@
 import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 import { RELEASE_5_7_0_HIGHLIGHTS } from './releaseNotes570';
+import { RELEASE_5_7_2_HIGHLIGHTS } from './releaseNotes572';
 /* Korean release notes, keyed by version. Machine-translated from the English highlights. */
 import { RELEASE_5_5_0_HIGHLIGHTS } from './releaseNotes550';
 export const RELEASE_NOTES_KO: Record<string, string[]> = {
   // 5.5.0 reads its Korean from the release's own highlight columns, the same
   // way the Italian, Turkish and both Chinese tables do.
+  "5.7.2": RELEASE_5_7_2_HIGHLIGHTS.map(highlight => highlight.ko),
+  "5.7.1": RELEASE_5_7_0_HIGHLIGHTS.map(highlight => highlight.ko),
   "5.7.0": RELEASE_5_7_0_HIGHLIGHTS.map(highlight => highlight.ko),
   "5.6.0": RELEASE_5_6_0_HIGHLIGHTS.map(highlight => highlight['ko']),
   "5.5.0": RELEASE_5_5_0_HIGHLIGHTS.map(highlight => highlight.ko),

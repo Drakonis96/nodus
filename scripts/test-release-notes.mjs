@@ -35,7 +35,47 @@ try {
   // Teaching, extends chat history to the other surfaces, dresses the tooltips,
   // lets the Atlas filter hold several values, brings the browser favicons back
   // and adds attendance to Teaching groups.
-  const release570 = RELEASE_NOTES[0];
+  // 5.7.2 turns Research Chat into an agent that plans the turn and looks up the
+  // catalogue, stops a question from freezing the window, speeds up document
+  // preparation and scan detection, points citations and sections at the right
+  // passage, cleans the library records, scopes re-embedding to the ideas that
+  // changed and rebuilds the Linux packages on Ubuntu 22.04 for older glibc.
+  // 5.7.1 only fixes the indexing welcome's «Yes, start» button, and its What's New
+  // modal is the 5.7.0 one, word for word in every language.
+  const release572 = RELEASE_NOTES[0];
+  assert.equal(release572.version, '5.7.2');
+  assert.equal(release572.date, '2026-09-29');
+  assert.equal(release572.highlights.length, 12);
+  assert.deepEqual(release572.highlights.map(h => h.scope), [
+    'academic', 'academic', 'academic', 'academic', 'academic', 'academic',
+    'library', 'library', 'library', 'library',
+    'ai',
+    'general',
+  ]);
+  for (const lang of ['es', 'en', 'fr', 'de', 'pt', 'pt-BR', 'it', 'tr', 'zh-CN', 'zh-TW', 'ja', 'ko']) {
+    for (const h of release572.highlights) {
+      assert.ok(h[lang]?.trim().length > 30, `5.7.2 missing ${lang} translation`);
+      if (lang !== 'en') assert.notEqual(h[lang], h.en, `5.7.2 ${lang} fell back to English`);
+      assert.doesNotMatch(h[lang], /[;—]/, `5.7.2 ${lang} must use simple sentences`);
+    }
+  }
+  for (const phrase of [
+    /Research Chat now plans each turn/, /looks up the authors and titles you mention/,
+    /Follow-up questions keep the thread/, /no longer says an indexed work has no index/,
+    /answers without freezing the window/, /one of the stored ideas has no statement/,
+    /Preparing documents is faster and takes less space/, /Only real scans wait for OCR/,
+    /Graph health in Settings, Data/, /rests on the passage that holds the quoted text/,
+    /page range stays inside its own source/, /Library records are cleaner/,
+    /Extracted text arrives complete/, /only the ideas whose theme text changed/,
+    /Linux packages start again on Ubuntu 22.04/,
+  ]) {
+    assert.ok(release572.highlights.some(h => phrase.test(h.en)), `5.7.2 missing ${phrase}`);
+  }
+  const release571 = RELEASE_NOTES.find(note => note.version === '5.7.1');
+  assert.equal(release571.version, '5.7.1');
+  assert.equal(release571.date, '2026-09-28');
+  const release570 = RELEASE_NOTES.find(note => note.version === '5.7.0');
+  assert.deepEqual(release571.highlights, release570.highlights);
   assert.equal(release570.version, '5.7.0');
   assert.equal(release570.date, '2026-09-28');
   assert.equal(release570.highlights.length, 21);
@@ -214,7 +254,7 @@ try {
 
   assert.ok(!RELEASE_NOTES.some(note => note.version === '5.3.2'), 'the unpublished slug must not appear in release history');
   const packageVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
-  assert.equal(release570.version, packageVersion);
+  assert.equal(release572.version, packageVersion);
 
   // 5.4.0 keeps its own entry, and 5.4.1 shows exactly the same highlights: someone
   // already on 5.4.0 has read them, and someone arriving from 5.3.1 must not miss them.

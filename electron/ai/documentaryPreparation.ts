@@ -4,7 +4,7 @@ import { researchActivityEnabled, startResearchActivity } from './researchActivi
 import { app } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
-import { backgroundProcess } from '../workers/backgroundProcess';
+import { backgroundProcess, type BackgroundProcess } from '../workers/backgroundProcess';
 import { createHash } from 'node:crypto';
 import { RETRIEVAL_CHUNKER_VERSION } from '@shared/retrievalChunks';
 import { unpreparedResearchAttachmentIds } from '@shared/researchCorpus';
@@ -20,12 +20,14 @@ import { getGlobalLibraryItem } from '../library/libraryService';
 import { currentEmbeddingConfig } from '../db/ideasRepo';
 import { embedMany, effectiveEmbeddingConfig, type EmbeddingExecutionConfig } from './aiClient';
 import { DocumentaryEmbeddingBatches } from '../db/documentaryEmbeddingBatches';
+import { storedDocumentaryVector } from '../db/documentaryVectors';
+import { mapOrderedPool } from './orderedPool';
 import { getWork } from '../db/worksRepo';
 import { readResearchAttachmentSource } from './researchAttachmentSources';
 import { getNote } from '../db/notesRepo';
 import { getSettings } from '../db/settingsRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
-import { documentarySourceText, documentaryReaderComplete, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, type DocumentarySourcePart } from './documentaryExtraction';
+import { documentarySourceText, documentaryReaderComplete, readDocumentarySourceMap, extractTraditionalResearchWork, extractGlobalResearchAttachments, DOCUMENTARY_EXTRACTION_OPTIONS, type DocumentarySourcePart } from './documentaryExtraction';
 import { onGlobalLibraryChanged } from '../library/libraryRuntime';
 import { getActiveVault, getVault, listVaults, withOwningVault, withoutOwningVault } from '../vaults/vaultRegistry';
 import { withVaultDatabase, withoutDatabaseContext } from '../db/database';
@@ -41,17 +43,109 @@ export function documentaryStore(): DocumentaryStore {
     fs.mkdirSync(directory, { recursive: true });
     shared = new DocumentaryStore(path.join(directory, 'store.sqlite'));
     new DocumentaryCampaigns(shared.db);
+    convertLegacyVectorsInBackground();
   }
   return shared;
+}
+let vectorConversion: ReturnType<typeof setTimeout> | null = null;
+let vectorCursor = 0;
+/** Stores written before vectors were binary hold each one twice as JSON: in the passage
+ * and in its finished working copy. Both are rewritten in short batches in the
+ * background (about 20 ms each on the main thread); semantic search reads either
+ * format meanwhile. Afterwards the store is compacted once preparation is idle. */
+function convertLegacyVectorsInBackground(): void {
+  if (vectorConversion) return;
+  vectorConversion = setTimeout(() => {
+    vectorConversion = null;
+    if (!shared || stopping) return;
+    const store = shared;
+    try {
+      if (!store.preference('legacy-vectors-converted')) {
+        if (!new DocumentaryEmbeddingBatches(store.db).discardFinished()) {
+          const next = store.convertLegacyVectors(vectorCursor);
+          if (next !== null) vectorCursor = next;
+        }
+        if (!store.preference('legacy-vectors-converted')) { convertLegacyVectorsInBackground(); return; }
+      }
+      compactDocumentaryStoreWhenIdle();
+    } catch { /* Retried the next time the store opens. */ }
+  }, 25);
+  vectorConversion.unref?.();
+}
+
+let maintenance: Promise<void> | null = null;
+let maintenanceWorker: BackgroundProcess | null = null;
+let documentaryWriters = 0;
+let initialized = false;
+/** A failed VACUUM (a full disk, say) is not retried in the same session: every attempt
+ * holds the writers off again. */
+let compactionFailed = false;
+/** Resolves when no store maintenance is running. */
+export function documentaryMaintenanceSettled(): Promise<void> {
+  return maintenance ?? Promise.resolve();
+}
+/** Work that writes the store outside the drain waits for maintenance to finish, and
+ * holds the next one off while it runs. */
+export async function withDocumentaryWrites<T>(work: () => Promise<T> | T): Promise<T> {
+  // Starts synchronously when nothing is being maintained, like the work it wraps did.
+  while (maintenance) await maintenance;
+  documentaryWriters += 1;
+  try { return await work(); } finally { documentaryWriters -= 1; }
+}
+const COMPACTION_MIN_FREE_BYTES = 256 * 1024 * 1024;
+const COMPACTION_MIN_FREE_RATIO = 0.3;
+function maintenanceWorkerFile(): string | null {
+  const candidates = [process.env.NODUS_DOCUMENTARY_MAINTENANCE_WORKER_FILE, path.join(__dirname, 'documentaryMaintenanceWorker.js'),
+    path.join(app.getAppPath(), 'dist-electron/documentaryMaintenanceWorker.js')];
+  return candidates.find((file): file is string => !!file && fs.existsSync(file)) ?? null;
+}
+/** Rewrite the store without its free pages once most of it is free. On a real store,
+ * binary vectors left 2.1 of 3.7 GB free and scattered what remained: semantic search
+ * took 5 s per query before compaction and 0.3 s after, with identical results. VACUUM
+ * holds the write lock for tens of seconds, so it runs in its own process and only while
+ * nothing writes: the drain, reconciliation and preparation actions wait for it. */
+export function compactDocumentaryStoreWhenIdle(threshold = { minFreeBytes: COMPACTION_MIN_FREE_BYTES, minFreeRatio: COMPACTION_MIN_FREE_RATIO }): void {
+  if (!initialized || compactionFailed || maintenance || !shared || stopping || draining || lanes || activePreparations.size || documentaryWriters) return;
+  const store = shared;
+  const pages = store.db.pragma('page_count', { simple: true }) as number;
+  const free = store.db.pragma('freelist_count', { simple: true }) as number;
+  const pageSize = store.db.pragma('page_size', { simple: true }) as number;
+  if (free * pageSize < threshold.minFreeBytes || free < pages * threshold.minFreeRatio) return;
+  const file = maintenanceWorkerFile();
+  if (!file) return;
+  maintenance = withoutOwningVault(() => withoutDatabaseContext(() => new Promise<void>(resolve => {
+    const worker = backgroundProcess(file, 'Nodus documentary maintenance');
+    maintenanceWorker = worker;
+    let settled = false;
+    const finish = (ok: boolean) => {
+      if (settled) return;
+      settled = true; maintenanceWorker = null;
+      if (!ok) compactionFailed = true;
+      void worker.terminate().finally(resolve);
+    };
+    worker.once('message', (message: { ok?: boolean }) => finish(message?.ok === true));
+    worker.once('error', () => finish(false));
+    worker.once('exit', () => finish(false));
+    worker.postMessage({ filename: store.db.name });
+  }))).finally(() => {
+    maintenance = null;
+    if (shared !== store || stopping) return;
+    try { store.db.pragma('wal_checkpoint(TRUNCATE)'); } catch { /* A later checkpoint trims the log. */ }
+    notifyDocumentaryPreparation();
+    void drainDocumentaryRequests().catch(() => undefined);
+  });
 }
 /** Resolves once the shared store is closed: at once when idle, or when a drain in
  * progress has stopped (it closes the store itself, so no write is cut short). */
 export function closeDocumentaryPreparation(): Promise<void> {
   stopping = true;
   if (corpusPoll) clearInterval(corpusPoll); corpusPoll = null;
-  activePreparation?.abort();
+  for (const active of activePreparations.values()) active.controller.abort();
   if (retryTimer) clearTimeout(retryTimer);
   if (autoTimer) clearTimeout(autoTimer);
+  if (vectorConversion) clearTimeout(vectorConversion); vectorConversion = null;
+  // An interrupted VACUUM rolls back; the store stays as it was.
+  if (maintenanceWorker) void maintenanceWorker.terminate().catch(() => undefined);
   unsubscribe?.(); unsubscribe = null;
   if (!draining) { shared?.close(); shared = null; return Promise.resolve(); }
   return new Promise(resolve => { drainClosed = resolve; });
@@ -59,7 +153,10 @@ export function closeDocumentaryPreparation(): Promise<void> {
 let drainClosed: (() => void) | null = null;
 
 /** Shared text writer used once extraction has supplied a real source revision. */
-export async function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
+export function prepareDocumentaryText(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string> = {}, signal?: AbortSignal, processingVersion = 'nodus-documentary/2'): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
+  return withDocumentaryWrites(() => prepareDocumentaryTextNow(document, text, sourceMap, signal, processingVersion));
+}
+async function prepareDocumentaryTextNow(document: ResearchCorpusDocument, text: string, sourceMap: Record<string, string>, signal: AbortSignal | undefined, processingVersion: string): Promise<{ indexKey: string; chunks: DocumentaryChunk[] }> {
   const store = documentaryStore();
   const identity: DocumentaryIndexIdentity = { documentId: document.id, attachmentId: document.attachmentId, revision: document.revision,
     attachmentRevision: document.attachments?.find(attachment => attachment.id === document.attachmentId)?.revision,
@@ -88,13 +185,19 @@ export async function prepareDocumentaryText(document: ResearchCorpusDocument, t
   } finally { clearInterval(heartbeat); }
 }
 
+/** Upper bound per document; the provider gate (automatic 2→4, halved on a 429) is the real limit. */
+const DOCUMENTARY_EMBEDDING_BATCHES_IN_FLIGHT = 4;
+
 function embeddingIdentityParameters(config: EmbeddingExecutionConfig) {
   return { endpoint: createHash('sha256').update(config.endpoint).digest('hex'), inputPolicy: 'utf8-4096/2' };
 }
 
-export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: () => void = () => {}, progress: (completed: number, unknown: number) => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+export function prepareDocumentaryEmbeddings(indexKey: string, chunks: DocumentaryChunk[], signal?: AbortSignal, execution = effectiveEmbeddingConfig(), assertAuthorized: (final?: boolean) => void = () => {}, progress: (completed: number, unknown: number) => void = () => {}): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
+  return withDocumentaryWrites(() => prepareDocumentaryEmbeddingsNow(indexKey, chunks, signal, execution, assertAuthorized, progress));
+}
+async function prepareDocumentaryEmbeddingsNow(indexKey: string, chunks: DocumentaryChunk[], signal: AbortSignal | undefined, execution: EmbeddingExecutionConfig, assertAuthorized: (final?: boolean) => void, progress: (completed: number, unknown: number) => void): Promise<{ indexKey: string; vectors: number[][]; provider: string; model: string }> {
   const store = documentaryStore();
-  assertAuthorized();
+  assertAuthorized(true);
   const base = JSON.parse(store.getJob(indexKey)!.identity_json) as DocumentaryIndexIdentity;
   const config = { provider: execution.provider, model: execution.modelId };
   const parameters = embeddingIdentityParameters(execution);
@@ -105,9 +208,9 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     AND json_extract(identity_json,'$.attachmentId') IS ?
     AND json_extract(identity_json,'$.embedding.parameters')=?`).get(base.documentId, base.textFingerprint, base.revision, base.chunkerVersion, config.provider, config.model, base.processingVersion, base.attachmentId, JSON.stringify(parameters)) as { index_key: string } | undefined;
   if (cached) {
-    const rows = store.db.prepare('SELECT vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as { vector_json: string }[];
+    const rows = store.db.prepare('SELECT vector,vector_json FROM documentary_passages WHERE index_key=? ORDER BY ordinal').all(cached.index_key) as Array<{ vector: Buffer | null; vector_json: string | null }>;
     progress(rows.length, 0);
-    return { indexKey: cached.index_key, vectors: rows.map(row => JSON.parse(row.vector_json)), ...config };
+    return { indexKey: cached.index_key, vectors: rows.map(row => storedDocumentaryVector(row)!), ...config };
   }
   if (store.preference('paused')) throw new Error('documentary_paused');
   // Dimensions are measured from the response, so lease a persistent operation
@@ -143,31 +246,39 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     const vectors = checkpoints.read(operation, texts);
     const updateProgress = () => progress(vectors.filter(Boolean).length, (store.db.prepare("SELECT COUNT(*) n FROM documentary_embedding_attempts WHERE operation=? AND state='unknown'").get(operation) as { n: number }).n);
     updateProgress();
-    // Sequential bounded batches checkpoint before the next paid request. The
-    // persistent operation lease fences concurrent writers and late responses.
+    // Bounded batches overlap (the provider gate decides how many run at once) and each
+    // is checkpointed as soon as it returns, so a restart pays again only for the batches
+    // that were in flight. The first failure stops the rest. The persistent operation
+    // lease fences concurrent writers and late responses.
+    const batches: Array<{ start: number; end: number }> = [];
     for (let start = 0; start < texts.length;) {
       if (vectors[start]) { start++; continue; }
       let end = start + 1;
       while (end < texts.length && end - start < 32 && !vectors[end]) end++;
-      controller.signal.throwIfAborted();
+      batches.push({ start, end });
+      start = end;
+    }
+    await mapOrderedPool(batches, DOCUMENTARY_EMBEDDING_BATCHES_IN_FLIGHT, async ({ start, end }, _index, batchSignal) => {
+      batchSignal.throwIfAborted();
       requests.renew(lease);
       const batch = texts.slice(start, end);
       const attempt = checkpoints.begin(operation, start, batch.length);
       try {
-        const received = await embedMany(batch, controller.signal, { config: execution, jobId: operation });
+        const received = await embedMany(batch, batchSignal, { config: execution, jobId: `${operation}:${start}` });
+        // A sibling's failure cancels what is still in flight, but a response that has
+        // already arrived was paid for and is kept; only a pause or a lost lease drops it.
         controller.signal.throwIfAborted();
         if (received.some(vector => !vector?.length)) throw new Error('documentary_embeddings_unavailable');
         checkpoints.complete(attempt, batch, received as number[][], () => { requests.renew(lease); assertAuthorized(); });
         vectors.splice(start, batch.length, ...received);
         updateProgress();
       } catch (error) { checkpoints.uncertain(attempt); updateProgress(); throw error; }
-      start = end;
-    }
+    }, controller.signal);
     signal?.throwIfAborted();
     requests.renew(lease);
     if (store.preference('paused')) throw new Error('documentary_paused');
     if (vectors.some(vector => !vector?.length) || !vectors.length) throw new Error('documentary_embeddings_unavailable');
-    assertAuthorized();
+    assertAuthorized(true);
     const identity: DocumentaryIndexIdentity = { ...base, embedding: { ...config, dimensions: vectors[0]!.length, metric: 'cosine', parameters } };
     const id = store.enqueue(identity, {});
     job = store.claim(Date.now(), 60000, id);
@@ -176,6 +287,7 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
     store.publishLexical(job);
     store.publishEmbeddings(job, vectors as number[][]);
     requests.finish(lease, null);
+    checkpoints.discard(operation);
     return { indexKey: id, vectors: vectors as number[][], ...config };
   } catch (error) {
     if (job && store.getJob(job.id)?.state === 'running') store.fail(job, 'documentary_embedding_publication_failed');
@@ -184,17 +296,27 @@ export async function prepareDocumentaryEmbeddings(indexKey: string, chunks: Doc
   } finally { clearInterval(heartbeat); signal?.removeEventListener('abort', abort); }
 }
 
-function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number; chunks_json: string }> {
-  return documentaryStore().db.prepare(`SELECT * FROM documentary_revisions WHERE document_id=? AND json_extract(identity_json,'$.revision')=? ORDER BY embedding_ready DESC,created_at DESC`)
+/** A document's revisions without their text. `SELECT *` brought every revision's full text
+ * and chunk JSON (327 MB over 453 revisions in a real library) into the main process for each
+ * of 1,229 sources, and the inventory parsed the chunks twice to count them: 1.3–2.7 s with
+ * the window frozen, at every Research Chat question and every documentary search. */
+function revisionsFor(document: ResearchCorpusDocument): Array<{ index_key: string; identity_json: string; embedding_ready: number; lexical_ready: number }> {
+  return documentaryStore().db.prepare(`SELECT index_key,identity_json,embedding_ready,lexical_ready FROM documentary_revisions WHERE document_id=? AND json_extract(identity_json,'$.revision')=? ORDER BY embedding_ready DESC,created_at DESC`)
     .all(document.id, document.indexedSource?.revision ?? document.revision) as ReturnType<typeof revisionsFor>;
+}
+/** Chunks in a revision. A published one has exactly one passage per chunk (publishLexical
+ * writes them in the transaction that sets lexical_ready), so they are counted on an index
+ * instead of parsing the chunk JSON; an unpublished one is counted by SQLite. */
+function chunkCount(store: DocumentaryStore, row: { index_key: string; lexical_ready: number }): number {
+  const counted = row.lexical_ready
+    ? store.db.prepare('SELECT COUNT(*) n FROM documentary_passages WHERE index_key=?').get(row.index_key)
+    : store.db.prepare('SELECT json_array_length(chunks_json) n FROM documentary_revisions WHERE index_key=?').get(row.index_key);
+  return (counted as { n: number | null } | undefined)?.n ?? 0;
 }
 function attachmentRevisions(document: ResearchCorpusDocument): Array<ReturnType<typeof revisionsFor>> {
   const groups = new Map<string | null, ReturnType<typeof revisionsFor>>();
   const attachments = document.indexedSource ? document.indexedSource.attachments : document.attachments;
-  const published = document.indexedSource?.indexKeys.flatMap(key => {
-    const job = documentaryStore().getJob(key);
-    return job ? [JSON.parse(job.identity_json) as DocumentaryIndexIdentity] : [];
-  });
+  const published = document.indexedSource?.indexKeys.flatMap(key => documentaryStore().jobIdentity(key) ?? []);
   for (const row of revisionsFor(document)) {
     const identity: DocumentaryIndexIdentity = JSON.parse(row.identity_json);
     if (published && !published.some(base => base.attachmentId === identity.attachmentId && base.textFingerprint === identity.textFingerprint
@@ -239,14 +361,14 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
     const latest = store.db.prepare('SELECT state,error,revision FROM documentary_requests WHERE document_id=? OR source_id=? ORDER BY updated_at DESC LIMIT 1').get(document.id, document.id) as { state: string; error: string | null; revision: string } | undefined;
     // A request for bytes that have since been replaced says nothing about the current file.
     const request = latest && latest.revision === current.revision ? latest : undefined;
-    const passages = revisions.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
+    const passages = revisions.reduce((sum, row) => sum + chunkCount(store, row), 0);
     const compatibleVectors = groups.flatMap(group => group.find(row => {
       const identity = JSON.parse(row.identity_json) as DocumentaryIndexIdentity;
       return row.embedding_ready && selectedEmbedding && identity.embedding?.provider === selectedEmbedding.provider
         && identity.embedding.model === selectedEmbedding.modelId
         && JSON.stringify(identity.embedding.parameters) === JSON.stringify(embeddingIdentityParameters(selectedEmbedding));
     }) ?? []);
-    const embedded = compatibleVectors.reduce((sum, row) => sum + (JSON.parse(row.chunks_json) as DocumentaryChunk[]).length, 0);
+    const embedded = compatibleVectors.reduce((sum, row) => sum + chunkCount(store, row), 0);
     const incompatible = groups.some(group => group.some(row => row.embedding_ready)) && compatibleVectors.length === 0;
     const coverage = revision ? (JSON.parse(revision.identity_json) as DocumentaryIndexIdentity).coverage ?? document.coverage : document.coverage;
     // An error on a request that is still queued or running is a retry in progress,
@@ -262,14 +384,33 @@ export function getResearchPreparationInventory(): ResearchPreparationInventory 
   }) };
 }
 
+/** Two documents at a time: while one waits on its embedding provider, the next one is
+ * extracted. Requests for the same source never run together. */
+const PREPARATION_LANES = 2;
+/** Re-reading the corpus inventory costs tens of milliseconds on the main thread; a
+ * source is revalidated at most this often while it is extracted or embedded, and
+ * always before anything is published. */
+const SOURCE_VALIDATION_INTERVAL_MS = 5000;
+/** Page and batch progress reaches the windows at most this often. */
+const PROGRESS_NOTICE_INTERVAL_MS = 250;
 let draining = false;
-let activePreparation: AbortController | null = null;
-let activePreparationDocument: string | null = null;
-let activePreparationRequest: string | null = null;
+let lanes = 0;
+let lanesFinished: (() => void) | null = null;
+const activePreparations = new Map<string, { controller: AbortController; sourceId: string }>();
 export function interruptUnusedDocumentaryRequest(): void {
-  if (!activePreparationRequest) return;
-  const row = documentaryStore().db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(activePreparationRequest) as { state: string } | undefined;
-  if (row?.state !== 'running') activePreparation?.abort();
+  for (const [requestId, active] of activePreparations) {
+    const row = documentaryStore().db.prepare('SELECT state FROM documentary_requests WHERE document_id=?').get(requestId) as { state: string } | undefined;
+    if (row?.state !== 'running') active.controller.abort();
+  }
+}
+let lastProgressNotice = 0;
+let progressNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+function notifyPreparationProgress(): void {
+  const wait = lastProgressNotice + PROGRESS_NOTICE_INTERVAL_MS - Date.now();
+  if (wait <= 0) { lastProgressNotice = Date.now(); notifyDocumentaryPreparation(); return; }
+  if (progressNoticeTimer) return;
+  progressNoticeTimer = setTimeout(() => { progressNoticeTimer = null; lastProgressNotice = Date.now(); notifyDocumentaryPreparation(); }, wait);
+  progressNoticeTimer.unref?.();
 }
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 /** Whether a frozen embedding configuration can run now: a local runtime, or a remote
@@ -278,6 +419,8 @@ export function embeddingConfigurationUsable(config: Pick<EmbeddingExecutionConf
   return ['ollama', 'lmstudio', 'nodus'].includes(config.provider) || !!getSettings().providerKeys[config.provider];
 }
 export async function prepareResearchDocuments(documentIds: string[], mode: 'embeddings' | 'text' = 'embeddings'): Promise<void> {
+  // Callers rely on the queue being written synchronously; only a running maintenance defers it.
+  if (maintenance) await maintenance;
   const store = documentaryStore();
   const inventory = researchCorpusInventory();
   const configuration = { embedding: mode === 'text' ? null : effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/2', ocrLanguages: getSettings().ocrLanguages || 'spa+eng' };
@@ -312,200 +455,225 @@ export function cancelResearchDocuments(documentIds: string[]): void {
     store.db.prepare(`UPDATE documentary_requests SET state='cancelled',lease_token=NULL,lease_until=NULL
       WHERE substr(document_id,1,?)=? AND state<>'complete'`).run(prefix.length, prefix);
     for (const row of store.db.prepare("SELECT id FROM documentary_jobs WHERE document_id=? AND state<>'complete'").all(id) as { id: string }[]) store.cancel(row.id);
-    if (activePreparationDocument === id) activePreparation?.abort();
+    for (const active of activePreparations.values()) if (active.sourceId === id) active.controller.abort();
   }
   notifyDocumentaryPreparation();
 }
 export function drainDocumentaryRequests(): Promise<void> {
   return withoutOwningVault(() => withoutDatabaseContext(drainOwnedDocumentaryRequests));
 }
+const preparationOwners = () => listVaults().filter(vault => vault.type === 'academic').map(vault => vault.id);
 async function drainOwnedDocumentaryRequests(): Promise<void> {
-  if (draining || stopping) return;
+  if (stopping) return;
+  if (maintenance) { void maintenance.then(() => drainDocumentaryRequests()).catch(() => undefined); return; }
   const store = documentaryStore();
   if (store.preference('paused')) return;
+  // New work while a drain runs gets a lane of its own if one is free.
+  if (draining) { if (lanesFinished && lanes < PREPARATION_LANES) startPreparationLane(); return; }
   draining = true;
   const requests = new DocumentaryRequests(store.db);
-  const owners = () => listVaults().filter(vault => vault.type === 'academic').map(vault => vault.id);
   // Adopt only legacy requests belonging to the active academic vault.
   if (getActiveVault().type === 'academic') store.db.prepare("UPDATE documentary_requests SET vault_id=? WHERE vault_id=''").run(getActiveVault().id);
   if (retryTimer) clearTimeout(retryTimer);
   try {
-    // One worker initially; existing Library extraction has its own bounded pool.
-    for (;;) {
-      if (stopping || store.preference('paused')) break;
-      new DocumentaryCampaigns(store.db).synchronizeOwners(owners());
-      const request = requests.claim(owners());
-      if (!request) break;
-      const controller = new AbortController();
-      activePreparation = controller;
-      activePreparationRequest = request.document_id;
-      notifyDocumentaryPreparation();
-      activePreparationDocument = request.source_id ?? request.document_id;
-      const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
-      let validateSource = () => {};
-      const checkLease = () => { controller.signal.throwIfAborted(); validateSource(); if (getVault(request.vault_id)?.type !== 'academic') throw new Error('research_vault_unavailable'); requests.renew(request); };
-      try {
-        await withOwningVault(request.vault_id, () => withVaultDatabase(request.vault_id, async () => {
-        // Legacy authorized jobs capture their existing provider once at first
-        // dispatch; new jobs already carry the enqueue-time configuration.
-        const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string; ocrLanguages?: string }
-          : { embedding: effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
-        if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
-        if (!['nodus-documentary/1', 'nodus-documentary/2'].includes(configuration.processingVersion)) throw new Error('documentary_processing_version_unavailable');
-        const document = researchCorpusInventory().documents.find(item => item.id === (request.source_id ?? request.document_id));
-        if (!document) throw new Error('research_source_not_authorized');
-        // New bytes are not a revoked permission: the request is simply obsolete.
-        if (document.revision !== request.revision) throw new Error('research_source_revision_changed');
-        validateSource = () => {
-          const current = researchCorpusInventory().documents.find(item => item.id === document.id);
-          if (!current || current.permissionRevision !== document.permissionRevision || (document.workId && current.workId !== document.workId)) throw new Error('research_source_not_authorized');
-          if (current.revision !== document.revision) throw new Error('research_source_revision_changed');
-        };
-        checkLease();
-        // OCR is deferred for documentary preparation, including already queued
-        // v2 jobs. Detect scanned pages, preserve the last publication and skip.
-        const extractionOptions = { ocrMode: 'off' as const, localOcrOnly: true, maxOcrPages: 0 };
-        const onExtractionProgress = (progress: { phase: string; page?: number; totalPages?: number }) => {
-          checkLease();
-          store.db.prepare('UPDATE documentary_requests SET stage=?,current_page=?,total_pages=?,updated_at=? WHERE document_id=? AND lease_token=?').run(progress.phase === 'ocr' ? 'ocr' : 'extraction', progress.page ?? null, progress.totalPages ?? null, Date.now(), request.document_id, request.lease_token);
-          notifyDocumentaryPreparation();
-        };
-        let text = '';
-        let coverage = document.coverage;
-        let sourceMap: Record<string, string> = {};
-        let parts: DocumentarySourcePart[] = [];
-        const publication = store.publishedDocument(document)?.indexedSource;
-        const prepared: Array<{ indexKey: string; chunks: DocumentaryChunk[] }> = [];
-        if (publication?.revision === document.revision && publication.indexKeys.length) {
-          const identities = publication.indexKeys.map(key => JSON.parse(store.getJob(key)!.identity_json) as DocumentaryIndexIdentity);
-          if (!unpreparedResearchAttachmentIds(document, identities).length && identities.every(identity => identity.chunkerVersion === RETRIEVAL_CHUNKER_VERSION && identity.processingVersion === configuration.processingVersion)) {
-            for (const key of publication.indexKeys) {
-              const revision = store.revision(key);
-              if (revision?.lexical_ready && revision.chunks_json) prepared.push({ indexKey: key, chunks: JSON.parse(revision.chunks_json) });
-            }
-            if (prepared.length !== publication.indexKeys.length) prepared.length = 0;
-            else coverage = identities.every(identity => identity.coverage === 'fulltext') ? 'fulltext' : identities.some(identity => identity.coverage === 'abstract') ? 'abstract' : document.coverage;
-          }
-        }
-        if (!prepared.length) {
-        if (document.conversationAttachment) {
-          const { conversationId, attachmentId } = document.conversationAttachment;
-          const source = readResearchAttachmentSource(conversationId, attachmentId);
-          if (!source) throw new Error('research_source_not_authorized');
-          // PDF import records physical page boundaries, not printed folios.
-          text = `[[src:conversation]]\n${source.text}`;
-          if (source.kind === 'pdf') text = text.split('\n').map(line => {
-            const prefix = `[${source.name}, página `;
-            const number = line.startsWith(prefix) && line.endsWith(']') ? line.slice(prefix.length, -1) : '';
-            return /^[1-9]\d*$/.test(number) ? `[[src:conversation p. ${number}]]` : line;
-          }).join('\n');
-          sourceMap.conversation = `conversation:${conversationId}:${attachmentId}`;
-        }
-        if (document.noteId) {
-          const note = getNote(document.noteId);
-          if (!note || note.trashedAt) throw new Error('research_source_not_authorized');
-          text = `[[src:note]]\n${note.content}`;
-          sourceMap.note = `note:${getActiveVault().id}:${note.id}`;
-        }
-        if (document.libraryItemId) {
-          const item = getGlobalLibraryItem(document.libraryItemId);
-          const raw = getLibraryReaderRawContent(document.libraryItemId);
-          const map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
-          const compatible = !!raw && !!map && map.reader.sha256 === createHash('sha256').update(raw.markdown).digest('hex')
-            && documentaryReaderComplete(raw.folder, item?.files?.qualityReport)
-            && item?.attachments.length === 1 && item.attachments[0].sha256 === map.source.sha256
-            && item.contentRevision?.components.extraction.freshness === 'current';
-          if (compatible && raw?.markdown) {
-            text = documentarySourceText(raw.markdown, map, 'library');
-            sourceMap.library = `library:${document.libraryItemId}:${document.attachmentId ?? 'reader'}`;
-            coverage = 'fulltext';
-          } else {
-            // Use a private staging worker, not the active-vault Library queue.
-            // Every compatible attachment keeps its own revision and locators.
-            if (item?.attachments.length) parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal, extractionOptions, onExtractionProgress);
-            if (!parts.length) { text = item?.metadata.abstract ?? ''; coverage = 'abstract'; }
-          }
-        }
-        if (!text && !parts.length && document.workId) {
-          const work = getWork(document.workId);
-          if (!work || work.archived) throw new Error('research_source_not_authorized');
-          const settings = getSettings();
-          const userId = settings.zoteroUserId || LOCAL_USER_ID;
-          const item = await getItem(userId, work.zotero_key).catch(() => null);
-          const resolved = await extractTraditionalResearchWork(userId, work.zotero_key, work.item_type, controller.signal, extractionOptions, onExtractionProgress);
-          text = resolved.text || item?.abstract || '';
-          coverage = resolved.text ? 'fulltext' : 'abstract';
-          sourceMap = resolved.sourceMap;
-          parts = resolved.parts;
-        }
-        if (!text.trim() && !parts.length) throw new Error('documentary_text_unavailable');
-        const current = researchCorpusInventory().documents.find(item => item.id === document.id);
-        if (!current || current.revision !== document.revision) throw new Error('research_source_revision_changed');
-        checkLease();
-        store.db.prepare("UPDATE documentary_requests SET stage='lexical' WHERE document_id=? AND lease_token=?").run(request.document_id, request.lease_token);
-        if (parts.length) {
-          for (const part of parts) {
-            checkLease();
-            prepared.push(await prepareDocumentaryText({ ...document, coverage: 'fulltext', attachmentId: part.attachmentId,
-              attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal, configuration.processingVersion));
-          }
-        } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal, configuration.processingVersion));
-        }
-        checkLease();
-        const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
-        if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');
-        store.publishDocument({ ...document, coverage: parts.length ? 'fulltext' : coverage }, prepared.map(result => result.indexKey));
-        // Publish every lexical attachment before any optional vector request.
-        const total = prepared.reduce((sum, result) => sum + result.chunks.length, 0);
-        store.db.prepare("UPDATE documentary_requests SET stage=?,total_passages=?,completed_passages=0,unknown_requests=0 WHERE document_id=? AND lease_token=?").run(configuration.embedding ? 'embeddings' : 'lexical', total, request.document_id, request.lease_token);
-        let completed = 0, unknown = 0;
-        for (const result of prepared) {
-          checkLease();
-          if (configuration.embedding && !embeddingConfigurationUsable(configuration.embedding)) throw new Error('documentary_embeddings_unavailable');
-          if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, checkLease, (count, uncertain) => {
-            store.db.prepare('UPDATE documentary_requests SET completed_passages=?,unknown_requests=?,updated_at=? WHERE document_id=? AND lease_token=?').run(completed + count, unknown + uncertain, Date.now(), request.document_id, request.lease_token);
-            notifyDocumentaryPreparation();
-          });
-          completed += result.chunks.length;
-          unknown = (store.db.prepare('SELECT unknown_requests FROM documentary_requests WHERE document_id=?').get(request.document_id) as { unknown_requests: number }).unknown_requests;
-        }
-        checkLease();
-        requests.finish(request, null);
-        store.db.prepare("UPDATE documentary_requests SET stage='complete' WHERE document_id=?").run(request.document_id);
-        }));
-      } catch (error) {
-        const superseded = error instanceof Error && error.message === 'research_source_revision_changed';
-        if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && !superseded && request.source_id) {
-          new DocumentaryCampaigns(store.db).blockOwner(request.document_id, request.vault_id);
-        }
-        try {
-          const code = error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed';
-          // A request for replaced bytes can never succeed; retrying it would only
-          // consume attempts. Close it; the new revision is prepared on its own request.
-          if (superseded) store.db.prepare("UPDATE documentary_requests SET state='cancelled',error=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE document_id=? AND lease_token=?")
-            .run(code, Date.now(), request.document_id, request.lease_token);
-          else if (/^documentary_(ocr_deferred|ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
-          else requests.finish(request, code, store.preference('paused') || stopping || controller.signal.aborted);
-        } catch { /* A newer request owns publication. */ }
-      } finally { notifyDocumentaryPreparation(); clearInterval(heartbeat); if (activePreparation === controller) { activePreparation = null; activePreparationDocument = null; activePreparationRequest = null; } }
-    }
+    await new Promise<void>(resolve => {
+      lanesFinished = resolve;
+      for (let lane = 0; lane < PREPARATION_LANES; lane++) startPreparationLane();
+    });
   } finally {
     draining = false;
     if (stopping) { store.close(); shared = null; drainClosed?.(); drainClosed = null; }
     else {
-      const delay = requests.nextDelay(owners());
+      const delay = requests.nextDelay(preparationOwners());
       if (delay !== null && !store.preference('paused')) {
         retryTimer = setTimeout(() => { retryTimer = null; void drainDocumentaryRequests().catch(() => undefined); }, delay);
         retryTimer.unref();
       }
+      if (store.preference('legacy-vectors-converted')) compactDocumentaryStoreWhenIdle();
     }
+  }
+}
+function startPreparationLane(): void {
+  lanes += 1;
+  void drainPreparationLane().catch(() => undefined).finally(() => {
+    lanes -= 1;
+    if (lanes === 0) { const finished = lanesFinished; lanesFinished = null; finished?.(); }
+  });
+}
+async function drainPreparationLane(): Promise<void> {
+  const store = documentaryStore();
+  const requests = new DocumentaryRequests(store.db);
+  const owners = preparationOwners;
+  for (;;) {
+    if (stopping || store.preference('paused')) break;
+    new DocumentaryCampaigns(store.db).synchronizeOwners(owners());
+    const busySources = [...activePreparations.values()].map(active => active.sourceId);
+    const request = requests.claim(owners(), Date.now(), 60000, false, busySources);
+    if (!request) break;
+    const controller = new AbortController();
+    activePreparations.set(request.document_id, { controller, sourceId: request.source_id ?? request.document_id });
+    notifyDocumentaryPreparation();
+    const heartbeat = setInterval(() => { try { requests.renew(request); } catch { controller.abort(); } }, 15000);
+    let validateSource = () => {};
+    let validatedAt = 0;
+    // `full` before every publication; page and batch progress revalidates on an interval.
+    const checkLease = (full = true) => {
+      controller.signal.throwIfAborted();
+      if (full || Date.now() - validatedAt >= SOURCE_VALIDATION_INTERVAL_MS) { validateSource(); validatedAt = Date.now(); }
+      if (getVault(request.vault_id)?.type !== 'academic') throw new Error('research_vault_unavailable');
+      requests.renew(request);
+    };
+    try {
+      await withOwningVault(request.vault_id, () => withVaultDatabase(request.vault_id, async () => {
+      // Legacy authorized jobs capture their existing provider once at first
+      // dispatch; new jobs already carry the enqueue-time configuration.
+      const configuration = request.configuration_json ? JSON.parse(request.configuration_json) as { embedding: EmbeddingExecutionConfig | null; processingVersion: string; ocrLanguages?: string }
+        : { embedding: effectiveEmbeddingConfig(), processingVersion: 'nodus-documentary/1' };
+      if (!request.configuration_json) store.db.prepare('UPDATE documentary_requests SET configuration_json=? WHERE document_id=? AND lease_token=?').run(JSON.stringify(configuration), request.document_id, request.lease_token);
+      if (!['nodus-documentary/1', 'nodus-documentary/2'].includes(configuration.processingVersion)) throw new Error('documentary_processing_version_unavailable');
+      const document = researchCorpusInventory().documents.find(item => item.id === (request.source_id ?? request.document_id));
+      if (!document) throw new Error('research_source_not_authorized');
+      // New bytes are not a revoked permission: the request is simply obsolete.
+      if (document.revision !== request.revision) throw new Error('research_source_revision_changed');
+      validateSource = () => {
+        const current = researchCorpusInventory().documents.find(item => item.id === document.id);
+        if (!current || current.permissionRevision !== document.permissionRevision || (document.workId && current.workId !== document.workId)) throw new Error('research_source_not_authorized');
+        if (current.revision !== document.revision) throw new Error('research_source_revision_changed');
+      };
+      checkLease();
+      // OCR is deferred for documentary preparation, including already queued
+      // v2 jobs. Detect scanned pages, preserve the last publication and skip.
+      const extractionOptions = DOCUMENTARY_EXTRACTION_OPTIONS;
+      const onExtractionProgress = (progress: { phase: string; page?: number; totalPages?: number }) => {
+        checkLease(false);
+        store.db.prepare('UPDATE documentary_requests SET stage=?,current_page=?,total_pages=?,updated_at=? WHERE document_id=? AND lease_token=?').run(progress.phase === 'ocr' ? 'ocr' : 'extraction', progress.page ?? null, progress.totalPages ?? null, Date.now(), request.document_id, request.lease_token);
+        notifyPreparationProgress();
+      };
+      let text = '';
+      let coverage = document.coverage;
+      let sourceMap: Record<string, string> = {};
+      let parts: DocumentarySourcePart[] = [];
+      const publication = store.publishedDocument(document)?.indexedSource;
+      const prepared: Array<{ indexKey: string; chunks: DocumentaryChunk[] }> = [];
+      if (publication?.revision === document.revision && publication.indexKeys.length) {
+        const identities = publication.indexKeys.map(key => JSON.parse(store.getJob(key)!.identity_json) as DocumentaryIndexIdentity);
+        if (!unpreparedResearchAttachmentIds(document, identities).length && identities.every(identity => identity.chunkerVersion === RETRIEVAL_CHUNKER_VERSION && identity.processingVersion === configuration.processingVersion)) {
+          for (const key of publication.indexKeys) {
+            const revision = store.revision(key);
+            if (revision?.lexical_ready && revision.chunks_json) prepared.push({ indexKey: key, chunks: JSON.parse(revision.chunks_json) });
+          }
+          if (prepared.length !== publication.indexKeys.length) prepared.length = 0;
+          else coverage = identities.every(identity => identity.coverage === 'fulltext') ? 'fulltext' : identities.some(identity => identity.coverage === 'abstract') ? 'abstract' : document.coverage;
+        }
+      }
+      if (!prepared.length) {
+      if (document.conversationAttachment) {
+        const { conversationId, attachmentId } = document.conversationAttachment;
+        const source = readResearchAttachmentSource(conversationId, attachmentId);
+        if (!source) throw new Error('research_source_not_authorized');
+        // PDF import records physical page boundaries, not printed folios.
+        text = `[[src:conversation]]\n${source.text}`;
+        if (source.kind === 'pdf') text = text.split('\n').map(line => {
+          const prefix = `[${source.name}, página `;
+          const number = line.startsWith(prefix) && line.endsWith(']') ? line.slice(prefix.length, -1) : '';
+          return /^[1-9]\d*$/.test(number) ? `[[src:conversation p. ${number}]]` : line;
+        }).join('\n');
+        sourceMap.conversation = `conversation:${conversationId}:${attachmentId}`;
+      }
+      if (document.noteId) {
+        const note = getNote(document.noteId);
+        if (!note || note.trashedAt) throw new Error('research_source_not_authorized');
+        text = `[[src:note]]\n${note.content}`;
+        sourceMap.note = `note:${getActiveVault().id}:${note.id}`;
+      }
+      if (document.libraryItemId) {
+        const item = getGlobalLibraryItem(document.libraryItemId);
+        const raw = getLibraryReaderRawContent(document.libraryItemId);
+        const map = raw ? readDocumentarySourceMap(raw.folder, item?.files?.sourceMap) : null;
+        const compatible = !!raw && !!map && map.reader.sha256 === createHash('sha256').update(raw.markdown).digest('hex')
+          && documentaryReaderComplete(raw.folder, item?.files?.qualityReport)
+          && item?.attachments.length === 1 && item.attachments[0].sha256 === map.source.sha256
+          && item.contentRevision?.components.extraction.freshness === 'current';
+        if (compatible && raw?.markdown) {
+          text = documentarySourceText(raw.markdown, map, 'library');
+          sourceMap.library = `library:${document.libraryItemId}:${document.attachmentId ?? 'reader'}`;
+          coverage = 'fulltext';
+        } else {
+          // Use a private staging worker, not the active-vault Library queue.
+          // Every compatible attachment keeps its own revision and locators.
+          if (item?.attachments.length) parts = await extractGlobalResearchAttachments(document.libraryItemId, controller.signal, extractionOptions, onExtractionProgress);
+          if (!parts.length) { text = item?.metadata.abstract ?? ''; coverage = 'abstract'; }
+        }
+      }
+      if (!text && !parts.length && document.workId) {
+        const work = getWork(document.workId);
+        if (!work || work.archived) throw new Error('research_source_not_authorized');
+        const settings = getSettings();
+        const userId = settings.zoteroUserId || LOCAL_USER_ID;
+        const item = await getItem(userId, work.zotero_key).catch(() => null);
+        const resolved = await extractTraditionalResearchWork(userId, work.zotero_key, work.item_type, controller.signal, extractionOptions, onExtractionProgress);
+        text = resolved.text || item?.abstract || '';
+        coverage = resolved.text ? 'fulltext' : 'abstract';
+        sourceMap = resolved.sourceMap;
+        parts = resolved.parts;
+      }
+      if (!text.trim() && !parts.length) throw new Error('documentary_text_unavailable');
+      const current = researchCorpusInventory().documents.find(item => item.id === document.id);
+      if (!current || current.revision !== document.revision) throw new Error('research_source_revision_changed');
+      checkLease();
+      store.db.prepare("UPDATE documentary_requests SET stage='lexical' WHERE document_id=? AND lease_token=?").run(request.document_id, request.lease_token);
+      if (parts.length) {
+        for (const part of parts) {
+          checkLease();
+          prepared.push(await prepareDocumentaryText({ ...document, coverage: 'fulltext', attachmentId: part.attachmentId,
+            attachments: [{ id: part.attachmentId, revision: part.attachmentRevision }] }, part.text, part.sourceMap, controller.signal, configuration.processingVersion));
+        }
+      } else prepared.push(await prepareDocumentaryText({ ...document, coverage }, text, sourceMap, controller.signal, configuration.processingVersion));
+      }
+      checkLease();
+      const beforePublish = researchCorpusInventory().documents.find(item => item.id === document.id);
+      if (!beforePublish || beforePublish.revision !== document.revision || beforePublish.permissionRevision !== document.permissionRevision) throw new Error('research_source_revision_changed');
+      store.publishDocument({ ...document, coverage: parts.length ? 'fulltext' : coverage }, prepared.map(result => result.indexKey));
+      // Publish every lexical attachment before any optional vector request.
+      const total = prepared.reduce((sum, result) => sum + result.chunks.length, 0);
+      store.db.prepare("UPDATE documentary_requests SET stage=?,total_passages=?,completed_passages=0,unknown_requests=0 WHERE document_id=? AND lease_token=?").run(configuration.embedding ? 'embeddings' : 'lexical', total, request.document_id, request.lease_token);
+      let completed = 0, unknown = 0;
+      for (const result of prepared) {
+        checkLease();
+        if (configuration.embedding && !embeddingConfigurationUsable(configuration.embedding)) throw new Error('documentary_embeddings_unavailable');
+        if (configuration.embedding) await prepareDocumentaryEmbeddings(result.indexKey, result.chunks, controller.signal, configuration.embedding, final => checkLease(!!final), (count, uncertain) => {
+          store.db.prepare('UPDATE documentary_requests SET completed_passages=?,unknown_requests=?,updated_at=? WHERE document_id=? AND lease_token=?').run(completed + count, unknown + uncertain, Date.now(), request.document_id, request.lease_token);
+          notifyPreparationProgress();
+        });
+        completed += result.chunks.length;
+        unknown = (store.db.prepare('SELECT unknown_requests FROM documentary_requests WHERE document_id=?').get(request.document_id) as { unknown_requests: number }).unknown_requests;
+      }
+      checkLease();
+      requests.finish(request, null);
+      store.db.prepare("UPDATE documentary_requests SET stage='complete' WHERE document_id=?").run(request.document_id);
+      }));
+    } catch (error) {
+      const superseded = error instanceof Error && error.message === 'research_source_revision_changed';
+      if (error instanceof Error && /^research_(source|vault)_/.test(error.message) && !superseded && request.source_id) {
+        new DocumentaryCampaigns(store.db).blockOwner(request.document_id, request.vault_id);
+      }
+      try {
+        const code = error instanceof Error ? error.message.slice(0, 120) : 'documentary_preparation_failed';
+        // A request for replaced bytes can never succeed; retrying it would only
+        // consume attempts. Close it; the new revision is prepared on its own request.
+        if (superseded) store.db.prepare("UPDATE documentary_requests SET state='cancelled',error=?,lease_token=NULL,lease_until=NULL,updated_at=? WHERE document_id=? AND lease_token=?")
+          .run(code, Date.now(), request.document_id, request.lease_token);
+        else if (/^documentary_(ocr_deferred|ocr_resources_missing|ocr_incomplete|embeddings_unavailable|extraction_worker_unavailable)$/.test(code)) requests.block(request, code);
+        else requests.finish(request, code, store.preference('paused') || stopping || controller.signal.aborted);
+      } catch { /* A newer request owns publication. */ }
+    } finally { clearInterval(heartbeat); activePreparations.delete(request.document_id); notifyDocumentaryPreparation(); }
   }
 }
 export function setResearchPreparationPaused(paused: boolean): void {
   if (typeof paused !== 'boolean') throw new Error('Invalid preparation preference');
   documentaryStore().setPreference('paused', paused);
   notifyDocumentaryPreparation();
-  if (paused) activePreparation?.abort(); else void drainDocumentaryRequests();
+  if (paused) for (const active of activePreparations.values()) active.controller.abort(); else void drainDocumentaryRequests();
 }
 export function setResearchPreparationEnabled(enabled: boolean): void {
   if (typeof enabled !== 'boolean') throw new Error('Invalid preparation preference');
@@ -519,7 +687,10 @@ export function setResearchPreparationEnabled(enabled: boolean): void {
 }
 
 /** Reconcile ownership before garbage collection. Shared copies survive other vaults. */
-export async function reconcileResearchDocumentOwnership(): Promise<void> {
+export function reconcileResearchDocumentOwnership(): Promise<void> {
+  return withDocumentaryWrites(reconcileOwnedResearchDocuments);
+}
+async function reconcileOwnedResearchDocuments(): Promise<void> {
   const store = documentaryStore();
   const snapshots: Array<{ vaultId: string; ids: Set<string> }> = [];
   for (const vault of listVaults().filter(vault => vault.type === 'academic')) {
@@ -560,7 +731,7 @@ export function notifyResearchCorpusChanged(): void {
   if (autoTimer) clearTimeout(autoTimer);
   autoTimer = withoutOwningVault(() => withoutDatabaseContext(() => setTimeout(() => {
     autoTimer = null;
-    void (async () => {
+    void withDocumentaryWrites(async () => {
       await initialization;
       const repo = new DocumentaryCampaigns(documentaryStore().db);
       await reconcileResearchDocumentOwnership();
@@ -577,7 +748,7 @@ export function notifyResearchCorpusChanged(): void {
           repo.savePolicy({ ...updated, known: inventory.map(document => document.id) });
         })).catch(() => { /* Retry discovery after configuration/import recovery; keep other vaults moving. */ });
       }
-    })().catch(() => undefined);
+    }).catch(() => undefined);
   }, 1000)));
   autoTimer.unref();
 }
@@ -620,6 +791,9 @@ async function initializeOwnedDocumentaryPreparation(): Promise<void> {
   }
   // Resume explicitly queued work after a restart, including a crashed stage.
   if (fs.existsSync(path.join(app.getPath('userData'), 'documentary/store.sqlite'))) void drainDocumentaryRequests().catch(() => undefined);
+  // Store maintenance never overlaps the start-up writes above.
+  initialized = true;
+  if (shared) convertLegacyVectorsInBackground();
 }
 
 export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchScope, query: string, settings: RetrievalSettings, vector: number[] | null, signal?: AbortSignal, read?: ResearchDocumentRead): Promise<{ evidence: ResearchEvidence[]; traversal: { partial: boolean; rounds: number; candidates: number; evidenceTokens: number; visited: string[] } }> {

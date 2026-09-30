@@ -853,10 +853,20 @@ export async function runDeepScan(
         getDb().transaction(() => {
           purgeDeepData(work.nodus_id);
           unionWorkThemes(work.nodus_id, deepThemeLabels, 4);
+          // Plans are resolved in parallel before this commit, so two chunks of the same
+          // scan that extracted the same idea both planned a *new* idea — neither could
+          // be the other's fusion candidate. Collapse identical new statements here.
+          const createdInScan = new Map<string, string>();
           const globalIds: string[] = [];
           for (let i = 0; i < preparedIdeas.length; i++) {
             const { labelKey, idea, ideaThemeLabels } = preparedIdeas[i];
-            const globalId = applyFusionPlan(resolvedPlans[i]);
+            const plan = resolvedPlans[i];
+            const statementKey = typeof idea.statement === 'string'
+              ? `${idea.type}|${idea.statement.replace(/\s+/g, ' ').trim().toLocaleLowerCase()}`
+              : null;
+            const duplicateOf = plan.existingId || !statementKey ? undefined : createdInScan.get(statementKey);
+            const globalId = duplicateOf ?? applyFusionPlan(plan);
+            if (!plan.existingId && !duplicateOf && statementKey) createdInScan.set(statementKey, globalId);
             globalIds.push(globalId);
             labelToGlobal.set(labelKey, globalId);
             setIdeaThemeLinks(work.nodus_id, globalId, ideaThemeLabels, idea.confidence, 'explicit');
@@ -877,7 +887,8 @@ export async function runDeepScan(
           for (const rel of merged.internal) {
             const from = labelToGlobal.get(rel.from);
             const to = labelToGlobal.get(rel.to);
-            if (!from || !to) continue;
+            // Fusion can map both labels onto one existing idea; that is not a relation.
+            if (!from || !to || from === to) continue;
             addEdge({
               from_id: from,
               to_id: to,

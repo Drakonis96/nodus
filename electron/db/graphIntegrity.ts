@@ -102,6 +102,13 @@ const CHECKS: readonly CheckDefinition[] = [
          OR NOT EXISTS (SELECT 1 FROM ideas i WHERE i.global_id = e.to_id)`,
   },
   {
+    // An idea related to itself: fusion mapped two labels of one scan onto the same idea
+    // and the scan stored the relation between them. addEdge now refuses them.
+    id: 'self_loop_edges',
+    category: 'repairable',
+    rows: () => 'SELECT e.source_work AS nodus_id FROM edges e WHERE e.from_id = e.to_id',
+  },
+  {
     id: 'orphan_edge_traces',
     category: 'repairable',
     rows: () => `SELECT NULL AS nodus_id FROM edge_traces et
@@ -297,13 +304,14 @@ export function repairGraphIntegrity(db: Database.Database, now = new Date().toI
     // 3–4. An idea is active exactly while a work holds it or a note owns it.
     const wokenIdeas = wakeIdeasWithWorks(db);
     const sleptIdeas = sleepIdeasWithoutWorks(db, now);
-    // 5. Edges with a missing endpoint, then traces without an edge. One orphan trace
+    // 5. Edges with a missing endpoint or relating an idea to itself, then traces without an edge. One orphan trace
     //    fails every later deep analysis, since assertDeepDataIntegrity checks them all.
     const danglingEdges = db.prepare(
       `DELETE FROM edges
         WHERE NOT EXISTS (SELECT 1 FROM ideas i WHERE i.global_id = edges.from_id)
            OR NOT EXISTS (SELECT 1 FROM ideas i WHERE i.global_id = edges.to_id)`
     ).run().changes;
+    const selfLoopEdges = db.prepare('DELETE FROM edges WHERE from_id = to_id').run().changes;
     const orphanTraces = db.prepare(
       'DELETE FROM edge_traces WHERE NOT EXISTS (SELECT 1 FROM edges e WHERE e.id = edge_traces.edge_id)'
     ).run().changes;
@@ -319,7 +327,7 @@ export function repairGraphIntegrity(db: Database.Database, now = new Date().toI
         ORDER BY title`
     ).all() as GraphIntegrityWork[];
     return {
-      counts: { rowsOfMissingWorks, danglingThemeLinks, danglingWorkThemes, wokenIdeas, sleptIdeas, danglingEdges, orphanTraces, prunedThemes },
+      counts: { rowsOfMissingWorks, danglingThemeLinks, danglingWorkThemes, wokenIdeas, sleptIdeas, danglingEdges, selfLoopEdges, orphanTraces, prunedThemes },
       integrityFailedWorks,
       themeWorks,
     };

@@ -11,6 +11,10 @@ import { researchFingerprint } from './researchCorpusScope';
 import { getGlobalLibraryItem, globalLibraryAttachmentPath } from '../library/libraryService';
 export { readDocumentarySourceMap } from '../library/librarySourcePages';
 
+/** Indexing reads text only. Figures and table crops would be rendered page by page and
+ * then discarded with the staging folder, leaving dangling `![…](assets/…)` lines. */
+export const DOCUMENTARY_EXTRACTION_OPTIONS: Partial<LibraryExtractionOptions> = { ocrMode: 'off', localOcrOnly: true, maxOcrPages: 0, extractImages: false };
+
 export interface DocumentarySourcePart { text: string; sourceMap: Record<string, string>; attachmentId: string; attachmentRevision: string }
 
 /** Preserve physical anchors only when the extraction map matches these bytes. */
@@ -49,7 +53,7 @@ async function fileHash(filename: string): Promise<string> {
 /** Use the existing clean-document worker in a disposable staging store. This
  * creates no Global Library item or vault migration and never discovers storage
  * directories: every input path comes from an authorized Zotero attachment. */
-export async function extractTraditionalResearchWork(userId: string, key: string, itemType: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = { ocrMode: 'off', maxOcrPages: 0 }, onProgress?: LibraryExtractionProgressHandler): Promise<{ text: string; sourceMap: Record<string, string>; parts: DocumentarySourcePart[] }> {
+export async function extractTraditionalResearchWork(userId: string, key: string, itemType: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = DOCUMENTARY_EXTRACTION_OPTIONS, onProgress?: LibraryExtractionProgressHandler): Promise<{ text: string; sourceMap: Record<string, string>; parts: DocumentarySourcePart[] }> {
   if (!libraryExtractionWorkerAvailable()) throw new Error('documentary_extraction_worker_unavailable');
   signal?.throwIfAborted();
   const attachments = itemType === 'attachment' ? [await itemAsAttachment(userId, key)].filter(item => item != null) : await itemChildren(userId, key, signal);
@@ -96,7 +100,7 @@ export async function extractTraditionalResearchWork(userId: string, key: string
 /** Extract each authorized Global attachment independently. The clean-document
  * worker normally chooses a primary attachment; a research corpus needs every
  * eligible attachment, with its own fingerprint and original source locator. */
-export async function extractGlobalResearchAttachments(itemId: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = { ocrMode: 'off', maxOcrPages: 0 }, onProgress?: LibraryExtractionProgressHandler): Promise<DocumentarySourcePart[]> {
+export async function extractGlobalResearchAttachments(itemId: string, signal?: AbortSignal, extractionOptions: Partial<LibraryExtractionOptions> = DOCUMENTARY_EXTRACTION_OPTIONS, onProgress?: LibraryExtractionProgressHandler): Promise<DocumentarySourcePart[]> {
   const item = getGlobalLibraryItem(itemId);
   if (!item || item.deletedAt) throw new Error('research_source_not_authorized');
   const parts: DocumentarySourcePart[] = [];

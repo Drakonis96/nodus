@@ -83,6 +83,21 @@ test('macOS entitlements are an exact minimum set with no dangerous exceptions',
   }
 });
 
+test('the release verifier allows exactly the entitlements the app is signed with', () => {
+  // The plist decides what the app carries and the verifier decides what the release
+  // accepts, and only the release build signs a real app. Without this comparison a
+  // privacy-scoped entitlement added to the plist fails the release hours later, in
+  // the macOS signing job, instead of here.
+  const verifier = require(path.join(repoRoot, 'scripts/verify-macos-code-signing.cjs'));
+  const root = plist.parse(read('build/entitlements.mac.plist'));
+  const inherited = plist.parse(read('build/entitlements.mac.inherit.plist'));
+
+  assert.deepEqual([...verifier.ROOT_ENTITLEMENTS].sort(), Object.keys(root).sort(),
+    'the release verifier must allow exactly the entitlements in entitlements.mac.plist');
+  assert.deepEqual([...verifier.CHILD_ENTITLEMENTS].sort(), Object.keys(inherited).sort(),
+    'the release verifier must allow exactly the entitlements in entitlements.mac.inherit.plist');
+});
+
 test('the custom signer covers the DockTile and every enclosed native code bundle', () => {
   const signer = read('build/macSign.cjs');
   assert.match(signer, /NodusDockTile\.docktileplugin/);

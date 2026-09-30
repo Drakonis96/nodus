@@ -17,6 +17,7 @@ import { getSettings } from '../db/settingsRepo';
 import {
   advanceRunningDocumentIndexJob,
   clearDocumentCheckpoints,
+  clearWorkDocumentCheckpoints,
   publishDocumentProfile,
   readDocumentCheckpoint,
   saveDocumentCheckpoint,
@@ -351,6 +352,29 @@ function parseSourceLocationAt(text: string, offset: number, sourceMap: Record<s
   };
 }
 
+/**
+ * Where a range that starts at `start` ends, without leaving the start's source. The
+ * last marker before `end` can belong to the next attachment when a section runs past
+ * a source boundary; its page number then counts pages of a different file (a section
+ * "p. 1099–12"). Walk back to the last marker still inside the start's source instead;
+ * page-only markers inherit the source of the marker before them.
+ */
+function rangeEndLocation(text: string, start: SourceLocation, end: number, sourceMap: Record<string, string> = {}): SourceLocation {
+  const raw = parseSourceLocationAt(text, end, sourceMap);
+  if (!start.sourceRef || !raw.sourceRef || raw.sourceRef === start.sourceRef) return raw;
+  let current: string | null = null;
+  let last: SourceLocation | null = null;
+  const pattern = /\[\[(?:src:(s\d+)(?:\s+p\.\s*(\d+))?|p\.\s*(\d+))\]\]/gi;
+  for (const match of text.matchAll(pattern)) {
+    if ((match.index ?? 0) > end) break;
+    if (match[1]) current = sourceMap[match[1]] ?? match[1];
+    if (current !== start.sourceRef) continue;
+    const pageNumber = Number(match[2] ?? match[3]) || null;
+    last = { label: pageNumber == null ? null : `p. ${pageNumber}`, sourceRef: current, pageNumber };
+  }
+  return last ?? start;
+}
+
 function headingMatches(text: string, sourceMap: Record<string, string>): Array<{ index: number; end: number; level: number; title: string; location: SourceLocation }> {
   const result: Array<{ index: number; end: number; level: number; title: string; location: SourceLocation }> = [];
   const pattern = /^(#{1,6})[ \t]+([^\n]+)$/gm;
@@ -426,7 +450,7 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
   if (headings.length === 0) {
     return mergeUndersizedChunks(text, chunksWithOffsets(text)).map((chunk, ordinal) => {
       const start = parseSourceLocationAt(text, chunk.start, sourceMap);
-      const end = parseSourceLocationAt(text, chunk.end, sourceMap);
+      const end = rangeEndLocation(text, start, chunk.end, sourceMap);
       return ({
       sectionId: `section-${sha256(`${fallbackTitle}|${ordinal}|${sha256(chunk.body)}`).slice(0, 24)}`,
       parentSectionId: null, level: 1, ordinal, title: ordinal === 0 ? fallbackTitle : '',
@@ -472,7 +496,7 @@ export function deriveDocumentStructure(text: string, fallbackTitle: string, sou
     if (!body) continue;
     while (parents.length && parents.at(-1)!.level >= heading.level) parents.pop();
     const startLocation = absorb ? parseSourceLocationAt(text, 0, sourceMap) : heading.location;
-    const endLocation = parseSourceLocationAt(text, end, sourceMap);
+    const endLocation = rangeEndLocation(text, startLocation, end, sourceMap);
     const sectionId = `section-${sha256(`${heading.level}|${heading.title}|${startLocation.label ?? ''}|${index}|${sha256(body)}`).slice(0, 24)}`;
     sections.push({
       sectionId, parentSectionId: parents.at(-1)?.id ?? null, level: heading.level,
@@ -668,7 +692,7 @@ async function analyzeSectionPart(
   options: RunDocumentProfileOptions,
   depth = 0,
 ): Promise<SectionAnalysis> {
-  const hash = sha256(evidence);
+  const hash = checkpointHash(options, evidence);
   const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, key, hash);
   if (cached) return cached;
   let candidate: SectionAnalysis;
@@ -713,6 +737,15 @@ async function analyzeSectionPart(
   return value;
 }
 
+/**
+ * A checkpoint belongs to the models that wrote it, not only to its input. Keyed by the
+ * evidence alone, a job resumed with another generator or auditor (the same-campaign
+ * resume switches models in place) reused the previous models' sections.
+ */
+function checkpointHash(options: Pick<RunDocumentProfileOptions, 'generatorModel' | 'auditorModel'>, content: string): string {
+  return sha256(JSON.stringify([options.generatorModel, options.auditorModel, content]));
+}
+
 async function analyzeSection(section: DerivedDocumentSection, options: RunDocumentProfileOptions): Promise<SectionAnalysis> {
   const sectionPack = documentProfilePromptPack(options.language ?? getSettings().promptLanguage ?? 'es').section;
   // The section audit sends the fragment AND the analysis of it, so the fragment may only
@@ -729,7 +762,7 @@ async function analyzeSection(section: DerivedDocumentSection, options: RunDocum
     return analyzeSectionPart(part, key, section.title, section.pageStart, { ...options, signal: poolSignal });
   }, options.signal);
   if (analyses.length === 1) return analyses[0];
-  const reduceHash = sha256(JSON.stringify(analyses));
+  const reduceHash = checkpointHash(options, JSON.stringify(analyses));
   const cached = readDocumentCheckpoint<SectionAnalysis>(options.jobId, `section:${section.sectionId}:reduced`, reduceHash);
   if (cached) return cached;
   let candidate: SectionAnalysis;
@@ -793,17 +826,74 @@ function quoteOffset(text: string, quote: string): number {
   return normalizedOffset >= 0 ? (haystack.offsets[normalizedOffset] ?? -1) : -1;
 }
 
-function passageForQuote(nodusId: string, quote: string, candidate: PreparedPassages | null): string | null {
+/** Collapsed prefixes of a quote, longest first. A quote can run past the end of its
+ * chunk; one shorter than the floor (a running head: "Index I:15") is matched whole. */
+function quoteNeedles(quote: string): string[] {
+  const collapsedQuote = collapsedLiteralText(quote).text.trim();
+  const needles: string[] = [];
+  for (const length of [60, 40, 24]) {
+    const needle = collapsedQuote.slice(0, length).trim();
+    if (needle.length < Math.min(12, collapsedQuote.length)) break;
+    needles.push(needle);
+  }
+  return needles;
+}
+
+/** How much of a quote's opening a passage holds: the longest of quoteNeedles it contains,
+ * 0 for none. Short prefixes can match inside unrelated words ("regla adición" holds "la
+ * adición"), so passages are compared by this length, longest first, as passageForQuote does. */
+export function quoteMatchLength(text: string, quote: string): number {
+  const haystack = collapsedLiteralText(text).text;
+  return quoteNeedles(quote).find((needle) => haystack.includes(needle))?.length ?? 0;
+}
+
+/**
+ * The passage a support's citation jump opens. The quote's literal offset already fixed
+ * its source and page, so the passage must agree with them: first a passage of that
+ * source that literally contains the start of the quote (nearest page at or before the
+ * quote's), and only then the best word overlap among that source's passages that start
+ * at or before the quote's page. Choosing by overlap across the whole document picked a
+ * passage elsewhere that happened to share the quote's words.
+ */
+export function passageForQuote(
+  nodusId: string,
+  quote: string,
+  location: SourceLocation,
+  candidate: PreparedPassages | null,
+): string | null {
+  const all = candidate
+    ? candidate.rows.map((row, index) => ({
+      passage_id: `${nodusId}#${index}`, text: row.text, source_ref: row.sourceRef ?? null, page_number: row.pageNumber ?? null,
+    }))
+    : getDb().prepare('SELECT passage_id,text,source_ref,page_number FROM passages WHERE nodus_id=? ORDER BY chunk_index')
+      .all(nodusId) as Array<{ passage_id: string; text: string; source_ref: string | null; page_number: number | null }>;
+  const sameSource = location.sourceRef ? all.filter((row) => row.source_ref === location.sourceRef) : [];
+  const rows = sameSource.length ? sameSource : all.filter((row) => row.source_ref == null || !location.sourceRef);
+  const startsBefore = (row: { page_number: number | null }) =>
+    location.pageNumber == null || row.page_number == null || row.page_number <= location.pageNumber;
+  const distance = (row: { page_number: number | null }) =>
+    location.pageNumber == null || row.page_number == null ? 0 : location.pageNumber - row.page_number;
+  const nearest = <T extends { page_number: number | null }>(list: T[]): T | null =>
+    list.reduce<T | null>((best, row) => (best == null || distance(row) < distance(best) ? row : best), null);
+
+  // A quote can run past the end of its chunk, so try shorter prefixes before giving up.
+  const haystacks = rows.map((row) => collapsedLiteralText(row.text).text);
+  for (const needle of quoteNeedles(quote)) {
+    const containing = rows.filter((_, index) => haystacks[index].includes(needle));
+    const chosen = nearest(containing.filter(startsBefore)) ?? nearest(containing);
+    if (chosen) return chosen.passage_id;
+  }
+
   const terms = quote.toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u).filter((term) => term.length > 4).slice(0, 8);
   if (!terms.length) return null;
-  const rows = candidate
-    ? candidate.rows.map((row, index) => ({ passage_id: `${nodusId}#${index}`, text: row.text }))
-    : getDb().prepare('SELECT passage_id,text FROM passages WHERE nodus_id=?').all(nodusId) as { passage_id: string; text: string }[];
-  let best: { id: string; score: number } | null = null;
-  for (const row of rows) {
+  let best: { id: string; score: number; distance: number } | null = null;
+  for (const row of rows.filter(startsBefore)) {
     const haystack = row.text.toLocaleLowerCase();
     const score = terms.filter((term) => haystack.includes(term)).length / terms.length;
-    if (!best || score > best.score) best = { id: row.passage_id, score };
+    const rowDistance = distance(row);
+    if (!best || score > best.score || (score === best.score && rowDistance < best.distance)) {
+      best = { id: row.passage_id, score, distance: rowDistance };
+    }
   }
   return best && best.score >= 0.45 ? best.id : null;
 }
@@ -822,7 +912,7 @@ function supportForQuote(input: {
   const location = parseSourceLocationAt(input.text, offset, input.sourceMap);
   return {
     supportId: randomUUID(), targetKind: input.targetKind, targetId: input.targetId,
-    sectionId: section?.sectionId ?? null, passageId: passageForQuote(input.nodusId, input.quote, input.candidatePassages),
+    sectionId: section?.sectionId ?? null, passageId: passageForQuote(input.nodusId, input.quote, location, input.candidatePassages),
     // A provider-supplied page label is never sufficient provenance. The quote's
     // literal offset must resolve against an extracted marker or the page stays null.
     pageStart: location.label, pageEnd: location.label,
@@ -880,7 +970,7 @@ async function synthesizeProfileAdaptive(
   splitPath = 'root',
   splitDepth = 0,
 ): Promise<ProfileSynthesis> {
-  const inputHash = sha256(JSON.stringify(input));
+  const inputHash = checkpointHash(options, JSON.stringify(input));
   const checkpointType = splitPath === 'root' ? 'profile:synthesis' : `profile:synthesis:${splitPath}`;
   const checkpoint = readDocumentCheckpoint<ProfileSynthesis>(options.jobId, checkpointType, inputHash);
   if (checkpoint) return checkpoint;
@@ -1509,5 +1599,6 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
     updatedAt: new Date().toISOString(),
   });
   clearDocumentCheckpoints(options.jobId);
+  clearWorkDocumentCheckpoints(work.nodus_id);
   return versionId;
 }

@@ -6,7 +6,8 @@ export type ResearchAction =
   | { action: 'search'; query: string }
   | { action: 'read'; documentId: string; operation: ResearchDocumentRead }
   | { action: 'original'; documentId: string; from: number; to?: number; attachmentId?: string }
-  | { action: 'web'; queries: string[]; intent: ResearchWebIntent };
+  | { action: 'web'; queries: string[]; intent: ResearchWebIntent }
+  | { action: 'catalog'; author?: string; title?: string; keywords?: string };
 
 /** Why the supervisor leaves the library: more coverage, a counter-position,
  * newer information than the corpus holds, or the user asked for the web. */
@@ -14,16 +15,21 @@ export type ResearchWebIntent = 'expand' | 'contrast' | 'update' | 'explicit';
 const WEB_INTENTS: readonly string[] = ['expand', 'contrast', 'update', 'explicit'];
 
 /** The web action exists only for runs that were granted it (Research Chat with web
- * search on); every other caller keeps the library-only vocabulary. */
-export function validResearchAction(value: unknown, allowWeb = false): value is ResearchAction {
+ * search on), and the catalogue lookup only for Research Chat's agent; every other
+ * caller keeps the library-only vocabulary. */
+export function validResearchAction(value: unknown, allowWeb = false, allowCatalog = false): value is ResearchAction {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const input = value as Record<string, unknown>;
   const keys = Object.keys(input);
   const allowed = input.action === 'finish' ? ['action'] : input.action === 'search' ? ['action', 'query']
     : input.action === 'read' ? ['action', 'documentId', 'operation'] : input.action === 'original' ? ['action', 'documentId', 'from', 'to', 'attachmentId']
-      : input.action === 'web' && allowWeb ? ['action', 'queries', 'intent'] : [];
+      : input.action === 'web' && allowWeb ? ['action', 'queries', 'intent'] : input.action === 'catalog' && allowCatalog ? ['action', 'author', 'title', 'keywords'] : [];
   if (!allowed.length || keys.some(key => !allowed.includes(key))) return false;
   if (input.action === 'finish') return true;
+  if (input.action === 'catalog') {
+    const fields = ['author', 'title', 'keywords'].filter(key => input[key] !== undefined);
+    return fields.length > 0 && fields.every(key => typeof input[key] === 'string' && (input[key] as string).trim().length >= 2 && (input[key] as string).length <= 200);
+  }
   if (input.action === 'web') {
     return Array.isArray(input.queries) && input.queries.length >= 1 && input.queries.length <= 4
       && input.queries.every(query => typeof query === 'string' && query.trim().length >= 2 && query.length <= 200)

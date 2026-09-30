@@ -38,3 +38,36 @@ test('the research scope a model reads names its limits in words, never as inter
     assert.match(assistant, /Passages are verbatim text of their source, not summaries/, 'the chat instruction says what a passage is');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+// A library of 1,223 sources reached the model as 1,223 entries with repeated notes and no
+// authors: 310,000 characters in which the answer said indexed works had no index and that
+// the list gave no authors. Research Chat names the sources of the turn and counts the rest.
+test('the research scope names the turn\'s sources with their authors and counts the rest of the library', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-scope-focus-'));
+  try {
+    await build({ entryPoints: ['shared/researchCorpus.ts'], outfile: path.join(root, 'corpus.cjs'), bundle: true, platform: 'node', format: 'cjs' });
+    const { researchScopeForPrompt, describeResearchLimitation } = require(path.join(root, 'corpus.cjs'));
+    const sourceCoverage = Array.from({ length: 1223 }, (_, index) => ({ documentId: `doc-${index}`, title: `Obra ${index}`,
+      reasons: index < 906 ? ['text_pending', 'embeddings_pending'] : index < 986 ? ['ocr_required', 'text_pending'] : [] }));
+    const documents = sourceCoverage.map((source, index) => ({ id: source.documentId, authors: [`Autor ${index}, A.`], year: 1990 + (index % 30) }));
+    const catalogue = Array.from({ length: 60 }, (_, index) => `doc-${1000 + index}`);
+    const coverage = { scopeId: 'f'.repeat(64), sourceCount: 1223, rounds: 9, evidenceTokens: 20000, decisionTokens: 30000, partial: true,
+      matchedDocumentIds: ['doc-1100', 'doc-1101', 'doc-5'], readDocumentIds: ['doc-1102'], limitations: ['text_pending', 'ocr_required'], sourceCoverage, queries: [] };
+    const scope = researchScopeForPrompt(coverage, { documentIds: catalogue, documents });
+    assert.equal(scope.sources.length, 40, 'at most forty sources are listed');
+    assert.deepEqual(scope.sources.slice(0, 4).map(source => source.title), ['Obra 1102', 'Obra 5', 'Obra 1100', 'Obra 1101'], 'read first, then passages found, then catalogue finds');
+    assert.deepEqual([scope.sources[0].authors, scope.sources[0].year, scope.sources[0].original_read], [['Autor 1102, A.'], 1990 + (1102 % 30), true]);
+    assert.equal(scope.sources[0].notes, undefined, 'a source that was read carries no excuse');
+    assert.deepEqual(scope.sources[4].notes, ['Found in the library catalogue; this turn did not read it within its limits.'], 'an indexed catalogue find says why it was not read, so no missing index is invented');
+    assert.equal(scope.other_sources.count, 1223 - 40);
+    // doc-5 is listed, so 905 + 80 unlisted sources have no text index yet.
+    assert.deepEqual(scope.other_sources.notes, [`985 of them: ${describeResearchLimitation('text_pending')}`,
+      `905 of them: ${describeResearchLimitation('embeddings_pending')}`, `80 of them: ${describeResearchLimitation('ocr_required')}`],
+    'the unlisted sources are counted by limitation, in words');
+    const text = JSON.stringify(scope);
+    assert.ok(text.length < 20_000, `the scope stays small (${text.length} characters)`);
+    for (const internal of ['text_pending', 'ocr_required', 'doc-1102', 'f'.repeat(64)]) assert.ok(!text.includes(internal), `${internal} stays out of the prompt`);
+    const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
+    assert.match(assistant, /Never say that you lack tools, that Zotero or its MCP is unavailable or must be enabled/, 'the answer owns the research instead of disowning Zotero');
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});

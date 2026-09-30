@@ -1770,6 +1770,8 @@ export function Library({
                       ? t('Documento comprendido')
                       : documentStatuses.get(w.nodus_id) === 'unavailable'
                         ? t('Sin texto completo')
+                        : documentStatuses.get(w.nodus_id) === 'failed'
+                          ? t('Ficha documental fallida')
                         : documentStatuses.get(w.nodus_id) && !['missing', 'failed', 'stale'].includes(documentStatuses.get(w.nodus_id)!)
                           ? t('Comprendiendo…')
                           : t('Sin ficha documental')}
