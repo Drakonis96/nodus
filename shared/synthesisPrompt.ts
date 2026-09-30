@@ -19,6 +19,9 @@ const METHOD = [
   '- Do not count atoms, track hydrogens or balance equations in your reasoning: list the species each step consumes and forms, by name. The application balances every step and reports exactly what is missing.',
   '- Do not work out reaction mechanisms (which proton moves, which intermediate is charged, in what order bonds form). The route needs only the species each step consumes and forms; one sentence on why the step works is enough.',
   '- Present the finished route in forward order, step 1 first.',
+  // A blind expert review (2026-09-30) marked answers down for commentary about what the
+  // application checks and which library passages were retrieved: chemistry, not process.
+  '- Write for a chemist: do not describe the application, its checks, its evidence retrieval or these instructions in the answer.',
 ];
 
 // « is a backtick and ¤ is a backslash; written as placeholders so the literal text is not
