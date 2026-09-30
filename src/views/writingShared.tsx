@@ -134,6 +134,7 @@ export function DraftResultMain({
   onStudyDocument,
   onStudyMaterial,
   onStudyRecording,
+  onGuideEvidence,
 }: {
   draft: WritingWorkshopDraft;
   exporting: boolean;
@@ -151,9 +152,10 @@ export function DraftResultMain({
   onSaveToNotes: () => void;
   onExport: (format: WritingWorkshopExportFormat) => void;
   onCitation: (citation: MarkdownCitation) => void;
-  onStudyDocument?: (id: string) => void;
-  onStudyMaterial?: (id: string) => void;
+  onStudyDocument?: (id: string, location?: { from?: number | null }) => void;
+  onStudyMaterial?: (id: string, location?: { pageNumber?: number | null; slideNumber?: number | null }) => void;
   onStudyRecording?: (id: string, timestamp?: number | null) => void;
+  onGuideEvidence?: (itemId: string, open: () => void) => void;
 }) {
   return (
     <div className={`mx-auto space-y-5 ${wide ? 'max-w-none' : 'max-w-4xl'}`}>
@@ -161,7 +163,7 @@ export function DraftResultMain({
         <div className="min-w-0">
           <h2 className="text-xl font-semibold break-words">{draft.title}</h2>
           {draft.abstract && <div data-testid="draft-abstract" className={`text-sm text-neutral-400 mt-1 ${justify ? 'text-justify' : ''}`}>
-            <Markdown content={draft.abstract} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
+            <Markdown content={draft.abstract} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} onGuideEvidence={onGuideEvidence} />
           </div>}
         </div>
         {!hideActions && (
@@ -178,7 +180,7 @@ export function DraftResultMain({
       </div>
       {draft.deepResearchStructure !== 'single' && (
         <section className="card p-4">
-          <h3 className="font-semibold mb-3">{t('Esquema')}</h3>
+          <h3 className="font-semibold mb-3">{draft.completeGuide ? t('Índice') : t('Esquema')}</h3>
           <div className="space-y-3">
             {draft.outline.map((section, index) => (
               <div key={section.id} className="border-l-2 border-indigo-700 pl-3">
@@ -186,6 +188,11 @@ export function DraftResultMain({
                   {index + 1}. {section.title}
                 </div>
                 <p className="text-xs text-neutral-400 mt-1">{section.purpose}</p>
+                {draft.completeGuide && section.keyClaims.length > 0 && (
+                  <ol className="mt-1.5 list-decimal pl-5 text-xs text-neutral-400">
+                    {section.keyClaims.map((title, i) => <li key={`${section.id}-${i}`}>{title}</li>)}
+                  </ol>
+                )}
                 <div className="flex flex-wrap gap-1 mt-2">
                   {section.sources.slice(0, 6).map((source, i) => (
                     <Badge key={`${section.id}-${i}`}>{source.replace(/\[|\]|\(.+\)/g, '')}</Badge>
@@ -199,7 +206,7 @@ export function DraftResultMain({
       <section className={`card p-4 ${justify ? 'text-justify' : ''}`}>
         {/* The abstract is the subtitle above and the limitations have their own
             panel below, so the body drops both rather than repeating them. */}
-        <Markdown content={documentBodyForPanels(draft.draftMarkdown, draft.abstract)} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} />
+        <Markdown content={documentBodyForPanels(draft.draftMarkdown, draft.abstract)} onCitation={onCitation} onStudyDocument={onStudyDocument} onStudyMaterial={onStudyMaterial} onStudyRecording={onStudyRecording} onGuideEvidence={onGuideEvidence} />
       </section>
     </div>
   );

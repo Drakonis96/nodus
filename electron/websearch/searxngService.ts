@@ -15,6 +15,11 @@ export interface SearxngResult {
   score: number;
   category: string;
   publishedDate: string | null;
+  /** Image results only (category "images"): the full image, its thumbnail and format. */
+  imgSrc?: string;
+  thumbnailSrc?: string;
+  imgFormat?: string;
+  author?: string;
 }
 export interface SearxngResponse {
   query: string;
@@ -23,7 +28,7 @@ export interface SearxngResponse {
   unresponsive: Array<[string, string]>;
 }
 export interface SearxngSearchOptions {
-  categories?: 'general' | 'science';
+  categories?: 'general' | 'science' | 'images';
   language?: string;
   pageno?: number;
   timeoutMs?: number;
@@ -135,6 +140,16 @@ export function plainSearchQuery(query: string): string {
 
 function text(value: unknown, limit: number): string { return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit) : ''; }
 
+function imageFields(item: Record<string, unknown>): Pick<SearxngResult, 'imgSrc' | 'thumbnailSrc' | 'imgFormat' | 'author'> {
+  const link = (value: unknown) => { const url = text(value, 2000); return /^https?:\/\//i.test(url) ? url : ''; };
+  const imgSrc = link(item.img_src);
+  if (!imgSrc) return {};
+  const thumbnailSrc = link(item.thumbnail_src);
+  const imgFormat = text(item.img_format, 60);
+  const author = text(item.author, 200);
+  return { imgSrc, ...(thumbnailSrc ? { thumbnailSrc } : {}), ...(imgFormat ? { imgFormat } : {}), ...(author ? { author } : {}) };
+}
+
 export async function searchSearxng(query: string, options: SearxngSearchOptions = {}, signal?: AbortSignal): Promise<SearxngResponse> {
   const q = plainSearchQuery(query);
   if (!q) return { query, results: [], unresponsive: [] };
@@ -161,7 +176,7 @@ export async function searchSearxng(query: string, options: SearxngSearchOptions
         engines: Array.isArray(item.engines) ? item.engines.filter((engine): engine is string => typeof engine === 'string').slice(0, 12) : [],
         positions: Array.isArray(item.positions) ? item.positions.filter((position): position is number => Number.isFinite(position)).slice(0, 12) : [],
         score: Number.isFinite(item.score) ? Number(item.score) : 0, category: text(item.category, 40),
-        publishedDate: text(item.publishedDate, 40) || null });
+        publishedDate: text(item.publishedDate, 40) || null, ...imageFields(item) });
     }
     const unresponsive = (Array.isArray(body.unresponsive_engines) ? body.unresponsive_engines : [])
       .filter((entry): entry is [string, string] => Array.isArray(entry) && typeof entry[0] === 'string').map(entry => [entry[0], String(entry[1] ?? '')] as [string, string]);

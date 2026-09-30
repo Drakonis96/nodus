@@ -253,6 +253,10 @@ const NOT_SYNCED_TABLES = new Set([
   'research_run_scopes', 'research_conversation_provenance', 'passage_publications',
   // Web receipts are what THIS machine read; another device verifies its own.
   'research_web_passages',
+  // Complete study guide working state and evidence sidecars: run checkpoints and the
+  // reading cache describe THIS machine's model calls; the saved guide's Markdown
+  // travels with writing_saved_drafts and does not need them.
+  'complete_guide_runs', 'complete_guide_units', 'complete_guide_chunk_cache', 'complete_guide_artifacts',
   // Source-resolution provenance is rebuilt from this machine's Zotero/library files.
   // Shipping it would create attachment locators that may not exist on the receiver.
   'work_text_sources',

@@ -5925,3 +5925,51 @@ html.theme-active.light .library-theme .text-indigo-100 { color: var(--a-700); }
 .light .tri-switch.is-neg { border-color: #fca5a5; background: #fef2f2; }
 .light .tri-switch.is-neg .tri-switch-thumb { background: #dc2626; }
 @media (prefers-reduced-motion: reduce) { .tri-switch-thumb { transition: none; } }
+
+/* Complete study guide callouts (see src/components/markdownCallouts.ts). Each kind
+   has one accent; AI-written boxes are dashed so they never read as source content. */
+.md .guide-callout {
+  --callout-accent: #818cf8;
+  margin: 0.9em 0;
+  padding: 0.65em 0.95em 0.7em;
+  border: 1px solid color-mix(in srgb, var(--callout-accent) 45%, transparent);
+  border-left: 4px solid var(--callout-accent);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--callout-accent) 9%, transparent);
+  font-style: normal;
+  opacity: 1;
+}
+.md .guide-callout > :is(p, ul, ol, table):first-of-type { margin-top: 0.2em; }
+.md .guide-callout > :last-child { margin-bottom: 0; }
+.md .guide-callout-title {
+  margin: 0 0 0.25em;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--callout-accent);
+}
+.md .guide-callout-definition { --callout-accent: #818cf8; }
+.md .guide-callout-formula { --callout-accent: #a78bfa; }
+.md .guide-callout-rule { --callout-accent: #38bdf8; }
+.md .guide-callout-procedure { --callout-accent: #2dd4bf; }
+.md .guide-callout-example { --callout-accent: #34d399; }
+.md .guide-callout-mistake { --callout-accent: #fb7185; }
+.md .guide-callout-memorize { --callout-accent: #facc15; }
+.md .guide-callout-selfcheck { --callout-accent: #22d3ee; }
+.md .guide-callout-web { --callout-accent: #94a3b8; }
+.md :is(.guide-callout-ai-example, .guide-callout-ai-analogy, .guide-callout-ai-mistake) {
+  --callout-accent: #fbbf24;
+  border-style: dashed;
+  border-left-style: solid;
+}
+.light .md .guide-callout-definition { --callout-accent: #4f46e5; }
+.light .md .guide-callout-formula { --callout-accent: #7c3aed; }
+.light .md .guide-callout-rule { --callout-accent: #0284c7; }
+.light .md .guide-callout-procedure { --callout-accent: #0f766e; }
+.light .md .guide-callout-example { --callout-accent: #047857; }
+.light .md .guide-callout-mistake { --callout-accent: #e11d48; }
+.light .md .guide-callout-memorize { --callout-accent: #a16207; }
+.light .md .guide-callout-selfcheck { --callout-accent: #0e7490; }
+.light .md .guide-callout-web { --callout-accent: #475569; }
+.light .md :is(.guide-callout-ai-example, .guide-callout-ai-analogy, .guide-callout-ai-mistake) { --callout-accent: #b45309; }

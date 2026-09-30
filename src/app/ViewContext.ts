@@ -88,6 +88,8 @@ export interface ViewContext extends VaultFlags {
   studyRecordingTarget: { id: string; timestamp?: number | null } | null;
   studyGraphTarget: Nonced<PendingGraphNavigationTarget> | null;
   studyChatTarget: { prompt: string; nonce: number } | null;
+  /** Materials → Deep Research: sources for a new complete study guide. */
+  completeGuideTarget: { sourceKeys: string[]; nonce: number } | null;
   assistantTarget: Nonced<PendingAssistantNavigationTarget> | null;
   researchConversationTarget: ResearchConversationNavigationTarget | null;
   radarTarget: { updateId?: string; nonce: number } | null;
@@ -132,6 +134,7 @@ export interface ViewContext extends VaultFlags {
   setStudyRecordingTarget: (target: { id: string; timestamp?: number | null } | null) => void;
   setStudyGraphTarget: (target: Nonced<PendingGraphNavigationTarget> | null) => void;
   setStudyChatTarget: (target: { prompt: string; nonce: number } | null) => void;
+  setCompleteGuideTarget: (target: { sourceKeys: string[]; nonce: number } | null) => void;
   setActiveDatabaseId: (id: string | null) => void;
   setPendingRecordId: (id: string | null) => void;
 

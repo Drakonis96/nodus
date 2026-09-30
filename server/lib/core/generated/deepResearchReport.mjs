@@ -502,7 +502,8 @@ function sectionHtml(section) {
   </section>`;
 }
 function renderProfessionalReportHtml(input) {
-  const image = imageIsSafe(input.imageDataUrl) ? `<figure class="cover-image"><img src="${input.imageDataUrl}" alt="" />${input.imageCredit ? `<figcaption>${escapeHtml(input.imageCredit)}</figcaption>` : ""}</figure>` : `<div class="cover-motif" aria-hidden="true"><span></span><span></span><span></span><span></span></div>`;
+  const hasImage = imageIsSafe(input.imageDataUrl);
+  const image = hasImage ? `<figure class="cover-image"><img src="${input.imageDataUrl}" alt="" />${input.imageCredit ? `<figcaption>${escapeHtml(input.imageCredit)}</figcaption>` : ""}</figure>` : "";
   const metrics = input.metrics?.length ? `<div class="cover-metrics">${input.metrics.map(
     (metric) => `<div><strong>${escapeHtml(metric.value)}</strong><span>${escapeHtml(metric.label)}</span></div>`
   ).join("")}</div>` : "";
@@ -569,23 +570,9 @@ function renderProfessionalReportHtml(input) {
       border-radius: 4mm;
     }
     .cover-image figcaption { margin-top: 2mm; color: var(--muted); font: italic 7.7pt/1.35 Georgia, serif; text-align: right; }
-    .cover-motif {
-      position: relative;
-      height: 74mm;
-      margin-top: 11mm;
-      overflow: hidden;
-      border: .25mm solid color-mix(in srgb, var(--accent) 25%, white);
-      border-radius: 4mm;
-      background:
-        radial-gradient(circle at 22% 24%, color-mix(in srgb, var(--accent) 16%, white) 0 1.5mm, transparent 1.6mm),
-        radial-gradient(circle at 72% 68%, color-mix(in srgb, var(--accent) 14%, white) 0 1.2mm, transparent 1.3mm),
-        linear-gradient(145deg, var(--accent-soft), #fff 56%, color-mix(in srgb, var(--accent) 8%, white));
-    }
-    .cover-motif span { position: absolute; height: .35mm; transform-origin: left; background: color-mix(in srgb, var(--accent) 35%, white); }
-    .cover-motif span:nth-child(1) { width: 76mm; left: 20mm; top: 19mm; transform: rotate(12deg); }
-    .cover-motif span:nth-child(2) { width: 97mm; left: 62mm; top: 36mm; transform: rotate(-17deg); }
-    .cover-motif span:nth-child(3) { width: 68mm; left: 27mm; top: 51mm; transform: rotate(-9deg); }
-    .cover-motif span:nth-child(4) { width: 58mm; left: 94mm; top: 17mm; transform: rotate(27deg); }
+    /* No picture: the title block sits in the upper third instead of hugging the top edge. */
+    .cover-plain .cover-kicker { margin-top: 46mm; }
+    .cover-plain .cover-subtitle { max-width: 138mm; margin-top: 7mm; }
     .cover-meta {
       margin-top: auto;
       padding-top: 8mm;
@@ -774,7 +761,7 @@ function renderProfessionalReportHtml(input) {
 </head>
 <body>
   <main>
-    <section class="cover">
+    <section class="cover${hasImage ? "" : " cover-plain"}">
       <div class="cover-kicker">${escapeHtml(input.kindLabel)}</div>
       <div class="cover-rule"></div>
       <h1>${escapeHtml(input.title)}</h1>
