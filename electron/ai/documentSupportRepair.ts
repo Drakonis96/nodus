@@ -1,5 +1,5 @@
 import { getDb } from '../db/database';
-import { passageForQuote, quoteMatchLength } from './documentProfile';
+import { fullQuoteMatchLength, passageForQuote, quoteMatchLength, type StoredPassageRow } from './documentProfile';
 
 const REPAIR_FLAG = 'document_support_passages_v1';
 
@@ -26,10 +26,23 @@ export function repairDocumentSupportPassagesOnce(): number | null {
         ).all() as Array<{ support_id: string; nodus_id: string; passage_id: string; quote: string; page_start: string | null; source_ref: string | null; page_start_number: number | null; text: string }>;
         const passageText = db.prepare('SELECT text FROM passages WHERE passage_id = ? AND nodus_id = ?');
         const move = db.prepare('UPDATE document_profile_support SET passage_id = ? WHERE support_id = ?');
+        // Each book's passages are read once, not once per support: 7,447 supports over 48 books
+        // re-read whole books ~13.5 million passage-times before the window opened, for longer
+        // than ten minutes.
+        const passagesOf = new Map<string, StoredPassageRow[]>();
+        const bookPassages = db.prepare('SELECT passage_id, text, source_ref, page_number FROM passages WHERE nodus_id = ? ORDER BY chunk_index');
         for (const support of supports) {
           const current = quoteMatchLength(support.text, support.quote);
+          // A support moves only to a passage holding strictly more of the quote's opening, so
+          // one whose passage already holds all of it — nearly every support — cannot move.
+          if (current >= fullQuoteMatchLength(support.quote)) continue;
+          let stored = passagesOf.get(support.nodus_id);
+          if (!stored) {
+            stored = bookPassages.all(support.nodus_id) as StoredPassageRow[];
+            passagesOf.set(support.nodus_id, stored);
+          }
           const better = passageForQuote(support.nodus_id, support.quote,
-            { label: support.page_start, sourceRef: support.source_ref, pageNumber: support.page_start_number }, null);
+            { label: support.page_start, sourceRef: support.source_ref, pageNumber: support.page_start_number }, null, stored);
           if (!better || better === support.passage_id) continue;
           const text = (passageText.get(better, support.nodus_id) as { text: string } | undefined)?.text;
           // Move only to a passage that holds strictly more of the quote's opening. A quote
