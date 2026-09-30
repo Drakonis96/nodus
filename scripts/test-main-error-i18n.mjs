@@ -191,6 +191,27 @@ test('every parameterized pattern keeps its runtime values and translates around
   }
 });
 
+test('catalogue and server-address errors keep their specific cause through IPC in every UI language', () => {
+  const messages = [
+    ['El proveedor no devolvió un catálogo de modelos válido.', 'The provider did not return a valid model catalogue.'],
+    ['El catálogo de modelos está incompleto.', 'The model catalogue is incomplete.'],
+    ['Falta la dirección del servidor.', 'The server address is missing.'],
+  ];
+  for (const [message, english] of messages) {
+    const payload = { ok: false, message };
+    assert.deepEqual(localizeIpcPayload(payload, 'es'), payload);
+    assert.equal(localizeIpcPayload(payload, 'en').message, english);
+    for (const language of [...LANGUAGES, 'zh-TW', 'ja', 'ko']) {
+      const translated = localizeIpcPayload(payload, language);
+      assert.equal(translated.ok, false);
+      assert.ok(MAIN_PROCESS_ERRORS[message][language], `${message} needs a ${language} translation`);
+      assert.equal(translated.message, MAIN_PROCESS_ERRORS[message][language]);
+      assert.notEqual(translated.message, message);
+      assert.ok(!GENERIC.has(translated.message), `${language} must preserve the cause of ${message}`);
+    }
+  }
+});
+
 test('the local provider failure that opened this file names its cause in every language', () => {
   const message = 'No se pudo conectar con Ollama en http://localhost:11434. HTTP 404. ¿Está Ollama en marcha?';
   assert.equal(localizeRuntimeError(message, 'es'), message);
