@@ -5,6 +5,7 @@
 // on its own so a reader never has to re-run a whole analysis to repair one index.
 import { useEffect, useState } from 'react';
 import type { DocumentUnderstandingState, WorkView } from '@shared/types';
+import { parseTextNotes } from '@shared/textProvenance';
 import { Icon } from '../components/ui';
 import { notifyDataChanged, useDismissableLayer } from '../hooks';
 import { RETRYABLE_STEP_STATES, STEP_ORDER, type StepId, type StepState, type WorkStatus } from '../libraryStatus';
@@ -217,7 +218,7 @@ export function WorkStatusModal({
     }
   };
 
-  const detailFor = (id: StepId): string => {
+  const baseDetailFor = (id: StepId): string => {
     const step = status.steps[id];
     if (step.state === 'blocked') return t('Necesita el texto completo de la obra.');
     switch (id) {
@@ -258,6 +259,24 @@ export function WorkStatusModal({
         }
         return step.total ? tx('{n} fragmentos indexados', { n: step.total }) : '—';
     }
+  };
+
+  const detailFor = (id: StepId): string => {
+    const base = baseDetailFor(id);
+    if (id !== 'citable') return base;
+    // Extraction coverage is independent of whether the passage index is current.
+    // OCR recovery alone does not establish that the whole work was scanned.
+    const provenance = parseTextNotes(work.resolved_text_notes);
+    const missingText = provenance.blankPages + provenance.unresolvedPages;
+    const extra = [
+      provenance.ocrPages ? tx('{n} páginas recuperadas por OCR', { n: provenance.ocrPages }) : '',
+      provenance.cappedPages ? (provenance.cap === null
+        ? tx('{n} páginas sin procesar por el límite de OCR: súbelo en Ajustes y vuelve a extraer el texto', { n: provenance.cappedPages })
+        : tx('{n} páginas sin procesar por el límite de OCR ({cap} páginas): súbelo en Ajustes y vuelve a extraer el texto', { n: provenance.cappedPages, cap: provenance.cap })) : '',
+      missingText ? tx('{n} páginas sin texto recuperado', { n: missingText }) : '',
+      provenance.ocrFailed ? t('La extracción por OCR no se completó. Reintenta la extracción del texto.') : '',
+    ].filter(Boolean);
+    return extra.length ? `${base} · ${extra.join(' · ')}` : base;
   };
 
   return (
