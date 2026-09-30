@@ -842,6 +842,12 @@ function quoteNeedles(quote: string): string[] {
 /** How much of a quote's opening a passage holds: the longest of quoteNeedles it contains,
  * 0 for none. Short prefixes can match inside unrelated words ("regla adición" holds "la
  * adición"), so passages are compared by this length, longest first, as passageForQuote does. */
+/** The most of a quote's opening any passage can hold: its longest needle's length. A passage
+ * already holding that much cannot be bettered by another. */
+export function fullQuoteMatchLength(quote: string): number {
+  return quoteNeedles(quote)[0]?.length ?? 0;
+}
+
 export function quoteMatchLength(text: string, quote: string): number {
   const haystack = collapsedLiteralText(text).text;
   return quoteNeedles(quote).find((needle) => haystack.includes(needle))?.length ?? 0;
@@ -855,18 +861,36 @@ export function quoteMatchLength(text: string, quote: string): number {
  * at or before the quote's page. Choosing by overlap across the whole document picked a
  * passage elsewhere that happened to share the quote's words.
  */
+/** A passage's collapsed literal text, computed once per row object: resolving many quotes of
+ *  one work (the support repair) would otherwise re-normalise the whole work for each. */
+const collapsedPassageTexts = new WeakMap<object, string>();
+function collapsedPassageText(row: { text: string }): string {
+  let text = collapsedPassageTexts.get(row);
+  if (text === undefined) {
+    text = collapsedLiteralText(row.text).text;
+    collapsedPassageTexts.set(row, text);
+  }
+  return text;
+}
+
+/** A work's stored passages, as passageForQuote reads them. */
+export type StoredPassageRow = { passage_id: string; text: string; source_ref: string | null; page_number: number | null };
+
 export function passageForQuote(
   nodusId: string,
   quote: string,
   location: SourceLocation,
   candidate: PreparedPassages | null,
+  /** The work's stored passages, already read: a caller resolving many quotes of one work
+   *  reads them once instead of once per quote. */
+  stored?: StoredPassageRow[],
 ): string | null {
-  const all = candidate
+  const all = stored ?? (candidate
     ? candidate.rows.map((row, index) => ({
       passage_id: `${nodusId}#${index}`, text: row.text, source_ref: row.sourceRef ?? null, page_number: row.pageNumber ?? null,
     }))
     : getDb().prepare('SELECT passage_id,text,source_ref,page_number FROM passages WHERE nodus_id=? ORDER BY chunk_index')
-      .all(nodusId) as Array<{ passage_id: string; text: string; source_ref: string | null; page_number: number | null }>;
+      .all(nodusId) as StoredPassageRow[]);
   const sameSource = location.sourceRef ? all.filter((row) => row.source_ref === location.sourceRef) : [];
   const rows = sameSource.length ? sameSource : all.filter((row) => row.source_ref == null || !location.sourceRef);
   const startsBefore = (row: { page_number: number | null }) =>
@@ -877,7 +901,7 @@ export function passageForQuote(
     list.reduce<T | null>((best, row) => (best == null || distance(row) < distance(best) ? row : best), null);
 
   // A quote can run past the end of its chunk, so try shorter prefixes before giving up.
-  const haystacks = rows.map((row) => collapsedLiteralText(row.text).text);
+  const haystacks = rows.map(collapsedPassageText);
   for (const needle of quoteNeedles(quote)) {
     const containing = rows.filter((_, index) => haystacks[index].includes(needle));
     const chosen = nearest(containing.filter(startsBefore)) ?? nearest(containing);

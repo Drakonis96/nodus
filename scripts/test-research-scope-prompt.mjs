@@ -71,3 +71,114 @@ test('the research scope names the turn\'s sources with their authors and counts
     assert.match(assistant, /Never say that you lack tools, that Zotero or its MCP is unavailable or must be enabled/, 'the answer owns the research instead of disowning Zotero');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 });
+
+test('the coverage kept with a chat turn lists only consulted sources in a large scope', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-scope-prompt-'));
+  try {
+    await build({ entryPoints: ['shared/researchCorpus.ts'], outfile: path.join(root, 'corpus.cjs'), bundle: true, platform: 'node', format: 'cjs' });
+    const { compactResearchTraversal, STORED_COVERAGE_LIMIT } = require(path.join(root, 'corpus.cjs'));
+    const sourceCoverage = Array.from({ length: 14051 }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`, reasons: ['embeddings_pending'] }));
+    const coverage = { scopeId: 's', sourceCount: 14051, rounds: 2, evidenceTokens: 7000, partial: false, matchedDocumentIds: ['d3', 'd9'], readDocumentIds: ['d40'], sourceCoverage, queries: [] };
+    const kept = compactResearchTraversal(coverage);
+    assert.deepEqual(kept.sourceCoverage.map(s => s.documentId), ['d3', 'd9', 'd40']);
+    assert.equal(kept.sourceCount, 14051, 'the scope size is still reported');
+    assert.deepEqual(kept.omittedSourceCoverage, { count: 14048, reasonCounts: { embeddings_pending: 14048 } });
+    assert.ok(Buffer.byteLength(JSON.stringify(kept)) < 2000);
+    const small = { ...coverage, sourceCoverage: sourceCoverage.slice(0, STORED_COVERAGE_LIMIT) };
+    assert.equal(compactResearchTraversal(small), small, 'a small scope is kept as it is');
+    const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
+    assert.match(assistant, /researchTraversal: compactResearchTraversal\(run\.coverage\(\)\)/);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+async function withCorpus(check) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-stored-coverage-'));
+  try {
+    await build({ entryPoints: ['shared/researchCorpus.ts'], outfile: path.join(root, 'corpus.cjs'), bundle: true, platform: 'node', format: 'cjs' });
+    await check(require(path.join(root, 'corpus.cjs')));
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+}
+
+function traversal(sourceCoverage, overrides = {}) {
+  return { scopeId: 'scope', sourceCount: sourceCoverage.length, rounds: 3, evidenceTokens: 7000, decisionTokens: 400,
+    partial: true, limitations: ['ocr_required'], matchedDocumentIds: [], readDocumentIds: [], sourceCoverage, queries: [], ...overrides };
+}
+
+test('stored coverage retains empty attempts and catalogue finds, and counts omitted limitations per source', () => withCorpus(({ compactResearchTraversal, researchScopeForPrompt }) => {
+  const sources = Array.from({ length: 65 }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`,
+    reasons: i < 10 ? ['ocr_required', 'text_pending', 'text_pending'] : i < 20 ? ['embeddings_pending'] : [] }));
+  const coverage = traversal(sources, { matchedDocumentIds: ['d30'], readDocumentIds: ['d31'], catalogDocumentIds: ['d32'],
+    attemptedDocumentIds: ['d0', 'd33'], contextDocumentIds: ['d34'], queries: [{ query: 'empty targeted search', sources: ['d1'], candidates: 0, partial: false },
+      { query: 'whole scope', sources: sources.map(source => source.documentId), candidates: 4, partial: true }] });
+  const original = JSON.stringify(coverage);
+  const focus = { documentIds: ['d32'], documents: [] };
+  const prompt = researchScopeForPrompt(coverage, focus);
+  const compact = compactResearchTraversal(coverage);
+  assert.deepEqual(compact.sourceCoverage.map(source => source.documentId), ['d0', 'd1', 'd30', 'd31', 'd32', 'd33', 'd34']);
+  assert.deepEqual(compact.omittedSourceCoverage, { count: 58, reasonCounts: { ocr_required: 8, text_pending: 8, embeddings_pending: 10 } });
+  assert.equal(compact.sourceCoverage.length + compact.omittedSourceCoverage.count, coverage.sourceCount);
+  assert.deepEqual(compact.queries[0], coverage.queries[0], 'the empty individual search keeps its source and result');
+  assert.deepEqual(compact.queries[1], { query: 'whole scope', sources: [], scope: { id: 'scope', sourceCount: 65 }, candidates: 4, partial: true });
+  for (const field of ['sourceCount', 'rounds', 'evidenceTokens', 'decisionTokens', 'partial', 'limitations', 'matchedDocumentIds', 'readDocumentIds', 'catalogDocumentIds', 'attemptedDocumentIds', 'contextDocumentIds'])
+    assert.deepEqual(compact[field], coverage[field], `${field}: unchanged`);
+  assert.equal(JSON.stringify(coverage), original, 'the input and nested arrays are not mutated');
+  assert.deepEqual(researchScopeForPrompt(coverage, focus), prompt, 'the live coverage still produces the same model prompt');
+  assert.deepEqual(compactResearchTraversal(JSON.parse(JSON.stringify(compact))), compact, 'stored coverage is idempotent after a JSON round trip');
+}));
+
+test('empty turns still store omitted coverage, and the 60-source boundary preserves small scopes', () => withCorpus(({ compactResearchTraversal }) => {
+  for (const count of [0, 1, 60, 61]) {
+    const coverage = traversal(Array.from({ length: count }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`, reasons: ['ocr_required', 'ocr_required'] })));
+    const compact = compactResearchTraversal(coverage);
+    if (count <= 60) assert.equal(compact, coverage);
+    else {
+      assert.deepEqual(compact.sourceCoverage, []);
+      assert.deepEqual(compact.omittedSourceCoverage, { count, reasonCounts: { ocr_required: count } });
+      assert.equal(compact.partial, coverage.partial);
+    }
+  }
+  const legacy = { scopeId: 'old', sourceCount: 2, rounds: 1, evidenceTokens: 0, partial: false, queries: [] };
+  assert.equal(compactResearchTraversal(legacy), legacy, 'optional fields remain optional for older records');
+}));
+
+test('only a verified complete scope can replace a query source list', () => withCorpus(({ compactResearchTraversal }) => {
+  const sources = Array.from({ length: 65 }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`, reasons: [] }));
+  const ids = sources.map(source => source.documentId);
+  for (const queryIds of [[ids[0], ids[1]], [...ids.slice(0, -1), 'foreign'], [...ids.slice(0, -1), ids[0]]]) {
+    const coverage = traversal(sources, { queries: [{ query: 'subset or different scope', sources: queryIds, candidates: 0, partial: false }] });
+    const compact = compactResearchTraversal(coverage);
+    assert.deepEqual(compact.queries[0].sources, queryIds);
+    assert.equal(compact.queries[0].scope, undefined, 'equal length alone cannot establish scope identity');
+    for (const id of queryIds.filter(id => ids.includes(id))) assert.ok(compact.sourceCoverage.some(source => source.documentId === id));
+  }
+  const reversed = traversal(sources, { queries: [{ query: 'scope in another order', sources: [...ids].reverse(), candidates: 2, partial: true }] });
+  assert.deepEqual(compactResearchTraversal(reversed).queries[0].scope, { id: 'scope', sourceCount: 65 });
+  const incomplete = { ...reversed, sourceCount: 66 };
+  assert.equal(compactResearchTraversal(incomplete).queries[0].scope, undefined, 'incomplete source coverage cannot prove a whole-scope query');
+}));
+
+test('more than sixty involved sources are never dropped or summarized again', () => withCorpus(({ compactResearchTraversal }) => {
+  const sources = Array.from({ length: 100 }, (_, i) => ({ documentId: `d${i}`, title: `Work ${i}`, reasons: ['embeddings_pending'] }));
+  const coverage = traversal(sources, { matchedDocumentIds: sources.slice(0, 80).map(source => source.documentId) });
+  const compact = compactResearchTraversal(coverage);
+  assert.equal(compact.sourceCoverage.length, 80);
+  assert.deepEqual(compact.omittedSourceCoverage, { count: 20, reasonCounts: { embeddings_pending: 20 } });
+  assert.equal(compactResearchTraversal(compact), compact);
+  const allInvolved = { ...coverage, matchedDocumentIds: sources.map(source => source.documentId) };
+  assert.equal(compactResearchTraversal(allInvolved), allInvolved);
+}));
+
+test('library-wide query storage stays small with real-length IDs and many rounds', () => withCorpus(({ compactResearchTraversal }) => {
+  const sources = Array.from({ length: 14051 }, (_, i) => ({ documentId: `nodus:00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, title: `Work ${i}`, reasons: ['embeddings_pending'] }));
+  const ids = sources.map(source => source.documentId);
+  for (const rounds of [1, 3, 8, 16]) {
+    const coverage = traversal(sources, { matchedDocumentIds: [ids[3]], readDocumentIds: [ids[40]],
+      queries: Array.from({ length: rounds }, (_, i) => ({ query: `whole scope ${i}`, sources: ids, candidates: 24, partial: i === rounds - 1 })) });
+    const compact = compactResearchTraversal(coverage);
+    assert.equal(compact.queries.length, rounds);
+    assert.ok(compact.queries.every(query => query.sources.length === 0 && query.scope.id === coverage.scopeId && query.scope.sourceCount === coverage.sourceCount));
+    assert.ok(Buffer.byteLength(JSON.stringify(compact)) < 5000, `rounds ${rounds}: the stored record must stay below 5 KB`);
+    assert.equal(compact.omittedSourceCoverage.reasonCounts.embeddings_pending + compact.sourceCoverage.length, sources.length);
+    assert.equal(coverage.queries[0].sources.length, 14051, 'the live query list remains complete');
+  }
+}));

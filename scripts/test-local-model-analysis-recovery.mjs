@@ -135,8 +135,12 @@ try {
     'buffered leased Nodus-local clients size their timeout by provider');
   assert.match(client, /const streamTimeoutMs = opts\.timeoutMs \?\? completionTimeoutMs\(model\)/,
     'streaming clients size their timeout by provider');
-  assert.ok((client.match(/withTransportDeadline\(/g) ?? []).length >= 3,
-    'buffered and streaming OpenAI-compatible clients keep the deadline until the complete body settles');
+  assert.ok((client.match(/withTransportDeadline\(/g) ?? []).length >= 2,
+    'buffered OpenAI-compatible clients keep the deadline until the complete body settles');
+  // The stream keeps a deadline over the complete body too, measured as idle time (a reasoning
+  // model streams for minutes before answering) with a total ceiling.
+  assert.match(client, /const executeStream = \(body: any\) => withIdleTransportDeadline\(\s*streamTimeoutMs,\s*Math\.max\(streamTimeoutMs, STREAM_TOTAL_MS\)/,
+    'the streaming OpenAI-compatible client keeps an idle deadline and a total ceiling until the body settles');
   assert.doesNotMatch(client, /timeout: opts\.timeoutMs \?\? 180_000/, 'no hard-coded ceiling survives');
   assert.match(client, /'Tiempo agotado esperando al proveedor de IA[^']*',\s*false,\s*false,\s*'timeout'/,
     'the timeout error carries its code');

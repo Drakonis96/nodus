@@ -788,6 +788,12 @@ export interface AcademicApi extends Pick<import('../researchCorpus').ResearchCo
   clearFinishedDeepResearchJobs(): Promise<number>;
   /** Subscribe to the lane; fires on every state change. Returns an unsubscribe function. */
   onDeepResearchQueue(cb: (jobs: DeepResearchJobRecord[]) => void): () => void;
+  /** Study vaults: readable sources and organization for the complete-guide source tree. */
+  listCompleteGuideCatalog(): Promise<import('../completeGuide/preview').CompleteGuideCatalog>;
+  /** Study vaults: resolve a complete-guide selection and estimate what reading it in full costs. */
+  previewCompleteGuide(request: import('../completeGuide/preview').CompleteGuidePreviewRequest): Promise<import('../completeGuide/preview').CompleteGuidePreview>;
+  /** Exact quotes behind one citation of a saved complete guide (local evidence sidecar). */
+  getCompleteGuideEvidence(draftId: string, itemId: string, language?: import('../types').PromptLanguage): Promise<import('../completeGuide/types').CompleteGuideEvidenceView | null>;
 
   // tutor mode (AI-guided graph walkthrough)
   /** Analyse the whole idea graph and propose weighted guided routes (overview or prompt-driven). */

@@ -17,6 +17,8 @@ import { ServerInbox } from './components/ServerInbox';
 import { unreadServerInboxGroupCount } from './serverInboxGrouping';
 import { NotificationsPanel, useAnnouncements } from './components/NotificationsPanel';
 import { BrowserMediaPopover, useBrowserMedia } from './components/browser/BrowserMedia';
+import { DriftMiniPlayer } from './components/drift/DriftMiniPlayer';
+import { useDrift } from './components/drift/DriftProvider';
 import { DatabasesSidebarExplore } from './components/DatabasesSidebarExplore';
 import { StudySidebar, type StudyNavigationTarget } from './components/StudySidebar';
 import { TeachingSidebar } from './components/TeachingSidebar';
@@ -404,6 +406,7 @@ export function App() {
   const [studyRecordingTarget, setStudyRecordingTarget] = useState<{ id: string; timestamp?: number | null } | null>(null);
   const [studyGraphTarget, setStudyGraphTarget] = useState<PendingGraphNavigationTarget & { nonce: number } | null>(null);
   const [studyChatTarget, setStudyChatTarget] = useState<{ prompt: string; nonce: number } | null>(null);
+  const [completeGuideTarget, setCompleteGuideTarget] = useState<{ sourceKeys: string[]; nonce: number } | null>(null);
   const [radarTarget, setRadarTarget] = useState<{ updateId?: string; nonce: number } | null>(null);
   const [primarySourceTarget, setPrimarySourceTarget] = useState<{
     itemId: string;
@@ -1436,6 +1439,7 @@ export function App() {
     studyRecordingTarget,
     studyGraphTarget,
     studyChatTarget,
+    completeGuideTarget,
     assistantTarget,
     researchConversationTarget,
     radarTarget,
@@ -1465,6 +1469,7 @@ export function App() {
     setStudyRecordingTarget,
     setStudyGraphTarget,
     setStudyChatTarget,
+    setCompleteGuideTarget,
     setActiveDatabaseId,
     setPendingRecordId,
     setCollectionsOpen,
@@ -1637,6 +1642,10 @@ export function App() {
           <BrowserMediaHeaderAction focusKeep={focusKeeps('header:media')} onOpenTab={(tabId) => {
             setView('browser');
             void window.nodus.activateBrowserTab(tabId);
+          }} onOpenDrift={() => {
+            // The real navigation state, like the Tools button: no router, no window.
+            setToolkitPage('drift');
+            setView('toolkit');
           }} />
           <HeaderAction
             icon="gitPr"
@@ -2369,33 +2378,54 @@ export function App() {
 /**
  * The header's media button.
  *
- * Rendered only when a browser tab holds a media session — and "holds a session"
- * is not "is making noise". A paused lecture keeps its controls, because taking
- * them away at the exact moment someone pauses is how a user loses the Play
- * button they were reaching for.
+ * Rendered when a browser tab holds a media session OR Nodus Drift has a selection —
+ * and "holds a session" is not "is making noise". A paused lecture keeps its controls,
+ * and so does a paused mix, because taking them away at the exact moment someone pauses
+ * is how a user loses the Play button they were reaching for. With neither source the
+ * button is gone; Drift is then reached from Nodus Tools.
+ *
+ * The two sources stay separate: Drift is not dressed up as a Browser media session, the
+ * popover offers a Browser | Drift selector inside the one existing popover (one backdrop),
+ * and choosing a tab never changes what is playing.
  */
-function BrowserMediaHeaderAction({ onOpenTab, focusKeep = true }: { onOpenTab: (tabId: string) => void; focusKeep?: boolean }) {
+function BrowserMediaHeaderAction({ onOpenTab, onOpenDrift, focusKeep = true }: { onOpenTab: (tabId: string) => void; onOpenDrift: () => void; focusKeep?: boolean }) {
   const states = useBrowserMedia();
+  const drift = useDrift();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  if (states.length === 0) return null;
-  const anyPlaying = states.some((state) => state.playing);
+  const hasBrowser = states.length > 0;
+  const hasDrift = drift.selection.length > 0;
+  if (!hasBrowser && !hasDrift) return null;
+  const browserPlaying = states.some((state) => state.playing);
+  const title = browserPlaying && drift.playing ? t('Reproduciéndose en Nodus Browser y Nodus Drift')
+    : browserPlaying ? t('Reproduciéndose en Nodus Browser')
+      : drift.playing ? t('Reproduciéndose en Nodus Drift')
+        : hasBrowser && hasDrift ? t('Medios en pausa en Nodus Browser y Nodus Drift')
+          : hasBrowser ? t('Medios en pausa en Nodus Browser')
+            : t('Nodus Drift en pausa');
+  const sources = states.length + (hasDrift ? 1 : 0);
   return (
     <span data-testid="browser-media-header-action" className="relative inline-flex">
       <HeaderAction
         icon="volume"
         focusKeep={focusKeep}
         label={t('Medios')}
-        title={anyPlaying ? t('Reproduciéndose en Nodus Browser') : t('Medios en pausa en Nodus Browser')}
+        title={title}
         onClick={(event) => {
           const button = event.currentTarget;
           setAnchor((current) => (current ? null : button));
         }}
       />
-      {states.length > 1 && <span className="header-action-badge">{states.length}</span>}
+      {sources > 1 && <span className="header-action-badge">{sources}</span>}
       <BrowserMediaPopover
         anchorEl={anchor}
         onClose={() => setAnchor(null)}
         onOpenTab={(tabId) => { setAnchor(null); onOpenTab(tabId); }}
+        drift={{
+          hasSelection: hasDrift,
+          lastTab: drift.mediaTab,
+          onTab: drift.setMediaTab,
+          panel: <DriftMiniPlayer onOpenDrift={() => { setAnchor(null); onOpenDrift(); }} />,
+        }}
       />
     </span>
   );

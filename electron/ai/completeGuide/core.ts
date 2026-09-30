@@ -1,0 +1,954 @@
+/**
+ * Pure orchestrator of the complete study guide. Every model call, cache, checkpoint
+ * and audit is injected, so the whole multi-pass flow runs in tests with a fake model.
+ *
+ *   0 snapshot (given) → 1 reconnaissance map per source → 2 chapters from the user's
+ *   units → 3 exhaustive anchored extraction → 4 chapter plans with code-checked
+ *   coverage → 5 section writing as prose (boxes only for examples, warnings, AI and web)
+ *   plus one summary per chapter → 6 verification (KaTeX, numbers, premise audit) →
+ *   7 overview, glossary, formula sheet, timeline, conflicts, review sheet, coverage and
+ *   source index → assembled Markdown.
+ *
+ * A chapter opens with what code builds from the verified items (its chronology and its key
+ * concepts) and the model's cited summary; then come the sections, and the chapter ends with
+ * its self-check questions, mixed across the sections, and the answers.
+ */
+import type { ResearchAuditSource } from '@shared/researchClaimAudit';
+import type { PromptLanguage } from '@shared/types';
+import type { StudySourceOrganization } from '@shared/studySourceTree';
+import { studyOrganizationPaths } from '@shared/studySourceTree';
+import type { CompleteGuideConfig } from '@shared/completeGuide/types';
+import type { CompleteGuidePassage, CompleteGuideSnapshot, CompleteGuideSnapshotSource } from '@shared/completeGuide/snapshot';
+import {
+  anchorRawItem,
+  finalizeItems,
+  looksDense,
+  mergeNearDuplicates,
+  normalizeRawItem,
+  validExtractionResult,
+  type CompleteGuideItem,
+  type PendingItem,
+} from '@shared/completeGuide/items';
+import { completeGuideLabels, type CompleteGuideLabels } from '@shared/completeGuide/labels';
+import { citationLink, citationUrl, locatorLabel, readMoreRanges } from '@shared/completeGuide/locators';
+import {
+  capAiBlocks,
+  coveredItemIds,
+  normalizeWrittenBlocks,
+  renderBlock,
+  renderPractice,
+  sanitizeModelMarkdown,
+  tidyAuditedMarkdown,
+  validWrittenBlocks,
+  type CompleteGuideBlock,
+  type PracticeEntry,
+} from '@shared/completeGuide/blocks';
+import { normalizeChapterPlan, validChapterPlan, type CompleteGuideChapterPlan, type CompleteGuideSectionPlan } from '@shared/completeGuide/plan';
+import { invalidMath, latexError, neutralizeInvalidMath } from '@shared/completeGuide/math';
+import {
+  chapterProfile,
+  chronologyOf,
+  renderChronology,
+  renderCheatSheet,
+  renderCoverage,
+  renderFormulaSheet,
+  renderGlossary,
+  renderKeyConcepts,
+  renderSourceIndex,
+  renderTimelineEntries,
+  validCheatSheetSelection,
+  type ChapterKind,
+  type DatedEntry,
+  type SourceCoverage,
+} from '@shared/completeGuide/reference';
+import type { CompleteGuideStage } from '@shared/completeGuide/estimate';
+import { selectFigureRequests, type CompleteGuideFigure, type CompleteGuideFigureRequest } from '@shared/completeGuide/figures';
+import { selectWebImageRequests, type CompleteGuideWebImageRequest } from '@shared/completeGuide/webImages';
+import {
+  CHEAT_SYSTEM,
+  CONTINUE_SYSTEM,
+  EXTRACT_SYSTEM,
+  MAP_SYSTEM,
+  PLAN_SYSTEM,
+  RECON_SYSTEM,
+  RECOVER_SYSTEM,
+  REPAIR_LATEX_SYSTEM,
+  REVISE_SYSTEM,
+  SUMMARY_SYSTEM,
+  WRITE_SYSTEM,
+} from './prompts';
+
+export interface GuideCall<T> {
+  stage: CompleteGuideStage;
+  system: string;
+  user: string;
+  maxTokens: number;
+  temperature?: number;
+  validate: (value: unknown) => value is T;
+  /** Mechanical passes (reading, audit, repair) run at standard reasoning and without skills. */
+  mechanical?: boolean;
+}
+
+export interface CompleteGuideProgress {
+  stage: 'recon' | 'extract' | 'plan' | 'write' | 'verify' | 'finalize';
+  done: number;
+  total: number;
+  detail?: string;
+}
+
+export interface CompleteGuideDeps {
+  json<T>(call: GuideCall<T>): Promise<T>;
+  /** Vectors for semantic deduplication; null entries are skipped. */
+  embed?(texts: string[]): Promise<Array<number[] | null>>;
+  /** Premise-based support audit; returns the text with unsupported sentences removed. */
+  audit?(markdown: string, sources: ResearchAuditSource[]): Promise<{ markdown: string; removed: number }>;
+  conflicts?(statements: string[]): Promise<Array<{ a: number; b: number; reason: string }>>;
+  /** Figures from the materials for the selected figure items (no model involved). */
+  figures?(requests: CompleteGuideFigureRequest[]): Promise<CompleteGuideFigure[]>;
+  /** Optional web complement: recorded web passages for one chapter (config.webText). */
+  web?(request: CompleteGuideWebRequest): Promise<CompleteGuideWebPassage[]>;
+  /** Optional licensed web images (config.webImages); each figure carries its attribution. */
+  webImages?(requests: CompleteGuideWebImageRequest[]): Promise<CompleteGuideFigure[]>;
+  cacheGet<T>(key: string): T | null;
+  cachePut(key: string, stage: string, value: unknown): void;
+  checkpointGet<T>(stage: string, unit: string): T | null;
+  checkpointPut(stage: string, unit: string, value: unknown): void;
+  hash(value: string): string;
+  progress?(event: CompleteGuideProgress): void;
+  /** Throws (e.g. budget exhausted, cancelled) to stop cleanly between calls. */
+  checkpoint?(): void;
+}
+
+export interface CompleteGuideWebRequest { unit: string; sections: string[]; terms: string[] }
+
+/** A recorded web passage (`web:<sha>`), cited as `nodus://passage/web:<sha>`. */
+export interface CompleteGuideWebPassage { id: string; title: string; site: string; url: string; text: string; retrievedAt?: string }
+
+export interface CompleteGuideInput {
+  config: CompleteGuideConfig;
+  snapshot: CompleteGuideSnapshot;
+  organization: StudySourceOrganization;
+  language: PromptLanguage;
+  /** Provider/model identity used in cache keys. */
+  modelKey: string;
+  promptVersion: string;
+  /** Composed student instructions (already bounded). */
+  instructions: string;
+  windows?: { reconChars: number; extractChars: number };
+  concurrency?: { read: number; write: number; verify: number };
+}
+
+export interface CompleteGuideChapterResult {
+  unitKey: string;
+  title: string;
+  overview: string;
+  /** What the chapter is about, from its items; it steered the writer. */
+  kind: ChapterKind;
+  /** The cited summary that follows the chapter's chronology and key concepts. */
+  summary: CompleteGuideBlock[];
+  sections: Array<{ id: string; title: string; purpose: string; blocks: CompleteGuideBlock[] }>;
+}
+
+export interface CompleteGuideResult {
+  title: string;
+  abstract: string;
+  markdown: string;
+  cheatSheetMarkdown: string;
+  chapters: CompleteGuideChapterResult[];
+  items: CompleteGuideItem[];
+  bibliography: string[];
+  limitations: string[];
+  coverage: SourceCoverage[];
+  counts: {
+    windows: number; failedWindows: number; items: number; itemsUsed: number; blocks: number; aiBlocks: number;
+    droppedUnsupported: number; auditedBlocks: number; removedSentences: number; repairedBlocks: number;
+    invalidLatex: number; conflicts: number; cacheHits: number; figures: number; webBlocks: number; webImages: number;
+    /** AI additions beyond the one allowed per section, and "to memorize" lists the prose already covers. */
+    droppedAi: number; droppedRedundant: number; summaries: number;
+  };
+  syllabus: { overview: string; connections: Array<{ from: string; to: string; relation: string }> };
+  warnings: string[];
+  /** Figures to seed into the saved guide, and for each figure item the items sharing its passage. */
+  figures: CompleteGuideFigure[];
+  figureSiblings: Record<string, string[]>;
+  /** Web pages cited by the guide, in the order of their W aliases. */
+  webSources: Array<{ alias: string; title: string; site: string; url: string; passageIds: string[] }>;
+}
+
+const DEFAULT_WINDOWS = { reconChars: 60_000, extractChars: 22_000 };
+const DEFAULT_CONCURRENCY = { read: 4, write: 3, verify: 4 };
+const MAX_FAILED_WINDOW_SHARE = 0.1;
+
+/** Bounded, fail-soft concurrency: one failing task never cancels its siblings. */
+export async function settlePool<T, R>(tasks: T[], limit: number, run: (task: T, index: number) => Promise<R>): Promise<Array<{ ok: true; value: R } | { ok: false; error: unknown }>> {
+  const results: Array<{ ok: true; value: R } | { ok: false; error: unknown }> = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const index = next++;
+      try { results[index] = { ok: true, value: await run(tasks[index], index) }; } catch (error) { results[index] = { ok: false, error }; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, tasks.length)) }, worker));
+  return results;
+}
+
+function isAbort(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && ((error as { name?: string }).name === 'AbortError' || (error as { code?: string }).code === 'budget_exhausted'));
+}
+
+/** Consecutive passages of one source, cut at `maxChars`. */
+export function readingWindows(passages: CompleteGuidePassage[], maxChars: number): CompleteGuidePassage[][] {
+  const windows: CompleteGuidePassage[][] = [];
+  let current: CompleteGuidePassage[] = [];
+  let size = 0;
+  for (const passage of passages) {
+    if (current.length && size + passage.chars > maxChars) { windows.push(current); current = []; size = 0; }
+    current.push(passage);
+    size += passage.chars;
+  }
+  if (current.length) windows.push(current);
+  return windows;
+}
+
+interface ReconMap { outline: Array<{ title: string; firstPassage: string; lastPassage: string; summary: string }>; keyTerms: string[] }
+
+function validRecon(value: unknown): value is ReconMap {
+  return Boolean(value && typeof value === 'object' && Array.isArray((value as ReconMap).outline));
+}
+
+function passagePayload(passages: CompleteGuidePassage[], labels: CompleteGuideLabels) {
+  return passages.map((passage) => ({ id: passage.id, location: locatorLabel(passage.locator, labels), text: passage.text }));
+}
+
+export async function runCompleteGuide(input: CompleteGuideInput, deps: CompleteGuideDeps): Promise<CompleteGuideResult> {
+  const { config, snapshot, language } = input;
+  const labels = completeGuideLabels(language);
+  const windowsConfig = input.windows ?? DEFAULT_WINDOWS;
+  const concurrency = input.concurrency ?? DEFAULT_CONCURRENCY;
+  const warnings: string[] = [];
+  const counts: CompleteGuideResult['counts'] = {
+    windows: 0, failedWindows: 0, items: 0, itemsUsed: 0, blocks: 0, aiBlocks: 0, droppedUnsupported: 0,
+    auditedBlocks: 0, removedSentences: 0, repairedBlocks: 0, invalidLatex: 0, conflicts: 0, cacheHits: 0, figures: 0, webBlocks: 0, webImages: 0,
+    droppedAi: 0, droppedRedundant: 0, summaries: 0,
+  };
+  const guard = () => deps.checkpoint?.();
+  const sourcesByKey = new Map(snapshot.sources.map((source) => [source.sourceKey, source]));
+  const passagesById = new Map(snapshot.passages.map((passage) => [passage.id, passage]));
+  const passageOrder = new Map(snapshot.passages.map((passage, index) => [passage.id, index]));
+  const readable = snapshot.passages.filter((passage) => !passage.duplicateOf);
+  const cacheKey = (stage: string, parts: string[]) => deps.hash([stage, input.promptVersion, input.modelKey, language, ...parts].join('\0'));
+  const cached = <T>(key: string): T | null => {
+    if (config.rereadAll) return null;
+    const value = deps.cacheGet<T>(key);
+    if (value) counts.cacheHits += 1;
+    return value;
+  };
+
+  // ── Chapters: the user's units, in their organization order ───────────────────
+  const paths = studyOrganizationPaths(input.organization);
+  const topics = new Map(input.organization.topics.map((topic) => [topic.id, topic]));
+  const folders = new Map(input.organization.folders.map((folder) => [folder.id, folder]));
+  const subjects = new Map(input.organization.subjects.map((subject) => [subject.id, subject]));
+  const unitOfSource = new Map<string, string>();
+  const chapterTitles = new Map<string, string>();
+  for (const source of snapshot.sources) {
+    const scope = source.placement;
+    const unitKey = scope.topicId ? `topic:${scope.topicId}` : scope.folderId ? `folder:${scope.folderId}` : scope.subjectId ? `subject:${scope.subjectId}` : 'root';
+    unitOfSource.set(source.sourceKey, unitKey);
+    if (!chapterTitles.has(unitKey)) {
+      const topicChain: string[] = [];
+      let topic = scope.topicId ? topics.get(scope.topicId) : undefined;
+      const seen = new Set<string>();
+      while (topic && !seen.has(topic.id)) { seen.add(topic.id); topicChain.unshift(topic.name); topic = topic.parentId ? topics.get(topic.parentId) : undefined; }
+      const title = topicChain.join(' · ')
+        || (scope.folderId ? folders.get(scope.folderId)?.name : undefined)
+        || (scope.subjectId ? subjects.get(scope.subjectId)?.name : undefined)
+        || paths.label(scope)
+        || source.title;
+      chapterTitles.set(unitKey, title);
+    }
+  }
+  const unitOrder = [...new Set(snapshot.sources.map((source) => unitOfSource.get(source.sourceKey)!))];
+
+  // ── Pass 1: reconnaissance map of every source ─────────────────────────────────
+  const reconBySource = new Map<string, ReconMap>();
+  const reconTasks = snapshot.sources.flatMap((source) => {
+    const sourcePassages = readable.filter((passage) => passage.sourceKey === source.sourceKey);
+    return readingWindows(sourcePassages, windowsConfig.reconChars).map((window) => ({ source, window }));
+  });
+  let reconDone = 0;
+  const reconResults = await settlePool(reconTasks, concurrency.read, async ({ source, window }) => {
+    guard();
+    const key = cacheKey('recon', window.map((passage) => passage.contentHash));
+    const hit = cached<ReconMap>(key);
+    const result = hit ?? await deps.json<ReconMap>({
+      stage: 'recon', system: RECON_SYSTEM, mechanical: true, maxTokens: 4_000, temperature: 0.1, validate: validRecon,
+      user: JSON.stringify({ source: { title: source.title, kind: source.kind }, passages: passagePayload(window, labels) }),
+    });
+    if (!hit) deps.cachePut(key, 'recon', result);
+    deps.progress?.({ stage: 'recon', done: ++reconDone, total: reconTasks.length, detail: source.title });
+    return { source, result };
+  });
+  for (const settled of reconResults) {
+    if (!settled.ok) { if (isAbort(settled.error)) throw settled.error; continue; }
+    const { source, result } = settled.value;
+    const current = reconBySource.get(source.sourceKey) ?? { outline: [], keyTerms: [] };
+    current.outline.push(...result.outline.filter((entry) => entry && typeof entry.title === 'string'));
+    current.keyTerms.push(...(Array.isArray(result.keyTerms) ? result.keyTerms.filter((term) => typeof term === 'string') : []));
+    reconBySource.set(source.sourceKey, current);
+  }
+
+  // ── Pass 3: exhaustive, anchored extraction ────────────────────────────────────
+  interface StoredItems { items: CompleteGuideItem[]; unread: Array<[string, { ranges: string[]; passages: number }]>; windows: number; failedWindows: number }
+  const storedItems = deps.checkpointGet<StoredItems>('items', 'all');
+  let items: CompleteGuideItem[];
+  const unread = new Map<string, { ranges: string[]; passages: number }>();
+  if (!storedItems) {
+    const extractTasks = snapshot.sources.flatMap((source) => {
+      const sourcePassages = readable.filter((passage) => passage.sourceKey === source.sourceKey);
+      return readingWindows(sourcePassages, windowsConfig.extractChars).map((window) => ({ source, window }));
+    });
+    counts.windows = extractTasks.length;
+    const extractOnce = async (source: CompleteGuideSnapshotSource, window: CompleteGuidePassage[], system: string, stage: string): Promise<unknown[]> => {
+      const recon = reconBySource.get(source.sourceKey);
+      const reconHash = deps.hash(JSON.stringify(recon?.outline.map((entry) => entry.title) ?? []));
+      const key = cacheKey(stage, [reconHash, ...window.map((passage) => passage.contentHash)]);
+      const hit = cached<{ items: unknown[] }>(key);
+      if (hit) return hit.items;
+      const call = (passages: CompleteGuidePassage[]) => deps.json<{ items: unknown[] }>({
+        stage: 'extract', system, mechanical: true, maxTokens: 12_000, temperature: 0.1, validate: validExtractionResult,
+        user: JSON.stringify({
+          source: { title: source.title, kind: source.kind },
+          ...(recon?.outline.length ? { sourceMap: recon.outline.map((entry) => entry.title).slice(0, 80) } : {}),
+          passages: passagePayload(passages, labels),
+        }),
+      });
+      // A window that overflows the output or the context is split, never truncated.
+      const attempt = async (passages: CompleteGuidePassage[], depth: number): Promise<unknown[]> => {
+        guard();
+        try { return (await call(passages)).items; } catch (error) {
+          if (isAbort(error) || passages.length < 2 || depth >= 2) throw error;
+          const middle = Math.ceil(passages.length / 2);
+          return [...await attempt(passages.slice(0, middle), depth + 1), ...await attempt(passages.slice(middle), depth + 1)];
+        }
+      };
+      const result = await attempt(window, 0);
+      deps.cachePut(key, stage, { items: result });
+      return result;
+    };
+    let extractDone = 0;
+    const extractResults = await settlePool(extractTasks, concurrency.read, async ({ source, window }) => {
+      const pending: PendingItem[] = [];
+      let position = 0;
+      const accept = (rawItems: unknown[]) => {
+        for (const raw of rawItems) {
+          const item = normalizeRawItem(raw);
+          if (!item) continue;
+          const anchored = anchorRawItem(item, window);
+          if (!anchored) continue;
+          pending.push({ raw: item, passage: anchored.passage, anchor: anchored.anchor, reconstructed: anchored.reconstructed, position: position++ });
+        }
+      };
+      accept(await extractOnce(source, window, EXTRACT_SYSTEM, 'extract'));
+      // Candidate detector: dense passages that produced nothing get a second, focused read.
+      const covered = new Set(pending.map((entry) => entry.passage.id));
+      const missed = window.filter((passage) => !covered.has(passage.id) && looksDense(passage.text));
+      if (missed.length) accept(await extractOnce(source, missed, RECOVER_SYSTEM, 'recover').catch((error) => { if (isAbort(error)) throw error; return []; }));
+      deps.progress?.({ stage: 'extract', done: ++extractDone, total: extractTasks.length, detail: source.title });
+      return pending;
+    });
+    const pendingAll: PendingItem[] = [];
+    extractResults.forEach((settled, index) => {
+      if (settled.ok) { pendingAll.push(...settled.value); return; }
+      if (isAbort(settled.error)) throw settled.error;
+      counts.failedWindows += 1;
+      const { source, window } = extractTasks[index];
+      const range = `${locatorLabel(window[0].locator, labels)}–${locatorLabel(window[window.length - 1].locator, labels)}`;
+      const entry = unread.get(source.sourceKey) ?? { ranges: [], passages: 0 };
+      unread.set(source.sourceKey, { ranges: [...entry.ranges, range], passages: entry.passages + window.length });
+    });
+    if (extractTasks.length && counts.failedWindows / extractTasks.length > MAX_FAILED_WINDOW_SHARE) {
+      throw new Error(`No se pudieron leer ${counts.failedWindows} de ${extractTasks.length} partes de las fuentes. Vuelve a intentarlo: lo ya leído se reutilizará.`);
+    }
+    items = finalizeItems(pendingAll, passageOrder, unitOfSource);
+    if (deps.embed && items.length > 1) {
+      guard();
+      const vectors = await deps.embed(items.map((item) => `${item.title}: ${item.statement}`)).catch(() => null);
+      if (vectors?.length === items.length) items = mergeNearDuplicates(items, vectors).items;
+    }
+    deps.checkpointPut('items', 'all', { items, unread: [...unread.entries()], windows: counts.windows, failedWindows: counts.failedWindows });
+  } else {
+    const stored = storedItems;
+    items = stored.items;
+    for (const [key, ranges] of stored.unread ?? []) unread.set(key, ranges);
+    counts.windows = stored.windows ?? 0;
+    counts.failedWindows = stored.failedWindows ?? 0;
+  }
+  counts.items = items.length;
+  const itemsById = new Map(items.map((item) => [item.id, item]));
+
+  // ── Citations (code-built) ─────────────────────────────────────────────────────
+  const citeCache = new Map<string, string[]>();
+  const cite = (itemId: string): string[] => {
+    const cachedLinks = citeCache.get(itemId);
+    if (cachedLinks) return cachedLinks;
+    const item = itemsById.get(itemId);
+    const links = (item?.evidence ?? []).flatMap((evidence) => {
+      const passage = passagesById.get(evidence.passageId);
+      const source = sourcesByKey.get(evidence.sourceKey);
+      return passage && source ? [citationLink(source, passage, labels, itemId)] : [];
+    });
+    const unique = [...new Set(links)];
+    citeCache.set(itemId, unique);
+    return unique;
+  };
+
+  // ── Pass 4: chapter plans ──────────────────────────────────────────────────────
+  const chaptersWithItems = unitOrder.map((unitKey) => ({ unitKey, title: chapterTitles.get(unitKey) ?? unitKey, items: items.filter((item) => item.unitKey === unitKey) }));
+  let planDone = 0;
+  const plans: CompleteGuideChapterPlan[] = [];
+  for (const chapter of chaptersWithItems) {
+    guard();
+    if (!chapter.items.length) {
+      plans.push({ unitKey: chapter.unitKey, title: chapter.title, overview: '', sections: [] });
+      continue;
+    }
+    const stored = deps.checkpointGet<CompleteGuideChapterPlan>('plan', chapter.unitKey);
+    if (stored) { plans.push(stored); continue; }
+    const recon = snapshot.sources.filter((source) => unitOfSource.get(source.sourceKey) === chapter.unitKey)
+      .map((source) => ({ source: `${source.alias} ${source.title}`, outline: (reconBySource.get(source.sourceKey)?.outline ?? []).map((entry) => `${entry.title}: ${entry.summary}`).slice(0, 60) }));
+    const raw = await deps.json<{ sections: unknown[] }>({
+      stage: 'plan', system: PLAN_SYSTEM, maxTokens: 6_000, temperature: 0.15, validate: validChapterPlan,
+      user: JSON.stringify({
+        unit: chapter.title,
+        sourceMaps: recon,
+        items: chapter.items.map((item) => ({ id: item.id, type: item.type, title: item.title, importance: item.importance, statement: item.statement.slice(0, 160) })),
+        ...(input.instructions ? { studentInstructions: input.instructions } : {}),
+      }),
+    }).catch((error) => { if (isAbort(error)) throw error; warnings.push(`plan:${chapter.unitKey}`); return { sections: [] }; });
+    const plan = normalizeChapterPlan(raw, chapter);
+    deps.checkpointPut('plan', chapter.unitKey, plan);
+    plans.push(plan);
+    deps.progress?.({ stage: 'plan', done: ++planDone, total: chaptersWithItems.length, detail: chapter.title });
+  }
+
+  // What each chapter is about, from its items: it steers the writer and the summary.
+  const profiles = new Map(chaptersWithItems.map((chapter) => [chapter.unitKey, chapterProfile(chapter.items)]));
+
+  // ── Optional web complement: one search per chapter, labelled and cited apart ───
+  const webByUnit = new Map<string, CompleteGuideWebPassage[]>();
+  const webById = new Map<string, CompleteGuideWebPassage>();
+  if (config.webText && deps.web) {
+    let webFailed = false;
+    for (const plan of plans) {
+      if (!plan.sections.length) continue;
+      let passages = deps.checkpointGet<CompleteGuideWebPassage[]>('web', plan.unitKey);
+      if (!passages) {
+        guard();
+        const terms = items.filter((item) => item.unitKey === plan.unitKey && item.importance === 'core').map((item) => item.title).slice(0, 8);
+        passages = await deps.web({ unit: plan.title, sections: plan.sections.map((section) => section.title).slice(0, 12), terms })
+          .then((list) => list.filter((passage) => passage && /^web:[a-f0-9]{8,}$/.test(passage.id) && passage.text?.trim() && /^https?:\/\//.test(passage.url)).slice(0, 8))
+          .catch((error) => { if (isAbort(error)) throw error; webFailed = true; return null; });
+        if (!passages) continue;
+        deps.checkpointPut('web', plan.unitKey, passages);
+      }
+      webByUnit.set(plan.unitKey, passages);
+      for (const passage of passages) webById.set(passage.id, passage);
+    }
+    if (webFailed) warnings.push('web_unavailable');
+  }
+
+  // ── Pass 5 + 6: write and verify every section ─────────────────────────────────
+  const sectionTasks = plans.flatMap((plan) => plan.sections.map((section, index) => ({ plan, section, index })));
+  const summaryTasks = plans.filter((plan) => plan.sections.length);
+  const writeTotal = sectionTasks.length + summaryTasks.length;
+  let writeDone = 0;
+  const writeSection = async (plan: CompleteGuideChapterPlan, section: CompleteGuideSectionPlan, index: number): Promise<CompleteGuideBlock[]> => {
+    const stored = deps.checkpointGet<CompleteGuideBlock[]>('section', section.id);
+    if (stored) return stored;
+    const sectionItems = section.itemIds.map((id) => itemsById.get(id)!).filter(Boolean);
+    const validItemIds = new Set(sectionItems.map((item) => item.id));
+    const web = webByUnit.get(plan.unitKey) ?? [];
+    const webIds = new Set(web.map((passage) => passage.id));
+    let webBudget = 8_000;
+    const webEvidence = web.flatMap((passage) => {
+      if (webBudget <= 0) return [];
+      const text = passage.text.slice(0, Math.min(2_500, webBudget));
+      webBudget -= text.length;
+      return [{ id: passage.id, title: passage.title, site: passage.site, text }];
+    });
+    const evidencePassages = (list: CompleteGuideItem[]) => {
+      const ids = [...new Set(list.flatMap((item) => item.evidence.map((evidence) => evidence.passageId)))].sort((a, b) => (passageOrder.get(a) ?? 0) - (passageOrder.get(b) ?? 0));
+      let budget = 18_000;
+      return ids.flatMap((id) => {
+        const passage = passagesById.get(id);
+        if (!passage || budget <= 0) return [];
+        budget -= passage.chars;
+        return [{ id, location: locatorLabel(passage.locator, labels), text: passage.text }];
+      });
+    };
+    const itemPayload = (list: CompleteGuideItem[]) => list.map((item) => ({
+      id: item.id, type: item.type, title: item.title, statement: item.statement, importance: item.importance,
+      ...(item.latex ? { latex: item.latex } : {}), ...(item.variables ? { variables: item.variables } : {}),
+      ...(item.conditions ? { conditions: item.conditions } : {}), ...(item.steps ? { steps: item.steps } : {}),
+      ...(item.solution ? { solution: item.solution } : {}), ...(item.date ? { date: item.date } : {}),
+      evidenceQuotes: item.evidence.map((evidence) => evidence.quote).filter(Boolean).slice(0, 3),
+    }));
+    const context = {
+      guideUnit: plan.title,
+      section: { title: section.title, purpose: section.purpose, position: `${index + 1}/${plan.sections.length}` },
+      previousSection: plan.sections[index - 1]?.title ?? null,
+      nextSection: plan.sections[index + 1]?.title ?? null,
+      profile: { kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual' },
+      aiExamples: config.aiExamples,
+      ...(input.instructions ? { studentInstructions: input.instructions } : {}),
+    };
+    guard();
+    const first = await deps.json<{ blocks: unknown[] }>({
+      stage: 'write', system: WRITE_SYSTEM, maxTokens: 12_000, temperature: 0.3, validate: validWrittenBlocks,
+      user: JSON.stringify({ ...context, items: itemPayload(sectionItems), evidencePassages: evidencePassages(sectionItems), ...(webEvidence.length ? { webEvidence } : {}) }),
+    });
+    const normalized = normalizeWrittenBlocks(first, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
+    const blocks = normalized.blocks;
+    counts.droppedUnsupported += normalized.dropped.unsupported;
+    counts.droppedRedundant += normalized.dropped.redundant;
+    // Coverage-driven continuation: re-prompt with the items still uncovered.
+    for (let round = 0; round < 2; round += 1) {
+      const covered = coveredItemIds(blocks);
+      const missing = sectionItems.filter((item) => !covered.has(item.id) && item.importance !== 'detail');
+      if (!missing.length) break;
+      guard();
+      const more = await deps.json<{ blocks: unknown[] }>({
+        stage: 'write', system: CONTINUE_SYSTEM, maxTokens: 8_000, temperature: 0.3, validate: validWrittenBlocks,
+        user: JSON.stringify({ ...context, writtenSoFar: blocks.map((block) => block.markdown || block.question || '').join('\n\n').slice(-6_000), items: itemPayload(missing), evidencePassages: evidencePassages(missing) }),
+      }).catch((error) => { if (isAbort(error)) throw error; return { blocks: [] }; });
+      const extra = normalizeWrittenBlocks(more, { validItemIds, items: itemsById, aiExamples: config.aiExamples, webIds });
+      counts.droppedUnsupported += extra.dropped.unsupported;
+      counts.droppedRedundant += extra.dropped.redundant;
+      if (!extra.blocks.length) break;
+      blocks.push(...extra.blocks);
+    }
+    // One AI addition per section, the first the writer produced; it never covers an item. A
+    // chapter about events takes no analogy and no invented example, only a warning about a confusion.
+    const capped = capAiBlocks(blocks, 1, profiles.get(plan.unitKey)?.kind === 'narrative' ? ['ai_example', 'ai_analogy'] : []);
+    counts.droppedAi += capped.dropped;
+    blocks.splice(0, blocks.length, ...capped.blocks);
+    // Nothing extracted is lost: whatever is still uncovered becomes a cited table.
+    const covered = coveredItemIds(blocks);
+    const leftover = sectionItems.filter((item) => !covered.has(item.id));
+    if (leftover.length) {
+      blocks.push({
+        kind: 'table', provenance: 'derived', title: labels.additionalDetails, markdown: '', itemIds: leftover.map((item) => item.id), citationsInRows: true,
+        table: { headers: [labels.term, labels.meaning, labels.source], rows: leftover.map((item) => [item.title.replace(/\|/g, '\\|'), `${item.latex ? `$${item.latex}$ — ` : ''}${item.statement}`.replace(/\|/g, '\\|'), cite(item.id).slice(0, 2).join('; ')]) },
+      });
+    }
+    const verified = await verifySection(blocks, sectionItems);
+    deps.checkpointPut('section', section.id, verified);
+    deps.progress?.({ stage: 'write', done: ++writeDone, total: writeTotal, detail: section.title });
+    return verified;
+  };
+
+  const auditSources = (block: CompleteGuideBlock): ResearchAuditSource[] => block.provenance === 'web'
+    ? (block.webPassageIds ?? []).flatMap((id) => {
+      const passage = webById.get(id);
+      return passage ? [{ id, label: passage.title, citation: passage.url, text: passage.text.slice(0, 4_000) }] : [];
+    })
+    : block.itemIds.flatMap((id) => {
+    const item = itemsById.get(id);
+    if (!item) return [];
+    const passages = item.evidence.map((evidence) => passagesById.get(evidence.passageId)?.text ?? '').join('\n').slice(0, 3_000);
+    // The audit writes `[label](citation)` around every sentence it keeps, so this is a URL
+    // and never the guide's rendered link: `[título]([A1 · p. 2](nodus://…))` is a link inside
+    // a link, which Markdown refuses to parse and the reader, the PDF and Word printed as
+    // literal `[título](` text with a stray bracket.
+    // The label is the guide's own citation label (`A1 · p. 2`): the audit prints it after every
+    // sentence it verifies, and a page reference reads as a citation where an item title reads
+    // as noise between the sentences of a paragraph.
+    const first = item.evidence[0];
+    const passage = first ? passagesById.get(first.passageId) : undefined;
+    const source = first ? sourcesByKey.get(first.sourceKey) : undefined;
+    return [{ id, label: passage && source ? `${source.alias} · ${locatorLabel(passage.locator, labels)}` : item.title, citation: passage && source ? citationUrl(source, passage.locator, id) : id, text: [item.statement, item.latex ? `LaTeX: ${item.latex}` : '', item.solution ?? '', ...(item.conditions ?? []), passages].filter(Boolean).join('\n') }];
+  });
+
+  const numbersSupported = (block: CompleteGuideBlock): boolean => {
+    const text = [block.markdown, ...(block.table?.rows.flat() ?? [])].join(' ').replace(/\$[^$]*\$/g, ' ');
+    const numbers = text.match(/\d+(?:[.,]\d+)?/g) ?? [];
+    if (!numbers.length) return true;
+    const evidence = auditSources(block).map((source) => source.text).join(' ');
+    return numbers.every((number) => evidence.includes(number) || evidence.includes(number.replace(',', '.')) || evidence.includes(number.replace('.', ',')));
+  };
+
+  const verifySection = async (blocks: CompleteGuideBlock[], sectionItems: CompleteGuideItem[]): Promise<CompleteGuideBlock[]> => {
+    // KaTeX: collect failing formulas across the section and repair them in one call.
+    const failing: Array<{ block: number; field: 'markdown' | 'answer' | 'question'; tex: string }> = [];
+    blocks.forEach((block, index) => {
+      for (const field of ['markdown', 'answer', 'question'] as const) {
+        for (const span of invalidMath(block[field] ?? '')) failing.push({ block: index, field, tex: span.tex });
+      }
+    });
+    if (failing.length) {
+      counts.invalidLatex += failing.length;
+      guard();
+      const repair = await deps.json<{ fixes: Array<{ index: number; latex: string }> }>({
+        stage: 'verify', system: REPAIR_LATEX_SYSTEM, mechanical: true, maxTokens: 3_000, temperature: 0,
+        validate: (value): value is { fixes: Array<{ index: number; latex: string }> } => Boolean(value && Array.isArray((value as { fixes?: unknown }).fixes)),
+        user: JSON.stringify({ formulas: failing.map((entry, index) => ({ index, latex: entry.tex, error: latexError(entry.tex) })) }),
+      }).catch((error) => { if (isAbort(error)) throw error; return { fixes: [] }; });
+      for (const fix of repair.fixes) {
+        const target = failing[fix.index];
+        if (!target || typeof fix.latex !== 'string' || latexError(fix.latex)) continue;
+        const block = blocks[target.block];
+        block[target.field] = (block[target.field] ?? '').split(target.tex).join(fix.latex);
+      }
+      for (const block of blocks) for (const field of ['markdown', 'answer', 'question'] as const) if (block[field]) block[field] = neutralizeInvalidMath(block[field]!).markdown;
+    }
+    // Connected prose and practice answers can invent a condition without inventing a
+    // number. Audit them even in standard mode, including the chapter summaries.
+    if (!deps.audit) return blocks;
+    const targets = blocks
+      .map((block) => ({ block, field: block.kind === 'selfcheck' ? 'answer' as const : 'markdown' as const }))
+      // Web blocks are always audited against their own passages.
+      .filter(({ block, field }) => block[field] && (block.provenance === 'web' || block.provenance === 'derived' || (block.provenance === 'materials' && (block.kind === 'explanation' || config.verification === 'exhaustive' || !numbersSupported(block)))));
+    const audited = await settlePool(targets, concurrency.verify, async ({ block, field }) => {
+      guard();
+      const sources = auditSources(block);
+      const first = await deps.audit!(block[field]!, sources);
+      counts.auditedBlocks += 1;
+      block.audit = { checked: true, removedSentences: 0, repaired: false };
+      if (!first.removed) return;
+      // Repair before removal: rewrite the block from the evidence, then audit again.
+      const revised = await deps.json<{ markdown: string }>({
+        stage: 'verify', system: REVISE_SYSTEM, maxTokens: 4_000, temperature: 0.1,
+        validate: (value): value is { markdown: string } => Boolean(value && typeof (value as { markdown?: unknown }).markdown === 'string'),
+        user: JSON.stringify({ block: block[field], ...(field === 'answer' ? { question: block.question } : {}), sources: sources.map((source) => ({ id: source.id, text: source.text })) }),
+      }).catch((error) => { if (isAbort(error)) throw error; return null; });
+      if (revised?.markdown) {
+        const second = await deps.audit!(sanitizeModelMarkdown(revised.markdown), sources);
+        if (second.removed < first.removed) {
+          block[field] = tidyAuditedMarkdown(second.markdown);
+          block.audit = { checked: true, removedSentences: second.removed, repaired: true };
+          counts.repairedBlocks += 1;
+          counts.removedSentences += second.removed;
+          return;
+        }
+      }
+      block[field] = tidyAuditedMarkdown(first.markdown);
+      block.audit = { checked: true, removedSentences: first.removed, repaired: false };
+      counts.removedSentences += first.removed;
+    });
+    // An audit outage must not publish the unchecked prose. The section has not been
+    // checkpointed yet, so a retry can resume it after the provider recovers.
+    for (const result of audited) if (!result.ok) throw result.error;
+    void sectionItems;
+    // A block the audit emptied has nothing left to teach.
+    return blocks.filter((block) => block.kind === 'selfcheck' ? Boolean(block.answer?.trim()) : block.kind === 'table' || block.markdown.trim());
+  };
+
+  const written = await settlePool(sectionTasks, concurrency.write, ({ plan, section, index }) => writeSection(plan, section, index));
+  const sectionBlocks = new Map<string, CompleteGuideBlock[]>();
+  written.forEach((settled, index) => {
+    const { section } = sectionTasks[index];
+    if (settled.ok) { sectionBlocks.set(section.id, settled.value); return; }
+    if (isAbort(settled.error)) throw settled.error;
+    throw settled.error instanceof Error ? settled.error : new Error(String(settled.error));
+  });
+
+  // ── Chapter summaries: the cited overview after the chronology and the key concepts ──
+  // Fail-soft: a chapter without a summary is still a complete chapter.
+  const summaryBlocks = new Map<string, CompleteGuideBlock[]>();
+  const validSummary = (value: unknown): value is { paragraphs: unknown[] } => Boolean(value && typeof value === 'object' && Array.isArray((value as { paragraphs?: unknown }).paragraphs));
+  const summarize = async (plan: CompleteGuideChapterPlan): Promise<CompleteGuideBlock[]> => {
+    const stored = deps.checkpointGet<CompleteGuideBlock[]>('summary', plan.unitKey);
+    if (stored) return stored;
+    const chapterItems = items.filter((item) => item.unitKey === plan.unitKey && item.importance !== 'detail');
+    if (!chapterItems.length) return [];
+    guard();
+    const raw = await deps.json<{ paragraphs: unknown[] }>({
+      stage: 'write', system: SUMMARY_SYSTEM, maxTokens: 4_000, temperature: 0.2, validate: validSummary,
+      user: JSON.stringify({
+        unit: plan.title,
+        profile: { kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual' },
+        sections: plan.sections.map((section) => section.title),
+        items: chapterItems.slice(0, 80).map((item) => ({
+          id: item.id, type: item.type, title: item.title, importance: item.importance, statement: item.statement.slice(0, 400),
+          ...(item.date ? { date: item.date } : {}), ...(item.latex ? { latex: item.latex } : {}),
+        })),
+        ...(input.instructions ? { studentInstructions: input.instructions } : {}),
+      }),
+    });
+    const paragraphs = raw.paragraphs.flatMap((entry) => {
+      const paragraph = entry as { markdown?: unknown; itemIds?: unknown };
+      return typeof paragraph?.markdown === 'string' ? [{ kind: 'explanation', markdown: paragraph.markdown, itemIds: paragraph.itemIds }] : [];
+    });
+    const normalized = normalizeWrittenBlocks({ blocks: paragraphs }, { validItemIds: new Set(chapterItems.map((item) => item.id)), items: itemsById, aiExamples: false });
+    counts.droppedUnsupported += normalized.dropped.unsupported;
+    const verified = await verifySection(normalized.blocks, chapterItems);
+    deps.checkpointPut('summary', plan.unitKey, verified);
+    return verified;
+  };
+  const summarized = await settlePool(summaryTasks, concurrency.write, async (plan) => {
+    const blocks = await summarize(plan);
+    deps.progress?.({ stage: 'write', done: ++writeDone, total: writeTotal, detail: plan.title });
+    return blocks;
+  });
+  summarized.forEach((settled, index) => {
+    const { unitKey } = summaryTasks[index];
+    if (settled.ok) { summaryBlocks.set(unitKey, settled.value); if (settled.value.length) counts.summaries += 1; return; }
+    if (isAbort(settled.error)) throw settled.error;
+    warnings.push(`summary:${unitKey}`);
+  });
+
+  // ── Pass 7: report-level synthesis ─────────────────────────────────────────────
+  deps.progress?.({ stage: 'finalize', done: 0, total: 3 });
+  const chapters: CompleteGuideChapterResult[] = plans.map((plan) => ({
+    unitKey: plan.unitKey, title: plan.title, overview: plan.overview,
+    kind: profiles.get(plan.unitKey)?.kind ?? 'conceptual',
+    summary: summaryBlocks.get(plan.unitKey) ?? [],
+    sections: plan.sections.map((section) => ({ id: section.id, title: section.title, purpose: section.purpose, blocks: sectionBlocks.get(section.id) ?? [] })),
+  }));
+  let syllabus = deps.checkpointGet<CompleteGuideResult['syllabus']>('final', 'map');
+  if (!syllabus) {
+    guard();
+    const raw = await deps.json<CompleteGuideResult['syllabus']>({
+      stage: 'finalize', system: MAP_SYSTEM, maxTokens: 2_500, temperature: 0.2,
+      validate: (value): value is CompleteGuideResult['syllabus'] => Boolean(value && typeof (value as { overview?: unknown }).overview === 'string'),
+      // Grounded in what was extracted (concept titles and section headings), not in the
+      // model's own chapter overviews, which nothing checks.
+      user: JSON.stringify({
+        units: chapters.map((chapter) => ({
+          title: chapter.title,
+          concepts: items.filter((item) => item.unitKey === chapter.unitKey && item.importance === 'core' && item.type !== 'example' && item.type !== 'mistake' && item.type !== 'figure').map((item) => item.title).slice(0, 12),
+          sections: chapter.sections.map((section) => section.title),
+        })),
+      }),
+    }).catch((error) => { if (isAbort(error)) throw error; return { overview: '', connections: [] }; });
+    const titles = new Set(chapters.map((chapter) => chapter.title));
+    syllabus = {
+      overview: raw.overview.trim(),
+      connections: (Array.isArray(raw.connections) ? raw.connections : []).filter((edge) => edge && titles.has(edge.from) && titles.has(edge.to) && typeof edge.relation === 'string').slice(0, 20),
+    };
+    deps.checkpointPut('final', 'map', syllabus);
+  }
+  const cheat = new Map<string, Array<{ itemId: string; phrase: string }>>();
+  for (const chapter of chaptersWithItems) {
+    if (!chapter.items.length) continue;
+    const stored = deps.checkpointGet<Array<{ itemId: string; phrase: string }>>('cheat', chapter.unitKey);
+    if (stored) { cheat.set(chapter.unitKey, stored); continue; }
+    guard();
+    const candidates = chapter.items.filter((item) => item.importance !== 'detail').slice(0, 80);
+    const raw = await deps.json<{ points: unknown[] }>({
+      stage: 'finalize', system: CHEAT_SYSTEM, maxTokens: 2_500, temperature: 0.1, validate: validCheatSheetSelection,
+      user: JSON.stringify({ unit: chapter.title, items: candidates.map((item) => ({ id: item.id, type: item.type, title: item.title, statement: item.statement.slice(0, 300), ...(item.latex ? { latex: item.latex } : {}) })) }),
+    }).catch((error) => { if (isAbort(error)) throw error; return { points: [] }; });
+    const valid = new Set(candidates.map((item) => item.id));
+    const points = raw.points.flatMap((point) => {
+      const entry = point as { itemId?: unknown; phrase?: unknown };
+      const itemId = typeof entry?.itemId === 'string' ? entry.itemId.trim().toUpperCase() : '';
+      return valid.has(itemId) ? [{ itemId, phrase: typeof entry.phrase === 'string' ? entry.phrase : '' }] : [];
+    }).slice(0, 14);
+    cheat.set(chapter.unitKey, points);
+    deps.checkpointPut('cheat', chapter.unitKey, points);
+  }
+  deps.progress?.({ stage: 'finalize', done: 2, total: 3 });
+
+  // Conflicts between sources on definitions, formulas, rules and stated values.
+  let conflictsMarkdown = '';
+  if (deps.conflicts) {
+    const candidates = items
+      .filter((item) => item.importance !== 'detail' && (item.type === 'definition' || item.type === 'formula' || item.type === 'rule' || (item.type === 'fact' && /\d/.test(item.statement))))
+      .sort((a, b) => Number(b.importance === 'core') - Number(a.importance === 'core') || a.order - b.order)
+      .slice(0, 80);
+    const multiSource = new Set(candidates.map((item) => item.evidence[0]?.sourceKey)).size > 1;
+    if (multiSource) {
+      guard();
+      const statements = candidates.map((item) => `${item.title}: ${item.statement}${item.latex ? ` [${item.latex}]` : ''}`);
+      const pairs = await deps.conflicts(statements).catch((error) => { if (isAbort(error)) throw error; warnings.push('conflicts_unchecked'); return []; });
+      const lines = pairs.flatMap((pair) => {
+        const a = candidates[pair.a];
+        const b = candidates[pair.b];
+        if (!a || !b || a.evidence[0]?.sourceKey === b.evidence[0]?.sourceKey) return [];
+        return [`- **${a.title}** (${cite(a.id).slice(0, 1).join('')}) / **${b.title}** (${cite(b.id).slice(0, 1).join('')}): ${pair.reason}`];
+      });
+      counts.conflicts = lines.length;
+      conflictsMarkdown = lines.join('\n');
+    }
+  }
+
+  // Figures from the materials: chosen by anchored figure items, rendered without a model.
+  let figures: CompleteGuideFigure[] = [];
+  const figureSiblings: Record<string, string[]> = {};
+  if (deps.figures) {
+    const requests = selectFigureRequests(items, passagesById, sourcesByKey);
+    if (requests.length) {
+      guard();
+      figures = await deps.figures(requests).catch((error) => { if (isAbort(error)) throw error; warnings.push('figures_failed'); return []; });
+      for (const figure of figures) {
+        const passage = itemsById.get(figure.itemId)?.evidence[0]?.passageId;
+        figureSiblings[figure.itemId] = items.filter((item) => item.id !== figure.itemId && item.evidence.some((evidence) => evidence.passageId === passage)).map((item) => item.id);
+      }
+      counts.figures = figures.length;
+    }
+  }
+  // Web images only illustrate core concepts the materials left without a figure.
+  if (config.webImages && deps.webImages) {
+    const stored = deps.checkpointGet<CompleteGuideFigure[]>('final', 'web-images');
+    let found = stored;
+    if (!found) {
+      const requests = selectWebImageRequests(items, plans.filter((plan) => plan.sections.length).map((plan) => plan.unitKey), new Set(figures.map((figure) => figure.itemId)));
+      if (requests.length) {
+        guard();
+        found = await deps.webImages(requests).catch((error) => { if (isAbort(error)) throw error; warnings.push('web_images_failed'); return null; });
+        if (found) deps.checkpointPut('final', 'web-images', found.map((figure) => ({ ...figure })));
+      }
+    }
+    const requested = new Set(items.map((item) => item.id));
+    for (const figure of (found ?? []).filter((entry) => entry.attribution && requested.has(entry.itemId))) {
+      figures.push(figure);
+      figureSiblings[figure.itemId] = [];
+      counts.webImages += 1;
+    }
+  }
+
+  // ── Assembly ───────────────────────────────────────────────────────────────────
+  const usedItems = new Set<string>();
+  // Web pages get W aliases in order of first citation; several passages of a page share one.
+  const webPages = new Map<string, CompleteGuideResult['webSources'][number]>();
+  const citeWeb = (id: string): string | null => {
+    const passage = webById.get(id);
+    if (!passage) return null;
+    let page = webPages.get(passage.url);
+    if (!page) {
+      page = { alias: `W${webPages.size + 1}`, title: passage.title, site: passage.site, url: passage.url, passageIds: [] };
+      webPages.set(passage.url, page);
+    }
+    if (!page.passageIds.includes(id)) page.passageIds.push(id);
+    const site = passage.site.replace(/[[\]]/g, '').trim();
+    return `[${page.alias}${site ? ` · ${site}` : ''}](nodus://passage/${encodeURIComponent(id)})`;
+  };
+  // The AI notice is written in full once, on the first AI block of the guide.
+  const context = { labels, cite, citeWeb, state: { aiNoticeShown: false } };
+  const parts: string[] = [];
+  // The overview is the abstract (cover and reader); here go how to read the guide and how the
+  // topics relate, when they do.
+  parts.push([
+    `## ${labels.howToUse}`,
+    labels.howToUseBody,
+    syllabus.connections.length ? `**${labels.unitRelations}**\n\n${syllabus.connections.map((edge) => `- **${edge.from}** → **${edge.to}**: ${edge.relation}`).join('\n')}` : '',
+  ].filter(Boolean).join('\n\n'));
+  const datedByChapter: DatedEntry[][] = [];
+  for (const chapter of chapters) {
+    const chapterParts: string[] = [`## ${chapter.title}`];
+    if (!chapter.sections.length) { chapterParts.push(`*${labels.unitNotCovered}*`); parts.push(chapterParts.join('\n\n')); continue; }
+    const chapterItems = items.filter((item) => item.unitKey === chapter.unitKey);
+    // What code builds from the verified items: the chronology and the key concepts.
+    const dated = chronologyOf(chapterItems, { quoteYears: profiles.get(chapter.unitKey)?.quoteYears ?? false });
+    datedByChapter.push(dated);
+    if (dated.length >= 3) chapterParts.push(`### ${labels.timeline}\n\n${renderChronology(dated, cite, labels)}`);
+    const concepts = renderKeyConcepts(chapterItems, cite, labels);
+    if (concepts) chapterParts.push(`### ${labels.keyConcepts}\n\n${concepts}`);
+    if (chapter.summary.length) {
+      chapterParts.push(`### ${labels.chapterSummary}\n\n${chapter.summary.map((block) => renderBlock(block, context).markdown).join('\n\n')}`);
+      for (const block of chapter.summary) block.itemIds.forEach((id) => usedItems.add(id));
+    }
+    const practice: PracticeEntry[][] = [];
+    // A chapter about events takes one warning about a confusion at most, not one per section.
+    let aiLeft = chapter.kind === 'narrative' ? 1 : Number.POSITIVE_INFINITY;
+    for (const section of chapter.sections) {
+      chapterParts.push(`### ${section.title}`);
+      const questions: PracticeEntry[] = [];
+      for (const block of section.blocks) {
+        if (block.provenance === 'ai') {
+          if (aiLeft < 1) { counts.droppedAi += 1; continue; }
+          aiLeft -= 1;
+        }
+        const rendered = renderBlock(block, context);
+        if (rendered.practice) questions.push(rendered.practice);
+        else chapterParts.push(rendered.markdown);
+        counts.blocks += 1;
+        if (block.provenance === 'ai') counts.aiBlocks += 1;
+        if (block.provenance === 'web') counts.webBlocks += 1;
+        if (block.provenance === 'materials' || block.provenance === 'derived') block.itemIds.forEach((id) => usedItems.add(id));
+      }
+      practice.push(questions);
+    }
+    const practiceMarkdown = renderPractice(practice, labels);
+    if (practiceMarkdown) chapterParts.push(`### ${labels.practice}\n\n${practiceMarkdown}`);
+    const readMore = readMoreRanges(snapshot.sources, chapterItems.flatMap((item) => item.evidence.map((evidence) => passagesById.get(evidence.passageId)!).filter(Boolean)), labels);
+    if (readMore.length) chapterParts.push(`**${labels.readMore}:** ${readMore.map(({ source, ranges }) => `${source.alias} — ${source.title} (${ranges})`).join(' · ')}`);
+    parts.push(chapterParts.join('\n\n'));
+  }
+  const chapterItemGroups = chapters.map((chapter) => ({ title: chapter.title, items: items.filter((item) => item.unitKey === chapter.unitKey) }));
+  const glossary = renderGlossary(items, cite, labels);
+  if (glossary) parts.push(`## ${labels.glossary}\n\n${glossary}`);
+  const formulas = renderFormulaSheet(chapterItemGroups, cite, labels);
+  if (formulas) parts.push(`## ${labels.formulaSheet}\n\n${formulas}`);
+  // A chapter carries its own chronology; a guide-wide one is for dates that span chapters.
+  const allDated = datedByChapter.flat().sort((a, b) => a.year - b.year || a.item.order - b.item.order);
+  if (datedByChapter.filter((entries) => entries.length).length >= 2 && allDated.length >= 3) parts.push(`## ${labels.timeline}\n\n${renderTimelineEntries(allDated, cite, labels)}`);
+  if (conflictsMarkdown) parts.push(`## ${labels.conflicts}\n\n${conflictsMarkdown}`);
+  const cheatSheet = renderCheatSheet(chaptersWithItems.map((chapter) => ({ title: chapter.title, items: chapter.items, points: cheat.get(chapter.unitKey) ?? [] })), cite, labels);
+  if (cheatSheet) parts.push(`## ${labels.reviewSheet}\n\n${cheatSheet}`);
+  counts.itemsUsed = usedItems.size;
+  const coverage: SourceCoverage[] = snapshot.sources.map((source) => {
+    const sourcePassages = snapshot.passages.filter((passage) => passage.sourceKey === source.sourceKey);
+    const sourceItems = items.filter((item) => item.evidence.some((evidence) => evidence.sourceKey === source.sourceKey));
+    const failed = unread.get(source.sourceKey);
+    const unreadRanges = failed?.ranges ?? [];
+    return {
+      source,
+      passagesTotal: sourcePassages.length,
+      passagesRead: sourcePassages.length - (failed?.passages ?? 0),
+      itemsExtracted: sourceItems.length,
+      itemsUsed: sourceItems.filter((item) => usedItems.has(item.id)).length,
+      duplicates: sourcePassages.filter((passage) => passage.duplicateOf).length,
+      unreadRanges,
+    };
+  });
+  const index = readMoreRanges(snapshot.sources, items.flatMap((item) => item.evidence.map((evidence) => passagesById.get(evidence.passageId)!).filter(Boolean)), labels);
+  const indexed = new Set(index.map((entry) => entry.source.sourceKey));
+  const sourceIndex = [...index, ...snapshot.sources.filter((source) => !indexed.has(source.sourceKey)).map((source) => ({ source, ranges: '' }))];
+  // Web images join the list with their confirmed licence and author.
+  for (const figure of figures) {
+    const credit = figure.attribution;
+    if (!credit || webPages.has(credit.url)) continue;
+    webPages.set(credit.url, { alias: `W${webPages.size + 1}`, title: `${credit.title}${credit.author ? ` — ${credit.author}` : ''}`, site: `${credit.site} · ${credit.license}`, url: credit.url, passageIds: [] });
+  }
+  const webSources = [...webPages.values()];
+  if (webSources.length) {
+    const escape = (value: string) => value.replace(/[[\]]/g, '').trim();
+    const href = (url: string) => url.replace(/[()\s]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+    parts.push(`## ${labels.webSources}\n\n*${labels.webNote}*\n\n${webSources.map((page) => `- **${page.alias}** — [${escape(page.title) || page.url}](${href(page.url)})${page.site ? ` · ${escape(page.site)}` : ''}`).join('\n')}`);
+  }
+  // What was read and where it comes from close the guide as one appendix.
+  parts.push(`## ${labels.sourcesAndCoverage}\n\n**${labels.sourceIndex}**\n\n${renderSourceIndex(sourceIndex)}\n\n**${labels.coverage}**\n\n${renderCoverage(coverage, labels)}`);
+
+  const limitations: string[] = [];
+  for (const row of coverage) {
+    if (row.source.pages?.empty.length) limitations.push(`${row.source.alias} ${row.source.title}: ${labels.pagesWithoutText}`);
+    if (row.unreadRanges.length) limitations.push(`${row.source.alias} ${row.source.title}: ${labels.unreadParts} (${row.unreadRanges.join(', ')})`);
+  }
+  for (const chapter of chapters) if (!chapter.sections.length) limitations.push(`${chapter.title}: ${labels.unitNotCovered}`);
+  const title = `${labels.guideTitle}: ${[...new Set(chapters.map((chapter) => chapter.title))].slice(0, 3).join(', ')}${chapters.length > 3 ? '…' : ''}`;
+  deps.progress?.({ stage: 'finalize', done: 3, total: 3 });
+  return {
+    title,
+    abstract: syllabus.overview,
+    markdown: parts.join('\n\n'),
+    cheatSheetMarkdown: cheatSheet ? `# ${labels.reviewSheet}\n\n${cheatSheet}` : '',
+    chapters,
+    items,
+    bibliography: [
+      ...sourceIndex.map(({ source, ranges }) => `${source.alias} — ${source.title}${ranges ? ` (${ranges})` : ''}`),
+      ...webSources.map((page) => `${page.alias} — ${page.title} (${page.url})`),
+    ],
+    limitations,
+    coverage,
+    counts,
+    syllabus,
+    warnings,
+    figures,
+    figureSiblings,
+    webSources,
+  };
+}

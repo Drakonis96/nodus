@@ -20,6 +20,7 @@ use_default_settings:
       - pubmed
       - europepmc
       - google scholar
+      - wikicommons.images
 
 general:
   debug: false
@@ -94,4 +95,10 @@ engines:
   - name: europepmc
     disabled: false
   - name: google scholar
+    disabled: false
+  # Complete study guides ("Imágenes de la web", off by default) search the
+  # "images" category. Only Wikimedia Commons: Nodus confirms each file's free
+  # licence and author through the Commons API before using it. Openverse is not
+  # enabled because SearXNG's result omits the licence.
+  - name: wikicommons.images
     disabled: false

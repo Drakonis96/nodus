@@ -4,9 +4,11 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
+import { DRIFT_TRANSLATIONS } from './i18n.drift';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -73,6 +75,7 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
@@ -127,6 +130,7 @@ export const PT_BR: Record<string, string> = {
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS['pt-BR'],
   ...STALE_MODEL_TRANSLATIONS['pt-BR'],
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS['pt-BR'],
+  ...TEXT_PROVENANCE_TRANSLATIONS['pt-BR'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['pt-BR'],
   ...LIBRARY_ONBOARDING_TRANSLATIONS['pt-BR'],
   ...LIBRARY_TUTORIAL_TRANSLATIONS['pt-BR'],
@@ -155,6 +159,7 @@ export const PT_BR: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ptBR,
   ...GRAPH_HEALTH_TRANSLATIONS.ptBR,
   ...STUDY_SOURCE_TRANSLATIONS["pt-BR"],
+  ...COMPLETE_GUIDE_TRANSLATIONS["pt-BR"],
   ...STUDY_FOCUS_TRANSLATIONS["pt-BR"],
   ...STUDY_NOTE_LINKS_TRANSLATIONS["pt-BR"],
   ...STUDY_IMPROVE_TRANSLATIONS.ptBR,
@@ -8813,4 +8818,5 @@ export const PT_BR: Record<string, string> = {
   "Ask the model to fix the failed steps": "Pedir ao modelo para corrigir as etapas que falharam",
   "Sent": "Enviado",
   ...CONCILIUM_TRANSLATIONS['pt-BR'],
+  ...DRIFT_TRANSLATIONS['pt-BR'],
 };

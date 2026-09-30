@@ -202,6 +202,11 @@ const INDIRECT_KEY_SOURCES = [
   // operation descriptions and option placeholders, all rendered through t() in the
   // Convert view.
   { file: 'shared/toolkitTypes.ts', pattern: /\b(?:label|description|placeholder):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  // Nodus Drift: the category names (shared/drift.ts) and the name and description of every
+  // sound in the catalogue (shared/driftCatalog.ts). They are Spanish keys handed to t() as
+  // t(sound.nameKey) / t(category.nameKey), so none of them is ever a literal inside a t() call.
+  { file: 'shared/drift.ts', pattern: /\bnameKey:\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
+  { file: 'shared/driftCatalog.ts', pattern: /\b(?:nameKey|descriptionKey):\s*(["'])((?:\\.|(?!\1).)*?)\1/g },
   // Tour steps are plain object literals fed through t() by the tour engine.
   ...['Tour', 'AdvancedTour', 'StudyTour', 'GenealogyTour', 'DatabasesTour', 'TeachingTour', 'PrimarySourcesTour', 'TestimonyTour', 'ProsopographyTour', 'WorldbuildingTour'].map((name) => ({
     file: `src/views/${name}.tsx`,

@@ -160,7 +160,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 196;
+export const SCHEMA_VERSION = 197;
 
 export const migrations: Migration[] = [
   {
@@ -9539,6 +9539,43 @@ export const migrations: Migration[] = [
   { version: 195, up: 'SELECT 1;', after: ensureStudyFocusTaskColumn },
   // Workspace notes linked to courses, subjects, folders, topics and materials.
   { version: 196, up: STUDY_NOTE_LINKS_SQL },
+  // Complete study guide (Study Deep Research mode). Machine-local working state:
+  // the frozen reading snapshot and per-pass checkpoints of a run (so a re-queued job
+  // resumes), a content-addressed cache of reading passes (so "another version" does
+  // not re-read unchanged sources), and each saved guide's evidence sidecar. The
+  // saved Markdown is self-sufficient; none of these rows is synced.
+  { version: 197, up: /* sql */ `
+    CREATE TABLE IF NOT EXISTS complete_guide_runs (
+      run_id       TEXT PRIMARY KEY,
+      stage        TEXT NOT NULL DEFAULT 'snapshot',
+      request_json TEXT NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      created_at   TEXT NOT NULL,
+      updated_at   TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS complete_guide_units (
+      run_id      TEXT NOT NULL,
+      stage       TEXT NOT NULL,
+      unit_key    TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      PRIMARY KEY (run_id, stage, unit_key)
+    );
+    CREATE TABLE IF NOT EXISTS complete_guide_chunk_cache (
+      cache_key    TEXT PRIMARY KEY,
+      stage        TEXT NOT NULL,
+      result_json  TEXT NOT NULL,
+      bytes        INTEGER NOT NULL,
+      last_used_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_complete_guide_cache_used ON complete_guide_chunk_cache(last_used_at);
+    CREATE TABLE IF NOT EXISTS complete_guide_artifacts (
+      draft_id     TEXT PRIMARY KEY,
+      run_id       TEXT NOT NULL,
+      artifacts_json TEXT NOT NULL,
+      created_at   TEXT NOT NULL
+    );
+  ` },
 ];
 
 /**

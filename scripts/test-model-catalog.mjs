@@ -199,6 +199,71 @@ test('Gemini full listing preserves non-picker models and incomplete pages remai
   await withPayload({ data: [], has_more: true }, async () => assert.deepEqual(await catalog.getModelCatalog('anthropic'), unreadable));
 });
 
+test('full Anthropic and Gemini catalogues retain advertised context limits', async () => {
+  globalThis.__catalogFixture.keys = { anthropic: 'fixture-key', gemini: 'fixture-key' };
+  await withPayload({ data: [{ id: 'chat', max_input_tokens: 600_000 }] }, async () => {
+    const result = await catalog.getModelCatalog('anthropic');
+    assert.equal(result.status, 'read');
+    assert.equal(result.models[0].contextLength, 600_000);
+    assert.equal(result.selectableModels[0].contextLength, 600_000);
+  });
+  await withPayload({ models: [
+    { name: 'models/chat', inputTokenLimit: 1_048_576, supportedGenerationMethods: ['generateContent'] },
+    { name: 'models/embedding', inputTokenLimit: 8192, supportedGenerationMethods: ['embedContent'] },
+  ] }, async () => {
+    const result = await catalog.getModelCatalog('gemini');
+    assert.equal(result.status, 'read');
+    assert.deepEqual(result.models.map(model => [model.id, model.contextLength]), [['chat', 1_048_576], ['embedding', 8192]]);
+    assert.deepEqual(result.selectableModels.map(model => model.id), ['chat']);
+  });
+});
+
+test('Cerebras context enrichment preserves full account evidence and never adds public-only models', async () => {
+  globalThis.__catalogFixture.keys = { cerebras: 'fixture-key' };
+  let privateLimit;
+  let publicUnavailable = false;
+  let incomplete = false;
+  let publicReads = 0;
+  globalThis.fetch = async (url, init) => {
+    let payload;
+    if (url === 'https://api.cerebras.ai/public/v1/models') {
+      publicReads++;
+      assert.equal(init.headers, undefined, 'public enrichment never receives the stored key');
+      if (publicUnavailable) throw Error('public catalogue offline');
+      payload = { data: [
+        { id: 'chat', limits: { max_context_length: 65_536 } },
+        { id: 'embedding-model', limits: { max_context_length: 8192 } },
+        { id: 'public-only', limits: { max_context_length: 1_000_000 } },
+      ] };
+    } else {
+      assert.equal(url, 'https://api.cerebras.ai/v1/models');
+      assert.equal(init.headers.Authorization, 'Bearer fixture-key');
+      payload = { data: [{ id: 'chat', context_window: privateLimit }, { id: 'embedding-model' }], has_more: incomplete };
+    }
+    return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    for (const limit of [16_384, undefined]) {
+      privateLimit = limit;
+      const result = await catalog.getModelCatalog('cerebras');
+      assert.equal(result.status, 'read');
+      assert.deepEqual(result.models.map(model => model.id), ['chat', 'embedding-model']);
+      assert.deepEqual(result.selectableModels.map(model => model.id), ['chat']);
+      assert.equal(result.selectableModels[0].contextLength, limit ?? 65_536);
+      assert.deepEqual(catalog.staleFavorites([favorite('cerebras', 'embedding-model')], new Map([['cerebras', result]])), []);
+      assert.deepEqual((await catalog.listModels('cerebras', 'fixture-key')).map(model => model.id), ['chat']);
+    }
+    publicUnavailable = true;
+    const result = await catalog.getModelCatalog('cerebras');
+    assert.equal(result.status, 'read', 'optional enrichment failure does not invalidate account evidence');
+    assert.deepEqual(result.models.map(model => model.id), ['chat', 'embedding-model']);
+    incomplete = true;
+    const readsBefore = publicReads;
+    assert.deepEqual(await catalog.getModelCatalog('cerebras'), unreadable);
+    assert.equal(publicReads, readsBefore, 'an incomplete account catalogue cannot be replaced by the public list');
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test('Codex hidden models on subsequent pages validate saved favourites without becoming replacements', async () => {
   const calls = codexRuntime();
   const result = await catalog.getModelCatalog('codex');

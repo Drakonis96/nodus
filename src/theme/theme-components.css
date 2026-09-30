@@ -210,6 +210,9 @@ html.theme-active.dark .toolkit-workspace :is([class~='border-amber-200'], [clas
 html.theme-active.light .toolkit-workspace :is([class~='border-amber-200'], [class~='border-amber-300'], [class~='border-amber-400'], [class~='border-amber-500'], [class~='border-amber-600']) { border-color: var(--a-600); }
 html.theme-active.dark .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-500); }
 html.theme-active.light .toolkit-workspace :is([class~='hover:border-amber-400']:hover, [class~='hover:border-amber-500\/60']:hover) { border-color: var(--a-600); }
+/* Nodus Drift's sliders follow the theme accent too (Tailwind's accent-amber-500 is a utility, not a token). */
+html.theme-active.dark .toolkit-workspace input[type='range'] { accent-color: var(--a-500); }
+html.theme-active.light .toolkit-workspace input[type='range'] { accent-color: var(--a-600); }
 
 /* Research chat has a few controls that predate the semantic button layer and
  * several menus that portal directly to <body>. Give the whole surface one

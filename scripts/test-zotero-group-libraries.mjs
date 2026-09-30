@@ -26,6 +26,7 @@ const server = createServer((request, response) => {
   response.setHeader('Last-Modified-Version', '17');
   const url = request.url ?? '';
   if (url.startsWith('/api/users/0/groups')) return response.end(JSON.stringify([{ id: 42, data: { name: 'Research team' } }]));
+  if (url.startsWith('/api/groups/42/items?limit=1')) return response.end('[]');
   if (url.startsWith('/api/groups/42/collections/top')) {
     const start = Number(new URL(`http://127.0.0.1${url}`).searchParams.get('start') ?? 0);
     response.setHeader('Total-Results', String(topRows.length));

@@ -5,6 +5,8 @@ import { app, BrowserWindow } from 'electron';
 import { nodiText } from '@shared/nodiNotifications';
 import { openDbPath } from '../db/database';
 import { saveWritingWorkshopDraft } from '../db/writingDraftsRepo';
+import { deleteCompleteGuideRun, saveCompleteGuideArtifacts } from '../db/completeGuideRepo';
+import { seedCompleteGuideFigures } from './completeGuide/figures';
 import { applyDecorativeImageOption } from './decorativeImages';
 import { localizedForUi } from '../ipc/context';
 import { addNotification } from '../notifications';
@@ -108,6 +110,23 @@ export function ensureDeepResearchLane(): void {
       // The durable report lands before optional image generation starts. Every
       // window can refresh the gallery immediately and receives the later image.
       broadcast('writing:saved:changed', null);
+      // A complete study guide's evidence sidecar stays on this machine; once it is
+      // stored, the run's checkpoints are no longer needed (the reading cache stays).
+      if (report.completeGuideArtifacts && report.draft.completeGuide) {
+        try {
+          saveCompleteGuideArtifacts(saved.id, report.draft.completeGuide.runId, report.completeGuideArtifacts);
+          deleteCompleteGuideRun(report.draft.completeGuide.runId);
+          // Kept out of the in-memory job (and MCP job payloads) once it is on disk.
+          delete report.completeGuideArtifacts;
+          if (report.completeGuideFigures) {
+            const { figures, siblings } = report.completeGuideFigures;
+            if (seedCompleteGuideFigures(saved.id, figures, (itemId) => siblings[itemId] ?? [])) broadcast('documentVisuals:changed', { kind: 'deep-research', id: saved.id });
+            delete report.completeGuideFigures;
+          }
+        } catch (error) {
+          console.warn('[complete guide] evidence sidecar not stored', error);
+        }
+      }
       const image = applyDecorativeImageOption('deep_research', saved.id, request.decorativeImage, (next) => {
         broadcast('images:changed', localizedForUi(next));
       });

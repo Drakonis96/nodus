@@ -1,5 +1,5 @@
 import type { ResearchTraversal } from '@shared/researchCorpus';
-import { t } from '../i18n';
+import { t, tx } from '../i18n';
 
 const reasons: Record<string, string> = {
   no_matches: 'Sin coincidencias', text_pending: 'Preparación pendiente', abstract_only: 'Solo abstract',
@@ -13,6 +13,8 @@ const reasons: Record<string, string> = {
   no_attachment: 'Sin adjuntos', not_downloaded: 'Archivos inaccesibles', inaccessible: 'Archivos inaccesibles', extraction_failed: 'Preparación pendiente',
 };
 export function ResearchCoverage({ value }: { value: ResearchTraversal }) {
+  const sources = new Map(value.sourceCoverage?.map(source => [source.documentId, source.title]));
+  const omitted = value.omittedSourceCoverage;
   return <details className="my-2 rounded border border-neutral-300 p-3 text-sm dark:border-neutral-700">
     <summary>{t('Cobertura documental')}: {value.sourceCount} {t('Fuentes')}{value.partial ? ` · ${t('Cobertura parcial')}` : ''}</summary>
     <dl className="my-2 grid grid-cols-2 gap-2">
@@ -20,9 +22,17 @@ export function ResearchCoverage({ value }: { value: ResearchTraversal }) {
         [t('Tokens de evidencia'), value.evidenceTokens], [t('Presupuesto de decisiones'), value.decisionTokens ?? 0]].map(([label, count]) => <div key={label}><dt>{label}</dt><dd>{count}</dd></div>)}
     </dl>
     {!!value.limitations?.length && <ul className="list-disc pl-5">{[...new Set(value.limitations.map(code => reasons[code] ?? 'Consulta adicional no disponible'))].map(reason => <li key={reason}>{t(reason)}</li>)}</ul>}
-    <ol className="my-2 list-decimal pl-5">{value.queries.map((query, index) => <li key={index}>{query.query} · {query.candidates} {t('Candidatos por búsqueda')}</li>)}</ol>
-    {!!value.sourceCoverage?.length && <details><summary>{t('Fuentes')}</summary><ul className="max-h-64 overflow-y-auto">{value.sourceCoverage.map(source => <li key={source.documentId} className="my-1">
+    <ol className="my-2 list-decimal pl-5">{value.queries.map((query, index) => <li key={index}>
+      {query.query}{query.scope ? ` · ${query.scope.sourceCount} ${t('Fuentes')}` : query.sources.length === 1 && sources.has(query.sources[0]) ? ` · ${sources.get(query.sources[0])}` : ''}
+      {' · '}{query.candidates} {t('Candidatos por búsqueda')}
+    </li>)}</ol>
+    {(!!value.sourceCoverage?.length || !!omitted?.count) && <details><summary>{t('Fuentes')}</summary><ul className="max-h-64 overflow-y-auto">{value.sourceCoverage?.map(source => <li key={source.documentId} className="my-1">
       {source.title}{source.reasons.length ? ` · ${[...new Set(source.reasons.map(code => t(reasons[code] ?? 'Consulta adicional no disponible')))].join(' · ')}` : ''}
-    </li>)}</ul></details>}
+    </li>)}</ul>{!!omitted?.count && <div className="mt-2">
+      <p>{tx('Fuentes adicionales resumidas: {n}', { n: omitted.count })}</p>
+      <ul className="list-disc pl-5">{Object.entries(omitted.reasonCounts).sort((a, b) => b[1] - a[1]).map(([reason, count]) => <li key={reason}>
+        {t(reasons[reason] ?? 'Consulta adicional no disponible')}: {count}
+      </li>)}</ul>
+    </div>}</details>}
   </details>;
 }

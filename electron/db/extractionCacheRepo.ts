@@ -2,7 +2,8 @@ import { getDb } from './database';
 import { planExtractionCacheEviction } from '@shared/extractionCachePrune';
 import type { PdfAnalysis, SourceType } from '@shared/types';
 
-export const EXTRACTION_CACHE_VERSION = 3;
+// Version 4 separates OCR results from pages selected for a batch that failed.
+export const EXTRACTION_CACHE_VERSION = 4;
 
 /** How much extracted text the cache may hold before the oldest entries go. */
 const MAX_CACHE_BYTES = 64 * 1024 * 1024;

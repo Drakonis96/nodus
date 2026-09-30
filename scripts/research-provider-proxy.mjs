@@ -90,14 +90,28 @@ export async function startResearchProviderProxy(root, { dispatch = fetch, catal
       const inputTokens = usage?.prompt_tokens ?? usage?.input_tokens;
       const outputTokens = usage?.completion_tokens ?? usage?.output_tokens ?? (provider === 'openrouter' ? 0 : undefined);
       let accountedUsd = null;
+      let accounting = 'reservation_retained';
       if (upstream.ok && [inputTokens, outputTokens].every(value => Number.isSafeInteger(value) && value >= 0)) {
         accountedUsd = typeof usage.cost === 'number' ? usage.cost : (inputTokens * target.input + outputTokens * target.output) / 1e6;
+        accounting = typeof usage.cost === 'number' ? 'provider_cost' : 'peak_price_upper_bound';
         try { ledger.settle(reservation, { actualUsd: accountedUsd, inputTokens, outputTokens }); }
         catch { stopped = true; throw new Error('research_accounting_bound_exceeded'); }
+      } else if (upstream.status >= 400 && upstream.status < 500) {
+        // A 4xx is a refusal, not a completed generation: the request was rejected before
+        // running, so it cannot have been charged — the same reading the application makes
+        // when it replays a refused request without its optional fields
+        // (electron/ai/providerErrors.ts). A refusal that keeps its bound for ever turns the
+        // ledger into a count of refusals: DeepSeek answers 400 to any prompt without the
+        // word "json", so a structural refusal books its bound on every call and stops a
+        // campaign that has spent a fraction of its authorization. Unknown usage from an
+        // accepted request still keeps the full reservation.
+        accountedUsd = 0;
+        accounting = 'refused_unbilled';
+        try { ledger.settle(reservation, { actualUsd: 0, inputTokens: 0, outputTokens: 0 }); }
+        catch { /* A refusal has nothing to account for. */ }
       }
       fs.appendFileSync(log, JSON.stringify({ reservation, provider, model: target.model, requestHash: createHash('sha256').update(bytes).digest('hex'),
-        status: upstream.status, latencyMs: performance.now() - started, firstByteMs, inputTokens, outputTokens, accountedUsd, maximumUsd,
-        accounting: typeof usage?.cost === 'number' ? 'provider_cost' : accountedUsd === null ? 'reservation_retained' : 'peak_price_upper_bound' }) + '\n', { mode: 0o600 });
+        status: upstream.status, latencyMs: performance.now() - started, firstByteMs, inputTokens, outputTokens, accountedUsd, maximumUsd, accounting }) + '\n', { mode: 0o600 });
       response.end();
     } catch (error) {
       // Test-only simulated upstreams can ask for a real connection reset instead

@@ -242,6 +242,10 @@ export default defineConfig({
     },
   },
   resolve: {
+    // One KaTeX for the whole renderer: rehype-katex otherwise bundles its own copy,
+    // and the mhchem extension (\ce{} in chemistry) registers on the instance that
+    // imports it, which then never renders.
+    dedupe: ['katex'],
     alias: {
       '@shared': path.resolve(__dirname, 'shared'),
       events: eventsPolyfill,

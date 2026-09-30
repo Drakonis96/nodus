@@ -4,9 +4,11 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
+import { DRIFT_TRANSLATIONS } from './i18n.drift';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -67,6 +69,7 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
@@ -123,6 +126,7 @@ export const ZH_CN: Record<string, string> = {
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS['zh-CN'],
   ...STALE_MODEL_TRANSLATIONS['zh-CN'],
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS['zh-CN'],
+  ...TEXT_PROVENANCE_TRANSLATIONS['zh-CN'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['zh-CN'],
   ...LIBRARY_ONBOARDING_TRANSLATIONS['zh-CN'],
   ...LIBRARY_TUTORIAL_TRANSLATIONS['zh-CN'],
@@ -151,6 +155,7 @@ export const ZH_CN: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS['zh-CN'],
   ...GRAPH_HEALTH_TRANSLATIONS['zh-CN'],
   ...STUDY_SOURCE_TRANSLATIONS["zh-CN"],
+  ...COMPLETE_GUIDE_TRANSLATIONS["zh-CN"],
   ...STUDY_FOCUS_TRANSLATIONS["zh-CN"],
   ...STUDY_NOTE_LINKS_TRANSLATIONS["zh-CN"],
   ...STUDY_IMPROVE_TRANSLATIONS['zh-CN'],
@@ -7868,4 +7873,5 @@ export const ZH_CN: Record<string, string> = {
   "Ask the model to fix the failed steps": "请模型修正失败的步骤",
   "Sent": "已发送",
   ...CONCILIUM_TRANSLATIONS['zh-CN'],
+  ...DRIFT_TRANSLATIONS['zh-CN'],
 };

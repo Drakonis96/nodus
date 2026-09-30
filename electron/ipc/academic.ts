@@ -293,7 +293,7 @@ import os from 'node:os';
 import AdmZip from 'adm-zip';
 import { dialog, app } from 'electron';
 import { showImportOpenDialog } from '../privacy';
-import type { AnalysisRunOptions, ModelRef, StudyMaterialImportInput, WorkDeletionOutcome } from '@shared/types';
+import type { AnalysisRunOptions, ModelRef, PromptLanguage, StudyMaterialImportInput, WorkDeletionOutcome } from '@shared/types';
 import { getSettings, updateSettings } from '../db/settingsRepo';
 import { stopMcpServer, stopMcpTunnel } from '../mcp';
 import * as works from '../db/worksRepo';
@@ -316,6 +316,9 @@ import { getDb, withVaultDatabase } from '../db/database';
 import { deleteWorks, worksRunningNow } from '../db/workDeletion';
 import { removeGlobalLibraryLinksForWorks } from '../library/libraryService';
 import { getActiveVault, withOwningVault } from '../vaults/vaultRegistry';
+import { completeGuideOrganization, listCompleteGuideCatalog, previewCompleteGuide } from '../ai/completeGuide/sources';
+import type { CompleteGuidePreviewRequest } from '@shared/completeGuide/preview';
+import { getCompleteGuideEvidence } from '../ai/completeGuide/evidence';
 import { configureAppleCalendarSync, getAppleCalendarSyncStatus, requestAppleCalendarSync } from '../calendar/appleCalendarSync';
 import { listAppleCalendars } from '../calendar/appleCalendarBridge';
 
@@ -1844,6 +1847,10 @@ export function registerAcademicIpc(context: IpcContext): void {
     ensureDeepResearchLane();
     return clearFinishedDeepResearchJobs();
   });
+  // Complete study guide: the composer's source tree and its pre-flight estimate.
+  h('research:completeGuide:catalog', async () => ({ sources: listCompleteGuideCatalog(), organization: completeGuideOrganization() }));
+  h('research:completeGuide:preview', async (_e, request: CompleteGuidePreviewRequest) => previewCompleteGuide(request));
+  h('research:completeGuide:evidence', async (_e, draftId: string, itemId: string, language?: PromptLanguage) => getCompleteGuideEvidence(draftId, itemId, language));
 
   // tutor mode (AI-guided graph walkthrough)
   h('tutor:plan', async (_e, request: TutorPlanRequest) => buildTutorPlan(request));

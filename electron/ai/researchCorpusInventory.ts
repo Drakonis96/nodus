@@ -22,6 +22,9 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
   }));
   const availableWorkIds = new Set(works.map(work => work.nodus_id));
   const links = listGlobalLibraryVaultLinks().filter(link => link.vaultId === vault.id);
+  // Keyed once: a per-item search through every link is quadratic in a large library.
+  const linkedWorkByItem = new Map<string, string>();
+  for (const link of links) if (!linkedWorkByItem.has(link.itemId)) linkedWorkByItem.set(link.itemId, link.workId);
   const globalMembership = new Map<string, string[]>();
   for (let offset = 0; ; offset += 500) {
     const page = listGlobalLibraryItems({ offset, limit: 500, includeFacets: false });
@@ -30,7 +33,7 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
       if (!item || item.deletedAt || item.sourceState === 'library-missing') continue;
       const identity = item.sourceIdentities.find(source => source.source === 'zotero' && (source.libraryType === 'user' || source.libraryType === 'group'));
       const canonicalWork = identity ? workByZoteroIdentity.get(JSON.stringify([identity.libraryType, identity.libraryId, identity.itemKey])) : null;
-      const linkedId = links.find(link => link.itemId === item.id)?.workId ?? item.vaultWorkIds?.[vault.id] ?? canonicalWork ?? null;
+      const linkedId = linkedWorkByItem.get(item.id) ?? item.vaultWorkIds?.[vault.id] ?? canonicalWork ?? null;
       const workId = linkedId && availableWorkIds.has(linkedId) ? linkedId : null;
       if (workId) linkedWorks.add(workId);
       documents.push({ id: item.id, workId, libraryItemId: item.id, title: item.metadata.title,
@@ -41,7 +44,10 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
         origin: identity ? { kind: 'zotero', libraryType: identity.libraryType as 'user' | 'group', libraryId: identity.libraryId, itemKey: identity.itemKey } : { kind: 'nodus', id: item.id },
         permissionRevision: researchFingerprint({ id: item.id, sourceState: item.sourceState ?? 'current', sources: item.sourceIdentities }),
         coverage: summary.readerAvailable ? 'fulltext' : item.metadata.abstract ? 'abstract' : 'metadata' });
-      for (const id of item.collectionIds) globalMembership.set(id, [...(globalMembership.get(id) ?? []), item.id]);
+      for (const id of item.collectionIds) {
+        const members = globalMembership.get(id);
+        if (members) members.push(item.id); else globalMembership.set(id, [item.id]);
+      }
     }
     if (offset + page.items.length >= page.total || !page.items.length) break;
   }
@@ -69,11 +75,25 @@ export function researchCorpusInventory(): { documents: ResearchCorpusDocument[]
   }
   const rows = getDb().prepare('SELECT collection_key,name,parent_key FROM collections').all() as { collection_key: string; name: string; parent_key: string | null }[];
   const members = getDb().prepare('SELECT collection_key,nodus_id FROM work_collections').all() as { collection_key: string; nodus_id: string }[];
+  // Grouped once, in the order the scans below used to produce: filtering every membership
+  // row and then every document for each collection was ~370M comparisons on a
+  // 14k-work library with 945 collections, freezing the main process for minutes.
+  const membersByCollection = new Map<string, string[]>();
+  for (const member of members) {
+    const list = membersByCollection.get(member.collection_key);
+    if (list) list.push(member.nodus_id); else membersByCollection.set(member.collection_key, [member.nodus_id]);
+  }
+  const documentIdsByWork = new Map<string, string[]>();
+  for (const document of documents) {
+    if (!document.workId) continue;
+    const list = documentIdsByWork.get(document.workId);
+    if (list) list.push(document.id); else documentIdsByWork.set(document.workId, [document.id]);
+  }
   for (const row of rows) {
     const match = /^groups:([^:]+):(.+)$/.exec(row.collection_key);
     collections.push({ reference: { kind: 'zotero-collection', id: match?.[2] ?? row.collection_key, libraryType: match ? 'group' : 'user', libraryId: match?.[1] ?? userId },
       name: row.name, parentId: row.parent_key?.replace(/^groups:[^:]+:/, '') ?? null, origin: 'zotero',
-      documentIds: members.filter(member => member.collection_key === row.collection_key).flatMap(member => documents.filter(document => document.workId === member.nodus_id).map(document => document.id)) });
+      documentIds: (membersByCollection.get(row.collection_key) ?? []).flatMap(workId => documentIdsByWork.get(workId) ?? []) });
   }
   const vaultZoteroKeys = new Set(rows.map(row => row.collection_key.replace(/^groups:[^:]+:/, '')));
   for (const { collection } of zoteroMirrors) {

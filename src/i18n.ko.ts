@@ -4,9 +4,11 @@ import { RESEARCH_NOTEBOOK_TRANSLATIONS } from './i18n.researchNotebooks';
 import { CALENDAR_SYNC_TRANSLATIONS } from './i18n.calendarSync';
 import { ACADEMIC_MANUAL_TRANSLATIONS } from './i18n.academicManual';
 import { STUDY_SOURCE_TRANSLATIONS } from './i18n.studySources';
+import { COMPLETE_GUIDE_TRANSLATIONS } from './i18n.completeGuide';
 import { STUDY_FOCUS_TRANSLATIONS } from './i18n.studyFocus';
 import { STUDY_NOTE_LINKS_TRANSLATIONS } from './i18n.studyNoteLinks';
 import { CONCILIUM_TRANSLATIONS } from './i18n.concilium';
+import { DRIFT_TRANSLATIONS } from './i18n.drift';
 import { RESEARCH_ATTACHMENT_TRANSLATIONS } from './i18n.researchAttachments';
 import { VAULT_FILE_DROP_TRANSLATIONS } from './i18n.vaultFileDrop';
 import { DOCUMENT_SKILLS_TRANSLATIONS } from './i18n.documentSkills';
@@ -67,6 +69,7 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
+import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
 import { ADAPTIVE_CONCURRENCY_TRANSLATIONS } from './i18n.adaptiveConcurrency';
 import { DATABASE_DEEP_RESEARCH_TRANSLATIONS } from './i18n.databaseDeepResearch';
@@ -115,6 +118,7 @@ export const KO: Record<string, string> = {
   ...TEACHING_ATTENDANCE_TRANSLATIONS.ko,
   ...GRAPH_HEALTH_TRANSLATIONS.ko,
   ...STUDY_SOURCE_TRANSLATIONS["ko"],
+  ...COMPLETE_GUIDE_TRANSLATIONS["ko"],
   ...STUDY_FOCUS_TRANSLATIONS["ko"],
   ...STUDY_NOTE_LINKS_TRANSLATIONS["ko"],
   ...STUDY_IMPROVE_TRANSLATIONS.ko,
@@ -156,6 +160,7 @@ export const KO: Record<string, string> = {
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.ko,
   ...STALE_MODEL_TRANSLATIONS.ko,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.ko,
+  ...TEXT_PROVENANCE_TRANSLATIONS.ko,
   ...MODEL_SETTINGS_TRANSLATIONS.ko,
   ...ADAPTIVE_CONCURRENCY_TRANSLATIONS.ko,
   ...DATABASE_DEEP_RESEARCH_TRANSLATIONS.ko,
@@ -8225,4 +8230,5 @@ export const KO: Record<string, string> = {
   "Ask the model to fix the failed steps": "실패한 단계를 수정하도록 모델에 요청하세요",
   "Sent": "전송됨",
   ...CONCILIUM_TRANSLATIONS['ko'],
+  ...DRIFT_TRANSLATIONS['ko'],
 };

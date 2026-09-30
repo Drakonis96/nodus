@@ -15,6 +15,7 @@ import { normalizeDeepResearchApproach } from '@shared/deepResearchApproaches';
 import { getDb } from './database';
 import { deleteDecorativeImageRow, getDecorativeImage } from './decorativeImagesRepo';
 import { deleteAnnotationsForWritingDraft } from './writingAnnotationsRepo';
+import { deleteCompleteGuideArtifacts } from './completeGuideRepo';
 import { relabelSavedDraft } from '../citations/liveCitations';
 
 interface SavedWritingDraftRow {
@@ -264,6 +265,7 @@ export function deleteWritingWorkshopDraft(id: string): boolean {
   deleteDocumentVisuals(getActiveVault().id, { kind: 'deep-research', id });
   deleteDecorativeImageRow('deep_research', id);
   deleteAnnotationsForWritingDraft(id);
+  deleteCompleteGuideArtifacts(id);
   // Before the report, so a mark can never be left pointing at nothing.
   getDb().prepare('DELETE FROM writing_draft_reads WHERE draft_id = ?').run(id);
   return getDb().prepare('DELETE FROM writing_saved_drafts WHERE id = ?').run(id).changes > 0;

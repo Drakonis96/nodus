@@ -1,8 +1,11 @@
 import { currentResearchRequestBudget, researchPromptUpperBound } from './researchRequestBudget';
+import { documentedContextWindow } from '@shared/providerContextWindows';
 import { withJobThinking } from './thinkingEffort';
 import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
 import { documentVisualPlanningPrompt } from './documentVisualContext';
+import { jobOutputLanguage } from './jobOutputLanguage';
+import { recordProviderUsage } from './usageMeter';
 import { excludeInvisibleArtifacts } from '../capabilities/modelHistory';
 import { getApiKey } from '../secrets/secretStore';
 import {
@@ -80,7 +83,7 @@ import {
   parseGeminiBatchEmbeddingResponse,
 } from './geminiEmbeddings';
 import { completeGeminiDeterministicJson } from './geminiDeterministicCompletion';
-import { withTransportDeadline } from './transportDeadline';
+import { withIdleTransportDeadline, withTransportDeadline } from './transportDeadline';
 import {
   buildLocalRequestPlan,
   recordLocalAiDiagnostic,
@@ -396,6 +399,8 @@ function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
  * finite because a wedged local server must not hold the scan queue open forever.
  */
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
+/** The outer bound on one streamed answer; the stream's own deadline is idle time. */
+const STREAM_TOTAL_MS = 30 * 60_000;
 const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
 /**
@@ -749,7 +754,7 @@ function outputLanguageDirective(lang: PromptLanguage): string {
 /** Exported for unit testing: appends the output-language directive per the current
  *  `promptLanguage` setting without mutating the base prompt. */
 export function withPromptLanguage<T extends { system: string; englishImagePrompts?: boolean }>(opts: T): T {
-  const lang = getSettings().promptLanguage ?? 'es';
+  const lang = jobOutputLanguage() ?? getSettings().promptLanguage ?? 'es';
   const toolException = opts.englishImagePrompts ? '\nIMAGE TOOL PROTOCOL EXCEPTION: In nodus-image JSON requests, the prompt field is an internal production instruction and MUST be written in English. Visible prose, title and alt still follow the output language above. Keep JSON keys and aspect-ratio values unchanged.' : '';
   return { ...opts, system: `${opts.system}${outputLanguageDirective(lang)}${toolException}` };
 }
@@ -765,7 +770,7 @@ export function withPromptLanguage<T extends { system: string; englishImagePromp
 export function withVaultTypeContext<T extends { system: string }>(opts: T): T {
   let pack = '';
   try {
-    pack = vaultTypePromptPack(getActiveVault().type, getSettings().promptLanguage ?? 'es');
+    pack = vaultTypePromptPack(getActiveVault().type, jobOutputLanguage() ?? getSettings().promptLanguage ?? 'es');
   } catch {
     pack = '';
   }
@@ -828,11 +833,25 @@ export async function researchModelContextWindow(model: ModelRef): Promise<{ tok
   if (local) return { tokens: local, known: true };
   const advertised = cachedModelContextWindow(model.provider, model.model);
   if (advertised) return { tokens: advertised, known: true };
-  // Official direct endpoint model contract, verified 2026-09-23:
-  // https://api-docs.deepseek.com/quick_start/pricing/
-  if (model.provider === 'deepseek' && model.model === 'deepseek-flash') return { tokens: 1000000, known: true };
+  // Exact provider/model contracts for catalogues that omit token limits.
+  const documented = documentedContextWindow(model.provider, model.model);
+  if (documented) return { tokens: documented, known: true };
   return { tokens: 32768, known: false };
 }
+/** Byte sizes of a request's parts, largest payload fields first, for the overflow log. */
+function requestSizeBreakdown(opts: CallOpts): string {
+  const bytes = (text: string) => new TextEncoder().encode(text).length;
+  const parts = [`system ${bytes(opts.system)}`, `user ${bytes(opts.user)}`, `output ${opts.maxTokens ?? 8000}`];
+  try {
+    const payload = JSON.parse(opts.user) as Record<string, unknown>;
+    const fields = Object.entries(payload).map(([key, value]) => [key, bytes(JSON.stringify(value) ?? '')] as const).sort((a, b) => b[1] - a[1]).slice(0, 8);
+    parts.push(`user fields: ${fields.map(([key, size]) => `${key}=${size}`).join(', ')}`);
+  } catch {
+    /* A plain-text user message has no fields to break down. */
+  }
+  return parts.join('; ');
+}
+
 async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise<void> {
   const active = currentResearchRequestBudget();
   if (!active && !opts.corpusContext) return;
@@ -840,6 +859,8 @@ async function assertCorpusRequestFits(model: ModelRef, opts: CallOpts): Promise
   const window = Math.min(effective.tokens, active?.window ?? Infinity);
   const needed = researchPromptUpperBound(opts.system, opts.user, opts.maxTokens ?? 8000);
   if (needed > window) {
+    // Say what is large: the generic message a cloud model gets carries no numbers.
+    console.warn(`[research] request refused before sending: needs ~${needed} (bytes as tokens) > window ${window} for ${model.provider}/${model.model}; ${requestSizeBreakdown(opts)}`);
     active?.onOverflow();
     throw new AiError(isLocalProvider(model.provider) || model.provider === 'nodus'
       ? contextOverflowMessage(model.provider, model.model, window, needed) : genericContextOverflowMessage(), false, true, 'context_overflow');
@@ -1396,6 +1417,7 @@ async function rawCompleteTransport(
           images: opts.images,
         }));
       if (result.headers) observeProviderQuota(model, opts, key, endpoint, result.headers);
+      recordProviderUsage(model, result.inputTokens ?? null, result.outputTokens ?? null);
       perfLogNs('AI response metadata', 0n, opts.perf, {
         provider: model.provider,
         model: model.model,
@@ -1507,6 +1529,7 @@ async function rawCompleteTransport(
         timestamp: Date.now(),
       });
     }
+    recordProviderUsage(model, Number((res as any).usage?.prompt_tokens) || null, Number((res as any).usage?.completion_tokens) || null);
     perfLogNs('AI response metadata', 0n, opts.perf, {
       provider: model.provider,
       model: model.model,
@@ -2185,10 +2208,14 @@ async function rawCompleteStreamTransport(
   // The last chunk's `finish_reason` is the only truncation signal on this transport; capture it
   // so a stream cut at the output ceiling is reported instead of silently stored as the answer.
   let finishReason: string | undefined;
+  let streamChunks = 0;
+  let streamReasoningChars = 0;
+  const streamStarted = Date.now();
   const consumeStream = async (
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
     transportSignal: AbortSignal,
+    touch: () => void = () => {},
   ): Promise<void> => {
     const contentBefore = full.length;
     try {
@@ -2203,9 +2230,12 @@ async function rawCompleteStreamTransport(
           }
           throw new AiError(msg, false);
         }
+        touch();
         const choice = chunk?.choices?.[0];
         if (choice?.finish_reason) finishReason = choice.finish_reason;
         const delta = choice?.delta;
+        streamChunks += 1;
+        streamReasoningChars += String(delta?.reasoning ?? delta?.reasoning_content ?? '').length;
         emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
         emitContent(delta?.content);
       }
@@ -2216,14 +2246,17 @@ async function rawCompleteStreamTransport(
       throw error;
     }
   };
-  const executeStream = (body: any) => withTransportDeadline(
+  // Idle, not total: a reasoning stream that keeps sending chunks is working, however long it
+  // thinks. STREAM_TOTAL_MS still bounds a provider that never finishes.
+  const executeStream = (body: any) => withIdleTransportDeadline(
     streamTimeoutMs,
+    Math.max(streamTimeoutMs, STREAM_TOTAL_MS),
     signal ?? opts.signal,
-    (transportSignal) => model.provider === 'nodus'
+    (transportSignal, touch) => model.provider === 'nodus'
       ? withNodusLocalServerLease(model.model, 'chat', (apiUrl) => consumeStream(new OpenAI({
           apiKey: key, baseURL: apiUrl, timeout: streamTimeoutMs, maxRetries: 0,
-        }), body, transportSignal))
-      : consumeStream(client, body, transportSignal),
+        }), body, transportSignal, touch))
+      : consumeStream(client, body, transportSignal, touch),
   );
   /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
   const replayStream = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
@@ -2279,7 +2312,12 @@ async function rawCompleteStreamTransport(
   if (/^(length|max_tokens|max_output_tokens)$/i.test(finishReason ?? '')) {
     throw new AiError(truncatedOutputMessage(model, maxTokens), false, false, 'output_truncated');
   }
-  if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  if (!answer.trim()) {
+    // Say what came back: a stream that ended after reasoning only, with no finish reason, reads
+    // the same to the user as an outage (hard synthesis routes on deepseek-flash, thinking high).
+    console.error(`[compat-stream] empty answer finish_reason=${finishReason ?? 'none'} chunks=${streamChunks} reasoning_chars=${streamReasoningChars} max_tokens=${maxTokens} elapsed_ms=${Date.now() - streamStarted} model=${model.provider}/${model.model}`);
+    throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  }
   return answer;
 }
 

@@ -17,6 +17,13 @@ const server = createServer((request, response) => {
     request.socket.destroy();
     return;
   }
+  if (mode === 'hang') return;
+  if (mode === 'missing') {
+    response.statusCode = 404;
+    response.setHeader('Last-Modified-Version', '91');
+    response.end('{}');
+    return;
+  }
   if (mode === 'unauthorized') {
     response.statusCode = 401;
     response.end('{}');
@@ -78,6 +85,19 @@ try {
   requests = 0;
   await assert.rejects(client.libraries(), (error) => error.code === 'credentials-expired' && error.retryable === false);
   assert.equal(requests, 1, 'a failed group-library inventory never degrades to a falsely complete personal-only list');
+
+  mode = 'missing'; requests = 0;
+  await assert.rejects(client.libraryVersion('0'), error => error.code === 'library-missing');
+  assert.equal(requests, 1, 'even a version header cannot make a missing library authoritative');
+
+  mode = 'hang'; requests = 0;
+  const started = Date.now();
+  const presence = await client.itemPresenceDetails('0', 'HANG0001', {
+    budget: { remaining: 1 }, libraries: new Map(), signal: AbortSignal.timeout(100),
+  });
+  assert.equal(presence.presence, 'unknown');
+  assert.equal(requests, 1, 'a stalled request stops at the deadline without retrying');
+  assert.ok(Date.now() - started < 2_000, 'a stalled Zotero cannot leave the removal worker waiting indefinitely');
 
   mode = 'closed'; requests = 0;
   await assert.rejects(client.libraryVersion('0'), (error) => error.code === 'zotero-closed' && error.retryable === true);

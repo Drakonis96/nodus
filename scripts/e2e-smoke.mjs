@@ -1147,8 +1147,8 @@ try {
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
-  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all nine tools in alphabetical order');
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-drift', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
+  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all ten tools in alphabetical order');
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();

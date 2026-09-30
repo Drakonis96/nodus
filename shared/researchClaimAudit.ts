@@ -109,6 +109,10 @@ export function researchProseSpans(markdown: string): Array<{ start: number; end
   for (const match of masked.matchAll(/\n+|[ \t]+(?=[\p{Lu}¿¡“«])/gu)) {
     if (match[0].startsWith('\n')) { boundaries.push({ index: match.index!, length: match[0].length }); continue; }
     if (depth[match.index!] > 0) continue;
+    // "1. Check the temperature" is one sentence: the ordinal is a list marker, and a marker
+    // cut off as a sentence of its own is removed with the sentences the audit rejects.
+    const lineStart = masked.lastIndexOf('\n', match.index! - 1) + 1;
+    if (/^[ \t]*\d{1,3}[.)]$/u.test(masked.slice(lineStart, match.index!))) continue;
     let before = match.index! - 1;
     while (before >= 0 && (masked[before] === '·' || masked[before] === ' ' || masked[before] === '\t')) before--;
     if (before >= 0 && '.!?。！？'.includes(masked[before])) boundaries.push({ index: match.index!, length: match[0].length });

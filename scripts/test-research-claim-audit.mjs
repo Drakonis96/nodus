@@ -65,6 +65,10 @@ try {
   assert.ok(unavailable.claims.every(claim => claim.status === 'unverified'));
   assert.equal(unavailable.markdown, '', 'judge failure cannot retain unverified factual prose');
   assert.equal(researchProseSpans('A fact [Doe, N. (2020)](nodus://passage/inside). Another fact.').length, 2, 'author initials cannot bypass sentence auditing');
+  // A numbered step is one sentence; its ordinal is not a sentence of its own that the audit can strike out.
+  assert.deepEqual(researchProseSpans('Pasos:\n1. Comprueba la temperatura. Anota el valor.\n2. Sustituye los datos.\n\n10) Cierra el cálculo.').map((span) => span.text),
+    ['Pasos:', '1. Comprueba la temperatura.', 'Anota el valor.', '2. Sustituye los datos.', '10) Cierra el cálculo.']);
+  assert.equal(researchProseSpans('En 1898. Entonces cayó el imperio.').length, 2, 'a sentence that ends in a number is still a sentence');
   assert.equal(researchProseSpans('A fact. [Doe, N. (2020)](nodus://passage/inside) [Roe](nodus://passage/x) Another fact.').length, 2,
     'citations appended after final punctuation still end the sentence, so audited prose can be segmented again');
   // Live regression: a nested-quantifier lookbehind backtracked exponentially over

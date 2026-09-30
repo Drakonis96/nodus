@@ -53,6 +53,8 @@ const PROBES = [
   { query: 'factores de la represión franquista en la posguerra', category: 'general' },
   { query: 'plazos de aplicación del Reglamento europeo de inteligencia artificial', category: 'general' },
   { query: 'historiografía memoria colectiva Halbwachs', category: 'science' },
+  // Complete study guides' optional web images (Wikimedia Commons only).
+  { query: 'phase diagram water', category: 'images' },
 ];
 
 const failures = [];

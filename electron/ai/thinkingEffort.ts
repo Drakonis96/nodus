@@ -37,8 +37,13 @@ export function thinkingOutputAllowance(model: ModelRef, effort: ResearchEffort,
   // DeepSeek's effort is not a token cap. Flash used 5,420 reasoning tokens at
   // low in a real JSON review, exhausting the old 1,024-token reserve and cutting
   // off the answer. Reserve room before the first request; retries stay invariant.
+  // High reasoned past a 16,384 reserve on multistep synthesis routes (tropinone, the
+  // Wieland–Miescher ketone), and camphor from α-pinene past 32,768: the answer was cut off
+  // before it began. Flash and V4 Pro allow up
+  // to 384K output tokens (api-docs.deepseek.com, checked 2026-09-29); the reserve is a ceiling,
+  // not a spend.
   if (model.provider === 'deepseek') {
-    return ({ low: 8192, high: 16384, max: 32768 } as Partial<Record<NativeResearchEffort, number>>)[native ?? 'none'] ?? researchThinkingAllowance(native);
+    return ({ low: 8192, high: 65536, max: 131072 } as Partial<Record<NativeResearchEffort, number>>)[native ?? 'none'] ?? researchThinkingAllowance(native);
   }
   // Adaptive thinking is always on, so its reserve stands in for the `budget_tokens` the
   // manual mode would otherwise cap at a much smaller number.

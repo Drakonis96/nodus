@@ -27,6 +27,7 @@ import type { RadarApi } from './api/radar';
 import type { ReactionIndexApi } from './api/reactionIndex';
 import type { CompassApi } from './api/compass';
 import type { LogsApi } from './api/logs';
+import type { DriftApi } from './api/drift';
 import type { LibraryAttachmentRecord } from './libraryTypes';
 import type { ToolkitToolPage } from './toolkitNavigation';
 
@@ -7180,6 +7181,8 @@ export interface WritingWorkshopBrief {
   deepResearchApproach?: import('./deepResearchApproaches').DeepResearchApproach;
   /** Deep Research engine used for this request. Missing on historical drafts. */
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
+  /** Study vaults: which kind of report this is. Missing means the retrieval-based report. */
+  studyReportMode?: 'research' | 'complete_guide';
 }
 
 export interface WritingWorkshopSelection {
@@ -7364,6 +7367,8 @@ export interface WritingWorkshopDraft {
   supportAudit?: SupportAuditEntry[];
   /** Reproducible quality signals shared by every Deep Research variant. */
   qualityAssessment?: import('./deepResearchQuality').DeepResearchQualityAssessment;
+  /** Complete study guides only: configuration, coverage and the review sheet. */
+  completeGuide?: import('./completeGuide/types').CompleteGuideDraftMeta;
   stats: {
     selectedIdeas: number;
     selectedThemes: number;
@@ -7391,6 +7396,8 @@ export interface WritingWorkshopExportRequest {
   format?: WritingWorkshopExportFormat;
   /** Saved Deep Research id, used only to include its ready decorative image in PDF exports. */
   entityId?: string;
+  /** Complete study guides: export only the review sheet. */
+  part?: 'full' | 'cheatsheet';
 }
 
 /**
@@ -7405,6 +7412,8 @@ export interface DeepResearchArchiveRequest {
   ids: string[];
   /** Defaults to `'markdown'` when omitted — the only format that costs nothing to render. */
   format?: DeepResearchArchiveFormat;
+  /** Complete study guides: also write each guide's review sheet as its own file. */
+  includeCheatSheets?: boolean;
 }
 
 export interface DeepResearchArchiveResult {
@@ -7594,6 +7603,12 @@ export interface DeepResearchRequest {
    * keep them as the throughline. Ignored outside the genealogy pipeline.
    */
   focusPersonId?: string | null;
+  /**
+   * Study vaults only: write a "Guía de estudio completa" from exactly these sources,
+   * read in full, instead of a retrieval-based study report. Present with an empty
+   * selection is an error, never a fallback to the whole vault.
+   */
+  completeGuide?: import('./completeGuide/types').CompleteGuideConfig;
 }
 
 /** One live progress event emitted while a report is being orchestrated. */
@@ -7607,6 +7622,10 @@ export interface DeepResearchProgress {
   sectionTitle?: string;
   wordsSoFar?: number;
   pagesSoFar?: number;
+  /** Complete study guides: the pass in progress and its own counter. */
+  stage?: 'recon' | 'extract' | 'plan' | 'write' | 'verify' | 'finalize';
+  done?: number;
+  total?: number;
 }
 
 export type DeepResearchJobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
@@ -7633,6 +7652,8 @@ export interface DeepResearchJobRecord {
   deepResearchVersion?: import('./deepResearchVersions').DeepResearchVersion;
   /** Requested visible structure, available while the report is still queued. */
   structure?: 'sectioned' | 'single';
+  /** Study vaults: a complete study guide rather than a retrieval-based report. */
+  studyReportMode?: 'research' | 'complete_guide';
   /** Requested guideline words per section. Missing on jobs queued before the control existed. */
   sectionLength?: import('./deepResearchSectionLength').DeepResearchSectionLength;
   /** Exact model selection captured when the job was enqueued, when one was explicit. */
@@ -7729,6 +7750,10 @@ export interface DeepResearchMeta {
 export interface DeepResearchReport {
   draft: WritingWorkshopDraft;
   meta: DeepResearchMeta;
+  /** Complete study guides: the evidence sidecar, stored locally once the draft is saved. */
+  completeGuideArtifacts?: unknown;
+  /** Complete study guides: figures from the materials, seeded into the saved guide. */
+  completeGuideFigures?: { figures: import('./completeGuide/figures').CompleteGuideFigure[]; siblings: Record<string, string[]> };
 }
 
 export interface DeepResearchStreamHandlers {
@@ -9244,7 +9269,7 @@ export interface BrowserApi {
   onBrowserFoundInPage(cb: (result: { requestId: number; activeMatchOrdinal: number; matches: number; selectionArea: unknown; finalUpdate: boolean }) => void): () => void;
 }
 
-export interface NodusApi extends StudyFocusApi, ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi {
+export interface NodusApi extends StudyFocusApi, ProsopographyApi, TestimoniesApi, ToolkitApi, TeachingApi, DatabasesApi, PagesApi, PrimarySourcesApi, ArchiveApi, WorldbuildingApi, PlatformApi, RecordsApi, AcademicApi, LibraryApi, RadarApi, ReactionIndexApi, CompassApi, BrowserApi, LogsApi, DriftApi {
   // settings + secrets
   getSettings(): Promise<AppSettings>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;

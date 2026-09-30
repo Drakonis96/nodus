@@ -27,6 +27,7 @@ import type {
 } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { runIsolatedGitHubCopilotCompletion } from './githubCopilotCompletion';
+import { rememberModelContextWindows } from './modelContextCache';
 
 interface CompletionOptions {
   model: string;
@@ -329,6 +330,9 @@ async function copilotModels(): Promise<CopilotModelInfo[]> {
       throw new ProviderRuntimeError('Conecta primero tu cuenta de GitHub Copilot en Proveedores y modelos.', 'auth');
     }
     const models = await runtime.listModels();
+    rememberModelContextWindows('github-copilot', models.map(model => ({
+      id: model.id, contextLength: model.capabilities?.limits?.max_context_window_tokens,
+    })));
     modelCache = models;
     modelCacheAt = Date.now();
     return models;

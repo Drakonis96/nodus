@@ -1,4 +1,5 @@
 import { redactStructured, redactText } from './redact.mjs';
+import { documentedContextWindow } from '../core/generated/providerContextWindows.mjs';
 
 const CAPABILITIES = new Set([
   'assistant', 'nodi', 'content-query', 'deep-research', 'database-deep-research', 'dictionary', 'idea-analysis',
@@ -83,7 +84,12 @@ function normalizeModelCatalog(provider, value) {
     if (provider === 'gemini' && !(entry?.supportedGenerationMethods ?? []).includes('generateContent')) return [];
     if (provider === 'openai' && exclude.test(id)) return [];
     const name = String(entry?.display_name ?? entry?.displayName ?? entry?.name ?? id).slice(0, 300);
-    const contextLength = Number(entry?.context_window ?? entry?.max_context_length ?? entry?.context_length);
+    const advertised = [entry?.context_window, entry?.max_context_length, entry?.context_length, entry?.max_model_len,
+      entry?.max_input_tokens, entry?.inputTokenLimit].find(limit => Number.isSafeInteger(limit) && limit >= 1024);
+    const routeLimit = entry?.top_provider?.context_length;
+    const contextLength = provider === 'openrouter' && Number.isSafeInteger(routeLimit) && routeLimit >= 1024
+      ? Math.min(advertised ?? Infinity, routeLimit)
+      : advertised ?? documentedContextWindow(provider, id);
     const supported = Array.isArray(entry?.supported_parameters) ? entry.supported_parameters : [];
     const inputModalities = Array.isArray(entry?.architecture?.input_modalities) ? entry.architecture.input_modalities : [];
     return [{
