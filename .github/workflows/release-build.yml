@@ -119,6 +119,23 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
 
+      # v5.7.3's build-only Drift verifier passed POSIX paths to Windows ASAR.
+      # Recover the immutable tag with the corrected verifier from this exact
+      # workflow commit. Neither this script nor the checkout enters the app.
+      - name: Checkout v5.7.3 Windows packaging verifier
+        if: matrix.asset-platform == 'win' && inputs.tag == 'v5.7.3'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+          sparse-checkout: scripts/verify-drift-assets.mjs
+          sparse-checkout-cone-mode: false
+          persist-credentials: false
+
+      - name: Apply v5.7.3 Windows packaging verifier
+        if: matrix.asset-platform == 'win' && inputs.tag == 'v5.7.3'
+        run: node -e "require('node:fs').copyFileSync('.release-tools/scripts/verify-drift-assets.mjs', 'scripts/verify-drift-assets.mjs')"
+
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
