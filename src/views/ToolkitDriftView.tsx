@@ -102,12 +102,12 @@ export function ToolkitDriftView({ onBack, settings }: { onBack: () => void; set
             <p>{t('Sonidos para leer, estudiar y descansar')}</p>
           </section>
           <section className="drift-catalog" aria-label={t('Sonidos')}>
-            {drift.filter !== 'presets' && <div className="drift-search">
+            <div className="drift-search">
               <Icon name="search" size={17} />
-              <input type="search" data-testid="drift-search" aria-label={t('Buscar sonidos')} placeholder={t('Buscar sonidos')}
+              <input type="search" data-testid="drift-search" aria-label={drift.filter === 'presets' ? t('Buscar predefinidos') : t('Buscar sonidos')} placeholder={drift.filter === 'presets' ? t('Buscar predefinidos') : t('Buscar sonidos')}
                 value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setQuery(''); }} />
               {query && <button type="button" aria-label={t('Limpiar búsqueda')} title={t('Limpiar búsqueda')} onClick={() => setQuery('')}><Icon name="x" size={16} /></button>}
-            </div>}
+            </div>
             <div role="group" aria-label={t('Filtrar sonidos')} className="drift-filters">
               {filters.map((filter) => <button key={filter.id} type="button" data-testid={`drift-filter-${filter.id}`}
                 aria-pressed={drift.filter === filter.id} onClick={() => { drift.setFilter(filter.id); if (filter.id === 'active') setQuery(''); }}>
@@ -164,7 +164,7 @@ export function ToolkitDriftView({ onBack, settings }: { onBack: () => void; set
             </p>
           )}
 
-            {drift.filter === 'presets' ? <DriftPresets onEdit={setPresetEditor} onApplied={() => setQuery('')} /> : drift.filter === 'active' ? (
+            {drift.filter === 'presets' ? <DriftPresets query={query} onEdit={setPresetEditor} onApplied={() => setQuery('')} /> : drift.filter === 'active' ? (
               activeVoices.length > 0 ? <ul data-testid="drift-active-grid" className="drift-grid drift-active-grid">{activeVoices.map((voice) => <DriftActiveVoice key={voice.id} voice={voice} />)}</ul>
                 : <p role="status" data-testid="drift-active-empty" className="drift-empty">{search ? t('Sin resultados') : t('Elige uno o varios sonidos para crear tu mezcla.')}</p>
             ) : operative.length > 0 && <ul data-testid="drift-grid" className="drift-grid">{operative.map(renderCard)}</ul>}

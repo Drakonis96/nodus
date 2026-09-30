@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { normalizeDriftSearch } from '@shared/drift';
 import { Icon, ModalBackdrop } from '../ui';
 import { t, tx } from '../../i18n';
 import { useDrift } from './DriftProvider';
@@ -10,12 +11,15 @@ export const DRIFT_PRESET_ICON_OPTIONS: Array<{ icon: DriftPresetIcon; label: st
   { icon: 'coffee', label: 'Cafetería' }, { icon: 'waves', label: 'Olas' }, { icon: 'star', label: 'Favorito' },
 ];
 
-export function DriftPresets({ onEdit, onApplied }: { onEdit: (preset: DriftPreset) => void; onApplied: () => void }) {
+export function DriftPresets({ query, onEdit, onApplied }: { query: string; onEdit: (preset: DriftPreset) => void; onApplied: () => void }) {
   const drift = useDrift();
+  const search = normalizeDriftSearch(query);
+  const presets = drift.presets.filter((preset) => !search || normalizeDriftSearch(preset.name).includes(search));
   return <section className="drift-presets" aria-label={t('Predefinidos')}>
     <p className="drift-presets-hint">{t('Los predefinidos guardan los sonidos y sus volúmenes. Al cargarlos, la mezcla queda en pausa.')}</p>
     {drift.presets.length === 0 ? <p data-testid="drift-presets-empty" className="drift-empty">{t('Crea una mezcla y guárdala para recuperarla aquí.')}</p>
-      : <ul className="drift-grid drift-preset-grid">{drift.presets.map((preset) => <li key={preset.id} className="drift-sound-card drift-preset-card" data-testid={`drift-preset-${preset.id}`}>
+      : presets.length === 0 ? <p role="status" data-testid="drift-presets-no-results" className="drift-empty">{t('Sin resultados')}</p>
+      : <ul className="drift-grid drift-preset-grid">{presets.map((preset) => <li key={preset.id} className="drift-sound-card drift-preset-card" data-testid={`drift-preset-${preset.id}`}>
         <button type="button" className="drift-sound-toggle" data-testid={`drift-preset-load-${preset.id}`} aria-label={tx('Cargar {name}', { name: preset.name })}
           onClick={() => { drift.applyPreset(preset.id); onApplied(); }}>
           <Icon name={preset.icon} size={30} className="drift-sound-icon" /><strong className="drift-sound-name">{preset.name}</strong>

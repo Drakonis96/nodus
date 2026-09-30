@@ -22,6 +22,7 @@
 //   node scripts/e2e-drift.mjs                              against the working tree (dist/ + dist-electron/)
 //   NODUS_E2E_EXECUTABLE=<app binary> node scripts/e2e-drift.mjs   against a packaged build
 //   NODUS_E2E_AUDIBLE=1 ...                                 let the speakers play the (quiet) mix
+//   node scripts/e2e-drift.mjs --preview                    open Drift for manual review, with real sounds and audio enabled
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
@@ -37,7 +38,8 @@ import { buildDriftFixtures } from './drift-fixtures.mjs';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const packagedExecutable = process.env.NODUS_E2E_EXECUTABLE || '';
-const audible = process.env.NODUS_E2E_AUDIBLE === '1';
+const manualPreview = process.argv.includes('--preview');
+const audible = manualPreview || process.env.NODUS_E2E_AUDIBLE === '1';
 const screenshotDirectory = process.env.NODUS_E2E_DRIFT_SCREENSHOTS || '';
 
 if (!packagedExecutable && (!existsSync(path.join(repoRoot, 'dist-electron/main.js')) || !existsSync(path.join(repoRoot, 'dist/index.html')))) {
@@ -370,10 +372,36 @@ const browserTarget = (fn, arg) => app.evaluate(async ({ webContents }, [source,
   return target.executeJavaScript(`(${source})(${JSON.stringify(argument ?? null)})`, true);
 }, [fn.toString(), arg]);
 
+async function previewDrift() {
+  // A human preview must never inherit the automated suite's mute switch or corrupt-file fixtures.
+  delete childEnv.NODUS_E2E_DRIFT_FIXTURES;
+  await new Promise((resolve) => server.close(resolve));
+  await launch();
+  await call('updateSettings', { appTheme: 'deep-ocean', theme: 'dark', autoBackupEnabled: false, autoBackupFolder: '', autoResumeQueue: false, reduceMotion: false });
+  await page.reload();
+  await openDrift();
+  await page.getByTestId('drift-card-light-rain').waitFor();
+  const settings = await call('getSettings');
+  assert.equal(settings.autoBackupEnabled, false);
+  assert.equal(settings.autoBackupFolder, '');
+  const output = await app.evaluate(({ app, BrowserWindow }) => ({
+    mutedAtLaunch: app.commandLine.hasSwitch('mute-audio'),
+    windowMuted: BrowserWindow.getAllWindows().find((win) => win.webContents.getURL().includes('index.html')).webContents.isAudioMuted(),
+  }));
+  assert.deepEqual(output, { mutedAtLaunch: false, windowMuted: false });
+  assert.equal((await signal(100)).created, 0, 'opening a manual preview does not start playback');
+  await app.evaluate(({ app, BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((entry) => entry.webContents.getURL().includes('index.html'));
+    win.maximize(); win.show(); win.focus(); app.focus({ steal: true });
+  });
+  console.log(`[drift-preview] READY ${profile} (audio enabled; backups disabled)`);
+  await new Promise((resolve) => app.process().once('exit', resolve));
+}
+
 /* ------------------------------------------------------------------------ run */
 
 let flowStartedAt = 0;
-try {
+async function runAutomatedChecks() {
   await launch({ secondVault: true });
 
   // ── 1. Nodus Tools ────────────────────────────────────────────────────────
@@ -943,6 +971,11 @@ try {
     await capture('drift-electron-light.png');
     console.log(`[e2e-drift] screenshots: ${screenshotDirectory}`);
   }
+}
+
+try {
+  if (manualPreview) await previewDrift();
+  else await runAutomatedChecks();
 } finally {
   await closeApp();
   await new Promise((resolve) => server.close(resolve));
@@ -954,4 +987,4 @@ if (failures.length > 0) {
   for (const name of failures) console.error(`  - ${name}`);
   process.exit(1);
 }
-console.log(`\n[e2e-drift] all ${checks} checks passed${packagedExecutable ? ` (packaged: ${packagedExecutable})` : ''}`);
+if (!manualPreview) console.log(`\n[e2e-drift] all ${checks} checks passed${packagedExecutable ? ` (packaged: ${packagedExecutable})` : ''}`);

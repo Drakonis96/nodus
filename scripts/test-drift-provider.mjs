@@ -619,6 +619,34 @@ test('Active shows paused and failed voices, clears a stale search and keeps vol
   await act(async () => env.root.unmount());
 });
 
+test('preset search remains available when empty and filters names without accents or case without starting audio', async () => {
+  for (const presets of [[], [
+    { id: 'reading', name: 'Lectúra', icon: 'bookOpen', selection: ['brown-noise'], volumes: { 'brown-noise': 0.4 }, master: 0.5 },
+    { id: 'night', name: 'Noche', icon: 'moon', selection: ['white-noise'], volumes: { 'white-noise': 0.3 }, master: 0.5 },
+  ]]) {
+    const env = environment({ stored: savedMix({ selection: [], filter: 'presets', presets }) });
+    await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));
+    const search = env.q('[data-testid="drift-search"]');
+    assert.ok(search, 'the search bar is present even without saved presets');
+    assert.equal(search.getAttribute('placeholder'), 'Buscar predefinidos');
+    await env.input(search, 'LECTURA');
+    if (!presets.length) {
+      assert.ok(env.q('[data-testid="drift-presets-empty"]'));
+    } else {
+      assert.ok(env.q('[data-testid="drift-preset-reading"]'));
+      assert.equal(env.q('[data-testid="drift-preset-night"]'), null);
+      await env.input(search, 'no match');
+      assert.ok(env.q('[data-testid="drift-presets-no-results"]'));
+      assert.equal(env.qa('.drift-preset-card').length, 0);
+      await env.click(env.q('button[aria-label="Limpiar búsqueda"]'));
+      assert.equal(search.value, '');
+      assert.equal(env.qa('.drift-preset-card').length, 2);
+    }
+    assert.equal(env.contexts.length, 0, 'searching does not start playback');
+    await act(async () => env.root.unmount());
+  }
+});
+
 test('presets save, edit, reload paused in the same context, survive restart and delete without changing the mix', async () => {
   const env = environment();
   await env.render(env.strict(provider(h(harness.ToolkitDriftView, { onBack: () => undefined }))));

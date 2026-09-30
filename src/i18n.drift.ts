@@ -13,6 +13,7 @@
 const rows: string[][] = [
   ['Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift', 'Nodus Drift'],
   ["Predefinidos", "Presets", "Préréglages", "Voreinstellungen", "Predefinições", "Predefinições", "Preimpostazioni", "Hazır ayarlar", "预设", "預設", "プリセット", "프리셋"],
+  ['Buscar predefinidos', 'Search presets', 'Rechercher des préréglages', 'Voreinstellungen suchen', 'Pesquisar predefinições', 'Buscar predefinições', 'Cerca preimpostazioni', 'Hazır ayar ara', '搜索预设', '搜尋預設', 'プリセットを検索', '프리셋 검색'],
   ["Guardar predefinido", "Save preset", "Enregistrer le préréglage", "Voreinstellung speichern", "Guardar predefinição", "Salvar predefinição", "Salva preimpostazione", "Hazır ayarı kaydet", "保存预设", "儲存預設", "プリセットを保存", "프리셋 저장"],
   ["Editar predefinido", "Edit preset", "Modifier le préréglage", "Voreinstellung bearbeiten", "Editar predefinição", "Editar predefinição", "Modifica preimpostazione", "Hazır ayarı düzenle", "编辑预设", "編輯預設", "プリセットを編集", "프리셋 수정"],
   ["Nombre del predefinido", "Preset name", "Nom du préréglage", "Name der Voreinstellung", "Nome da predefinição", "Nome da predefinição", "Nome della preimpostazione", "Hazır ayar adı", "预设名称", "預設名稱", "プリセット名", "프리셋 이름"],
