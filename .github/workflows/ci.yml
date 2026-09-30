@@ -1,7 +1,7 @@
 name: CI
 
 # Build this commit once, run the entire suite in three isolated macOS groups,
-# and boot the real app in parallel. The final `test` check verifies that every
+# and boot the real app in the smaller third group. The final `test` check verifies that every
 # discovered test file completed exactly once and all prerequisite jobs passed.
 
 on:
@@ -18,9 +18,7 @@ concurrency:
 
 jobs:
   build:
-    # Standard Intel macOS has 14 GB RAM for the concurrent browser fixtures.
-    # All build consumers must match its architecture and Electron native ABI.
-    runs-on: macos-15-intel
+    runs-on: macos-latest
     timeout-minutes: 20
     outputs:
       artifact_id: ${{ steps.share-build.outputs.artifact-id }}
@@ -109,7 +107,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3]
-    runs-on: macos-15-intel
+    runs-on: macos-latest
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -167,6 +165,29 @@ jobs:
       - name: Unit and integration tests
         # Keep the proven two-file memory bound on each independent runner.
         run: npm run test:ci:shard -- ${{ matrix.shard }}
+      - name: Materialize Electron before real-app checks
+        if: matrix.shard == 3
+        run: node scripts/prepare-electron-tests.mjs
+      - name: E2E smoke (real app boot)
+        if: matrix.shard == 3
+        timeout-minutes: 10
+        run: npm run test:e2e
+
+      - name: Stellar canvas E2E (isolated demonstration profile)
+        if: matrix.shard == 3
+        timeout-minutes: 5
+        run: npm run test:e2e:stellar
+
+      - name: Graph tabs E2E (isolated demonstration profile)
+        if: matrix.shard == 3
+        timeout-minutes: 5
+        run: npm run test:e2e:stellar-tabs
+
+      - name: Argument map E2E (isolated demonstration profile)
+        if: matrix.shard == 3
+        timeout-minutes: 5
+        run: npm run test:e2e:argument-map
+
       - name: Preserve execution inventory and timing, including failures
         if: always()
         uses: actions/upload-artifact@v7
@@ -181,53 +202,17 @@ jobs:
           retention-days: 7
 
   e2e:
-    needs: build
-    runs-on: macos-15-intel
-    timeout-minutes: 30
+    # The third macOS group executes all four real-app checks. Preserve this
+    # check name and reject failed/cancelled prerequisites.
+    if: always()
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Download this run's build
-        uses: actions/download-artifact@v8
-        with:
-          artifact-ids: ${{ needs.build.outputs.artifact_id }}
-          path: .ci
-          merge-multiple: true
-      - name: Restore and verify this commit's build
-        run: |
-          tar -xzf .ci/build.tgz
-          node scripts/ci-build-artifact.mjs verify
-      - name: Restore and verify the identical Electron native runtime
-        run: |
-          tar -xzf .ci/native.tgz
-          node scripts/ci-native-artifact.mjs verify
-      - name: Check all native dependencies for Electron
-        run: npx electron-builder install-app-deps
-      - name: Materialize Electron before real-app checks
-        run: node scripts/prepare-electron-tests.mjs
-
-      - name: E2E smoke (real app boot)
-        timeout-minutes: 10
-        run: npm run test:e2e
-
-      - name: Stellar canvas E2E (isolated demonstration profile)
-        timeout-minutes: 5
-        run: npm run test:e2e:stellar
-
-      - name: Graph tabs E2E (isolated demonstration profile)
-        timeout-minutes: 5
-        run: npm run test:e2e:stellar-tabs
-
-      - name: Argument map E2E (isolated demonstration profile)
-        timeout-minutes: 5
-        run: npm run test:e2e:argument-map
+      - name: All test groups and real-app checks succeeded
+        env:
+          UNIT_RESULT: ${{ needs.unit.result }}
+        run: test "$UNIT_RESULT" = success
 
   test:
     # Preserve the existing check name; a skipped/cancelled prerequisite fails

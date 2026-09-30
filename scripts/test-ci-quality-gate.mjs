@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { createPlan, discoverTests, validatePlan, validateReports } from './ci-test-shards.mjs';
+import { createPlan, discoverTests, validatePlan, validateReports, fileConcurrency, e2eReservationMs, e2eShard } from './ci-test-shards.mjs';
 import { createBuildManifest, verifyBuildManifest } from './ci-build-artifact.mjs';
 import { createNativeManifest, verifyNativeManifest } from './ci-native-artifact.mjs';
 import { preparedComponentStyles } from './lib/component-test-styles.mjs';
@@ -33,6 +33,21 @@ test('all discovered files, including ones without duration hints, run exactly o
     for (const file of ['test-new.mjs', 'test-a.mjs', 'test-not-selected.js', 'e2e-smoke.mjs']) fs.writeFileSync(path.join(root, 'scripts', file), '');
     assert.deepEqual(discoverTests(root), ['scripts/test-a.mjs', 'scripts/test-new.mjs']);
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+
+test('the E2E group reserves real-app time without dropping or duplicating tests', () => {
+  const inventory = Array.from({ length: 90 }, (_, index) => `scripts/test-fixture-${index}.mjs`);
+  const durations = Object.fromEntries(inventory.map(file => [file, 30_000]));
+  const planned = createPlan(inventory, commit, durations);
+  validatePlan(planned, inventory, commit);
+  const last = planned.shards.find(shard => shard.index === e2eShard);
+  assert.ok(last.files.length < planned.shards[0].files.length);
+  assert.equal(planned.shards.reduce((sum, shard) => sum + shard.estimatedMs, 0), 90 * 30_000 + fileConcurrency * e2eReservationMs);
+  assert.ok(Math.max(...planned.shards.map(s => s.estimatedMs)) - Math.min(...planned.shards.map(s => s.estimatedMs)) <= 30_000);
+  const small = createPlan(inventory.slice(0, 3), commit);
+  validatePlan(small, inventory.slice(0, 3), commit);
+  assert.ok(small.shards.every(shard => shard.files.length === 1));
 });
 
 test('missing, duplicate, stale and empty assignments cannot pass the inventory gate', () => {

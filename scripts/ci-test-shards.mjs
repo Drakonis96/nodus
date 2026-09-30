@@ -10,6 +10,11 @@ import { tap } from 'node:test/reporters';
 import { pipeline } from 'node:stream/promises';
 
 export const shardCount = 3;
+export const fileConcurrency = 2;
+export const e2eShard = 3;
+// Reserve five minutes of real-app work in the last group. At two file
+// processes per runner, this is ten minutes in the placement weight.
+export const e2eReservationMs = 300_000;
 const allowedSkips = new Map([
   ['CompassStore persists pagination, selections, saved/dismissed records and bounded cache state', 'better-sqlite3 native addon requires the Electron ABI'],
   ['every published skill has an icon the application can draw', 'no marketplace checkout beside this one; set NODUS_MARKETPLACE_DIR'],
@@ -27,11 +32,13 @@ export function createPlan(files, commit, durations = {}, count = shardCount) {
   assert.ok(Number.isInteger(count) && count > 0 && files.length >= count, 'Every shard must contain tests');
   assert.equal(new Set(files).size, files.length, 'Duplicate test discovery');
   const weight = file => Number.isFinite(durations[file]) && durations[file] > 0 ? durations[file] : 1000;
-  const shards = Array.from({ length: count }, (_, index) => ({ index: index + 1, files: [], estimatedMs: 0 }));
+  const shards = Array.from({ length: count }, (_, index) => ({ index: index + 1, files: [], estimatedMs: index + 1 === e2eShard ? fileConcurrency * e2eReservationMs : 0 }));
   // Longest files first, on the lightest group. Hints only affect placement;
   // unknown/new files always run and actual process durations are reported.
   for (const file of [...files].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b))) {
-    const shard = [...shards].sort((a, b) => a.estimatedMs - b.estimatedMs || a.index - b.index)[0];
+    // Seed every group before balancing, including small regression fixtures.
+    const empty = shards.filter(shard => shard.files.length === 0);
+    const shard = [...(empty.length ? empty : shards)].sort((a, b) => a.estimatedMs - b.estimatedMs || a.index - b.index)[0];
     shard.files.push(file);
     shard.estimatedMs += weight(file);
   }
@@ -81,7 +88,7 @@ export async function executeShard(plan, index, root, destination, output = proc
   const selected = new Map(shard.files.map(file => [path.resolve(root, file), file]));
   const report = { schemaVersion: 1, commit: plan.commit, index, assignedFiles: shard.files, completed: [], skips: [], success: false };
   const started = Date.now();
-  const stream = run({ files: [...selected.keys()], concurrency: 2 });
+  const stream = run({ files: [...selected.keys()], concurrency: fileConcurrency });
   stream.on('test:complete', data => {
     // These are the runner's file-process completions, including scripts that
     // use plain assertions or re-exec under Electron instead of node:test.

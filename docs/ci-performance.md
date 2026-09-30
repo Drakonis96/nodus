@@ -1,24 +1,22 @@
 # CI execution and measurement
 
-CI builds each commit once on `macos-15-intel`. Three independent macOS jobs run
+CI builds each commit once on `macos-latest`. Three independent macOS jobs run
 every `scripts/test-*.mjs` file, with the same Node 22 runtime, Electron native
 module checks, full Git history, and two-file process concurrency as the original
-job. The four existing Electron E2E scripts run in a fourth job against the same
-build. Cross-repository capability checks retain all three platforms.
-
-Build, groups and E2E use the same standard Intel runner (4 CPUs, 14 GB RAM),
-which gives parallel browser fixtures more memory than the standard ARM runner
-(3 CPUs, 7 GB RAM). Standard runners are free for public repositories; see
-[GitHub's runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
-The complete suite now runs on Intel macOS. Existing macOS ARM capability checks
-and the separate Research native ARM/Intel matrix retain their existing targets.
-This is not equivalent to running the full suite on both architectures. Native
-artifacts are always built and verified on matching architectures.
+job. The four existing Electron E2E scripts run after the smaller third group,
+against the same build. Cross-repository capability checks retain all three platforms.
 
 `scripts/ci-test-shards.mjs plan` discovers the complete test inventory. Historical
 durations in `scripts/ci-test-durations.json` balance placement, never inclusion:
 new files without hints also run. Each group runs longer files first and reports
 the runner's actual file-process completions, durations, result counts and skips.
+The third group reserves five minutes of E2E work in its placement weights;
+this changes assignment, never test inclusion. Every group is seeded with at least
+one file. Three downstream macOS runners replace four, leaving room for the two
+concurrent macOS Research native jobs within the standard five-job allowance.
+The `e2e` check verifies the matrix result: failure/cancellation in any group or
+real-app step fails it. Existing E2E assertions and individual timeouts remain.
+
 The final `test` check requires successful build, all groups, E2E and capability
 jobs, and checks that every discovered file completed exactly once. Missing,
 duplicate, cancelled, failed or stale reports fail the gate. New skipped tests
@@ -79,7 +77,7 @@ the checks finish. The planner and transports retain their dedicated test suites
 4. A first execution measures a cold check cache. A later commit with small changes
    can measure restored incremental caches; do not combine the two benchmarks.
 5. Aim for 14–16 minutes and compare measured results before
-   claiming an improvement. Four downstream macOS jobs can compete with other PRs
+   claiming an improvement. Three downstream macOS jobs can compete with other PRs
    for the account's macOS concurrency allowance. Queue time is not guaranteed.
 
 Application code and the local `npm test`, `npm run test:ci`, `npm run build`,
