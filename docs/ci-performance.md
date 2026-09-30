@@ -1,10 +1,19 @@
 # CI execution and measurement
 
-CI builds each commit once on `macos-latest`. Three independent macOS jobs run
+CI builds each commit once on `macos-15-intel`. Three independent macOS jobs run
 every `scripts/test-*.mjs` file, with the same Node 22 runtime, Electron native
 module checks, full Git history, and two-file process concurrency as the original
 job. The four existing Electron E2E scripts run in a fourth job against the same
 build. Cross-repository capability checks retain all three platforms.
+
+Build, groups and E2E use the same standard Intel runner (4 CPUs, 14 GB RAM),
+which gives parallel browser fixtures more memory than the standard ARM runner
+(3 CPUs, 7 GB RAM). Standard runners are free for public repositories; see
+[GitHub's runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+The complete suite now runs on Intel macOS. Existing macOS ARM capability checks
+and the separate Research native ARM/Intel matrix retain their existing targets.
+This is not equivalent to running the full suite on both architectures. Native
+artifacts are always built and verified on matching architectures.
 
 `scripts/ci-test-shards.mjs plan` discovers the complete test inventory. Historical
 durations in `scripts/ci-test-durations.json` balance placement, never inclusion:
