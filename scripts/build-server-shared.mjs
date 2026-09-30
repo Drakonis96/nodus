@@ -25,6 +25,7 @@ const outputDir = path.join(repoRoot, 'server/lib/core/generated');
 export const GENERATED = [
   { entry: 'shared/deepResearchReport.ts', out: 'deepResearchReport.mjs' },
   { entry: 'shared/vaultColors.ts', out: 'vaultColors.mjs' },
+  { entry: 'shared/providerContextWindows.ts', out: 'providerContextWindows.mjs' },
 ];
 
 const BANNER = `// GENERATED — do not edit.

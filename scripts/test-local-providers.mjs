@@ -146,6 +146,7 @@ try {
     assert.deepEqual(cloudCalls, [
       { url: 'https://api.groq.com/openai/v1/models', authorization: 'Bearer gsk-test' },
       { url: 'https://api.cerebras.ai/v1/models', authorization: 'Bearer csk-test' },
+      { url: 'https://api.cerebras.ai/public/v1/models', authorization: undefined },
     ], 'cloud model endpoints receive the stored bearer key');
   } finally {
     globalThis.fetch = nativeFetch;
