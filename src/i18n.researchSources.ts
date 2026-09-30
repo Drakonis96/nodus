@@ -2,6 +2,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "en": {
     "Filtrar contexto": "Filter context",
     "Fuentes": "Sources",
+    "Fuentes adicionales resumidas: {n}": "Additional sources summarized: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Limit context to selected sources",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Authors include their own works, not texts that merely mention them. Selecting both authors and works uses their intersection.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "When sources change, previous responses using a different context will not be sent to the model.",
@@ -19,6 +20,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "fr": {
     "Filtrar contexto": "Filtrer le contexte",
     "Fuentes": "Sources",
+    "Fuentes adicionales resumidas: {n}": "Sources supplémentaires résumées : {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Limiter le contexte aux sources sélectionnées",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Les auteurs incluent leurs œuvres, pas les textes qui les mentionnent seulement. Si vous choisissez des auteurs et des œuvres, leur intersection sera utilisée.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Si les sources changent, les réponses précédentes utilisant un autre contexte ne seront pas envoyées au modèle.",
@@ -36,6 +38,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "de": {
     "Filtrar contexto": "Kontext filtern",
     "Fuentes": "Quellen",
+    "Fuentes adicionales resumidas: {n}": "Weitere zusammengefasste Quellen: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Kontext auf ausgewählte Quellen beschränken",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Autoren umfassen ihre eigenen Werke, nicht Texte, die sie nur erwähnen. Bei Auswahl von Autoren und Werken wird die Schnittmenge verwendet.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Bei geänderten Quellen werden frühere Antworten mit anderem Kontext nicht an das Modell gesendet.",
@@ -53,6 +56,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "it": {
     "Filtrar contexto": "Filtra contesto",
     "Fuentes": "Fonti",
+    "Fuentes adicionales resumidas: {n}": "Fonti aggiuntive riepilogate: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Limita il contesto alle fonti selezionate",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Gli autori includono le proprie opere, non i testi che li menzionano soltanto. Se scegli autori e opere, verrà usata la loro intersezione.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Cambiando le fonti, le risposte precedenti con un contesto diverso non verranno inviate al modello.",
@@ -70,6 +74,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "pt": {
     "Filtrar contexto": "Filtrar contexto",
     "Fuentes": "Fontes",
+    "Fuentes adicionales resumidas: {n}": "Fontes adicionais resumidas: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Limitar o contexto às fontes selecionadas",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Os autores incluem as suas obras, não os textos que apenas os mencionam. Ao escolher autores e obras, será usada a interseção.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Ao alterar as fontes, as respostas anteriores com outro contexto não serão enviadas ao modelo.",
@@ -87,6 +92,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "pt-BR": {
     "Filtrar contexto": "Filtrar contexto",
     "Fuentes": "Fontes",
+    "Fuentes adicionales resumidas: {n}": "Fontes adicionais resumidas: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Limitar o contexto às fontes selecionadas",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Os autores incluem suas obras, não os textos que apenas os mencionam. Ao escolher autores e obras, será usada a interseção.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Ao alterar as fontes, as respostas anteriores com outro contexto não serão enviadas ao modelo.",
@@ -104,6 +110,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "tr": {
     "Filtrar contexto": "Bağlamı filtrele",
     "Fuentes": "Kaynaklar",
+    "Fuentes adicionales resumidas: {n}": "Özetlenen ek kaynaklar: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "Bağlamı seçili kaynaklarla sınırla",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "Yazarlar yalnızca kendilerinden söz eden metinleri değil, kendi eserlerini kapsar. Hem yazar hem eser seçerseniz kesişimleri kullanılır.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "Kaynaklar değiştiğinde farklı bağlam kullanan önceki yanıtlar modele gönderilmez.",
@@ -121,6 +128,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   "zh-CN": {
     "Filtrar contexto": "筛选上下文",
     "Fuentes": "来源",
+    "Fuentes adicionales resumidas: {n}": "已汇总的其他来源：{n}",
     "Limitar el contexto a las fuentes seleccionadas": "将上下文限制为所选来源",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "作者包含其本人的文献，而非仅提及他们的文本。若同时选择作者和文献，将使用二者的交集。",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "更改来源后，使用其他上下文的先前回复不会再发送给模型。",
@@ -138,6 +146,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   'zh-TW': {
     "Filtrar contexto": "篩選上下文",
     "Fuentes": "來源",
+    "Fuentes adicionales resumidas: {n}": "已彙總的其他來源：{n}",
     "Limitar el contexto a las fuentes seleccionadas": "將上下文限制為所選來源",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "作者包含其本人的文獻，而非僅提及他們的文本。若同時選擇作者和文獻，將使用二者的交集。",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "更改來源後，使用其他上下文的先前回復不會再發送給模型。",
@@ -155,6 +164,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   ko: {
     "Filtrar contexto": "컨텍스트 필터링",
     "Fuentes": "출처",
+    "Fuentes adicionales resumidas: {n}": "요약된 추가 출처: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "선택한 소스로 컨텍스트를 제한합니다.",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "저자는 단지 자신의 작품을 언급하는 텍스트가 아닌 자신의 작품을 포함합니다. 작가와 작품을 모두 선택하면 교차점을 사용합니다.",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "소스가 변경되면 다른 컨텍스트를 사용하는 이전 응답은 모델로 전송되지 않습니다.",
@@ -172,6 +182,7 @@ export const RESEARCH_SOURCE_TRANSLATIONS = {
   ja: {
     "Filtrar contexto": "フィルターコンテキスト",
     "Fuentes": "情報源",
+    "Fuentes adicionales resumidas: {n}": "集計されたその他の情報源: {n}",
     "Limitar el contexto a las fuentes seleccionadas": "コンテキストを選択したソースに限定する",
     "Los autores incluyen sus obras, no los textos que solo los mencionan. Si eliges autores y obras, se usará la intersección.": "著者には、単に言及するだけのテキストではなく、自分の作品が含まれています。著者と作品の両方を選択するには、それらの交差部分を使用します。",
     "Al cambiar las fuentes, las respuestas anteriores con otro contexto no se enviarán al modelo.": "ソースが変更されると、異なるコンテキストを使用した以前の応答はモデルに送信されなくなります。",

@@ -62,6 +62,8 @@ export class ResearchCorpusRun {
   readonly limitations = new Set<string>();
   readonly matchedDocuments = new Set<string>();
   readonly readDocuments = new Set<string>();
+  readonly attemptedDocuments = new Set<string>();
+  private readonly contextDocuments = new Set<string>();
   readonly ideas = new Map<string, WritingWorkshopIdeaCandidate>();
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
   /** Research Chat and Dictionary: the web step, when the user left it on. Deep Research never sets it. */
@@ -202,6 +204,7 @@ export class ResearchCorpusRun {
       if (!statement || this.ideas.has(row.global_id) || !acceptRound(`idea:${row.global_id}`, statement)) continue;
       const ids = getDb().prepare('SELECT DISTINCT nodus_id FROM idea_occurrences WHERE global_id=?').all(row.global_id) as { nodus_id: string }[];
       const documents = this.scope.documents.filter(document => ids.some(id => id.nodus_id === document.workId));
+      documents.forEach(document => this.contextDocuments.add(document.id));
       this.ideas.set(row.global_id, { id: row.global_id, label: row.label, summary: row.statement, statement: row.statement,
         type: row.type, themes: [], score: row.similarity, reason: 'scoped-idea', workCount: documents.length, evidenceCount: 0,
         works: documents.map(document => ({ nodus_id: document.workId!, title: document.title, authors: document.authors, year: document.year,
@@ -222,6 +225,7 @@ export class ResearchCorpusRun {
     const document = this.scope.documents.find(item => item.id === documentId);
     if (!document) throw new Error('research_source_not_authorized');
     if (read.kind === 'pages' && read.attachmentId && document.attachments && !document.attachments.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
+    this.attemptedDocuments.add(document.id);
     const query = read.kind === 'search' ? read.query : read.kind === 'references' ? read.query ?? 'references bibliography bibliografía bibliographie literaturverzeichnis' : `${read.kind}:${JSON.stringify(read)}`;
     if (!this.budget.nextRound(true) || this.budget.evidenceTokenLimit - this.budget.usedEvidenceTokens < 256) {
       this.budget.partial = true;
@@ -252,6 +256,8 @@ export class ResearchCorpusRun {
     if (!document) throw new Error('research_source_not_authorized');
     const current = researchCorpusInventory().documents.find(item => item.id === documentId);
     assertResearchDocument(this.scope, documentId, current);
+    if (read.attachmentId && document.attachments && !document.attachments.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
+    this.attemptedDocuments.add(document.id);
     const remaining = this.stepAllowance();
     if ((!counted && !this.budget.nextRound(true)) || remaining < 256) {
       this.limitations.add('budget_exhausted'); return { evidence: [], scopeId: this.scope.id, partial: true };
@@ -259,7 +265,6 @@ export class ResearchCorpusRun {
     const library = document.libraryItemId ? getGlobalLibraryItem(document.libraryItemId) : null;
     const attachments = library?.attachments.filter(item => item.mimeType === 'application/pdf') ?? [];
     const attachment = read.attachmentId ? attachments.find(item => item.id === read.attachmentId) : attachments.length === 1 ? attachments[0] : null;
-    if (read.attachmentId && document.attachments && !document.attachments.some(item => item.id === read.attachmentId)) throw new Error('research_source_not_authorized');
     let attachmentId = attachment?.id ?? read.attachmentId ?? null;
     let attachmentRevision = document.attachments?.find(item => item.id === attachmentId)?.revision;
     let sourceRef = library && attachment ? `library:${library.id}:${attachment.id}` : null;
@@ -409,6 +414,9 @@ export class ResearchCorpusRun {
   coverage(): ResearchTraversal {
     return { scopeId: this.scope.id, sourceCount: this.scope.documents.length, rounds: this.budget.rounds,
       evidenceTokens: this.budget.usedEvidenceTokens, decisionTokens: this.budget.decisionTokens, matchedDocumentIds: [...this.matchedDocuments], readDocumentIds: [...this.readDocuments],
+      catalogDocumentIds: [...this.catalogHits.keys()],
+      attemptedDocumentIds: [...this.attemptedDocuments],
+      contextDocumentIds: [...this.contextDocuments],
       sourceCoverage: this.sourceCoverage, limitations: [...this.limitations], partial: this.budget.partial, queries: this.traversal.map(query => ({ ...query, sources: [...query.sources] })) };
   }
   private passage(item: ResearchEvidence): WritingWorkshopPassageCandidate {
@@ -446,6 +454,7 @@ export class ResearchCorpusRun {
       ORDER BY confidence DESC,id LIMIT ?`).all(works, ideas, limit) as Array<{ id: string; kind: WritingWorkshopSnapshot['gaps'][number]['kind']; statement: string; related_idea: string | null; confidence: number; nodus_id: string }>)
       .filter(row => this.budget.accept(`gap:${row.id}`, row.statement)).map(row => {
         const document = this.scope.documents.find(document => document.workId === row.nodus_id)!;
+        this.contextDocuments.add(document.id);
         return { id: row.id, kind: row.kind, label: row.statement.slice(0, 100), summary: row.statement, score: row.confidence,
           reason: 'scoped-gap', relatedIdea: row.related_idea, confidence: row.confidence,
           work: { nodus_id: row.nodus_id, title: document.title, authors: document.authors, year: document.year, zotero_key: document.origin.kind === 'zotero' ? document.origin.itemKey : '' } };
@@ -455,9 +464,13 @@ export class ResearchCorpusRun {
       WHERE e.type IN ('contradicts','refutes') AND e.source_work IN (SELECT value FROM json_each(?))
       AND e.from_id IN (SELECT value FROM json_each(?)) AND e.to_id IN (SELECT value FROM json_each(?))
       ORDER BY e.confidence DESC,e.id LIMIT ?`).all(works, ideas, ideas, limit) as Array<{ id: string; type: string; basis: WritingWorkshopSnapshot['contradictions'][number]['basis']; confidence: number; from_label: string; to_label: string; from_statement: string; to_statement: string; source_work: string }>)
-      .map(row => ({ id: row.id, label: `${row.from_label} / ${row.to_label}`, summary: `${row.from_statement} / ${row.to_statement}`,
+      .map(row => {
+        const documents = this.scope.documents.filter(document => document.workId === row.source_work);
+        documents.forEach(document => this.contextDocuments.add(document.id));
+        return { id: row.id, label: `${row.from_label} / ${row.to_label}`, summary: `${row.from_statement} / ${row.to_statement}`,
         score: row.confidence, reason: 'scoped-contradiction', fromLabel: row.from_label, toLabel: row.to_label, type: row.type, basis: row.basis, confidence: row.confidence,
-        sources: this.scope.documents.filter(document => document.workId === row.source_work).map(document => `${document.authors.join('; ')} (${document.year ?? ''})`) }))
+        sources: documents.map(document => `${document.authors.join('; ')} (${document.year ?? ''})`) };
+      })
       .filter(row => this.budget.accept(`contradiction:${row.id}`, row.summary));
     const themes = (db.prepare(`SELECT t.theme_id id,t.label,COUNT(DISTINCT wt.nodus_id) workCount FROM themes t
       JOIN work_themes wt ON wt.theme_id=t.theme_id WHERE wt.nodus_id IN (SELECT value FROM json_each(?))
