@@ -50,14 +50,26 @@ function retryDelay(response: Response | null, attempt: number): number {
 async function waitForRetry(milliseconds: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) throw new DOMException('Solicitud cancelada', 'AbortError');
   await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(resolve, milliseconds);
-    signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Solicitud cancelada', 'AbortError')); }, { once: true });
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(new DOMException('Solicitud cancelada', 'AbortError'));
+    };
+    const timer = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, milliseconds);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
-async function zfetch(url: string, signal?: AbortSignal, init: RequestInit = {}): Promise<Response> {
+export interface ZoteroRequestBudget { remaining: number }
+
+async function zfetch(url: string, signal?: AbortSignal, init: RequestInit = {}, budget?: ZoteroRequestBudget): Promise<Response> {
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
+      signal?.throwIfAborted();
+      if (budget) {
+        if (budget.remaining <= 0) throw new ZoteroRequestError('Se agotó el presupuesto de comprobaciones de Zotero.', 'rate-limited', null, true);
+        budget.remaining -= 1;
+      }
       const response = await fetch(url, { ...init, headers: { ...HEADERS, ...(init.headers ?? {}) }, signal });
       if ([429, 502, 503, 504].includes(response.status) && attempt < 3) {
         await waitForRetry(retryDelay(response, attempt), signal);
@@ -182,6 +194,7 @@ export async function libraryVersion(
   signal?: AbortSignal,
 ): Promise<number> {
   const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?limit=1`, signal);
+  if (!res.ok) throw endpointError('Versión de la biblioteca de Zotero', res);
   const v = res.headers.get('Last-Modified-Version');
   return v ? parseInt(v, 10) : 0;
 }
@@ -492,21 +505,71 @@ export async function getItem(userId: string, itemKey: string, requestedLibrary?
   return mapItem(await res.json(), parsed.library);
 }
 
-/** Whether an item is still in the Zotero library: `trashed` when it sits in Zotero's Trash
- *  (`deleted`), `gone` when Zotero no longer knows it (the Trash was emptied), `unknown` when
- *  Zotero could not be asked. The local API reports no deletions, so a sync that stops seeing
- *  an item asks here before treating it as removed. */
-export async function itemPresence(userId: string, itemKey: string): Promise<'present' | 'trashed' | 'gone' | 'unknown'> {
+export interface ZoteroPresenceSession {
+  budget: ZoteroRequestBudget;
+  signal?: AbortSignal;
+  libraries: Map<string, ZoteroPresenceLibrary | null>;
+}
+
+export interface ZoteroPresenceLibrary { key: string; version: number }
+export type ZoteroItemPresence = 'present' | 'trashed' | 'gone' | 'unknown';
+
+function responseVersion(res: Response): number | null {
+  const header = res.headers.get('Last-Modified-Version');
+  if (header === null || !header.trim()) return null;
+  const version = Number(header);
+  return Number.isSafeInteger(version) && version >= 0 ? version : null;
+}
+
+/** A missing item is authoritative only while its source library can be read. */
+export async function presenceLibrary(userId: string, itemKey: string, session: ZoteroPresenceSession, fresh = false): Promise<ZoteroPresenceLibrary | null> {
+  const { library } = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
+  const key = `${library.type}:${library.id}`;
+  if (!fresh && session.libraries.has(key)) return session.libraries.get(key) ?? null;
   try {
-    const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
-    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`);
-    if (res.status === 404) return 'gone';
-    if (!res.ok) return 'unknown';
-    const body = (await res.json()) as { data?: { deleted?: boolean | number } };
-    return body?.data?.deleted ? 'trashed' : 'present';
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(library)}/items?limit=1`, session.signal, {}, session.budget);
+    const version = responseVersion(res);
+    if (!res.ok || version === null || !Array.isArray(await res.json())) {
+      session.libraries.set(key, null);
+      return null;
+    }
+    const snapshot = { key, version };
+    session.libraries.set(key, snapshot);
+    return snapshot;
   } catch {
-    return 'unknown';
+    session.libraries.set(key, null);
+    return null;
   }
+}
+
+export async function itemPresenceDetails(userId: string, itemKey: string, session: ZoteroPresenceSession): Promise<{
+  presence: ZoteroItemPresence; library: string; version: number | null;
+}> {
+  const parsed = parseCanonicalKey(itemKey, { ...PERSONAL_LIBRARY, id: userId });
+  const library = `${parsed.library.type}:${parsed.library.id}`;
+  const unknown = { presence: 'unknown' as const, library, version: null };
+  try {
+    const res = await zfetch(`${ZOTERO_API_BASE}/${libraryPrefix(parsed.library)}/items/${encodeURIComponent(parsed.rawKey)}`, session.signal, {}, session.budget);
+    if (res.status === 404) {
+      const snapshot = await presenceLibrary(userId, itemKey, session);
+      return snapshot ? { presence: 'gone', library, version: snapshot.version } : unknown;
+    }
+    if (!res.ok) return unknown;
+    const body = (await res.json()) as { data?: { deleted?: boolean | number } };
+    if (!body?.data || typeof body.data !== 'object' || Array.isArray(body.data)) return unknown;
+    const deleted = body.data.deleted;
+    if (deleted !== undefined && deleted !== false && deleted !== true && deleted !== 0 && deleted !== 1) return unknown;
+    return { presence: deleted === true || deleted === 1 ? 'trashed' : 'present', library, version: responseVersion(res) };
+  } catch {
+    return unknown;
+  }
+}
+
+/** `gone` requires a readable source library; a 404 for the entire source is unknown. */
+export async function itemPresence(userId: string, itemKey: string): Promise<ZoteroItemPresence> {
+  return (await itemPresenceDetails(userId, itemKey, {
+    budget: { remaining: 6 }, libraries: new Map(), signal: AbortSignal.timeout(5_000),
+  })).presence;
 }
 
 export async function searchItems(library: ZoteroLibrary, query: string): Promise<ZoteroItem[]> {

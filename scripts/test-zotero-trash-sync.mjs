@@ -29,7 +29,7 @@ installSharedRuntimeHooks(root);
 const Module = require('node:module');
 const sharedResolve = Module._resolveFilename;
 const databaseStub = path.join(root, 'stub-database.cjs');
-fs.writeFileSync(databaseStub, 'exports.getDb = () => globalThis.__zoteroTrashDb;\nexports.setVectorScanQuery = () => {};\n');
+fs.writeFileSync(databaseStub, 'exports.getDb = () => globalThis.__zoteroTrashDb;\nexports.setVectorScanQuery = () => {};\nexports.withDatabaseContext = (_db, work) => work();\n');
 Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
   const resolved = sharedResolve.call(this, request, parent, isMain, options);
   return resolved === path.join(repoRoot, 'electron/db/database.ts') ? databaseStub : resolved;
@@ -65,9 +65,11 @@ try {
 
   // Decision: Zotero says trashed or unknown-to-it → archived; present or unreachable → kept.
   const original = globalThis.fetch;
+  const json = body => new Response(JSON.stringify(body), { status: 200, headers: { 'Last-Modified-Version': '42' } });
   globalThis.fetch = async (url) => {
     const u = String(url);
-    if (u.endsWith('/users/0/items/TRASH001')) return new Response(JSON.stringify({ data: { key: 'TRASH001', deleted: true } }), { status: 200 });
+    if (u.endsWith('/items?limit=1')) return json([]);
+    if (u.endsWith('/users/0/items/TRASH001')) return json({ data: { key: 'TRASH001', deleted: true } });
     if (u.endsWith('/groups/42/items/GONE0001')) return new Response('Not found', { status: 404 });
     if (u.endsWith('/users/0/items/MOVED001')) return new Response(JSON.stringify({ data: { key: 'MOVED001' } }), { status: 200 });
     if (u.endsWith('/users/0/items/OFFLINE1')) return new Response('down', { status: 500 });
