@@ -22,6 +22,7 @@ import { planResearchTurn, literalResearchTurnPlan } from './researchTurnPlanner
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
 import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, formatRouteCheckUnavailable, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor, routeFixPromptForHistory, routeReportsForHistory } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
+import { reviseRouteWithEvidence, revisionUserMessage, routeEvidencePassEnabled } from './routeEvidencePass';
 import { SYNTHESIS_EVIDENCE_KEY, SYNTHESIS_EVIDENCE_SYSTEM_RULE, synthesisEvidencePayload, synthesisRetrievalQuery } from '@shared/synthesisEvidence';
 import { gatherSynthesisEvidence } from './synthesisEvidence';
 import type {
@@ -227,6 +228,16 @@ function skillExecution(request: ResearchChatRequest) {
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
+/** Route quality option A: a new route's first draft is revised once against per-step ORD,
+ *  textbook and web evidence before the checks run. Off unless its switch is on. */
+async function withRouteEvidence(answer: string, execution: ReturnType<typeof skillExecution>, opts: Parameters<typeof completeText>[0], local: boolean, sourceContext: string, signal?: AbortSignal): Promise<string> {
+  const question = execution.question ?? '';
+  const chemistry = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
+  if (!routeEvidencePassEnabled() || !chemistry || isRouteFixPrompt(question) || !looksLikeSynthesisRequest(question)) return answer;
+  return reviseRouteWithEvidence(answer, { model: execution.model, target: execution.target, question: execution.request ?? question, signal, locale: getSettings().promptLanguage ?? 'en' },
+    async brief => finalizeAnswer(await completeTextStream({ ...opts, user: revisionUserMessage(opts.user, answer, brief) }, () => {}, execution.model, signal), local, sourceContext));
+}
+
 /** Runs the reply through its Skills, then appends the RDKit checks: the structure check on
  *  the species the model proposed and the route check plus a drawing of every verified step.
  *  The audits are skipped when Chemistry Studio is disabled. */
@@ -308,7 +319,7 @@ async function answerResearchChatTurn(request: ResearchChatRequest, signal: Abor
     signal.throwIfAborted();
     answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
     validateNotebookRequest(request);
-    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: rememberNotebookTurn(request, await finalizeWithAudit(answer, execution)), stats };
+    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: rememberNotebookTurn(request, await finalizeWithAudit(await withRouteEvidence(answer, execution, opts, local, user, signal), execution)), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -393,6 +404,7 @@ async function streamResearchChatTurn(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
+  if (!council?.member) answer = await withRouteEvidence(answer, execution, opts, local, sourceContext, signal);
   // Interim repaints carry the whole answer, so they replace the streamed text rather than append.
   const repaint = (text: string) => onDelta(text, 'replace');
   return { answer: council?.member ? answer : rememberNotebookTurn(request, await (execution.skills.length ? researchActivityStep('tools', 'execute', () => finalizeWithAudit(answer, execution, signal, repaint)) : finalizeWithAudit(answer, execution, signal, repaint))), stats };

@@ -237,7 +237,7 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
 /** Looks the route's reactions and target up in the local Open Reaction Database index, when
  *  the package exposes the tool and the index has been downloaded and verified. Best-effort:
  *  an absent index, an older package or a tool failure all return null and change nothing. */
-async function lookupReactionPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<{ precedent: ReactionPrecedent; provider: CapabilityProvider } | null> {
+export async function lookupReactionPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<{ precedent: ReactionPrecedent; provider: CapabilityProvider } | null> {
   const provider = knownReactionsProvider();
   if (!provider) return null;
   const indexDir = await reactionIndexService().localDirectory();
