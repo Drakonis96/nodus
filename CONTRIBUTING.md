@@ -41,6 +41,22 @@ Security vulnerabilities must be reported privately as described in
 
 Nodus uses Node.js 22 in continuous integration.
 
+## Repository map
+
+| Area | Responsibility |
+| --- | --- |
+| [Desktop renderer (`src/`)](src/) | React views, components, navigation and the desktop UI shell. |
+| [Electron (`electron/`)](electron/) | Main process, preload/IPC, local SQLite repositories, native integrations and background work. |
+| [Shared (`shared/`)](shared/) | Types, API contracts and domain helpers consumed across runtimes. |
+| [Server (`server/`)](server/) | Node service, HTTP/authentication, synchronization, persistence and standalone deployment. |
+| [Server Web (`src/serverWeb/`)](src/serverWeb/) | Browser client for the Server, with its own entry point, session/API boundary and Vite build. |
+
+Current architectural decisions live in [docs/architecture/](docs/architecture/README.md).
+Use the [testing guide](docs/TESTING.md) for suite categories and prerequisites,
+and the [script catalogue](scripts/README.md) for commands and their effects.
+
+## Local setup
+
 1. Fork and clone the repository.
 2. Install the locked dependencies:
 

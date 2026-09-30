@@ -1,10 +1,11 @@
 # Nodus Protect — parity matrix with IDprotector v0.4.1
 
-Matrix version: **1.0.0 · 2026-07-19**
+Original matrix: **1.0.0 · 2026-07-19**. Availability and language references
+reviewed against current code on **2026-09-30**.
 
 Original reference: **IDprotector v0.4.1**, commit `9f523158de3d597bdfe6bf35a6319c5f45c5c70c`
 
-License: MIT; full attribution in [`THIRD_PARTY_NOTICES.md`](../THIRD_PARTY_NOTICES.md).
+License: MIT; full attribution in [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md).
 
 This array is the port output contract. `A-*` identifies an automated check and `M-*` a reproducible
 manual scenario. A row can only be considered covered when implementation and evidence exist;
@@ -14,12 +15,11 @@ manual scenario. A row can only be considered covered when implementation and ev
 
 - `A-ENG`: `node scripts/test-protect-engine.mjs` — fixed IDPS vectors, cross-test against original
   JavaScript, geometry and gold patterns.
-- `A-DB`: `node scripts/test-protect-persistence.mjs` — migration v90, CRUD, SHA-256 and headstones
-  without BLOB. The table initially planned for v88 was moved because `main` already reserved
-  v88–v89 for the tightening of synchronization.
+- `A-DB`: `node scripts/test-protect-persistence.mjs` — real migrations, CRUD, SHA-256 and
+  logical deletion without retaining the BLOB.
 - `A-SYNC`: `node scripts/test-sync-package.mjs` — export/mixture `.nodussync`, newest-wins and
   logical deletion.
-- `A-I18N`: `node scripts/test-i18n-coverage.mjs` — same exact set of keys in seven languages and
+- `A-I18N`: `node scripts/test-i18n-coverage.mjs` — required key coverage across supported interface languages and
   without visible fallback.
 - `A-UI`: `node scripts/test-toolkit-ui.mjs` and `node scripts/e2e-smoke.mjs` — Electron hub,
   navigation, states and smoke.
@@ -31,7 +31,7 @@ manual scenario. A row can only be considered covered when implementation and ev
 
 | ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
-| UI-01 | Hub 2×2 with Convert and Protect in development, Presenter and upcoming OCR | `ToolkitView.tsx`; A-UI | D |
+| UI-01 | Toolkit exposes implemented tools; Convert and Protect remain available | `ToolkitView.tsx`; A-UI | D |
 | UI-02 | Port React/TypeScript, without iframe or WebView | `ToolkitProtectView.tsx`, `src/lib/protect/*`; A-UI | D |
 | UI-03 | Cover with Protect and Verify | `ProtectHome`; A-UI | D |
 | UI-04 | Style, theme, headers, back, upload, warnings, confirmation and amber accent | Toolkit/`ConfirmModal` components; M-UI-01 | D |
@@ -105,7 +105,7 @@ manual scenario. A row can only be considered covered when implementation and ev
 | WM-08 | Deterministic variation per page and preview=export | PRNG/unique composer; gold A-ENG | D |
 | WM-09 | Multipage Live Preview | `PreviewCanvas`; M-WM-03 | D |
 | FT-01 | Folding foot, white strip, fit, blue and prominent message | composer/UI; gold A-ENG | D |
-| FT-02 | GDPR EUR-Lex located | map of seven languages; A-ENG | D |
+| FT-02 | GDPR EUR-Lex located | localized legal links; A-ENG | D |
 | FT-03 | 32 official authorities and URLs | `PROTECT_AUTHORITIES`; A-ENG | D |
 | FT-04 | Country by language until manual change | `DEFAULT_AUTHORITY`; A-ENG | D |
 | FT-05 | Optional e-mail/telephone | model/UI/compositor; A-ENG | D |
@@ -119,7 +119,7 @@ manual scenario. A row can only be considered covered when implementation and ev
 | EX-01 | Multipage Preview and Selector Image/PDF | `ResultStep`; A-UI | D |
 | EX-02 | One page image→PNG; several→ZIP ordered | `buildProtectArtifact`; A-ENG | D |
 | EX-03 | PDF raster: JPEG 0.92 without trace; PNG with trace | `pdf-lib` composer; A-ENG/A-SEC | D |
-| EX-04 | Suffix located in seven languages | `SUFFIX`; A-I18N | D |
+| EX-04 | Localized output suffix | `SUFFIX`; A-I18N | D |
 | EX-05 | Save, vault and share independent | `ResultStep`/IPC; A-UI | D |
 | EX-06 | New ID per completed action; cancellation without registration | device by action + registration after success; A-REG | D |
 | EX-07 | ShareMenu Electron and default save | main process; M-PKG-02 | D |
@@ -155,17 +155,17 @@ manual scenario. A row can only be considered covered when implementation and ev
 | VER-08 | Never claim he wasn't protected. | localized copy; A-I18N | D |
 | VER-09 | Without Web Crypto: visible metadata and unavailable authentication | branch `idpsAvailable`; A-ENG | D |
 
-## Italian, documentation and packaging
+## Localization, documentation and packaging
 
 | ID | Parity required | Implementation/evidence | State |
 | --- | --- | --- | --- |
 | I18N-01 | `AppLanguage=it`, normalization, settings, tutorial, recovery/runtime | shared tables/UI; A-I18N | D |
 | I18N-02 | Complete Italian table, exactly the same keys | `i18n.it.ts`; A-I18N | D |
 | I18N-03 | Dominion, kinship and all historical notes in Italian | modules `.it.ts`; A-I18N | D |
-| I18N-04 | Complete protection in seven languages | `i18n.protect.ts`; A-I18N | D |
-| I18N-05 | `PromptLanguage` without Italian | types/tutorial/Settings; A-I18N | D |
+| I18N-04 | Protect coverage for every supported interface language | `i18n.protect.ts`; A-I18N | D |
+| I18N-05 | Prompt-language options follow `PROMPT_LANGUAGES`, including Italian | types/tutorial/Settings; A-I18N | D |
 | DOC-01 | Help, Toolkit, News and Accurate Privacy | README, FAQ, Nodi docs, release notes | D |
-| PKG-01 | macOS/Windows/Linux: worker PDF, HEIC, save and share failback | M-PKG-01/M-PKG-02 by IC device | Scenario |
+| PKG-01 | macOS/Windows/Linux: worker PDF, HEIC, save and share failback | M-PKG-01/M-PKG-02 on each release platform | Scenario |
 | NET-01 | Zero network access during Protect processing | no network API in engine/service; A-IPC/M-NET-01 | D |
 | REG-01 | Zero regressions in Nodus Convert | existing Toolkit suite + build; A-UI/A-BUILD | D |
 
@@ -186,7 +186,7 @@ manual scenario. A row can only be considered covered when implementation and ev
    check that it is not overwritten.
 6. **M-LIB-01**: save a copy in the vault, reuse, download and delete it after confirmation;
    synchronize and check the tombstone on the second device.
-7. **M-PKG-01...02**: run the IC installer of each OS with real HEIC and multipage PDF; save with
+7. **M-PKG-01...02**: run the CI-built installer of each OS with real HEIC and multipage PDF; save with
    overwrite and share (ShareMenu in macOS, save dialog in Windows/Linux).
 8. **M-NET-01**: block/register outgoing traffic from the process, complete protection and
    verification and check zero requests; other Nodus functions are out of this scenario.
@@ -196,3 +196,15 @@ manual scenario. A row can only be considered covered when implementation and ev
 Delivery is blocked if any previous test fails, a pending row appears, changes an IDPS vector, there
 is removable text in a protected PDF, the hash of an original is modified, Protect makes a network
 request or Convert/Protect cards cease to appear as available.
+
+## Current location
+
+This acceptance matrix was moved from `design/` after checking its named
+implementation and executable references and refreshing obsolete tool/language claims on 2026-09-30. Current Toolkit boundaries
+are documented in [toolkit.md](toolkit.md). The reference version identifies the
+upstream fixture; it is not the current Nodus application version.
+
+Implementation: [engine](../../src/lib/protect/engine.ts),
+[IDPS format](../../src/lib/protect/stego.ts),
+[session lifecycle](../../src/lib/protect/session.ts), and
+[interface](../../src/views/ToolkitProtectView.tsx).

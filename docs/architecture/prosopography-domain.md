@@ -61,3 +61,12 @@ identificadores de statements y fuentes, y la huella de la proyección.
 - una relación derivada requiere huella de regla;
 - una propuesta de IA aceptada requiere revisor;
 - una versión publicada se duplica, no se edita.
+
+## Implementación y comprobaciones
+
+Contrato contrastado el 30 de septiembre de 2026 con
+[prosopographyDomain.ts](../../shared/prosopographyDomain.ts),
+[proyecciones](../../shared/prosopographyProjection.ts),
+[cuestionarios](../../electron/db/prosopQuestionnaireRepo.ts),
+[identidad](../../electron/db/prosopIdentityRepo.ts) y
+[pruebas de dominio](../../scripts/test-prosopography-domain.mjs).
