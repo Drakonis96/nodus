@@ -1767,6 +1767,15 @@ export interface ModelInfo {
   vision?: boolean;
 }
 
+/** A complete provider listing, distinct from the models shown by its picker. */
+export interface ProviderModelCatalog {
+  models: ModelInfo[];
+  selectableModels: ModelInfo[];
+}
+
+/** A failed or unsupported catalogue query is inconclusive, never an empty catalogue. */
+export type ModelCatalogResult = ({ status: 'read' } & ProviderModelCatalog) | { status: 'unreadable' };
+
 /** How hard a model should "think" before answering. `off` skips the chain-of-thought
  *  on reasoning models where the provider supports it (much faster for scanning). */
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high';

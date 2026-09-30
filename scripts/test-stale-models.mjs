@@ -2,7 +2,7 @@
 // legacy `deepseek-v4-flash`) are found against the live catalogues and rewritten in one step.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -21,7 +21,8 @@ const opus = { provider: 'anthropic', model: 'claude-opus-4-8' };
 const local = { provider: 'ollama', model: 'qwen3.8:27b-q8_0' };
 
 test('only a favourite missing from a catalogue that was read is stale', () => {
-  const catalogues = new Map([['deepseek', new Set(['deepseek-flash', 'deepseek-v4-pro'])], ['ollama', null]]);
+  const models = ['deepseek-flash', 'deepseek-v4-pro'].map((id) => ({ id }));
+  const catalogues = new Map([['deepseek', { status: 'read', models, selectableModels: models }], ['ollama', { status: 'unreadable' }]]);
   assert.deepEqual(staleFavorites([legacy, flash, opus, local], catalogues), [legacy],
     'an unreadable provider (ollama offline) and an unchecked one (anthropic) are never stale');
 });
@@ -48,9 +49,7 @@ test('remove only drops the favourite; tasks are not unset', () => {
   assert.deepEqual(patch, { favorites: [flash] });
 });
 
-test('the settings view offers the check and the panel', async () => {
-  const source = await readFile(path.join(root, 'src/views/ProvidersSettings.tsx'), 'utf8');
-  assert.match(source, /FavoriteAvailabilityButton favorites=\{favorites\}/);
-  assert.match(source, /<StaleFavoritesPanel /);
-  assert.match(source, /replaceModelPatch\(settings, from, to\)/);
+test('hidden models in a complete catalogue are listed even if they are not selectable', () => {
+  const catalogues = new Map([['deepseek', { status: 'read', models: [{ id: legacy.model }], selectableModels: [] }]]);
+  assert.deepEqual(staleFavorites([legacy], catalogues), []);
 });

@@ -17,6 +17,7 @@ import { installCopilotAddin, installLibreOfficeCopilot } from '../copilot/insta
 import { setApiKey, clearApiKey, getApiKey, getLocalServerAdminPassword } from '../secrets/secretStore';
 import { recoverLegacyApiKeys } from '../secrets/legacySecretRecovery';
 import { listEmbeddingModels, listModels, testCustomProvider, testLocalProvider } from '../ai/providers';
+import { getModelCatalog } from '../ai/modelCatalog';
 import { cancelChatGptSubscriptionLogin, getChatGptSubscriptionStatus, listChatGptSubscriptionModels, logoutChatGptSubscription, startChatGptSubscriptionLogin } from '../ai/codexSubscription';
 import { cancelGitHubCopilotSubscriptionLogin, getGitHubCopilotSubscriptionStatus, listGitHubCopilotSubscriptionModels, logoutGitHubCopilotSubscription, startGitHubCopilotSubscriptionLogin } from '../ai/githubCopilotSubscription';
 import { getOpenCodeGoUsageStatus } from '../ai/openCodeGoUsage';
@@ -230,6 +231,7 @@ export function registerPlatformIpc({ h, getWindow }: IpcContext): void {
     if (provider === 'github-copilot') return listGitHubCopilotSubscriptionModels();
     return listModels(provider, getApiKey(provider));
   });
+  h('ai:modelCatalog', async (_e, provider: AiProvider) => getModelCatalog(provider));
   h('ai:listEmbeddingModels', async (_e, provider: EmbeddingProvider) =>
     listEmbeddingModels(provider, getApiKey(provider))
   );

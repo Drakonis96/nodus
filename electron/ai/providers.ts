@@ -4,6 +4,7 @@ import type {
   LocalProvider,
   LocalProviderTestResult,
   ModelInfo,
+  ProviderModelCatalog,
 } from '@shared/types';
 import { researchAdvertisedEfforts } from '@shared/researchReasoning';
 import { getSettings } from '../db/settingsRepo';
@@ -341,6 +342,24 @@ function byId(a: ModelInfo, b: ModelInfo): number {
   return a.id.localeCompare(b.id);
 }
 
+const NON_CHAT_MODEL = /embedding|whisper|tts|speech|orpheus|guard|dall-e|audio|realtime|moderation|image|davinci|babbage|computer-use|transcribe|search/i;
+
+function catalogRows<T>(payload: unknown, field: string, strict = true): T[] {
+  const rows = payload && typeof payload === 'object' ? (payload as Record<string, unknown>)[field] : undefined;
+  if (!Array.isArray(rows)) {
+    if (strict) throw new Error('El proveedor no devolvió un catálogo de modelos válido.');
+    return [];
+  }
+  return rows as T[];
+}
+
+function requireCompleteCatalog(payload: unknown): void {
+  const page = payload as { has_more?: boolean; nextPageToken?: string; nextCursor?: string; next_cursor?: string };
+  if (page.has_more || page.nextPageToken || page.nextCursor || page.next_cursor) {
+    throw new Error('El catálogo de modelos está incompleto.');
+  }
+}
+
 /**
  * Fetch the live model list for a provider using its stored key. Sorted
  * alphabetically; OpenRouter is additionally grouped/sorted by upstream provider.
@@ -358,38 +377,62 @@ export async function listModels(provider: AiProvider, key: string | null, signa
   }
   return models;
 }
-async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+/** Full listing evidence. Manual IDs never prove that a remote catalogue was read. */
+export async function listProviderModelCatalog(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ProviderModelCatalog> {
+  const testModels = researchTestProviderModels(provider, 'chat');
+  if (testModels) return { models: testModels, selectableModels: testModels };
+  const models = await fetchModels(provider, key, signal, true);
+  if (models.some((model) => typeof model.id !== 'string' || !model.id.trim())) {
+    throw new Error('El proveedor no devolvió un catálogo de modelos válido.');
+  }
+  let selectableModels = models;
+  if (provider === 'openai' || provider === 'groq' || provider === 'cerebras') {
+    selectableModels = models.filter((model) => !NON_CHAT_MODEL.test(model.id));
+  } else if (provider === 'gemini') {
+    selectableModels = models.filter((model) => model.kind === 'llm');
+  } else if (provider === 'lmstudio' || provider === 'nodus') {
+    selectableModels = models.filter((model) => model.kind !== 'embeddings');
+  } else if (provider === 'custom') {
+    // Even after a successful read, manual aliases are selections, not listing evidence.
+    selectableModels = mergeCustomModels(models);
+  }
+  return { models, selectableModels };
+}
+
+async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal, fullCatalog = false): Promise<ModelInfo[]> {
   switch (provider) {
     case 'anthropic':
-      return listAnthropic(key, signal);
+      return listAnthropic(key, signal, fullCatalog);
     case 'openai':
-      return listOpenAiStyle('https://api.openai.com/v1/models', key, true, { signal });
+      return listOpenAiStyle('https://api.openai.com/v1/models', key, !fullCatalog, { signal, fullCatalog });
     case 'codex':
       throw new Error('Los modelos de Codex se consultan mediante el runtime de suscripción gestionado.');
     case 'github-copilot':
       throw new Error('Los modelos de GitHub Copilot se consultan mediante su runtime oficial.');
     case 'opencode-go':
-      return listOpenCodeGo();
+      return listOpenCodeGo(signal, fullCatalog);
     case 'deepseek':
-      return listOpenAiStyle(`${researchTestProviderBase(provider) ?? 'https://api.deepseek.com'}/models`, key, false, { signal });
+      return listOpenAiStyle(`${researchTestProviderBase(provider) ?? 'https://api.deepseek.com'}/models`, key, false, { signal, fullCatalog });
     case 'openrouter':
-      return listOpenRouter(signal);
+      return listOpenRouter(signal, fullCatalog);
     case 'groq':
-      return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, true, { signal });
+      return listOpenAiStyle('https://api.groq.com/openai/v1/models', key, !fullCatalog, { signal, fullCatalog });
     case 'cerebras':
-      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, true, { signal });
+      return listOpenAiStyle('https://api.cerebras.ai/v1/models', key, !fullCatalog, { signal, fullCatalog });
     case 'gemini':
-      return listGemini(key);
+      return listGemini(key, fullCatalog, signal);
     case 'xiaomi':
-      return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false, { signal });
+      return listOpenAiStyle('https://api.xiaomimimo.com/v1/models', key, false, { signal, fullCatalog });
     case 'ollama':
-      return listOllama(key);
+      return listOllama(key, fullCatalog);
     case 'lmstudio':
-      return listLmStudio(key, false);
+      return listLmStudio(key, false, fullCatalog);
     case 'custom':
-      return listCustom(key, signal);
+      if (!fullCatalog) return listCustom(key, signal);
+      if (!customBaseUrl()) throw new Error('Falta la dirección del servidor.');
+      return listOpenAiStyle(`${customBaseUrl()}/models`, key, false, { keyRequired: false, timeoutMs: 8000, signal, fullCatalog });
     case 'nodus':
-      return listNodusLocalChatModels();
+      return fullCatalog ? [...listNodusLocalChatModels(), ...listNodusLocalEmbeddingModels()] : listNodusLocalChatModels();
   }
 }
 
@@ -418,6 +461,11 @@ async function listCustom(key: string | null, signal?: AbortSignal): Promise<Mod
     // list still selects and still runs inference.
     remote = [];
   }
+  return mergeCustomModels(remote);
+}
+
+function mergeCustomModels(remote: ModelInfo[]): ModelInfo[] {
+  const manual: ModelInfo[] = customManualModels().map((id) => ({ id, name: id }));
   const typed = new Set(manual.map((model) => model.id));
   return [...manual.map(model => ({ ...remote.find(candidate => candidate.id === model.id), ...model })), ...remote.filter((model) => !typed.has(model.id))];
 }
@@ -485,16 +533,19 @@ const OPENCODE_GO_MODEL_NAMES: Record<string, string> = {
 /** Public catalogue documented by OpenCode Go. Authentication is required only
  * for inference, so Settings can show what the subscription offers before a key
  * is pasted. The response intentionally carries no inferred vision capability. */
-async function listOpenCodeGo(): Promise<ModelInfo[]> {
+async function listOpenCodeGo(signal?: AbortSignal, fullCatalog = false): Promise<ModelInfo[]> {
   // Unauthenticated, but still an OpenCode Go request: it needs the session
   // header like any other or it may start being rejected, which would empty the
   // model picker in Settings before a key is even pasted.
   const res = await fetch('https://opencode.ai/zen/go/v1/models', {
     headers: { 'User-Agent': nodusUserAgent(), 'x-opencode-session': openCodeGoSessionId() },
+    signal,
   });
   if (!res.ok) throw new Error(`OpenCode Go /models HTTP ${res.status}`);
   const data = (await res.json()) as { data?: { id?: string }[] };
-  return (data.data ?? [])
+  if (fullCatalog) requireCompleteCatalog(data);
+  if (fullCatalog && catalogRows<{ id?: string }>(data, 'data').some((model) => !model.id)) throw new Error('El proveedor no devolvió un catálogo de modelos válido.');
+  return catalogRows<{ id?: string }>(data, 'data', fullCatalog)
     .flatMap((model) => model.id ? [{ id: model.id, name: OPENCODE_GO_MODEL_NAMES[model.id] ?? model.id }] : [])
     .sort(byId);
 }
@@ -519,7 +570,7 @@ export async function listEmbeddingModels(provider: EmbeddingProvider, key: stri
   }
 }
 
-async function listAnthropic(key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
+async function listAnthropic(key: string | null, signal?: AbortSignal, fullCatalog = false): Promise<ModelInfo[]> {
   if (!key) throw new Error('Falta la clave de Anthropic.');
   const res = await fetch('https://api.anthropic.com/v1/models?limit=1000', {
     headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, signal,
@@ -528,7 +579,8 @@ async function listAnthropic(key: string | null, signal?: AbortSignal): Promise<
   const data = (await res.json()) as { data?: { id: string; display_name?: string;
     capabilities?: { effort?: { supported?: boolean } & Partial<Record<'low' | 'medium' | 'high' | 'xhigh' | 'max', { supported?: boolean }>> };
   }[] };
-  return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name,
+  if (fullCatalog) requireCompleteCatalog(data);
+  return catalogRows<NonNullable<typeof data.data>[number]>(data, 'data', fullCatalog).map((m) => ({ id: m.id, name: m.display_name,
     researchReasoningLevels: m.capabilities?.effort?.supported === true
       ? (['low', 'medium', 'high', 'xhigh', 'max'] as const).filter(level => m.capabilities?.effort?.[level]?.supported === true) : [],
   })).sort(byId);
@@ -546,7 +598,7 @@ async function listOpenAiStyle(
   url: string,
   key: string | null,
   filterChat: boolean,
-  options: { keyRequired?: boolean; timeoutMs?: number; signal?: AbortSignal } = {},
+  options: { keyRequired?: boolean; timeoutMs?: number; signal?: AbortSignal; fullCatalog?: boolean } = {},
 ): Promise<ModelInfo[]> {
   if (!key && options.keyRequired !== false) throw new Error('Falta la clave del proveedor.');
   const controller = new AbortController();
@@ -572,7 +624,8 @@ async function listOpenAiStyle(
       effort?: { supported_levels?: ModelInfo['researchReasoningLevels'] };
     }[];
   };
-  let models = (data.data ?? []).map((m) => ({
+  if (options.fullCatalog) requireCompleteCatalog(data);
+  let models = catalogRows<NonNullable<typeof data.data>[number]>(data, 'data', Boolean(options.fullCatalog)).map((m) => ({
     id: m.id,
     name: m.name,
     contextLength: m.context_window ?? m.max_context_length,
@@ -583,8 +636,7 @@ async function listOpenAiStyle(
   if (filterChat) {
     // Hide non-chat models. Groq's endpoint also returns Whisper, speech and
     // prompt-guard models alongside its conversational catalog.
-    const exclude = /embedding|whisper|tts|speech|orpheus|guard|dall-e|audio|realtime|moderation|image|davinci|babbage|computer-use|transcribe|search/i;
-    models = models.filter((m) => !exclude.test(m.id));
+    models = models.filter((m) => !NON_CHAT_MODEL.test(m.id));
   }
   return models.sort(byId);
 }
@@ -600,14 +652,15 @@ async function listOpenAiEmbeddingModels(key: string | null): Promise<ModelInfo[
     .sort(byId);
 }
 
-async function listOpenRouter(signal?: AbortSignal): Promise<ModelInfo[]> {
+async function listOpenRouter(signal?: AbortSignal, fullCatalog = false): Promise<ModelInfo[]> {
   // OpenRouter's model list is public (no key required).
   const res = await fetch('https://openrouter.ai/api/v1/models', signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
   const data = (await res.json()) as {
     data?: { id: string; name?: string; context_length?: number; top_provider?: { context_length?: number }; reasoning?: { supported_efforts?: ModelInfo['researchReasoningLevels'] }; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
   };
-  const models: ModelInfo[] = (data.data ?? []).map((m) => ({
+  if (fullCatalog) requireCompleteCatalog(data);
+  const models: ModelInfo[] = catalogRows<NonNullable<typeof data.data>[number]>(data, 'data', fullCatalog).map((m) => ({
     id: m.id,
     name: m.name,
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
@@ -639,16 +692,19 @@ async function listOpenRouterEmbeddingModels(key: string | null): Promise<ModelI
     .sort((a, b) => (a.group! === b.group! ? a.id.localeCompare(b.id) : a.group!.localeCompare(b.group!)));
 }
 
-async function listGemini(key: string | null): Promise<ModelInfo[]> {
+async function listGemini(key: string | null, fullCatalog = false, signal?: AbortSignal): Promise<ModelInfo[]> {
   if (!key) throw new Error('Falta la clave de Gemini.');
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1000`);
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}&pageSize=1000`, { signal });
   if (!res.ok) throw new Error(`Gemini /models HTTP ${res.status}`);
   const data = (await res.json()) as {
     models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
   };
-  return (data.models ?? [])
-    .filter((m) => (m.supportedGenerationMethods ?? []).includes('generateContent'))
-    .map((m) => ({ id: m.name.replace(/^models\//, ''), name: m.displayName }))
+  if (fullCatalog) requireCompleteCatalog(data);
+  return catalogRows<NonNullable<typeof data.models>[number]>(data, 'models', fullCatalog)
+    .filter((m) => fullCatalog || (m.supportedGenerationMethods ?? []).includes('generateContent'))
+    .map((m): ModelInfo => ({ id: m.name.replace(/^models\//, ''), name: m.displayName,
+      ...(fullCatalog ? { kind: (m.supportedGenerationMethods ?? []).includes('generateContent') ? 'llm' as const : 'other' as const } : {}),
+    }))
     .sort(byId);
 }
 
@@ -701,7 +757,7 @@ interface OllamaTag {
 }
 
 /** GET {base}/api/tags — the models pulled locally into Ollama. */
-async function listOllama(key: string | null): Promise<ModelInfo[]> {
+async function listOllama(key: string | null, fullCatalog = false): Promise<ModelInfo[]> {
   const base = localBaseUrl('ollama');
   let res: Response;
   try {
@@ -711,7 +767,10 @@ async function listOllama(key: string | null): Promise<ModelInfo[]> {
   }
   if (!res.ok) throw localError('ollama', base, `HTTP ${res.status}. ¿Está Ollama en marcha?`);
   const data = (await res.json()) as { models?: OllamaTag[] };
-  return (data.models ?? [])
+  if (fullCatalog && catalogRows<OllamaTag>(data, 'models').some((model) => !(model.model ?? model.name))) {
+    throw new Error('El proveedor no devolvió un catálogo de modelos válido.');
+  }
+  return catalogRows<OllamaTag>(data, 'models', fullCatalog)
     .map((m) => {
       const id = m.model ?? m.name ?? '';
       return {
@@ -748,7 +807,7 @@ interface LmStudioModel {
 
 /** GET {base}/api/v0/models — LM Studio's native list with loaded state + metadata.
  *  `embeddingsOnly` keeps only type "embeddings"; otherwise chat/vision models. */
-async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promise<ModelInfo[]> {
+async function listLmStudio(key: string | null, embeddingsOnly: boolean, fullCatalog = false): Promise<ModelInfo[]> {
   const base = localBaseUrl('lmstudio');
   let res: Response;
   try {
@@ -758,7 +817,8 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
   }
   if (!res.ok) throw localError('lmstudio', base, `HTTP ${res.status}. Activa el servidor local en LM Studio.`);
   const data = (await res.json()) as { data?: LmStudioModel[] };
-  const mapped = (data.data ?? [])
+  if (fullCatalog) requireCompleteCatalog(data);
+  const mapped = catalogRows<LmStudioModel>(data, 'data', fullCatalog)
     .map((m) => {
       const type = m.type;
       const kind: ModelInfo['kind'] =
@@ -780,7 +840,7 @@ async function listLmStudio(key: string | null, embeddingsOnly: boolean): Promis
         vision: kind === 'vlm' ? true : kind === 'llm' || kind === 'embeddings' ? false : undefined,
       } as ModelInfo;
     })
-    .filter((m) => m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings'));
+    .filter((m) => fullCatalog || (m.id && (embeddingsOnly ? m.kind === 'embeddings' : m.kind !== 'embeddings')));
   if (!embeddingsOnly) {
     try {
       const native = await localFetch(`${base}/api/v1/models`, key);

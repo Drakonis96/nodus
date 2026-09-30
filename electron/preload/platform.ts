@@ -107,6 +107,7 @@ export const platformApi: PlatformApi = {
   },
 
   listModels: (provider) => ipcRenderer.invoke('ai:listModels', provider),
+  getModelCatalog: (provider) => ipcRenderer.invoke('ai:modelCatalog', provider),
   listEmbeddingModels: (provider) => ipcRenderer.invoke('ai:listEmbeddingModels', provider),
   testLocalProvider: (provider) => ipcRenderer.invoke('ai:testLocalProvider', provider),
   testCustomProvider: () => ipcRenderer.invoke('ai:testCustomProvider'),

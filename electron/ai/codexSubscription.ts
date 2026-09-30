@@ -9,6 +9,7 @@ import type {
   ChatGptSubscriptionStatus,
   CodexReasoningEffort,
   ModelInfo,
+  ProviderModelCatalog,
   ReasoningEffort,
 } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
@@ -324,6 +325,10 @@ async function readModelCatalog(force = false): Promise<CodexModel[]> {
 }
 
 export async function listChatGptSubscriptionModels(): Promise<ModelInfo[]> {
+  return (await listChatGptSubscriptionModelCatalog()).selectableModels;
+}
+
+export async function listChatGptSubscriptionModelCatalog(): Promise<ProviderModelCatalog> {
   const status = await readStatus(false);
   if (!status.connected) {
     throw new ProviderRuntimeError('Conecta primero una suscripción de ChatGPT en Proveedores y modelos.', 'auth');
@@ -332,17 +337,19 @@ export async function listChatGptSubscriptionModels(): Promise<ModelInfo[]> {
   // Resolved once: finding it inside the comparator re-scanned the catalogue on
   // every comparison.
   const defaultId = models.find((model) => model.isDefault)?.id;
-  return models
-    .filter((model) => !model.hidden)
-    .map((model) => ({
-      id: model.id,
-      name: model.displayName || model.id,
-      vision: (model.inputModalities ?? ['text', 'image']).includes('image'),
-      reasoning: (model.supportedReasoningEfforts?.length ?? 0) > 0,
-      supportedReasoningEfforts: model.supportedReasoningEfforts,
-      defaultReasoningEffort: model.defaultReasoningEffort,
-    }))
-    .sort((a, b) => Number(b.id === defaultId) - Number(a.id === defaultId) || a.id.localeCompare(b.id));
+  const describe = (model: CodexModel): ModelInfo => ({
+    id: model.id,
+    name: model.displayName || model.id,
+    vision: (model.inputModalities ?? ['text', 'image']).includes('image'),
+    reasoning: (model.supportedReasoningEfforts?.length ?? 0) > 0,
+    supportedReasoningEfforts: model.supportedReasoningEfforts,
+    defaultReasoningEffort: model.defaultReasoningEffort,
+  });
+  return {
+    models: models.map(describe),
+    selectableModels: models.filter((model) => !model.hidden).map(describe)
+      .sort((a, b) => Number(b.id === defaultId) - Number(a.id === defaultId) || a.id.localeCompare(b.id)),
+  };
 }
 
 /** Text/vision completion backed by an ephemeral, isolated Codex thread. */

@@ -1,11 +1,9 @@
-import type { AppSettings, ModelRef } from './types';
+import type { AppSettings, ModelCatalogResult, ModelRef } from './types';
 import { GRANULAR_MODEL_KEYS } from './modelSettings';
 
 /**
- * Favourites and task selections can name a model its provider no longer serves (a retired or
- * legacy id such as DeepSeek's `deepseek-v4-flash`). These helpers find them against the
- * providers' live catalogues and rewrite them, so the user can clean up without editing every
- * task selector by hand.
+ * Find favourites absent from successfully read provider catalogues. Unlisted aliases may
+ * still serve inference: absence is a cleanup candidate, never proof of retirement.
  */
 
 /** Every single-model setting that selects a text/vision model for a task. */
@@ -16,15 +14,13 @@ export type TaskModelKey = (typeof TASK_MODEL_KEYS)[number];
 const same = (a: ModelRef | null | undefined, b: ModelRef | null | undefined) =>
   Boolean(a && b && a.provider === b.provider && a.model === b.model);
 
-/** A provider's live catalogue: the ids it lists, or null when it could not be read (no key,
- *  offline, an error). A null catalogue never marks anything stale. */
-export type ModelCatalogues = Map<string, Set<string> | null>;
+export type ModelCatalogues = Map<string, ModelCatalogResult>;
 
 /** Favourites whose provider catalogue was read and does not list them. */
 export function staleFavorites(favorites: readonly ModelRef[], catalogues: ModelCatalogues): ModelRef[] {
   return favorites.filter((model) => {
-    const listed = catalogues.get(model.provider);
-    return listed != null && !listed.has(model.model);
+    const catalog = catalogues.get(model.provider);
+    return catalog?.status === 'read' && !catalog.models.some((listed) => listed.id === model.model);
   });
 }
 
