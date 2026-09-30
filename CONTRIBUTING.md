@@ -84,6 +84,12 @@ npm run test:e2e
 The full end-to-end suite launches the real desktop app and is most reliable on
 macOS, which is also the platform used by the main CI job.
 
+CI compiles the current commit once, runs the complete test inventory across three
+isolated macOS groups, and runs all four real-app E2E checks in parallel. The final
+`test` check verifies complete execution as well as successful capability checks
+on Linux, macOS and Windows. See [CI execution and measurement](docs/ci-performance.md)
+for the inventory reports, cache behavior, and performance validation procedure.
+
 ## Publishing releases
 
 Stable and Beta are separate GitHub Actions entry points backed by the shared
