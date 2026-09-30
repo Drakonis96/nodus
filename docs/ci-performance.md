@@ -42,6 +42,10 @@ build hash manifest. Consumers use that verified file and fail if it is missing
 or empty, avoiding duplicate compilation at parallel test startup. All browser
 assertions still inspect the real generated stylesheet. Local tests retain their
 existing stylesheet preparation unless the CI artifact path is explicitly set.
+The group assigned the Drift audio fixture verifies working `ffmpeg` and `ffprobe` binaries, installing or
+repairing the Homebrew formula only when necessary. This keeps the Drift audio
+fixture's duration, channels, sample rate and loop-seam assertions active; a
+missing tool is not accepted as an additional skip.
 
 The attachment integration fixture intercepts structured planner inference as well
 as text/stream inference. It retains the literal planning fallback and all format,

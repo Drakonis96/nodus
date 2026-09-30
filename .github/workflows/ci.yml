@@ -141,6 +141,27 @@ jobs:
         run: npx electron-builder install-app-deps
       - name: Prepare hash-verified local OCR test resource
         run: node scripts/prepare-research-ocr-fixture.mjs
+      - name: Verify audio measurement tools for the complete suite
+        # Runner images can lack working FFmpeg binaries. The audio fixture
+        # must measure duration/channels/seams rather than introduce a new skip.
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          requires_audio=$(node -e "const plan = require('./.ci/plan.json'); const group = plan.shards.find(s => s.index === Number(process.env.SHARD_INDEX)); if (!group) throw Error('Missing test group'); console.log(group.files.includes('scripts/test-drift-assets.mjs'));")
+          if [ "$requires_audio" != true ]; then
+            exit 0
+          fi
+          if ! ffmpeg -version >/dev/null 2>&1 || ! ffprobe -version >/dev/null 2>&1; then
+            if brew list --versions ffmpeg >/dev/null 2>&1; then
+              brew reinstall ffmpeg
+            else
+              brew install ffmpeg
+            fi
+          fi
+          ffmpeg -version >/dev/null
+          ffprobe -version >/dev/null
       - name: Unit and integration tests
         # Keep the proven two-file memory bound on each independent runner.
         run: npm run test:ci:shard -- ${{ matrix.shard }}
