@@ -167,9 +167,10 @@ try {
   server.sweepIdleSessions();
   assert.equal(server.__sessionCountForTest(), 1, 'fresh session survives the sweep');
 
-  // With the TTL collapsed to zero the same session is now "idle" and evicted.
+  // With the TTL collapsed to zero, advance the sweep clock past the last
+  // activity. A sweep in that same millisecond correctly keeps the session.
   server.__setSessionIdleTtlForTest(0);
-  server.sweepIdleSessions();
+  server.sweepIdleSessions(Date.now() + 1);
   assert.equal(server.__sessionCountForTest(), 0, 'idle session is swept');
 
   await client.close().catch(() => {});
