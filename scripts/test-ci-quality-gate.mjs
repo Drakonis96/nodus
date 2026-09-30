@@ -111,11 +111,15 @@ test('real child processes report every file, propagate assertion failures, and 
 test('build transfer rejects missing outputs, corruption and another commit', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-ci-build-'));
   try {
-    for (const file of ['dist/index.html', 'dist-electron/main.js', 'server/dist/web/index.html', 'cloudflare/dist/worker.mjs']) {
+    for (const file of ['dist/index.html', 'dist-electron/main.js', 'server/dist/web/index.html', 'cloudflare/dist/worker.mjs',
+      'cloudflare/src/generated/mutableTables.mjs', 'server/lib/core/generatedMutableTables.mjs', 'electron/serverSync/generatedMutableTables.ts']) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), file);
     }
     const manifest = createBuildManifest(root, commit);
     verifyBuildManifest(root, commit, manifest);
+    fs.appendFileSync(path.join(root, 'electron/serverSync/generatedMutableTables.ts'), '\nchanged generator output');
+    assert.throws(() => verifyBuildManifest(root, commit, manifest), /hash mismatch/);
+    fs.writeFileSync(path.join(root, 'electron/serverSync/generatedMutableTables.ts'), 'electron/serverSync/generatedMutableTables.ts');
     assert.throws(() => verifyBuildManifest(root, 'b'.repeat(40), manifest), /different commit/);
     fs.appendFileSync(path.join(root, 'dist-electron/main.js'), '\ncorrupted');
     assert.throws(() => verifyBuildManifest(root, commit, manifest), /hash mismatch/);

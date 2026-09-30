@@ -16,7 +16,9 @@ duplicate, cancelled, failed or stale reports fail the gate. New skipped tests
 also fail; only the two exact skip names/reasons present in the baseline run are
 accepted. Existing assertions and E2E timeouts are unchanged.
 
-Build outputs travel in a tar archive to retain native helper permissions. The
+Build outputs and the contract sources generated during preparation travel in a
+tar archive to retain native helper permissions. Source-driven tests therefore
+see the same generated files as the original single job. The
 manifest verifies their SHA-256 hashes and the exact checked-out commit before
 tests start. Artifacts are scoped to the current workflow run. A failed-job rerun
 reuses the successful build's artifact ID and replaces only retried group reports;
