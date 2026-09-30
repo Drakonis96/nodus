@@ -77,3 +77,16 @@ the corrected verifier from the exact workflow commit before packaging. This
 build-only script is outside the packaged file patterns; the tagged application,
 recordings, legal notices and corresponding-source reference remain unchanged.
 Later release tags include the corrected verifier directly.
+
+## CI metadata recovery
+
+The post-merge CI exposed two packaging assertions still expecting v5.7.2 and
+a sitemap generated before the release metadata commit. The v4 compatibility
+and Zotero packaging tests now compare their version, source tag and citation
+date with the current package metadata instead of embedding a release number.
+The sitemap is regenerated after the content commit so its four affected dates
+match the source history. The focused suites pass all 93 tests.
+
+The v5.7.3 Zotero release job also obtains the corrected test from the exact
+workflow commit. Its tagged plugin code, source offer, generated XPI and update
+manifest are unchanged by this test-only recovery.
