@@ -180,16 +180,25 @@ export interface ResearchEvidence {
 
 export interface ResearchTraversal {
   sourceCoverage?: Array<{ documentId: string; title: string; reasons: string[] }>;
+  /** Sources whose individual detail was replaced by counts, once per reason per source. */
+  omittedSourceCoverage?: { count: number; reasonCounts: Record<string, number> };
   decisionTokens?: number;
   matchedDocumentIds?: string[];
   readDocumentIds?: string[];
+  /** Authorized individual operations, including empty, unavailable or budget-blocked reads. */
+  attemptedDocumentIds?: string[];
+  catalogDocumentIds?: string[];
+  /** Sources behind consulted ideas or graph records, without claiming a text match or read. */
+  contextDocumentIds?: string[];
   limitations?: string[];
   scopeId: string;
   sourceCount: number;
   rounds: number;
   evidenceTokens: number;
   partial: boolean;
-  queries: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }>;
+  queries: Array<{ query: string; sources: string[]; candidates: number; partial: boolean;
+    /** A stored whole-scope search references its scope instead of repeating every ID. */
+    scope?: { id: string; sourceCount: number } }>;
 }
 
 /** What each limitation code means, for a model prompt. Codes and field names are
@@ -231,15 +240,34 @@ export interface ResearchScopePromptFocus {
 }
 type ScopePromptSource = { title: string; authors?: string[]; year?: number; passages_found: boolean; original_read?: true; notes?: string[] };
 
-/** The coverage record kept with a chat turn. A library-wide scope listed every source (14,051
- *  entries, ~3 MB per turn in the vault and over IPC). Past `STORED_COVERAGE_LIMIT` only the consulted
- *  sources are kept; `sourceCount` still gives the whole scope. */
+/** Large chat records keep the turn's sources and summarize the rest. Whole-scope
+ * searches reference the scope; individual attempts keep their IDs, even without hits.
+ * Only the stored copy is compacted: the live run and model prompt retain full coverage. */
 export const STORED_COVERAGE_LIMIT = 60;
 export function compactResearchTraversal(coverage: ResearchTraversal): ResearchTraversal {
   const all = coverage.sourceCoverage ?? [];
-  if (all.length <= STORED_COVERAGE_LIMIT) return coverage;
-  const consulted = new Set([...(coverage.matchedDocumentIds ?? []), ...(coverage.readDocumentIds ?? [])]);
-  return { ...coverage, sourceCoverage: all.filter(source => consulted.has(source.documentId)) };
+  if (all.length <= STORED_COVERAGE_LIMIT || coverage.omittedSourceCoverage) return coverage;
+  const scopeIds = new Set(all.map(source => source.documentId));
+  const completeScope = all.length === coverage.sourceCount && scopeIds.size === coverage.sourceCount;
+  const queries = coverage.queries.map(query => completeScope && query.sources.length === scopeIds.size
+    && query.sources.every(id => scopeIds.has(id)) && new Set(query.sources).size === scopeIds.size
+    ? { ...query, sources: [], scope: { id: coverage.scopeId, sourceCount: coverage.sourceCount } } : query);
+  const involved = new Set([...(coverage.matchedDocumentIds ?? []), ...(coverage.readDocumentIds ?? []),
+    ...(coverage.attemptedDocumentIds ?? []), ...(coverage.catalogDocumentIds ?? []), ...(coverage.contextDocumentIds ?? []),
+    ...queries.flatMap(query => query.sources)]);
+  const kept: NonNullable<ResearchTraversal['sourceCoverage']> = [];
+  const counts = new Map<string, number>();
+  let omitted = 0;
+  for (const source of all) {
+    if (involved.has(source.documentId)) kept.push(source);
+    else {
+      omitted++;
+      for (const reason of new Set(source.reasons)) counts.set(reason, (counts.get(reason) ?? 0) + 1);
+    }
+  }
+  if (!omitted && queries.every((query, index) => query === coverage.queries[index])) return coverage;
+  return { ...coverage, sourceCoverage: kept, queries,
+    ...(omitted ? { omittedSourceCoverage: { count: omitted, reasonCounts: Object.fromEntries(counts) } } : {}) };
 }
 
 /** The run's coverage as a model should read it: titles and plain descriptions, without

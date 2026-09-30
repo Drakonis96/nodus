@@ -113,6 +113,7 @@ try {
   assert.match(payloads[1].coordinator_note, /Only 3 sources support/);
   assert.ok(payloads[1].coordinator_note.includes(idOf('c8')) && payloads[1].coordinator_note.includes(idOf('rf')), 'the refusal names the unread candidates');
   assert.ok(run.catalogHits.has(idOf('pe')), 'a catalogue action of the supervisor runs');
+  assert.deepEqual(run.coverage().catalogDocumentIds, [...run.catalogHits.keys()], 'the stored traversal receives catalogue finds');
   assert.equal(payloads[2].coordinator_note, undefined, 'a note is shown once');
   assert.match(payloads[4].coordinator_note, new RegExp(idOf('c8')));
   assert.ok(!payloads[4].coordinator_note.includes(idOf('rf')), 'a source already read is no longer a candidate');
@@ -164,6 +165,71 @@ try {
   assert.equal(followUp.evidence.get(receipt.passage_id).summary, 'Libro, literatura y relato: de mayor a menor amplitud nocional.');
   assert.ok(followUp.matchedDocuments.has(idOf('gu')));
   assert.equal(followUp.seedPriorEvidence(cited), 1, 'a passage already carried is not charged twice');
+
+  // A large turn must also remember failed and empty individual operations. In
+  // particular, readOriginal returns early when a local original is unavailable.
+  for (let i = 0; i < 65; i++) db.prepare("INSERT INTO works(nodus_id,zotero_key,title,authors_json,item_type,source_type) VALUES(?,?,?,'[]','book','text')")
+    .run(`coverage-${i}`, `coverage-${i}`, `Coverage source ${i}`);
+  const largeScope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
+  const documentId = i => largeScope.documents.find(document => document.workId === `coverage-${i}`).id;
+  const emptyRetrieval = preparation.retrieveSharedDocumentaryEvidence;
+  let emptyReads = 0;
+  preparation.retrieveSharedDocumentaryEvidence = async () => { emptyReads++; return { evidence: [], traversal: { rounds: 1, candidates: 0, partial: false } }; };
+  try {
+    const empty = new ResearchCorpusRun(largeScope, RESEARCH_CHAT_AGENT_SETTINGS);
+    empty.catalog({ title: 'Coverage source 3' });
+    await empty.readDocument(documentId(0), { kind: 'search', query: 'absent term' });
+    await empty.readOriginal(documentId(1), { kind: 'pages', from: 1 });
+    empty.budget.usedEvidenceTokens = empty.budget.evidenceTokenLimit - 255;
+    await empty.readOriginal(documentId(2), { kind: 'pages', from: 1 });
+    await empty.readDocument(documentId(8), { kind: 'search', query: 'budget-blocked search' });
+    await assert.rejects(() => empty.readDocument('unauthorized', { kind: 'search', query: 'absent' }), /not_authorized/);
+    await assert.rejects(() => empty.readOriginal('unauthorized', { kind: 'pages', from: 1 }), /not_authorized/);
+    const full = empty.coverage();
+    assert.deepEqual(full.attemptedDocumentIds, [documentId(0), documentId(1), documentId(2), documentId(8)]);
+    assert.equal(emptyReads, 1, 'budget-blocked searches do not dispatch retrieval');
+    assert.deepEqual(full.matchedDocumentIds, []);
+    assert.deepEqual(full.readDocumentIds, []);
+    assert.ok(full.limitations.includes('no_matches'));
+    assert.ok(full.limitations.includes('original_unavailable'));
+    assert.ok(full.limitations.includes('budget_exhausted'));
+    const { compactResearchTraversal } = load('shared/researchCorpus.ts');
+    const compact = compactResearchTraversal(full);
+    for (const id of [...full.attemptedDocumentIds, ...full.catalogDocumentIds]) assert.ok(compact.sourceCoverage.some(source => source.documentId === id), `${id}: retained without evidence`);
+    assert.equal(compact.sourceCoverage.length + compact.omittedSourceCoverage.count, full.sourceCount);
+    assert.equal(full.sourceCoverage.length, full.sourceCount, 'compaction leaves the live run intact');
+    const chats = load('electron/db/chatRepo.ts');
+    const conversation = chats.createConversation({ title: 'Coverage round trip' });
+    const stats = { sections: [], works: 0, documents: 0, summaries: 0, passages: 0, contextChars: 0, truncated: full.partial, researchTraversal: compact };
+    chats.saveMessages(conversation.id, [{ id: 'coverage-message', role: 'assistant', content: 'No evidence', stats }]);
+    assert.deepEqual(chats.getConversation(conversation.id).messages[0].stats.researchTraversal, compact, 'coverage detail, attempts and counts survive the actual chat repository');
+    db.prepare("INSERT INTO ideas(global_id,type,label,statement) VALUES ('coverage-idea','claim','Coverage idea','coverage marker')").run();
+    db.prepare("INSERT INTO idea_occurrences(global_id,nodus_id,role,confidence) VALUES ('coverage-idea','coverage-4','principal',1)").run();
+    db.prepare("INSERT INTO gaps(id,nodus_id,kind,statement,confidence) VALUES ('coverage-gap','coverage-5','open_question','coverage missing comparison',0.9)").run();
+    db.prepare("INSERT INTO ideas(global_id,type,label,statement) VALUES ('coverage-counterclaim','claim','Coverage counterclaim','coverage contrary marker')").run();
+    db.prepare("INSERT INTO idea_occurrences(global_id,nodus_id,role,confidence) VALUES ('coverage-counterclaim','coverage-6','principal',1)").run();
+    db.prepare("INSERT INTO edges(id,from_id,to_id,type,basis,confidence,source_work) VALUES ('coverage-edge','coverage-idea','coverage-counterclaim','contradicts','explicit',0.9,'coverage-7')").run();
+    const ideasOnly = new ResearchCorpusRun(largeScope, RESEARCH_CHAT_AGENT_SETTINGS);
+    ideasOnly.layers = { ideas: true, documents: false };
+    const snapshot = await ideasOnly.snapshot({ kind: 'research_question', objective: 'coverage marker', language: 'en' });
+    assert.ok(snapshot.ideas.some(idea => idea.id === 'coverage-idea'));
+    assert.ok(snapshot.gaps.some(gap => gap.id === 'coverage-gap'));
+    assert.ok(snapshot.contradictions.some(edge => edge.id === 'coverage-edge'));
+    assert.equal(snapshot.passages.length, 0);
+    const ideaCoverage = ideasOnly.coverage();
+    assert.deepEqual(ideaCoverage.matchedDocumentIds, []);
+    assert.deepEqual(ideaCoverage.readDocumentIds, []);
+    for (const i of [4, 5, 6, 7]) {
+      assert.ok(ideaCoverage.contextDocumentIds.includes(documentId(i)), `context source ${i}: tracked`);
+      assert.ok(compactResearchTraversal(ideaCoverage).sourceCoverage.some(source => source.documentId === documentId(i)), `context source ${i}: survives without document reads or matches`);
+    }
+    assert.equal(emptyReads, 1, 'the ideas-only turn never dispatches documentary retrieval');
+    const storedIdeas = compactResearchTraversal(ideaCoverage);
+    assert.deepEqual(storedIdeas.queries[0].scope, { id: largeScope.id, sourceCount: largeScope.documents.length });
+    assert.deepEqual(storedIdeas.queries[0].sources, []);
+    chats.saveMessages(conversation.id, [{ id: 'coverage-context-message', role: 'assistant', content: 'Ideas only', stats: { ...stats, researchTraversal: storedIdeas } }]);
+    assert.deepEqual(chats.getConversation(conversation.id).messages[0].stats.researchTraversal, storedIdeas, 'scope references and graph-source coverage survive the actual chat repository');
+  } finally { preparation.retrieveSharedDocumentaryEvidence = emptyRetrieval; }
   console.log('Research chat agent: follow-up planning, catalogue by author, groundwork reads, refused premature finishes and carried citations passed.');
 } finally {
   load('electron/ai/documentaryPreparation.ts').closeDocumentaryPreparation();
