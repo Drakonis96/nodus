@@ -351,8 +351,11 @@ export function cachedModelContextWindow(provider: AiProvider, model: string): n
 }
 export async function listModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
   const endpoint = openAiCompatBase(provider);
-  const models = researchTestProviderModels(provider, 'chat') ?? await fetchModels(provider, key, signal);
-  rememberModelContextWindows(provider, models, endpoint);
+  const testModels = researchTestProviderModels(provider, 'chat');
+  const models = testModels ?? await fetchModels(provider, key, signal);
+  // Custom discovery can fall back to manual IDs on failure. Only its successful
+  // remote catalogue may replace known windows; listCustom records that snapshot.
+  if (provider !== 'custom' || testModels) rememberModelContextWindows(provider, models, endpoint);
   return models;
 }
 async function fetchModels(provider: AiProvider, key: string | null, signal?: AbortSignal): Promise<ModelInfo[]> {
@@ -408,15 +411,19 @@ async function listCustom(key: string | null, signal?: AbortSignal): Promise<Mod
   const base = customBaseUrl();
   if (!base) return manual;
   let remote: ModelInfo[] = [];
+  let catalogueAvailable = false;
   try {
     remote = await listOpenAiStyle(`${base}/models`, key, false, { keyRequired: false, timeoutMs: 8000, signal });
+    catalogueAvailable = true;
   } catch {
     // Endpoint has no catalogue, is unreachable, or rejects the key: the manual
     // list still selects and still runs inference.
     remote = [];
   }
   const typed = new Set(manual.map((model) => model.id));
-  return [...manual.map(model => ({ ...remote.find(candidate => candidate.id === model.id), ...model })), ...remote.filter((model) => !typed.has(model.id))];
+  const models = [...manual.map(model => ({ ...remote.find(candidate => candidate.id === model.id), ...model })), ...remote.filter((model) => !typed.has(model.id))];
+  if (catalogueAvailable) rememberModelContextWindows('custom', models, base);
+  return models;
 }
 
 /**

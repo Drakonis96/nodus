@@ -67,6 +67,7 @@ let enrichmentFails = false;
 let privateCerebrasLimit;
 let catalogueReads = 0;
 let holdCustomCatalogue = false;
+let customCatalogueFails = false;
 let releaseCustomCatalogue;
 globalThis.fetch = (input, init) => {
   const url = new URL(typeof input === 'string' || input instanceof URL ? input : input.url);
@@ -101,6 +102,7 @@ globalThis.fetch = (input, init) => {
     if (url.hostname === 'api.openai.com') return Promise.resolve(json({ data: [{ id: 'gpt-6.1-sol' }] }));
     if (url.hostname === 'openrouter.ai') return Promise.resolve(json({ data: [{ id: 'anthropic/claude-opus-5-5', context_length: 1_000_000, top_provider: { context_length: 4096 } }] }));
     if (url.origin === new URL(base).origin) {
+      if (customCatalogueFails) return Promise.reject(new Error('Custom catalogue unavailable'));
       const response = json({ data: [url.pathname.includes('/gateway-a/')
         ? { id: 'same-id', context_length: 131_072 }
         : { id: 'same-id', context_window: 0, max_model_len: 8192 }] });
@@ -205,6 +207,12 @@ try {
   assert.deepEqual(await ai.researchModelContextWindow({ provider: 'custom', model: 'same-id' }), { tokens: 32768, known: false });
   await providers.listModels('custom', null);
   assert.equal((await ai.researchModelContextWindow({ provider: 'custom', model: 'same-id' })).tokens, 8192);
+  settings.updateSettings({ customProvider: { baseUrl: `${base}/gateway-b/v1`, models: ['same-id'] } });
+  customCatalogueFails = true;
+  assert.deepEqual((await providers.listModels('custom', null)).map(model => model.id), ['same-id'], 'manual models still work when discovery fails');
+  assert.equal((await ai.researchModelContextWindow({ provider: 'custom', model: 'same-id' })).tokens, 8192, 'best-effort discovery failure preserves a known smaller window');
+  await refused({ provider: 'custom', model: 'same-id' }, 10_000);
+  customCatalogueFails = false;
   console.log('OpenRouter and custom gateways: route caps, metadata variants and endpoint isolation passed.');
 
   settings.updateSettings({ localProviders: { lmstudio: { baseUrl: base } } });
