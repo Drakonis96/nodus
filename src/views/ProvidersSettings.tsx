@@ -21,12 +21,13 @@ import {
   normalizeCustomModels,
   supportsFreeTierShaping,
 } from '@shared/providers';
-import { AI_PROVIDERS, PROVIDER_LABELS, Icon, isLocalAiProvider, modelLabel, sameModel } from '../components/ui';
+import { AI_PROVIDERS, PROVIDER_LABELS, Icon, isLocalAiProvider, sameModel } from '../components/ui';
 import { IMAGE_PROVIDER_LABELS } from '@shared/providers';
 import { SettingsModelDot, SettingsModelList, settingsModelRowClass } from '../components/SettingsModelList';
 import { codexReasoningLabel } from '../components/ModelPicker';
 import { withCodexReasoning } from '@shared/codexReasoning';
 import { t, tx } from '../i18n';
+import { FavoriteModelAvailability } from '../components/FavoriteModelAvailability';
 
 export function ProvidersSettings({
   settings,
@@ -41,6 +42,11 @@ export function ProvidersSettings({
 
   const favorites = settings.favorites ?? [];
   const isFav = (m: ModelRef) => favorites.some((f) => sameModel(f, m));
+  const [catalogRevision, setCatalogRevision] = useState(0);
+  const refreshProviders = async () => {
+    setCatalogRevision((value) => value + 1);
+    await onChange();
+  };
 
   const toggleFav = async (m: ModelRef) => {
     const currentlyFav = isFav(m);
@@ -74,7 +80,7 @@ export function ProvidersSettings({
                 setRecoveryMessage(null);
                 try {
                   const result = await window.nodus.recoverApiKeys();
-                  await onChange();
+                  await refreshProviders();
                   setRecoveryMessage(result.remainingLockedProviders.length === 0
                     ? t('Claves recuperadas y protegidas de nuevo correctamente.')
                     : t('Algunas claves siguen bloqueadas. Vuelve a intentarlo y acepta el acceso al Llavero.'));
@@ -93,25 +99,7 @@ export function ProvidersSettings({
       )}
 
       {/* Favorites feed every independent workload/feature selector. */}
-      <div className="mb-4 text-sm">
-        <div className="text-neutral-400">{t('Modelos favoritos para los selectores independientes')}</div>
-        {favorites.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {favorites.map((m) => (
-              <span
-                key={`${m.provider}::${m.model}`}
-                className="flex items-center gap-1 rounded bg-neutral-800 px-2 py-0.5 text-xs text-neutral-300"
-              >
-                <Icon name="star" size={12} className="shrink-0 fill-current text-amber-400" />
-                <span>{modelLabel(m)}</span>
-                <button className="ml-0.5 grid h-4 w-4 shrink-0 place-items-center rounded text-neutral-500 hover:bg-neutral-700 hover:text-red-400" title={t('Quitar de favoritos')} aria-label={t('Quitar de favoritos')} onClick={() => toggleFav(m)}>
-                  <Icon name="x" size={10} />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
+      <FavoriteModelAvailability settings={settings} revision={catalogRevision} toggleFav={toggleFav} onChange={refreshProviders} />
 
       <div className="space-y-2">
         {AI_PROVIDERS.map((p) =>
@@ -121,7 +109,7 @@ export function ProvidersSettings({
               settings={settings}
               expanded={open === p}
               onToggle={() => setOpen(open === p ? null : p)}
-              onChange={onChange}
+              onChange={refreshProviders}
               isFav={isFav}
               toggleFav={toggleFav}
             />
@@ -139,7 +127,7 @@ export function ProvidersSettings({
               settings={settings}
               expanded={open === p}
               onToggle={() => setOpen(open === p ? null : p)}
-              onChange={onChange}
+              onChange={refreshProviders}
               isFav={isFav}
               toggleFav={toggleFav}
             />
@@ -150,7 +138,7 @@ export function ProvidersSettings({
               settings={settings}
               expanded={open === p}
               onToggle={() => setOpen(open === p ? null : p)}
-              onChange={onChange}
+              onChange={refreshProviders}
               isFav={isFav}
               toggleFav={toggleFav}
             />
@@ -161,7 +149,7 @@ export function ProvidersSettings({
               settings={settings}
               expanded={open === p}
               onToggle={() => setOpen(open === p ? null : p)}
-              onChange={onChange}
+              onChange={refreshProviders}
               isFav={isFav}
               toggleFav={toggleFav}
             />

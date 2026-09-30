@@ -67,6 +67,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
+import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
@@ -123,6 +124,7 @@ export const ZH_TW: Record<string, string> = {
   ...DEEP_RESEARCH_APPROACH_TRANSLATIONS['zh-TW'],
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS['zh-TW'],
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS['zh-TW'],
+  ...STALE_MODEL_TRANSLATIONS['zh-TW'],
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS['zh-TW'],
   ...TEXT_PROVENANCE_TRANSLATIONS['zh-TW'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['zh-TW'],

@@ -73,6 +73,7 @@ import { DEEP_RESEARCH_APPROACH_TRANSLATIONS } from './i18n.deepResearchApproach
 import { DICTIONARY_TRANSLATIONS } from './i18n.dictionary';
 import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions';
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
+import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
@@ -127,6 +128,7 @@ export const PT_BR: Record<string, string> = {
   ...DEEP_RESEARCH_APPROACH_TRANSLATIONS['pt-BR'],
   ...DEEP_RESEARCH_VERSION_TRANSLATIONS['pt-BR'],
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS['pt-BR'],
+  ...STALE_MODEL_TRANSLATIONS['pt-BR'],
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS['pt-BR'],
   ...TEXT_PROVENANCE_TRANSLATIONS['pt-BR'],
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS['pt-BR'],

@@ -42,6 +42,7 @@ import type {
   McpTunnelConnectInput,
   McpTunnelStatus,
   ModelInfo,
+  ModelCatalogResult,
   NodusServerOverview,
   NodusServerPairResult,
   ServerInboxEntry,
@@ -177,6 +178,7 @@ export interface PlatformApi {
 
   // AI model discovery
   listModels(provider: AiProvider): Promise<ModelInfo[]>;
+  getModelCatalog(provider: AiProvider): Promise<ModelCatalogResult>;
   listEmbeddingModels(provider: EmbeddingProvider): Promise<ModelInfo[]>;
   listImageModels(): Promise<ImageModelInfo[]>;
   getNodusLocalAiStatus(): Promise<NodusLocalAiStatus>;
