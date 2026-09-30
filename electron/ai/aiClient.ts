@@ -80,7 +80,7 @@ import {
   parseGeminiBatchEmbeddingResponse,
 } from './geminiEmbeddings';
 import { completeGeminiDeterministicJson } from './geminiDeterministicCompletion';
-import { withTransportDeadline } from './transportDeadline';
+import { withIdleTransportDeadline, withTransportDeadline } from './transportDeadline';
 import {
   buildLocalRequestPlan,
   recordLocalAiDiagnostic,
@@ -396,6 +396,8 @@ function truncatedOutputMessage(model: ModelRef, maxTokens: number): string {
  * finite because a wedged local server must not hold the scan queue open forever.
  */
 const CLOUD_COMPLETION_TIMEOUT_MS = 180_000;
+/** The outer bound on one streamed answer; the stream's own deadline is idle time. */
+const STREAM_TOTAL_MS = 30 * 60_000;
 const ON_DEVICE_COMPLETION_TIMEOUT_MS = 1_200_000;
 
 /**
@@ -2185,10 +2187,14 @@ async function rawCompleteStreamTransport(
   // The last chunk's `finish_reason` is the only truncation signal on this transport; capture it
   // so a stream cut at the output ceiling is reported instead of silently stored as the answer.
   let finishReason: string | undefined;
+  let streamChunks = 0;
+  let streamReasoningChars = 0;
+  const streamStarted = Date.now();
   const consumeStream = async (
     streamClient: InstanceType<typeof OpenAI>,
     body: any,
     transportSignal: AbortSignal,
+    touch: () => void = () => {},
   ): Promise<void> => {
     const contentBefore = full.length;
     try {
@@ -2203,9 +2209,12 @@ async function rawCompleteStreamTransport(
           }
           throw new AiError(msg, false);
         }
+        touch();
         const choice = chunk?.choices?.[0];
         if (choice?.finish_reason) finishReason = choice.finish_reason;
         const delta = choice?.delta;
+        streamChunks += 1;
+        streamReasoningChars += String(delta?.reasoning ?? delta?.reasoning_content ?? '').length;
         emitReasoning(delta?.reasoning ?? delta?.reasoning_content);
         emitContent(delta?.content);
       }
@@ -2216,14 +2225,17 @@ async function rawCompleteStreamTransport(
       throw error;
     }
   };
-  const executeStream = (body: any) => withTransportDeadline(
+  // Idle, not total: a reasoning stream that keeps sending chunks is working, however long it
+  // thinks. STREAM_TOTAL_MS still bounds a provider that never finishes.
+  const executeStream = (body: any) => withIdleTransportDeadline(
     streamTimeoutMs,
+    Math.max(streamTimeoutMs, STREAM_TOTAL_MS),
     signal ?? opts.signal,
-    (transportSignal) => model.provider === 'nodus'
+    (transportSignal, touch) => model.provider === 'nodus'
       ? withNodusLocalServerLease(model.model, 'chat', (apiUrl) => consumeStream(new OpenAI({
           apiKey: key, baseURL: apiUrl, timeout: streamTimeoutMs, maxRetries: 0,
-        }), body, transportSignal))
-      : consumeStream(client, body, transportSignal),
+        }), body, transportSignal, touch))
+      : consumeStream(client, body, transportSignal, touch),
   );
   /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
   const replayStream = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
@@ -2279,7 +2291,12 @@ async function rawCompleteStreamTransport(
   if (/^(length|max_tokens|max_output_tokens)$/i.test(finishReason ?? '')) {
     throw new AiError(truncatedOutputMessage(model, maxTokens), false, false, 'output_truncated');
   }
-  if (!answer.trim()) throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  if (!answer.trim()) {
+    // Say what came back: a stream that ended after reasoning only, with no finish reason, reads
+    // the same to the user as an outage (hard synthesis routes on deepseek-flash, thinking high).
+    console.error(`[compat-stream] empty answer finish_reason=${finishReason ?? 'none'} chunks=${streamChunks} reasoning_chars=${streamReasoningChars} max_tokens=${maxTokens} elapsed_ms=${Date.now() - streamStarted} model=${model.provider}/${model.model}`);
+    throw new AiError('Respuesta vacía del proveedor de IA.', false);
+  }
   return answer;
 }
 
