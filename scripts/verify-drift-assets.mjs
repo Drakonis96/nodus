@@ -40,18 +40,24 @@ export function locateAsar(input) {
  * drift audio path into a scratch directory, then judge that directory. Nothing is trusted
  * from the archive's own listing beyond the paths.
  */
-export async function auditAsar({ asarPath, definitions, drift }) {
-  const asar = await import('@electron/asar');
-  const listing = asar.listPackage(asarPath, { isPack: false }).map((entry) => entry.replace(/\\/g, '/').replace(/^\//, ''));
+export async function auditAsar({ asarPath, definitions, drift, asarApi }) {
+  const asar = asarApi ?? await import('@electron/asar');
+  // ASAR's filesystem lookup uses the host separator. Keep its native listing
+  // paths for stat/extract, and normalize only the paths used by our catalogue.
+  const entries = asar.listPackage(asarPath, { isPack: false }).map((entry) => ({
+    nativePath: entry.replace(/^[/\\]/, ''),
+    cataloguePath: entry.replace(/\\/g, '/').replace(/^\//, ''),
+  }));
+  const listing = entries.map(entry => entry.cataloguePath);
   // The listing has directories too; only files are extracted (a directory has `files`).
-  const audio = listing.filter((entry) => entry.startsWith(`${AUDIO_IN_ARCHIVE}/`) && !entry.endsWith('/') && !asar.statFile(asarPath, entry).files);
+  const audio = entries.filter(({ nativePath, cataloguePath }) => cataloguePath.startsWith(`${AUDIO_IN_ARCHIVE}/`) && !cataloguePath.endsWith('/') && !asar.statFile(asarPath, nativePath).files);
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-drift-asar-'));
   try {
-    for (const entry of audio) {
-      const relative = entry.slice(AUDIO_IN_ARCHIVE.length + 1);
+    for (const { nativePath, cataloguePath } of audio) {
+      const relative = cataloguePath.slice(AUDIO_IN_ARCHIVE.length + 1);
       const target = path.join(scratch, ...relative.split('/'));
       fs.mkdirSync(path.dirname(target), { recursive: true });
-      fs.writeFileSync(target, asar.extractFile(asarPath, entry));
+      fs.writeFileSync(target, asar.extractFile(asarPath, nativePath));
     }
     // Undeclared audio, uncleared recordings, wrong sizes and wrong hashes are all judged by
     // the same audit a source directory gets.

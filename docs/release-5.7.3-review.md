@@ -62,3 +62,18 @@ are preserved.
 
 The reviewed light and dark modal screenshots are also saved under
 `docs/verification/release-5.7.3/` for review in the pull request.
+
+## Windows packaging recovery
+
+The first stable build failed in `afterPack` while auditing the Drift recordings
+inside `app.asar`. The verifier normalized archive paths to `/` before calling
+ASAR's native-path lookup, which requires `\` on Windows. It now retains the
+native paths for file reads and uses normalized paths only for catalogue matching.
+A regression test reads a real archive through Windows-style paths and also
+checks that corrupted audio still fails its SHA-256 audit.
+
+For the existing immutable `v5.7.3` tag only, the Windows release job checks out
+the corrected verifier from the exact workflow commit before packaging. This
+build-only script is outside the packaged file patterns; the tagged application,
+recordings, legal notices and corresponding-source reference remain unchanged.
+Later release tags include the corrected verifier directly.

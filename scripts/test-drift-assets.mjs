@@ -377,6 +377,42 @@ test('the archive is found from the archive itself, a macOS app, or a resources 
   assert.throws(() => locateAsar(path.join(root, 'nowhere')), /no app\.asar/);
 });
 
+test('Windows ASAR paths keep native separators for stat and extraction', async () => {
+  const asar = await import('@electron/asar');
+  const src = clean('windows-native-asar-src');
+  const audio = path.join(src, 'electron', 'assets', 'drift', 'audio');
+  mkdirSync(path.join(audio, 'rain'), { recursive: true });
+  writeFileSync(path.join(audio, 'README.md'), 'Bundled audio');
+  const payload = Buffer.from('verified recording');
+  writeFileSync(path.join(audio, 'rain', 'light-rain.mp3'), payload);
+  const asarPath = path.join(scratch, 'windows-native.asar');
+  await asar.createPackage(src, asarPath);
+  const calls = [];
+  // Simulate Windows's ASAR lookup on any test host, while reading a real archive.
+  const lookup = (operation, archive, entry) => {
+    assert.ok(!entry.includes('/'), `${operation} must receive Windows separators: ${entry}`);
+    calls.push([operation, entry]);
+    return asar[operation](archive, entry.replace(/\\/g, path.sep));
+  };
+  const windowsAsar = {
+    listPackage: archive => asar.listPackage(archive).map(entry => entry.replace(/[/\\]/g, '\\')),
+    statFile: (archive, entry) => lookup('statFile', archive, entry),
+    extractFile: (archive, entry) => lookup('extractFile', archive, entry),
+  };
+  const definitions = [approvedClone('light-rain', payload)];
+  const result = await auditAsar({ asarPath, definitions, drift: catalog, asarApi: windowsAsar });
+  assert.deepEqual(result.problems, []);
+  assert.equal(result.present.length, 1);
+  assert.equal(result.bytes, payload.length);
+  assert.ok(result.listing.includes('electron/assets/drift/audio/rain/light-rain.mp3'));
+  assert.ok(calls.some(([operation, entry]) => operation === 'statFile' && entry.endsWith('README.md')));
+  assert.ok(calls.some(([operation, entry]) => operation === 'extractFile' && entry.endsWith('light-rain.mp3')));
+  // Keep the integrity check effective after fixing path handling.
+  const corrupt = { ...windowsAsar, extractFile: (archive, entry) => entry.endsWith('.mp3') ? Buffer.alloc(payload.length) : windowsAsar.extractFile(archive, entry) };
+  const rejected = await auditAsar({ asarPath, definitions, drift: catalog, asarApi: corrupt });
+  assert.ok(rejected.problems.some(problem => /SHA-256|hash|digest/i.test(problem)));
+});
+
 test('--require-all turns a build without its recordings into a failure, and a complete one into a pass', async (t) => {
   let asar;
   try { asar = await import('@electron/asar'); } catch { t.skip('@electron/asar is not installed'); return; }
