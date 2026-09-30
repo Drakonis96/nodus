@@ -2277,6 +2277,12 @@ async function rawCompleteStreamTransport(
         ), signal, !opts.noRetry);
       } else if (Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
         await replayRefusedOptionalFields(model, extras, e, sentReasoning, replayStream);
+      } else if (!opts.noRetry && !signal?.aborted && full.length === 0 && isTransientNetworkFailure(e)) {
+        // The connection dropped before any answer text (a long reasoning stream lost after
+        // 84 KB of thinking: "read ETIMEDOUT"): nothing was shown that a replay could repeat,
+        // so ask once more. Once answer text has streamed, the error stands.
+        console.warn(`[compat-stream] connection lost before the answer (${e instanceof Error ? e.message : String(e)}); retrying once`);
+        await replayStream(extras);
       } else {
         throw e;
       }
