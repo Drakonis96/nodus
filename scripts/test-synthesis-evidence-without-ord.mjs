@@ -27,6 +27,8 @@ const STUBS = {
   './aiClient': `export const embed = async () => null;`,
   // No stock lists imported: disconnections are requested without a stock directory.
   './chemistryStock': `export const chemistryStockDirectory = () => null; export const chemistryStockLists = () => [];`,
+  // No local reranker installed: the fused order stands.
+  './localReranker': `export const rerankerAvailable = () => false; export const rerank = async () => null;`,
   '../db/database': `export const getDb = () => ({ prepare: () => ({ all: () => [{ nodus_id: 'w1', title: 'Klein Organic Chemistry 3rd Ed', collections: 'Chemistry' }] }) });`,
   '../db/passagesRepo': `export const findSimilarPassages = () => [];
 export const lexicalPassageSearch = (query) => [{ passage_id: 'w1#' + query.length, nodus_id: 'w1', text: 'Benzocaine is made by the Fischer esterification of a carboxylic acid with an alcohol under acid catalysis. The equilibrium is driven toward the ester by using the alcohol as the solvent and by removing the water that forms, and the nitro group is then reduced to the amine with tin and hydrochloric acid or by catalytic hydrogenation over palladium on carbon.', page_label: 'p. 862', source_ref: null, page_number: 862, similarity: 0.9, title: 'Klein Organic Chemistry 3rd Ed', authors_json: '[]', year: 2017, zotero_key: 'K' }];`,

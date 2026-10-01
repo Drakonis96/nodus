@@ -22,6 +22,7 @@ import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
 import { reactionIndexService } from '../reactionIndex';
 import { chemistryStockDirectory } from './chemistryStock';
+import { rerank, rerankerAvailable } from './localReranker';
 import { embed } from './aiClient';
 import { chemistryRunner } from './moleculeInspection';
 
@@ -34,6 +35,9 @@ const MAX_PASSAGES = 8;
 const PASSAGES_PER_QUERY = 2;
 const PASSAGE_CHARS = 1_200;
 const PASSAGE_SIMILARITY = 0.3;
+/** With the reranker: candidates per lane, and how many fused candidates it orders. */
+const RERANK_LANE = 20;
+const RERANK_POOL = 30;
 
 interface EvidenceOptions {
   model?: ModelRef | null;
@@ -142,11 +146,15 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
   const scannedWork = scannedWorkLookup();
   for (const query of queries) {
     signal?.throwIfAborted();
+    // With the local reranker each lane offers more candidates, and the reranker orders the
+    // fused top RERANK_POOL by reading query and passage together (localReranker.ts).
+    const reranking = rerankerAvailable();
+    const laneSize = reranking ? RERANK_LANE : 6;
     const lanes: SimilarPassage[][] = [];
-    try { lanes.push(lexicalPassageSearch(query, 6, { nodusIds: workIds })); } catch { /* FTS is optional */ }
+    try { lanes.push(lexicalPassageSearch(query, laneSize, { nodusIds: workIds })); } catch { /* FTS is optional */ }
     try {
       const vector = await embed(query);
-      if (vector) lanes.push(findSimilarPassages(vector, PASSAGE_SIMILARITY, 6, { nodusIds: workIds }));
+      if (vector) lanes.push(findSimilarPassages(vector, PASSAGE_SIMILARITY, laneSize, { nodusIds: workIds }));
     } catch { /* no embedding provider: the lexical lane alone */ }
     const scores = new Map<string, { score: number; hit: SimilarPassage }>();
     for (const lane of lanes) {
@@ -156,8 +164,14 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
         scores.set(hit.passage_id, entry);
       });
     }
+    let ordered = [...scores.values()].sort((a, b) => b.score - a.score);
+    if (reranking && ordered.length > 1) {
+      const pool = ordered.slice(0, RERANK_POOL);
+      const relevance = await rerank(query, pool.map(({ hit }) => hit.text.slice(0, 2000)), signal);
+      if (relevance) ordered = pool.map((entry, index) => ({ entry, score: relevance[index] })).sort((a, b) => b.score - a.score).map(({ entry }) => entry);
+    }
     let taken = 0;
-    for (const { hit } of [...scores.values()].sort((a, b) => b.score - a.score)) {
+    for (const { hit } of ordered) {
       if (taken >= perQuery || chosen.size >= MAX_PASSAGES) break;
       if (chosen.has(hit.passage_id) || isIndexLikePassage(hit.text)) continue;
       // Schemes flattened into text, citation runs and running heads cut out: a model given
