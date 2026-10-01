@@ -22,6 +22,8 @@ import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
 import { reactionIndexService } from '../reactionIndex';
 import { chemistryStockDirectory } from './chemistryStock';
+import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
+import { textbookPreparations, type TextbookPreparation } from '@shared/textbookSchemes';
 import { rerank, rerankerAvailable } from './localReranker';
 import { embed } from './aiClient';
 import { chemistryRunner } from './moleculeInspection';
@@ -103,6 +105,28 @@ async function ordDisconnections(target: string, starting: string[], options: Ev
     await dispose();
   }
   return briefs.filter((brief) => brief.proposals.length || brief.recordedRoutes.length);
+}
+
+/** Reactions in the user's textbook schemes that make the target and its most promising ORD
+ *  precursors, with book-and-page citations. Best-effort: no textbook index, an older package or a
+ *  tool failure returns []. */
+async function textbookSchemePreparations(target: string, disconnections: TargetDisconnections[], starting: string[], options: EvidenceOptions): Promise<TextbookPreparation[]> {
+  const provider = disconnectProvider();
+  const indexDir = provider ? textbookSchemeDirectory() : null;
+  if (!provider || !indexDir) return [];
+  const molecules = [...new Set([target, ...secondLevelTargets(disconnections, starting, 5)])].slice(0, 6);
+  const { runner, dispose } = chemistryRunner(options);
+  try {
+    const result = await runner.invoke({ provider, toolId: DISCONNECT_TOOL, input: { indexDir, targets: molecules, limit: 3 } });
+    const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-disconnections');
+    return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir)) : [];
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    console.warn('[synthesisEvidence] textbook schemes unavailable:', error instanceof Error ? error.message : String(error));
+    return [];
+  } finally {
+    await dispose();
+  }
 }
 
 /** The works whose passages count as route evidence: synthetic-chemistry texts and works filed
@@ -211,5 +235,6 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] textbook passages unavailable:', error instanceof Error ? error.message : String(error));
   }
-  return { target, startingMaterials, disconnections, passages };
+  const preparations = await textbookSchemePreparations(target, disconnections, startingMaterials, options);
+  return { target, startingMaterials, disconnections, passages, ...(preparations.length ? { textbookPreparations: preparations } : {}) };
 }

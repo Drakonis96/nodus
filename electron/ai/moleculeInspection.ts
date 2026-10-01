@@ -46,6 +46,8 @@ import {
 } from '@shared/moleculeInspection';
 import { findStartingSmiles, formatStartingMaterialStock, relevantExcerpt, routeStartingMaterials, textbookQueryForClass } from '@shared/synthesisEvidence';
 import { chemistryStockDirectory } from './chemistryStock';
+import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
+import { formatTextbookPrecedents, TEXTBOOK_ID } from '@shared/textbookSchemes';
 import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
@@ -259,6 +261,30 @@ export async function lookupReactionPrecedent(runner: Runner, steps: string[], o
     const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-precedent');
     const precedent = artifact ? normalizeReactionPrecedent(artifact.data) : null;
     return precedent ? { precedent, provider } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The same lookup against the textbook-scheme index (reactions read from the user's own books),
+ *  when it has been built. Best-effort like the ORD lookup: null on any absence or failure. */
+export async function lookupTextbookPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<ReactionPrecedent | null> {
+  const provider = knownReactionsProvider();
+  const indexDir = provider ? textbookSchemeDirectory() : null;
+  if (!provider || !indexDir) return null;
+  try {
+    const result = await runner.invoke({
+      provider,
+      toolId: KNOWN_REACTIONS_TOOL,
+      input: {
+        indexDir,
+        reactions: steps.slice(0, 32),
+        products: options.target ? [options.target] : [],
+        similar: steps.slice(0, 16),
+      },
+    });
+    const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-precedent');
+    return artifact ? normalizeReactionPrecedent(artifact.data, TEXTBOOK_ID) : null;
   } catch {
     return null;
   }
@@ -836,6 +862,12 @@ export async function appendRouteReportAndDrawings(
       const drawings = precedentDrawings(runner, result.provider, result.precedent, queries);
       return formatReactionPrecedents(result.precedent, { queries, labels, target, drawings, support });
     }).catch(() => '');
+    // The same steps in the reaction schemes of the user's own textbooks, cited by book and page.
+    const textbookSection = lookupTextbookPrecedent(runner, queries.map((query) => query.query), options).then((precedent) => {
+      if (!precedent) return '';
+      const target = options.target ? { smiles: options.target, name: targetName(labels, audit, options.target) } : null;
+      return formatTextbookPrecedents(precedent, (ids) => textbookCitations(ids), { queries, target });
+    }).catch(() => '');
     // Which starting materials the user's vendor stock lists hold (no lists: nothing is said).
     const stockPromise = startingMaterialStockLine(runner, labels).catch(() => '');
     const review = await reviewPromise;
@@ -848,7 +880,8 @@ export async function appendRouteReportAndDrawings(
     const fix = formatNamedRouteFixPrompts(labels, audit, review, support, overrides.unresolved ?? []);
     const sources = await evidenceSources(modelAnswer, steps.length, precedentPromise, queries, support);
     const stockLine = await stockPromise;
-    return `${finalAnswer.trimEnd()}\n\n${report}\n${stockLine ? `${stockLine}\n\n` : ''}${drawings}${precedentText}${sources}${fix ? `\n${fix}\n` : ''}`;
+    const textbookText = await textbookSection;
+    return `${finalAnswer.trimEnd()}\n\n${report}\n${stockLine ? `${stockLine}\n\n` : ''}${drawings}${precedentText}${textbookText}${sources}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
     if (options.signal?.aborted) return finalAnswer;
     return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable(error instanceof Error ? error.message : 'the route check failed')}\n`;

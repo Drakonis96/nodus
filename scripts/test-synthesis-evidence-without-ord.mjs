@@ -27,6 +27,8 @@ const STUBS = {
   './aiClient': `export const embed = async () => null;`,
   // No stock lists imported: disconnections are requested without a stock directory.
   './chemistryStock': `export const chemistryStockDirectory = () => null; export const chemistryStockLists = () => [];`,
+  // No textbook-scheme index unless a scenario sets one.
+  './textbookSchemes': `export const textbookSchemeDirectory = () => globalThis.__textbook?.dir ?? null; export const textbookCitations = (ids) => (globalThis.__textbook?.cite ?? (() => []))(ids);`,
   // No local reranker installed: the fused order stands.
   './localReranker': `export const rerankerAvailable = () => false; export const rerank = async () => null;`,
   '../db/database': `export const getDb = () => ({ prepare: () => ({ all: () => [{ nodus_id: 'w1', title: 'Klein Organic Chemistry 3rd Ed', collections: 'Chemistry' }] }) });`,
@@ -139,4 +141,38 @@ test('with starting materials the lookup goes three levels back, toward them', a
   Object.assign(globalThis.__ord, { provider: TOOL, indexDir: '/idx', invoke, calls: 0 });
   await quiet(() => gatherSynthesisEvidence('Propose a synthesis of benzocaine (SMILES: CCOC(=O)c1ccc(N)cc1).'));
   assert.equal(asked.length, 2);
+});
+
+test('with a textbook-scheme index, the textbook preparations of the target are cited by book and page', async () => {
+  const TB = `tb-${'a'.repeat(32)}`;
+  globalThis.__textbook = {
+    dir: '/schemes',
+    cite: (ids) => ids.filter((id) => id === TB).map((id) => ({ id, book: 'Klein Organic Chemistry 3rd Ed', page: 862, kind: 'crop', reagents: 'EtOH, H2SO4, reflux', yield: '85%', status: 'confirmed', link: 'nodus://passage/w1%23862' })),
+  };
+  const ordBrief = { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [{ input: 'CCOC(=O)c1ccc(N)cc1', target: 'CCOC(=O)c1ccc(N)cc1', madeBy: null, proposals: [{ precursors: 'CCO.Nc1ccc(C(=O)O)cc1', classes: ['Fischer esterification'], recorded: 3, available: true }] }] } }] };
+  const textbook = { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [{ input: 'CCOC(=O)c1ccc(N)cc1', target: 'CCOC(=O)c1ccc(N)cc1', madeBy: { count: 1, reactions: [{ key: 'k', count: 1, samples: [TB, `tb-${'b'.repeat(32)}`, 'ord-x'], reaction: 'CCO.Nc1ccc(C(=O)O)cc1>>CCOC(=O)c1ccc(N)cc1' }] }, proposals: [] }] } }] };
+  const dirs = [];
+  try {
+    const evidence = await scenario({ provider: TOOL, indexDir: '/idx', invoke: async ({ input }) => { dirs.push(input.indexDir); return input.indexDir === '/schemes' ? textbook : ordBrief; } });
+    assert.ok(dirs.includes('/schemes'), 'the textbook index is asked');
+    const payload = synthesisEvidencePayload(evidence);
+    const [prep] = payload.textbook_preparations;
+    assert.equal(prep.molecule, 'CCOC(=O)c1ccc(N)cc1');
+    assert.equal(prep.reactions[0].citations.length, 1, 'unknown and ORD ids are not cited');
+    assert.match(prep.reactions[0].citations[0], /\[\*Klein Organic Chemistry 3rd Ed\*, p\. 862\]\(nodus:\/\/passage\/w1%23862\) · conditions: EtOH, H2SO4, reflux · yield 85%/);
+    assert.ok(payload.ord_disconnections, 'the ORD brief is still there');
+  } finally {
+    globalThis.__textbook = undefined;
+  }
+});
+
+test('a textbook index that fails never blocks the request', async () => {
+  globalThis.__textbook = { dir: '/schemes', cite: () => [] };
+  try {
+    const evidence = await scenario({ provider: TOOL, indexDir: null, invoke: async () => { throw new Error('boom'); } });
+    assert.ok(evidence.passages.length > 0);
+    assert.equal(evidence.textbookPreparations, undefined);
+  } finally {
+    globalThis.__textbook = undefined;
+  }
 });

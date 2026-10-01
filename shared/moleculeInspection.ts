@@ -6,6 +6,9 @@
  * so a model reasons over a verified graph instead of re-reading SMILES text. */
 
 import { correctionTargetPlanRule, ROUTE_LABEL_LINES, ROUTE_SPECIES_RULES } from './routeRules';
+import { similarityBand } from './reactionSimilarity';
+
+export { similarityBand };
 
 export interface MoleculeAtom {
   /** 0-based position in the parsed graph; bond endpoints use this index. */
@@ -1311,10 +1314,10 @@ function reactionSmilesOr(value: unknown): string | undefined {
   return ends.every((part) => SMILES_CHARS.test(part)) && (!middle || SMILES_CHARS.test(middle)) ? value : undefined;
 }
 
-function normalizePrecedentEntry(entry: unknown): ReactionPrecedentEntry | null {
+function normalizePrecedentEntry(entry: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedentEntry | null {
   const value = asRecord(entry);
   if (!value || typeof value.input !== 'string' || !value.input) return null;
-  const samples = Array.isArray(value.samples) ? stringArray(value.samples).filter((id) => ORD_ID.test(id)).slice(0, 3) : [];
+  const samples = Array.isArray(value.samples) ? stringArray(value.samples).filter((id) => idPattern.test(id)).slice(0, 3) : [];
   const reaction = reactionSmilesOr(value.reaction);
   return {
     input: value.input.slice(0, 4000),
@@ -1344,14 +1347,15 @@ function normalizePrecedentNeighbor(item: unknown): ReactionPrecedentNeighbor | 
   };
 }
 
-/** Accepts only a precedent payload the capability can actually have produced. */
-export function normalizeReactionPrecedent(data: unknown): ReactionPrecedent | null {
+/** Accepts only a precedent payload the capability can actually have produced. Sample ids must
+ *  be Open Reaction Database ids unless another index's pattern is given (textbook schemes: tb-…). */
+export function normalizeReactionPrecedent(data: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedent | null {
   const value = asRecord(data);
   if (!value) return null;
   const reactions = (Array.isArray(value.reactions) ? value.reactions : [])
-    .map(normalizePrecedentEntry).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+    .map((entry) => normalizePrecedentEntry(entry, idPattern)).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
   const products = (Array.isArray(value.products) ? value.products : [])
-    .map(normalizePrecedentEntry).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+    .map((entry) => normalizePrecedentEntry(entry, idPattern)).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
   const similar = (Array.isArray(value.similar) ? value.similar : []).map((entry) => {
     const record = asRecord(entry);
     if (!record || typeof record.input !== 'string') return null;
@@ -1361,18 +1365,6 @@ export function normalizeReactionPrecedent(data: unknown): ReactionPrecedent | n
   }).filter((entry): entry is ReactionPrecedentSimilar => entry !== null).slice(0, 16);
   if (!reactions.length && !products.length && !similar.length) return null;
   return { reactions, products, similar };
-}
-
-/** Plain-language reading of a reaction-fingerprint similarity (0..1). Calibrated on real ORD
- *  neighbours: 1.0 is the same local change (often on another substrate); 0.7-0.9 the same
- *  reaction type on a different substrate (acylations, SOCl2, Suzuki, brominations); around
- *  0.5-0.6 only partial overlap (a Kolbe carboxylation's nearest were salicylate salt formations). */
-export function similarityBand(similarity: number): string {
-  // Only a step with no exact match is given a band, so 100% is always other molecules.
-  if (similarity >= 0.999) return 'same bond changes, on different molecules';
-  if (similarity >= 0.7) return 'same transformation, different substrate';
-  if (similarity >= 0.4) return 'shares some of the bond changes';
-  return 'loosely related';
 }
 
 /** The drawing shown for a step: its closest known reaction, as the package drew it. An exact

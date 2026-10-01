@@ -21,8 +21,10 @@ await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')
       '../reactionIndex': `export const reactionIndexService=()=>({localDirectory:async()=>null})`,
       './synthesisEvidence': `export async function invokeDisconnections(){return null} export function synthesisEvidenceWorkIds(){return []} export async function textbookPassages(){return []}`,
       './chemistryStock': `export const chemistryStockDirectory=()=>null`,
+      // No textbook-scheme index built: the route report has no textbook section.
+      './textbookSchemes': `export const textbookSchemeDirectory=()=>null; export const textbookCitations=()=>[]`,
     };
-    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\/textbookSchemes|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
   } }],
 });
