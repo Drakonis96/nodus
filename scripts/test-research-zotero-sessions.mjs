@@ -35,13 +35,16 @@ try {
   }
   load('electron/mcp/managedZotero.ts').ManagedZoteroConnection = Connection;
   const service = load('electron/mcp/researchZotero.ts');
+  const { withResearchActivity } = load('electron/ai/researchActivity.ts');
+  const { summarizeResearchActivity, updateResearchActivities } = load('shared/researchActivity.ts');
+  const events = [];
   const scope = load('electron/ai/researchNotebookService.ts').resolveAcademicResearchScope();
   assert.equal(service.getResearchZoteroStatus().automatic, true, 'managed MCP requires no connect action');
   const firstController = new AbortController();
   const input = { documentId: scope.documents.find(doc => doc.workId === 'SOURCE01').id, from: 1 };
   const first = service.readAutomaticResearchZotero(scope, input, firstController.signal);
   const firstRejected = assert.rejects(first, /abort/i);
-  const second = service.readAutomaticResearchZotero(scope, input);
+  const second = withResearchActivity(event => events.push(event), undefined, () => service.readAutomaticResearchZotero(scope, input));
   for (let i = 0; i < 100 && gates.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 5));
   assert.equal(gates.length, 2);
   await assert.rejects(() => service.readAutomaticResearchZotero(scope, input), /session_limit/);
@@ -49,6 +52,8 @@ try {
   assert.equal(connections[0].closed, true);
   assert.equal(connections[1].closed, false, 'cancelling one run cannot close another');
   gates[1](); await second;
+  assert.deepEqual(events.map(event => [event.layer, event.operation, event.status]), [['zotero', 'pages', 'active'], ['zotero', 'pages', 'completed']], 'connection and tool call form one observed read');
+  assert.equal(summarizeResearchActivity(events.reduce(updateResearchActivities, [])).find(row => row.layer === 'zotero').state, 'completed');
   assert.equal(service.getResearchZoteroStatus().activeSessions, 0);
   assert.deepEqual(fs.readdirSync(path.join(root, 'mcp/zotero')), [], 'own ephemeral manifests are removed');
   await service.setResearchZoteroAutomatic(false);
@@ -63,7 +68,10 @@ try {
   await assert.rejects(() => service.readAutomaticResearchZotero(scope, input, undefined, pins), /revision_changed/, 'a later attachment revision cannot replace the run snapshot');
   assert.equal(service.getResearchZoteroStatus().activeSessions, 0);
   globalThis.fetch = async () => new Response('{}');
-  await assert.rejects(() => service.readAutomaticResearchZotero(scope, input), /identity_mismatch/);
+  events.length = 0;
+  await assert.rejects(() => withResearchActivity(event => events.push(event), undefined, () => service.readAutomaticResearchZotero(scope, input)), /identity_mismatch/);
+  assert.deepEqual(events.map(event => event.status), ['active', 'failed'], 'a startup failure is observed even before the MCP tool can be called');
+  assert.equal(summarizeResearchActivity(events.reduce(updateResearchActivities, [])).find(row => row.layer === 'zotero').state, 'failed');
   assert.equal(service.getResearchZoteroStatus().activeSessions, 0, 'failed startup releases its reserved slot');
   console.log('Simulated MCP sessions: default automatic, two-slot reservation, independent cancellation, disabled policy, endpoint identity and owned cleanup passed.');
 } finally {

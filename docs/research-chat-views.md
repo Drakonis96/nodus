@@ -8,6 +8,30 @@ The database, study/teaching and world views provide `ResearchChatAdapter` imple
 
 The academic source filter remains opt-in. Native source panels keep their existing context rules. All Research chat transports pass the explicit effort through `researchGenerationOptions`; non-chat Study Assistant requests retain their existing settings. Nodi is unchanged.
 
+## Zotero MCP access in academic research
+
+Academic Research Chat and Deep Research consult the authorized Nodus indexes first.
+Original-page reads use a local PDF when available and fall back to the managed Zotero
+MCP when the original is only available through Zotero. A document imported from Zotero
+does not by itself count as an MCP consultation: the activity panel marks Zotero only
+when the connector is actually attempted. Startup failures are reported as errors,
+and the answer's research log distinguishes local evidence, successful MCP reads and
+attempts without readable pages. Zotero must be running for the local connector to work.
+
+Immersion generation also uses this bounded research path, retaining its existing
+profiles, topic ranking and graph. It adds citable source passages from the shared
+index or original files; abstracts and generated notes are not treated as literal
+source passages. The scope preview continues to retrieve existing material without
+starting supervising inference or a Zotero MCP session. MCP access remains read-only,
+limited to authorized documents and subject to the existing automatic-connection
+preference. Research starts when the user sends a query or generates a session.
+
+Regression coverage: `scripts/test-research-zotero-agents.mjs` exercises the three
+production retrieval callers with simulated transport and disposable data;
+`scripts/test-research-zotero-sessions.mjs` checks activity outcomes and session
+ownership. `scripts/verify-managed-zotero-mcp.mjs` separately exercises the real
+stdio runtime against a synthetic HTTP endpoint and PDF.
+
 ## Offline validation
 
 - `node --test scripts/test-sidebar-vault-filtering.mjs scripts/test-view-registry.mjs scripts/test-world-chat-parity.mjs`
