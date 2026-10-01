@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawn } from 'node:child_process';
-import { once } from 'node:events';
+import { once, EventEmitter } from 'node:events';
 import { closeComponentBrowser, launchComponentBrowser } from './lib/component-test-browser.mjs';
 
-const exited = () => ({ exitCode: 0, signalCode: null });
+const exited = () => Object.assign(new EventEmitter(), { exitCode: 0, signalCode: null, stdio: [] });
 const deadlines = { timeoutMs: 20, killTimeoutMs: 1000, diagnostic: () => {} };
 
 test('a graceful shutdown finishes without forcing the browser', async () => {
@@ -64,8 +64,55 @@ test('a failed or stalled force termination cannot pass cleanup', async () => {
   }
   await assert.rejects(closeComponentBrowser({
     close: async () => {}, kill: async () => {},
-    process: () => ({ exitCode: null, signalCode: null }),
+    process: () => Object.assign(new EventEmitter(), { exitCode: null, signalCode: null, stdio: [] }),
   }, deadlines), /process did not exit/);
+});
+
+test('inherited pipes cannot block cleanup after the owned process exits', { timeout: 10_000 }, async () => {
+  for (const alreadyExited of [false, true]) {
+    // The helper inherits stdout/stderr but outlives the parent. Node's close
+    // event stays pending even though exitCode is already zero: the CI failure.
+    const child = spawn(process.execPath, ['-e', `
+      const { spawn } = require('node:child_process');
+      const helper = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: ['ignore', 1, 2] });
+      helper.unref();
+      process.on('message', () => process.exit(0));
+      process.send(helper.pid);
+    `], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+    const closed = once(child, 'close');
+    const exit = once(child, 'exit');
+    const [helperPid] = await once(child, 'message');
+    try {
+      if (alreadyExited) {
+        child.send('exit');
+        await exit;
+        assert.equal(child.exitCode, 0);
+        assert.equal(child.stdout.destroyed, false, 'the inherited output pipe is still open');
+      }
+      await closeComponentBrowser({
+        close: () => {
+          if (!alreadyExited) {
+            assert.equal(child.exitCode, null);
+            assert.equal(child.stdout.destroyed, false, 'a live browser must keep its pipes');
+            child.send('exit');
+          }
+          return closed;
+        },
+        kill: async () => { assert.fail('an exited browser must finish cleanup without force termination'); },
+        process: () => child,
+      }, { ...deadlines, timeoutMs: 2000 });
+      assert.equal(child.exitCode, 0);
+      assert.equal(child.stdout.destroyed, true);
+      assert.equal(child.stderr.destroyed, true);
+      assert.equal(child.listenerCount('exit'), 0);
+    } finally {
+      // Only the explicitly spawned fixture helper is terminated.
+      try { process.kill(helperPid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGKILL');
+      child.stdio.forEach(stream => stream?.destroy?.());
+      await closed;
+    }
+  }
 });
 
 test('a connection failure still closes the launched browser', async () => {

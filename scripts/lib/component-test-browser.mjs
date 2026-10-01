@@ -12,21 +12,30 @@ async function bounded(operation, timeoutMs) {
 }
 
 export async function closeComponentBrowser(server, { timeoutMs = 10_000, killTimeoutMs = 15_000, diagnostic = console.warn } = {}) {
-  try {
-    await bounded(() => server.close(), timeoutMs);
-  } catch (error) {
-    diagnostic(`[component-browser] ${error.message}; terminating the owned browser process`);
-    // Playwright kills the owned process tree and waits for exit on each platform.
-    // A timeout or failed kill remains a test failure; never leave cleanup pending.
-    try {
-      await bounded(() => server.kill(), killTimeoutMs);
-    } catch (failure) {
-      const child = server.process();
-      throw new Error(`Component browser termination failed (exit=${child.exitCode}, signal=${child.signalCode})`, { cause: failure });
-    }
-  }
   const child = server.process();
-  if (child.exitCode === null && child.signalCode === null) throw new Error('Component browser process did not exit');
+  // Node emits `exit` before `close`. Chrome helpers can retain inherited pipe
+  // descriptors after Chrome exits, delaying `close` and Playwright's cleanup.
+  // Only release this child's pipes after confirmed exit, never a live browser's.
+  const releasePipes = () => {
+    for (const stream of child.stdio) stream?.destroy?.();
+  };
+  child.once('exit', releasePipes);
+  if (child.exitCode !== null || child.signalCode !== null) releasePipes();
+  try {
+    try {
+      await bounded(() => server.close(), timeoutMs);
+    } catch (error) {
+      diagnostic(`[component-browser] ${error.message}; terminating the owned browser process`);
+      // Playwright kills the owned process tree and waits for exit on each platform.
+      // A timeout or failed kill remains a test failure; never leave cleanup pending.
+      try {
+        await bounded(() => server.kill(), killTimeoutMs);
+      } catch (failure) {
+        throw new Error(`Component browser termination failed (exit=${child.exitCode}, signal=${child.signalCode})`, { cause: failure });
+      }
+    }
+    if (child.exitCode === null && child.signalCode === null) throw new Error('Component browser process did not exit');
+  } finally { child.off('exit', releasePipes); }
 }
 
 export async function launchComponentBrowser(browserType, options) {
