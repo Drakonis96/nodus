@@ -64,3 +64,6 @@ App Store and optional system diagnostic information under its own policies.
 The companion desktop app has additional, optional capabilities covered by the
 [Nodus Research privacy policy](PRIVACY.md). They are not mobile-app features.
 Material changes to this mobile policy will be published here with a new date.
+
+The same policy is published on the project website at
+[https://nodusresearch.com/presenter/privacy/](https://nodusresearch.com/presenter/privacy/).
