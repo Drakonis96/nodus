@@ -104,11 +104,11 @@ export function StudyCalendarView() {
           return <div key={week[0].toISOString()} className="relative grid grid-cols-7" data-testid="study-calendar-month-week">
             {week.map((date, column) => <button
               key={date.toISOString()}
-              className={`relative min-h-28 border-b border-r border-neutral-200 p-1.5 text-left align-top hover:bg-teal-50/60 dark:border-neutral-800 dark:hover:bg-teal-950/20 ${date.getMonth() !== cursor.getMonth() ? 'bg-neutral-50 text-neutral-400 dark:bg-neutral-950/40 dark:text-neutral-600' : ''}`}
+              className={`relative min-h-32 border-b border-r border-neutral-200 p-1.5 text-left hover:bg-teal-50/60 dark:border-neutral-800 dark:hover:bg-teal-950/20 ${date.getMonth() !== cursor.getMonth() ? 'bg-neutral-50 text-neutral-400 dark:bg-neutral-950/40 dark:text-neutral-600' : ''}`}
               onClick={() => openNew(date)}
             >
-              <span className={`grid h-6 w-6 place-items-center rounded-full text-xs ${sameDay(date, new Date()) ? 'bg-teal-600 text-white' : ''}`}>{date.getDate()}</span>
-              {layout.overflowByDay[column] > 0 && <span className="absolute bottom-1 left-1.5 text-[9px] text-neutral-500">+{layout.overflowByDay[column]} {t('más')}</span>}
+              <span className={`absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full text-xs ${sameDay(date, new Date()) ? 'bg-teal-600 text-white' : ''}`}>{date.getDate()}</span>
+              {layout.overflowByDay[column] > 0 && <span className="absolute bottom-1 left-1.5 text-[9px] leading-none text-neutral-500">+{layout.overflowByDay[column]} {t('más')}</span>}
             </button>)}
             <div className="pointer-events-none absolute inset-x-0 top-8 grid grid-cols-7 auto-rows-[18px] gap-y-0.5" data-testid="study-calendar-month-event-layer">
               {layout.segments.map((segment) => <div
