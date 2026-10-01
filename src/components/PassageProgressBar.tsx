@@ -42,7 +42,7 @@ export function PassageProgressBar({ progress }: { progress: PassageEmbeddingPro
           <div className="mb-1 flex flex-wrap justify-between gap-2 text-xs text-neutral-400">
             <span className="min-w-0 break-words [overflow-wrap:anywhere]">
               {active ? (
-                currentWorkTitle ? <>{t('Obra')} {currentWorkIndex + 1}/{totalWorks}: <span className="text-neutral-200">{currentWorkTitle}</span><span className="ml-1 text-green-300">· {t('pasaje')} {currentPassageIndex + 1}/{currentWorkPassages}</span>{workElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {workElapsed}</span>}</> : t('Preparando…')
+                currentWorkTitle ? <>{t('Obra')} {currentWorkIndex + 1}/{totalWorks}: <span className="text-neutral-200">{currentWorkTitle}</span><span className="ml-1 text-green-300">· {currentWorkPassages > 0 ? <>{t('pasaje')} {currentPassageIndex + 1}/{currentWorkPassages}</> : t('Preparando…')}</span>{workElapsed && <span className="ml-1 tabular-nums text-neutral-500">· {t('Obra')} {workElapsed}</span>}</> : t('Preparando…')
               ) : error ? t('Indexación detenida por error') : cancelled ? t('Indexación cancelada') : tx('{n} pasajes indexados', { n: passagesEmbedded })}
             </span>
             <span className="shrink-0 tabular-nums">{totalElapsed && <span className="mr-3">{t('Total')} {totalElapsed}</span>}{pct}%</span>
