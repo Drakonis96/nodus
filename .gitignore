@@ -1,4 +1,5 @@
 node_modules/
+build/system-audio/*/*.node
 tmp/
 dist/
 dist-electron/
