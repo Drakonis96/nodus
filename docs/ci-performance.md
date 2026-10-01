@@ -22,6 +22,11 @@ later timing out in an unbounded browser close; assertions, test deadlines and
 the complete-inventory gate remain active. Shutdown fallbacks are logged with
 the `[component-browser]` prefix. `test-component-browser-lifecycle.mjs` covers
 stalled cleanup with a real disposable process as well as failure propagation.
+When the owned Chrome process emits `exit`, its stdio streams are destroyed so
+inherited pipe descriptors cannot hold Node's later `close` event open. This
+allows Playwright to finish cleanup after a confirmed process exit. Regression
+coverage includes a real helper process retaining stdout/stderr, both before
+and after the parent's exit; live browser streams are never closed this way.
 
 `scripts/ci-test-shards.mjs plan` discovers the complete test inventory. Historical
 durations in `scripts/ci-test-durations.json` balance placement, never inclusion:
