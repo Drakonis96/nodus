@@ -9,13 +9,14 @@ import os from 'node:os';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 const repo = path.resolve(import.meta.dirname, '..');
 const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/usr/bin/google-chrome', '/usr/bin/chromium'].filter(Boolean).find(existsSync);
 test('each third of the switch is a radio, clickable and reachable with the arrow keys', { timeout: 300_000 }, async t => {
   if (!chrome) { t.skip('An isolated test browser is required'); return; }
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-tri-switch-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   try {
     const bundle = await build({ entryPoints: [path.join(repo, 'scripts/fixtures/tri-state-switch/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
     const css = componentStyles();
@@ -46,5 +47,5 @@ test('each third of the switch is a radio, clickable and reachable with the arro
       assert.deepEqual(errors, []);
       await page.close();
     }
-  } finally { await browser.close(); await rm(root, { recursive: true, force: true }); }
+  } finally { await closeBrowser(); await rm(root, { recursive: true, force: true }); }
 });

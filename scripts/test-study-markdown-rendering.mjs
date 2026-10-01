@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,7 +21,7 @@ const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Content
 test('questions and flashcards typeset Markdown and LaTeX in both themes', { timeout: 300_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-study-markdown-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   try {
     const bundle = await build({
       entryPoints: [path.join(root, 'scripts/fixtures/study-markdown/renderer.tsx')],
@@ -120,7 +121,7 @@ test('questions and flashcards typeset Markdown and LaTeX in both themes', { tim
       await page.close();
     }
   } finally {
-    await browser.close();
+    await closeBrowser();
     await rm(dir, { recursive: true, force: true });
   }
 });

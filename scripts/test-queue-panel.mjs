@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -28,7 +29,7 @@ const standaloneDocument = (status = 'queued', phase = 'queued', error = null) =
 test('queue dropdown retains and controls every processing lane', { timeout: 240_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-queue-panel-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   let page;
   try {
     const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/queue-panel/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
@@ -498,5 +499,5 @@ test('queue dropdown retains and controls every processing lane', { timeout: 240
       await page.getByTestId('header-queue-panel').waitFor({ state: 'detached' });
     });
     assert.deepEqual(errors, [], 'real renderer has no uncaught errors');
-  } finally { await browser.close(); await rm(dir, { recursive: true, force: true }); }
+  } finally { await closeBrowser(); await rm(dir, { recursive: true, force: true }); }
 });

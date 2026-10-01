@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,7 +31,7 @@ const chrome = [
 test('the log modal filters, sorts, copies, downloads and manages retention', { timeout: 240_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-pipeline-logs-modal-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   let page;
   try {
     const bundle = await build({
@@ -313,8 +314,7 @@ test('the log modal filters, sorts, copies, downloads and manages retention', { 
       assert.deepEqual(errors, []);
     });
   } finally {
-    if (page) await page.close().catch(() => undefined);
-    await browser.close().catch(() => undefined);
+    await closeBrowser();
     await rm(dir, { recursive: true, force: true });
     await mkdir(dir, { recursive: true }).catch(() => undefined);
   }

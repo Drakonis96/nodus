@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -18,7 +19,7 @@ const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Content
 test('notebook dialog: collections only, hierarchical, N/Z marks, subfolders included', { timeout: 300_000 }, async (t) => {
   if (!chrome) { t.skip('Chrome/Chromium not installed'); return; }
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-notebook-dialog-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   try {
     const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/research-notebook-dialog/renderer.tsx')], bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' }, loader: { '.css': 'empty', '.svg': 'dataurl' } });
     const css = componentStyles();
@@ -93,7 +94,7 @@ test('notebook dialog: collections only, hierarchical, N/Z marks, subfolders inc
       await page.close();
     });
   } finally {
-    await browser.close();
+    await closeBrowser();
     await rm(dir, { recursive: true, force: true });
   }
 });

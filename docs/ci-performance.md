@@ -13,6 +13,16 @@ placement weight to account for their sequential execution. The four existing
 Electron E2E scripts run after the smaller third group,
 against the same build. Cross-repository capability checks retain all three platforms.
 
+Component browser fixtures own a Playwright browser server bound to loopback.
+Cleanup allows ten seconds for Chrome to exit gracefully, then terminates only
+that fixture's process tree and waits up to fifteen seconds for exit and Playwright's
+temporary-profile cleanup. A failed kill
+or a surviving process fails the test. This prevents successful assertions from
+later timing out in an unbounded browser close; assertions, test deadlines and
+the complete-inventory gate remain active. Shutdown fallbacks are logged with
+the `[component-browser]` prefix. `test-component-browser-lifecycle.mjs` covers
+stalled cleanup with a real disposable process as well as failure propagation.
+
 `scripts/ci-test-shards.mjs plan` discovers the complete test inventory. Historical
 durations in `scripts/ci-test-durations.json` balance placement, never inclusion:
 new files without hints also run. Each group runs longer files first and reports

@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import ts from 'typescript';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
@@ -58,7 +59,7 @@ test('real update UI: work, postpone, revisit, retry and install in all language
   const [bundle, strictBundle] = await Promise.all([buildFixture('production'), buildFixture('development')]);
   const stylesheet = componentStyles();
   const css = await readFile(stylesheet, 'utf8');
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   const errors = [];
   let page;
   async function fresh(config = {}) {
@@ -184,5 +185,5 @@ test('real update UI: work, postpone, revisit, retry and install in all language
       }
     });
     assert.deepEqual(errors, []);
-  } finally { await browser.close(); }
+  } finally { await closeBrowser(); }
 });
