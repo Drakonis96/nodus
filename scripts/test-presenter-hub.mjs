@@ -36,7 +36,13 @@ try {
   assert.equal(h.getPresenterRuntimeState().currentSlide,2);
   assert.equal(m.webEvents.at(-1).a.type,'next'); assert.equal(m.nativeEvents.at(-1).origin,'iphone');
   m.native.onAction({type:'timerToggle'},'iphone');
-  await new Promise(r=>setTimeout(r,1200));
+  // The tick is anchored at presentation start, before the control message.
+  // Its first callback can therefore precede a full elapsed second. Wait for
+  // the observed tick with a bounded deadline instead of assuming its phase.
+  const tickDeadline = Date.now() + 5000;
+  while (h.getPresenterRuntimeState().timerSeconds < 1 && Date.now() < tickDeadline) {
+    await new Promise(r=>setTimeout(r,50));
+  }
   assert.ok(h.getPresenterRuntimeState().timerSeconds>=1,'Audience-only mode keeps time without presenter window');
   m.web.onRemoteAction({type:'timerToggle'},42);
   const paused=h.getPresenterRuntimeState().timerSeconds;
