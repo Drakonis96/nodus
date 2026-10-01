@@ -241,6 +241,29 @@ test('a custom player with no media elements pauses through its visible semantic
   assert.equal(cardPause.clicks, 0, 'a duplicate card control must not toggle too');
 });
 
+test('real library DOM: unrelated book buttons cannot inherit the player through the page root', () => {
+  const { JSDOM } = require('jsdom');
+  const dom = new JSDOM(`<main><div id="library"><button aria-label="Play">Another book</button></div>
+    <section id="player"><input type="range" aria-label="Progress"><button aria-label="Pause">Pause</button></section></main>`);
+  dom.window.HTMLElement.prototype.getClientRects = () => [{}];
+  try {
+    const page = dom.window.document;
+    assert.equal(media.pagePlaybackState([], page), true);
+    const result = media.applySemanticMediaCommand(page, 'pause');
+    assert.equal(result.scope, page.getElementById('player'));
+    const button = page.querySelector('#player button');
+    button.setAttribute('aria-label', 'Play');
+    button.textContent = 'Play';
+    assert.equal(media.pagePlaybackState([], page, result.scope), false);
+    let resumed = 0;
+    button.addEventListener('click', () => { resumed += 1; });
+    assert.equal(media.applySemanticMediaCommand(page, 'play', result.scope).handled, true);
+    assert.equal(resumed, 1);
+  } finally {
+    dom.window.close();
+  }
+});
+
 test('PLAY resumes inside the remembered player instead of choosing another book', () => {
   const unrelated = semanticButton('Play');
   const resume = semanticButton('Play');
@@ -339,14 +362,33 @@ test('an element that throws on play or pause does not take the others down', ()
   assert.equal(ordinary.paused, true);
 });
 
-test('an unlistenable page still answers rather than acting on nothing', () => {
-  // Every element is a placeholder: the fallback keeps them in play for Pause,
-  // because misjudging one and pausing it is harmless, but nothing is running,
-  // so the command reports unhandled and the caller reaches for the page's Media
-  // Session handler.
+test('standby elements cannot swallow Play before a custom player can handle it', () => {
   const nodes = [placeholder(), placeholder()];
-  assert.equal(media.applyMediaCommand(nodes, 'play', null), true, 'trying is better than refusing');
-  assert.equal(media.applyMediaCommand(nodes, 'previous', null), true);
+  assert.equal(media.applyMediaCommand(nodes, 'play', null), false);
+  assert.equal(media.applyMediaCommand(nodes, 'previous', null), false);
+  assert.equal(nodes.reduce((sum, node) => sum + node.played, 0), 0);
+});
+
+test('standby elements cannot announce paused over a running custom player', () => {
+  const nodes = [placeholder(), placeholder()];
+  const pause = semanticButton('Pause');
+  const scope = playerScope([pause]);
+  const page = doc(nodes, { buttons: [pause] });
+  assert.equal(media.pagePlaybackState(nodes, page), true);
+  assert.equal(media.pagePlaybackState(nodes, page, scope), true);
+  assert.equal(media.pagePlaybackState(nodes, doc(nodes)), null,
+    'without a player control, standby elements cannot override Chromium');
+});
+
+test('a paused custom player reports false even with empty audio elements', () => {
+  const nodes = [placeholder()];
+  const resume = semanticButton('Play');
+  const scope = playerScope([resume]);
+  const page = doc(nodes, { buttons: [resume] });
+  assert.equal(media.pagePlaybackState(nodes, page, scope), false);
+  assert.equal(media.applyMediaCommand(nodes, 'play'), false);
+  assert.equal(media.applySemanticMediaCommand(page, 'play', scope).handled, true);
+  assert.equal(resume.clicks, 1);
 });
 
 test('kind is read from the tag, and unknown for anything else', () => {

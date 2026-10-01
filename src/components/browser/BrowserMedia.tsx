@@ -4,6 +4,7 @@ import { Icon } from '../ui';
 import { t } from '../../i18n';
 import type { BrowserMediaState } from '@shared/browser';
 import { defaultMediaTab, type MediaSourceTab } from './mediaTab';
+import { useDeviceVolume } from './useDeviceVolume';
 
 /**
  * The header's media control.
@@ -92,8 +93,7 @@ export function BrowserMediaPopover({
   anchorEl, onClose, onOpenTab, drift,
 }: { anchorEl: HTMLElement | null; onClose: () => void; onOpenTab: (tabId: string) => void; drift?: DriftPopoverSlot }) {
   const states = useBrowserMedia();
-  const [deviceVolume, setDeviceVolume] = useState(50);
-  const [deviceVolumeReady, setDeviceVolumeReady] = useState(false);
+  const { volume: deviceVolume, ready: deviceVolumeReady, changeVolume } = useDeviceVolume(Boolean(anchorEl));
   const [snapshot, setSnapshot] = useState<BrowserSnapshot | null>(null);
   // The tab of THIS opening: decided by defaultMediaTab when the popover opens, changed only by
   // the user's own choice, and never recomputed while it stays open. Clearing Drift's mix from
@@ -129,12 +129,6 @@ export function BrowserMediaPopover({
     };
     void freezeBrowserPage();
 
-    void window.nodus.getBrowserDeviceVolume()
-      .then((volume) => {
-        setDeviceVolume(Math.max(0, Math.min(100, Math.round(volume))));
-        setDeviceVolumeReady(true);
-      })
-      .catch(() => setDeviceVolumeReady(false));
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onCloseRef.current(); };
     window.addEventListener('keydown', onKey);
     return () => {
@@ -256,9 +250,7 @@ export function BrowserMediaPopover({
                       disabled={!deviceVolumeReady}
                       value={deviceVolume}
                       onChange={(event) => {
-                        const volume = Number(event.currentTarget.value);
-                        setDeviceVolume(volume);
-                        void window.nodus.setBrowserDeviceVolume(volume);
+                        changeVolume(Number(event.currentTarget.value));
                       }}
                       className="w-full accent-indigo-500 disabled:opacity-50"
                     />

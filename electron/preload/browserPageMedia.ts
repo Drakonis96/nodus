@@ -189,12 +189,19 @@ function containsProgressControl(scope: SemanticMediaScope): boolean {
  * gives Play a safe, unambiguous place to look after Pause.
  */
 function playerScope(control: SemanticMediaControl): SemanticMediaScope | null {
+  const unambiguous = (scope: SemanticMediaScope) => (
+    matchingControls(scope, PLAY_LABELS).length + matchingControls(scope, PAUSE_LABELS).length === 1
+  );
   let current: SemanticMediaScope | null = control;
   for (let depth = 0; current && depth < 10; depth += 1) {
-    if (containsProgressControl(current)) return current;
+    // A library card eventually reaches the page-wide ancestor containing the
+    // player's slider too. That ancestor is not its player: it also holds the
+    // other books' Play buttons and must never become a remembered scope.
+    if (containsProgressControl(current) && unambiguous(current)) return current;
     current = current.parentElement ?? null;
   }
-  return control.parentElement ?? null;
+  const parent = control.parentElement ?? null;
+  return parent && unambiguous(parent) ? parent : null;
 }
 
 function clickControl(control: SemanticMediaControl): boolean {
@@ -246,6 +253,22 @@ export function semanticPlaybackState(
     return Boolean(scope && containsProgressControl(scope));
   });
   return inPlayers.length === 1 ? inPlayers[0].playing : null;
+}
+
+/** A standby <audio> says nothing about a custom player's playback state. */
+export function pagePlaybackState(
+  elements: MediaEl[],
+  document: MediaRoot | null | undefined,
+  preferredScope: SemanticMediaScope | null = null,
+): boolean | null {
+  if (connectedScope(preferredScope)) {
+    const state = semanticPlaybackState(document, preferredScope);
+    if (state !== null) return state;
+  }
+  if (anyPlaying(elements)) return true;
+  const semantic = semanticPlaybackState(document);
+  if (semantic !== null) return semantic;
+  return elements.some(isPlayableMedia) ? false : null;
 }
 
 /**
@@ -338,15 +361,11 @@ export function anyPlaying(elements: MediaEl[]): boolean {
 }
 
 /**
- * The elements worth acting on, with a deliberate fallback.
- *
- * If a page exposes nothing playable we keep the raw list rather than doing
- * nothing at all: Pause on an element we misjudged is harmless, and refusing to
- * act would be a worse answer than trying.
+ * Empty standby elements cannot serve a command. Returning them used to swallow
+ * Play before the custom player's control or Media Session handler could run.
  */
 export function playableMedia(elements: MediaEl[]): MediaEl[] {
-  const playable = elements.filter(isPlayableMedia);
-  return playable.length > 0 ? playable : elements;
+  return elements.filter(isPlayableMedia);
 }
 
 export function kindOf(target: unknown): 'audio' | 'video' | 'unknown' {

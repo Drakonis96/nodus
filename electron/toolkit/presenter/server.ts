@@ -95,13 +95,14 @@ function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     if (url.pathname === '/api/volume') {
       const set = url.searchParams.get('set');
       if (set !== null) {
-        void deps?.setVolume(parseInt(set, 10) || 0);
-        res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ok":true}');
+        void (deps?.setVolume(parseInt(set, 10) || 0) ?? Promise.resolve()).then(() =>
+          res.writeHead(200, { 'Content-Type': 'application/json' }).end('{"ok":true}'),
+        ).catch(() => res.writeHead(503).end('Volume unavailable'));
         return;
       }
       void (deps?.getVolume() ?? Promise.resolve(50)).then((v) =>
         res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ volume: v })),
-      );
+      ).catch(() => res.writeHead(503).end('Volume unavailable'));
       return;
     }
     const pdfMatch = url.pathname.match(/^\/api\/pdf\/([^/]+)$/);

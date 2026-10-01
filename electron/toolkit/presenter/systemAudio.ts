@@ -3,24 +3,40 @@
 // the mobile remote can nudge the output volume; casting opens the macOS Screen
 // Mirroring picker. Everything is a no-op on other platforms so callers stay simple.
 import { execFile } from 'node:child_process';
+import { SystemVolume } from './systemVolume';
+import { nativeSystemAudio } from './nativeSystemAudio';
 
 const isMac = process.platform === 'darwin';
 
-export function getSystemVolume(): Promise<number> {
-  if (!isMac) return Promise.resolve(50);
-  return new Promise((resolve) => {
-    execFile('osascript', ['-e', 'output volume of (get volume settings)'], (err, stdout) => {
-      resolve(err ? 50 : parseInt(stdout.trim(), 10) || 0);
+const systemVolume = new SystemVolume(
+  () => new Promise<number>((resolve, reject) => {
+    try {
+      const native = nativeSystemAudio();
+      if (native) { resolve(native.getVolume()); return; }
+    } catch { /* An unsupported output device keeps the serialized fallback. */ }
+    execFile('osascript', ['-e', 'output volume of (get volume settings)'], { timeout: 2_000 }, (err, stdout) => {
+      if (err) reject(err);
+      else resolve(parseInt(stdout.trim(), 10) || 0);
     });
-  });
+  }),
+  (volume) => new Promise<void>((resolve, reject) => {
+    try {
+      const native = nativeSystemAudio();
+      if (native) { native.setVolume(volume); resolve(); return; }
+    } catch { /* An unsupported output device keeps the serialized fallback. */ }
+    execFile('osascript', ['-e', `set volume output volume ${volume}`], { timeout: 2_000 }, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  }),
+);
+
+export function getSystemVolume(): Promise<number> {
+  return isMac ? systemVolume.get() : Promise.resolve(50);
 }
 
 export function setSystemVolume(volume: number): Promise<void> {
-  if (!isMac) return Promise.resolve();
-  const v = Math.max(0, Math.min(100, Math.round(volume) || 0));
-  return new Promise((resolve) => {
-    execFile('osascript', ['-e', `set volume output volume ${v}`], () => resolve());
-  });
+  return isMac ? systemVolume.set(volume) : Promise.resolve();
 }
 
 /** Open the macOS Control Center "Screen Mirroring" panel; falls back to Displays. */
