@@ -1474,45 +1474,54 @@ try {
   await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
   await page.getByTestId('presenter-back').click();
   await page.getByTestId('toolkit-home').waitFor();
-  // Tags: seed a shelf through the same IPC the view writes to, then drive the
-  // chips. A tag is only worth having if clicking it actually narrows the list,
-  // and deleting one must ask first and must not take its presentations with it.
+  // A legacy tagged shelf migrates to folder navigation over the real IPC.
   await page.evaluate(() => window.nodus.savePresenterLibrary({
-    tags: [{ id: 'tag_smoke', name: 'Seminario', createdAt: '2026-01-01T00:00:00Z' }],
+    tags: [{ id: 'folder_smoke', name: 'Seminario', createdAt: '2026-01-01T00:00:00Z' }],
     presentations: [
-      { id: 'pres_tagged', name: 'Clase etiquetada', fileName: 'a.pdf', createdAt: '2026-01-02T00:00:00Z', tag: 'tag_smoke', totalPages: 2, notes: {}, videos: {} },
+      { id: 'pres_filed', name: 'Clase organizada', fileName: 'a.pdf', createdAt: '2026-01-02T00:00:00Z', tag: 'folder_smoke', totalPages: 2, notes: {}, videos: {} },
       { id: 'pres_loose', name: 'Clase suelta', fileName: 'b.pdf', createdAt: '2026-01-03T00:00:00Z', tag: '', totalPages: 2, notes: {}, videos: {} },
     ],
   }));
   await page.getByTestId('toolkit-card-presenter').click();
   await page.getByTestId('presenter-import').waitFor({ timeout: 10_000 });
-  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'the seeded shelf lists both presentations');
-  const smokeTagChip = page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' });
-  await smokeTagChip.waitFor();
-  await smokeTagChip.click();
-  await waitForCondition('la etiqueta filtra a una sola presentación', async () => (await page.getByTestId('presenter-row').count()) === 1, { timeout: 5_000 });
-  assert.match(await page.getByTestId('presenter-row').first().innerText(), /Clase etiquetada/, 'the tag filter keeps only its own presentations');
-  await smokeTagChip.click(); // clicking the active tag clears the filter
-  await waitForCondition('al quitar el filtro vuelven las dos presentaciones', async () => (await page.getByTestId('presenter-row').count()) === 2, { timeout: 5_000 });
-  // Deleting a tag is confirmed, and cancelling really cancels.
-  assert.equal(await page.getByTestId('presenter-delete-tag-modal').count(), 0, 'no confirmation is showing yet');
-  await page.getByTestId('presenter-delete-tag').first().click();
-  await page.getByTestId('presenter-delete-tag-modal').waitFor({ timeout: 5_000 });
-  await page.getByTestId('presenter-delete-tag-modal').getByRole('button', { name: /cancel|cancelar/i }).click();
-  await page.getByTestId('presenter-delete-tag-modal').waitFor({ state: 'detached', timeout: 5_000 });
-  assert.equal(await page.getByTestId('presenter-tag-chip').filter({ hasText: 'Seminario' }).count(), 1, 'cancelling the confirmation keeps the tag');
-  await page.getByTestId('presenter-delete-tag').first().click();
-  await page.getByTestId('presenter-delete-tag-confirm').click();
-  await page.getByTestId('presenter-tags').getByText('Seminario', { exact: true }).waitFor({ state: 'detached', timeout: 5_000 });
-  assert.equal(await page.getByTestId('presenter-row').count(), 2, 'deleting a tag unties it, it does not delete presentations');
-  // Downloading the deck's PDF is offered on the selected presentation.
+  await waitForCondition('la biblioteca principal muestra solo sus presentaciones', async () => (await page.getByTestId('presenter-row').count()) === 1, { timeout: 5_000 });
+  assert.match(await page.getByTestId('presenter-row').first().innerText(), /Clase suelta/);
+  const presenterSearch = page.locator('.presenter-library-rail input[type="search"]');
+  await presenterSearch.fill('Clase');
+  await waitForCondition('la búsqueda principal incluye las carpetas', async () => (await page.getByTestId('presenter-row').count()) === 2, { timeout: 5_000 });
+  assert.match(await page.getByTestId('presenter-row').filter({ hasText: 'Clase organizada' }).locator('.presenter-row-location').innerText(), /Seminario/);
+  await presenterSearch.fill('');
+  const smokeFolder = page.getByTestId('presenter-folder-nav').filter({ hasText: 'Seminario' });
+  await page.getByTestId('presenter-row').first().locator('.presenter-row-select').dragTo(smokeFolder);
+  await waitForCondition('arrastrar mueve la presentación a la carpeta', async () => (await page.evaluate(() => window.nodus.getPresenterLibrary())).presentations.find(p => p.id === 'pres_loose')?.folderId === 'folder_smoke', { timeout: 5_000 });
+  const looseRow = page.locator('[data-presentation-id="pres_loose"]');
+  await looseRow.getByTestId('presenter-row-menu').click();
+  assert.equal(await page.getByRole('menuitem').count(), 3, 'each presentation has rename, move and delete in one menu');
+  await page.getByTestId('presenter-row-move').click();
+  await page.getByTestId('presenter-move-folder-select').selectOption('');
+  await page.getByTestId('presenter-move-confirm').click();
+  await waitForCondition('el menú permite volver a la biblioteca principal', async () => (await page.evaluate(() => window.nodus.getPresenterLibrary())).presentations.find(p => p.id === 'pres_loose')?.folderId === null, { timeout: 5_000 });
+  await smokeFolder.click();
+  await waitForCondition('la carpeta muestra su presentación', async () => /Clase organizada/.test(await page.getByTestId('presenter-row').first().innerText()), { timeout: 5_000 });
+  await page.getByTestId('presenter-folder-root').click();
+  await page.getByTestId('presenter-folder-menu').first().click();
+  await page.getByTestId('presenter-delete-folder').click();
+  await page.getByTestId('presenter-delete-folder-modal').waitFor();
+  await page.getByTestId('presenter-delete-folder-modal').getByRole('button', { name: /cancel|cancelar/i }).click();
+  await page.getByTestId('presenter-delete-folder-modal').waitFor({ state: 'detached' });
+  assert.equal(await smokeFolder.count(), 1, 'cancel keeps the folder');
+  await page.getByTestId('presenter-folder-menu').first().click();
+  await page.getByTestId('presenter-delete-folder').click();
+  await page.getByTestId('presenter-delete-folder-confirm').click();
+  await smokeFolder.waitFor({ state: 'detached' });
+  await waitForCondition('las presentaciones conservadas vuelven a la biblioteca principal', async () => (await page.getByTestId('presenter-row').count()) === 2, { timeout: 5_000 });
   await page.getByTestId('presenter-row').first().click();
   await page.getByTestId('presenter-download-pdf').waitFor({ timeout: 5_000 });
-  assert.equal(await page.getByTestId('presenter-download-pdf').isDisabled(), false, 'the PDF download button is offered for a selected deck');
-  await page.evaluate(() => window.nodus.savePresenterLibrary({ tags: [], presentations: [] }));
+  assert.equal(await page.getByTestId('presenter-download-pdf').isDisabled(), false);
+  await page.evaluate(() => window.nodus.savePresenterLibrary({ folders: [], presentations: [] }));
   await page.getByTestId('presenter-back').click();
   await page.getByTestId('toolkit-home').waitFor();
-  console.log('[e2e] PDF Presenter tags filter the shelf, deleting one is confirmed and spares its presentations, and the deck offers its PDF');
+  console.log('[e2e] PDF Presenter folders migrate tags, search recursively, move by dragging or menu and confirm deletion while keeping decks.');
   // Nodus Convert opens on its empty state: the dropzone plus the catalogue of
   // formats it accepts, so the drop is never a blind guess.
   await page.getByTestId('toolkit-card-convert').click();

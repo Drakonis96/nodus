@@ -55,6 +55,8 @@ export function PresenterToolbar({
           key={tool.name}
           type="button"
           title={`${t(tool.label)} (${toolShortcut(tool.key)})`}
+          aria-label={t(tool.label)}
+          aria-pressed={activeTool === tool.name}
           onClick={() => onSetTool(activeTool === tool.name ? null : tool.name)}
           className={`flex flex-col items-center justify-center gap-0.5 rounded-md px-1.5 py-1 transition-colors ${
             showShortcuts ? '' : 'h-8 w-8'
@@ -72,7 +74,9 @@ export function PresenterToolbar({
               key={c}
               type="button"
               onClick={() => onSetColor(c)}
-              aria-label={c}
+              title={`${t('Color')}: ${c}`}
+              aria-label={`${t('Color')}: ${c}`}
+              aria-pressed={color === c}
               style={{ background: c }}
               className={`h-5 w-5 rounded-full border ${color === c ? 'border-white ring-2 ring-white/60' : 'border-white/30'}`}
             />
@@ -85,6 +89,8 @@ export function PresenterToolbar({
           <span className="text-xs text-neutral-400">{activeTool === 'zoom' ? t('Diámetro') : t('Tamaño')}</span>
           <input
             type="range"
+            title={activeTool === 'zoom' ? t('Diámetro') : t('Tamaño')}
+            aria-label={activeTool === 'zoom' ? t('Diámetro') : t('Tamaño')}
             min={range.min}
             max={range.max}
             value={Math.min(Math.max(size, range.min), range.max)}
@@ -101,6 +107,9 @@ export function PresenterToolbar({
               key={f}
               type="button"
               onClick={() => onSetZoomFactor(f)}
+              title={`${t('Lupa')} ${f}×`}
+              aria-label={`${t('Lupa')} ${f}×`}
+              aria-pressed={zoomFactor === f}
               className={`rounded px-1.5 py-0.5 text-xs ${zoomFactor === f ? 'bg-amber-500/25 text-amber-300' : 'hover:bg-white/10'}`}
             >
               {f}×
@@ -113,6 +122,7 @@ export function PresenterToolbar({
         <button
           type="button"
           title={t('Limpiar dibujo')}
+          aria-label={t('Limpiar dibujo')}
           onClick={onClear}
           className="flex h-8 w-8 items-center justify-center rounded-md border-l border-white/10 hover:bg-white/10"
         >

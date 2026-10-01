@@ -8620,4 +8620,26 @@ export const TR: Record<string, string> = {
   "Sent": "Gönderildi",
   ...CONCILIUM_TRANSLATIONS['tr'],
   ...DRIFT_TRANSLATIONS['tr'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "Slaytlarınızı düzenleyin. Fikirlerinizi paylaşın.",
+  "Buscar por número o notas…": "Numara veya notlara göre ara…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "Klasörü düzenle",
+  "Carpeta principal": "Üst klasör",
+  "Biblioteca principal": "Ana kitaplık",
+  "Color personalizado": "Özel renk",
+  "Ruta de carpetas": "Klasör yolu",
+  "Opciones de la carpeta {name}": "{name} klasörünün seçenekleri",
+  "No se pudo eliminar la carpeta.": "Klasör silinemedi.",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "“{name}” klasörü ve alt klasörleri ({n}) silinecek.",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "İçindeki {n} sunumla ne yapmak istersiniz?",
+  "Conservar presentaciones": "Sunumları koru",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "Notları ve videolarıyla birlikte ana kitaplığa taşı.",
+  "Eliminar también las presentaciones": "Sunumları da sil",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "Kitaplıktaki kopyaları silinecek. Orijinal dosyalar korunacak.",
+  "Eliminar carpeta y presentaciones": "Klasörü ve sunumları sil",
+  "Ciencia": "Bilim",
+  "Arte": "Sanat",
+  "Favoritos": "Favoriler",
 };

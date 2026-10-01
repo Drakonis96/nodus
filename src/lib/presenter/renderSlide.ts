@@ -28,17 +28,18 @@ export class FittedSlideRenderer {
       return;
     }
 
-    const cw = this.container.clientWidth;
-    const ch = this.container.clientHeight;
-    if (cw === 0 || ch === 0) {
+    const padding = getComputedStyle(this.container);
+    const cw = this.container.clientWidth - (parseFloat(padding.paddingLeft) || 0) - (parseFloat(padding.paddingRight) || 0);
+    const ch = this.container.clientHeight - (parseFloat(padding.paddingTop) || 0) - (parseFloat(padding.paddingBottom) || 0);
+    if (cw <= 0 || ch <= 0) {
       page.cleanup?.();
       return;
     }
 
     const base = page.getViewport({ scale: 1 });
     const dpr = window.devicePixelRatio || 1;
-    const scale = Math.min(cw / base.width, ch / base.height, this.maxScale);
-    const viewport = page.getViewport({ scale: scale * dpr });
+    const fitScale = Math.min(cw / base.width, ch / base.height);
+    const viewport = page.getViewport({ scale: Math.min(fitScale, this.maxScale) * dpr });
 
     // Render into a buffer first, then blit — avoids showing a half-painted canvas
     // when a fast navigation cancels mid-render.
@@ -62,8 +63,10 @@ export class FittedSlideRenderer {
 
     this.canvas.width = buffer.width;
     this.canvas.height = buffer.height;
-    this.canvas.style.width = `${Math.floor(viewport.width / dpr)}px`;
-    this.canvas.style.height = `${Math.floor(viewport.height / dpr)}px`;
+    // Keep the PDF's exact display ratio; round only the backing bitmap. The
+    // raster cap limits memory, while the slide still fills the available space.
+    this.canvas.style.width = `${base.width * fitScale}px`;
+    this.canvas.style.height = `${base.height * fitScale}px`;
     const ctx = this.canvas.getContext('2d', { alpha: false });
     ctx?.drawImage(buffer, 0, 0);
   }

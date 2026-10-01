@@ -195,6 +195,7 @@ const ICON_PATHS: Record<string, string> = {
   heading: '<path d="M6 4v16"/><path d="M18 4v16"/><path d="M6 12h12"/>',
   list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
   grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  qrCode: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M6 6h.01M18 6h.01M6 18h.01M12 3v3M12 9v3H9M3 12h3M15 12h3v3h3M12 15v3h3v3h3M21 18v3M12 21h.01"/>',
   clock: '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
   // The Marketplace's own mark, reduced to a line glyph: the header rail is a row of
   // 2px strokes, and the gradient basket would read as a sticker among them.

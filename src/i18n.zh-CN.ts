@@ -7874,4 +7874,28 @@ export const ZH_CN: Record<string, string> = {
   "Sent": "已发送",
   ...CONCILIUM_TRANSLATIONS['zh-CN'],
   ...DRIFT_TRANSLATIONS['zh-CN'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "整理幻灯片，分享您的想法。",
+  "Buscar por número o notas…": "按编号或备注搜索…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "编辑文件夹",
+  "Carpeta principal": "上级文件夹",
+  "Biblioteca principal": "主资料库",
+  "Color personalizado": "自定义颜色",
+  "Ruta de carpetas": "文件夹路径",
+  "Opciones de la carpeta {name}": "文件夹 {name} 的选项",
+  "No se pudo eliminar la carpeta.": "无法删除文件夹。",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "将删除文件夹“{name}”及其子文件夹（{n} 个）。",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "如何处理其中的 {n} 个演示文稿？",
+  "Conservar presentaciones": "保留演示文稿",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "将它们及其备注和视频移至主资料库。",
+  "Eliminar también las presentaciones": "同时删除演示文稿",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "将删除资料库中的副本，保留原始文件。",
+  "Eliminar carpeta y presentaciones": "删除文件夹和演示文稿",
+  "Ciencia": "科学",
+  "Imagen": "图像",
+  "Arte": "艺术",
+  "Favoritos": "收藏",
+  "Inicio": "首页",
 };

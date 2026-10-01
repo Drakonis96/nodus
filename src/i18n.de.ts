@@ -8869,4 +8869,26 @@ export const DE: Record<string, string> = {
   "Sent": "Gesendet",
   ...CONCILIUM_TRANSLATIONS['de'],
   ...DRIFT_TRANSLATIONS['de'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "Organisieren Sie Ihre Folien. Teilen Sie Ihre Ideen.",
+  "Buscar por número o notas…": "Nach Nummer oder Notizen suchen…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "Ordner bearbeiten",
+  "Carpeta principal": "Übergeordneter Ordner",
+  "Biblioteca principal": "Hauptbibliothek",
+  "Color personalizado": "Benutzerdefinierte Farbe",
+  "Ruta de carpetas": "Ordnerpfad",
+  "Opciones de la carpeta {name}": "Optionen für den Ordner {name}",
+  "No se pudo eliminar la carpeta.": "Der Ordner konnte nicht gelöscht werden.",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "Der Ordner „{name}“ und seine Unterordner ({n}) werden gelöscht.",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "Was soll mit den {n} Präsentationen geschehen?",
+  "Conservar presentaciones": "Präsentationen behalten",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "Mit ihren Notizen und Videos in die Hauptbibliothek verschieben.",
+  "Eliminar también las presentaciones": "Präsentationen ebenfalls löschen",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "Ihre Bibliothekskopien werden gelöscht. Die Originaldateien bleiben erhalten.",
+  "Eliminar carpeta y presentaciones": "Ordner und Präsentationen löschen",
+  "Ciencia": "Wissenschaft",
+  "Arte": "Kunst",
+  "Favoritos": "Favoriten",
 };

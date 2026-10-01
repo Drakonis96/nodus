@@ -8231,4 +8231,26 @@ export const KO: Record<string, string> = {
   "Sent": "전송됨",
   ...CONCILIUM_TRANSLATIONS['ko'],
   ...DRIFT_TRANSLATIONS['ko'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "슬라이드를 정리하고 아이디어를 공유하세요.",
+  "Buscar por número o notas…": "번호 또는 노트로 검색…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "폴더 편집",
+  "Carpeta principal": "상위 폴더",
+  "Biblioteca principal": "기본 라이브러리",
+  "Color personalizado": "사용자 지정 색상",
+  "Ruta de carpetas": "폴더 경로",
+  "Opciones de la carpeta {name}": "{name} 폴더 옵션",
+  "No se pudo eliminar la carpeta.": "폴더를 삭제할 수 없습니다.",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "“{name}” 폴더와 하위 폴더({n}개)가 삭제됩니다.",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "포함된 프레젠테이션 {n}개를 어떻게 처리할까요?",
+  "Conservar presentaciones": "프레젠테이션 유지",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "노트 및 동영상과 함께 기본 라이브러리로 이동합니다.",
+  "Eliminar también las presentaciones": "프레젠테이션도 삭제",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "라이브러리의 복사본이 삭제됩니다. 원본 파일은 유지됩니다.",
+  "Eliminar carpeta y presentaciones": "폴더 및 프레젠테이션 삭제",
+  "Ciencia": "과학",
+  "Arte": "예술",
+  "Favoritos": "즐겨찾기",
 };

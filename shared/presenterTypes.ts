@@ -1,7 +1,7 @@
 // PDF Presenter — shared, Electron-free data model and pure reducers.
 //
 // The presenter's library is a global Toolkit resource (one shelf of
-// presentations + tags, independent of the active vault, like Convert and
+// presentations + folders, independent of the active vault, like Convert and
 // Protect). Everything here is a pure function over plain data so it can be
 // unit-tested directly (scripts/test-presenter-library.mjs) — the filesystem side
 // (copying the PDF, reading/writing the JSON) lives in electron/toolkit/presenter.
@@ -9,9 +9,7 @@
 // Field names deliberately mirror the reference app's meta.json so the audience,
 // presenter and mobile views can consume a presentation without a translation
 // layer: `notes`/`videos` are keyed by the 1-based slide number as a string
-// (JSON object keys are strings), `tag` is the assigned tag id ('' or undefined =
-// untagged). Libraries written before the rename stored the same two fields as
-// `folder`/`folders`; normalizeLibrary migrates them on read.
+// (JSON object keys are strings). Legacy tags are migrated to folders on read.
 
 /** A YouTube overlay pinned to one slide, positioned in percentages of the slide. */
 export interface PresenterVideo {
@@ -35,8 +33,8 @@ export interface Presentation {
   createdAt: string;
   /** ISO timestamp of the last time it was opened; drives "recent-opened" sort. */
   lastOpenedAt?: string;
-  /** Assigned tag id; '' or undefined means untagged. */
-  tag?: string;
+  /** Containing folder; null or undefined means the main library. */
+  folderId?: string | null;
   /** Page count, filled in the first time the PDF is opened and its pages counted. */
   totalPages: number;
   /** Presenter notes, keyed by 1-based slide number (as a string). */
@@ -45,16 +43,21 @@ export interface Presentation {
   videos: Record<string, PresenterVideo>;
 }
 
-export interface PresenterTag {
+export interface PresenterFolder {
   id: string;
   name: string;
   createdAt: string;
+  parentId: string | null;
+  icon: string;
+  color: string;
 }
 
-/** The whole on-disk library: the flat list of presentations plus the tags. */
+export type PresenterFolderDeleteMode = 'move-to-root' | 'delete-presentations';
+
+/** The whole on-disk library; folder hierarchy is stored through parentId. */
 export interface PresenterLibrary {
   presentations: Presentation[];
-  tags: PresenterTag[];
+  folders: PresenterFolder[];
 }
 
 /** Speaker notes extracted from a .pptx (the parser lives in electron/toolkit). */
@@ -103,47 +106,65 @@ export type PresenterImportResult =
 export type PresenterSortMode = 'recent-added' | 'recent-opened' | 'name-asc' | 'name-desc';
 
 export interface PresenterListQuery {
-  /** Tag id to restrict to; '' means no filter (all presentations). */
-  tag?: string;
+  /** Folder id, or null for the main library. Omitted searches every folder. */
+  folderId?: string | null;
+  /** Include descendants of the selected folder; at root, include every folder. */
+  recursive?: boolean;
   /** Case/accent-insensitive name substring. */
   search?: string;
   sort?: PresenterSortMode;
 }
 
 export function emptyLibrary(): PresenterLibrary {
-  return { presentations: [], tags: [] };
+  return { presentations: [], folders: [] };
 }
 
 /**
  * Coerce whatever is on disk into a well-formed {@link PresenterLibrary}. Tolerates
  * a legacy bare array of presentations (mirrors the reference's meta.json backward
- * compat), migrates the pre-rename `folders`/`folder` fields to `tags`/`tag`, and
+ * compat), migrates `tags`/`tag` and older `folders`/`folder` fields, and
  * fills missing sub-objects so callers never guard for undefined.
  */
 export function normalizeLibrary(raw: unknown): PresenterLibrary {
-  if (Array.isArray(raw)) {
-    return { presentations: raw.map(normalizePresentation), tags: [] };
+  const obj = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const source = Array.isArray(obj.folders) ? obj.folders : Array.isArray(obj.tags) ? obj.tags : [];
+  const folders: PresenterFolder[] = [];
+  const ids = new Set<string>();
+  for (const entry of source) {
+    if (!entry || typeof entry !== 'object') continue;
+    const f = entry as Partial<PresenterFolder>;
+    if (typeof f.id !== 'string' || !f.id || ids.has(f.id)) continue;
+    ids.add(f.id);
+    folders.push({
+      id: f.id, name: String(f.name ?? '').trim() || 'Carpeta', createdAt: String(f.createdAt ?? ''),
+      parentId: typeof f.parentId === 'string' && f.parentId ? f.parentId : null,
+      icon: typeof f.icon === 'string' && /^[a-zA-Z][a-zA-Z0-9]{0,63}$/.test(f.icon) ? f.icon : 'folder',
+      color: typeof f.color === 'string' && /^#[0-9a-f]{6}$/i.test(f.color) ? f.color : '#6366f1',
+    });
   }
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Partial<PresenterLibrary> & { folders?: PresenterTag[] };
-    const tags = Array.isArray(obj.tags) ? obj.tags : Array.isArray(obj.folders) ? obj.folders : [];
-    return {
-      presentations: Array.isArray(obj.presentations) ? obj.presentations.map(normalizePresentation) : [],
-      tags,
-    };
+  const byId = new Map(folders.map(f => [f.id, f]));
+  for (const folder of folders) {
+    const seen = new Set([folder.id]);
+    let parentId = folder.parentId;
+    while (parentId) {
+      if (!byId.has(parentId) || seen.has(parentId)) { folder.parentId = null; break; }
+      seen.add(parentId);
+      parentId = byId.get(parentId)!.parentId;
+    }
   }
-  return emptyLibrary();
+  const presentations = (Array.isArray(raw) ? raw : Array.isArray(obj.presentations) ? obj.presentations : []).map(normalizePresentation);
+  return { folders, presentations: presentations.map(p => ({ ...p, folderId: p.folderId && ids.has(p.folderId) ? p.folderId : null })) };
 }
 
 function normalizePresentation(raw: unknown): Presentation {
-  const p = (raw ?? {}) as Partial<Presentation> & { folder?: string };
+  const p = (raw ?? {}) as Partial<Presentation> & { folder?: string; tag?: string };
   return {
     id: String(p.id ?? ''),
     name: String(p.name ?? ''),
     fileName: String(p.fileName ?? ''),
     createdAt: String(p.createdAt ?? ''),
     lastOpenedAt: p.lastOpenedAt,
-    tag: p.tag ?? p.folder ?? '',
+    folderId: p.folderId !== undefined ? p.folderId || null : p.tag || p.folder || null,
     totalPages: Number(p.totalPages ?? 0) || 0,
     notes: p.notes && typeof p.notes === 'object' ? p.notes : {},
     videos: p.videos && typeof p.videos === 'object' ? p.videos : {},
@@ -156,13 +177,20 @@ function fold(value: string): string {
 }
 
 /**
- * Filter by tag + search and sort, returning a new array (never mutates).
+ * Filter by folder + search and sort, returning a new array (never mutates).
  * Sorting is stable-enough for the UI: locale name compare, ISO-string time
  * compare (lexicographic works because the timestamps are ISO-8601).
  */
 export function queryPresentations(lib: PresenterLibrary, q: PresenterListQuery = {}): Presentation[] {
   let list = [...lib.presentations];
-  if (q.tag) list = list.filter((p) => (p.tag || '') === q.tag);
+  if (q.folderId !== undefined) {
+    if (q.recursive && q.folderId) {
+      const ids = folderSubtreeIds(lib, q.folderId);
+      list = list.filter(p => ids.has(p.folderId || ''));
+    } else if (!q.recursive) {
+      list = list.filter(p => (p.folderId || null) === (q.folderId || null));
+    }
+  }
   if (q.search && q.search.trim()) {
     const needle = fold(q.search.trim());
     list = list.filter((p) => fold(p.name).includes(needle));
@@ -185,9 +213,37 @@ export function queryPresentations(lib: PresenterLibrary, q: PresenterListQuery 
   return list;
 }
 
-/** How many presentations carry a tag (for the chip count). */
-export function tagCount(lib: PresenterLibrary, tagId: string): number {
-  return lib.presentations.filter((p) => (p.tag || '') === tagId).length;
+/** A folder and its descendants, for search, counts and recursive deletion. */
+export function folderSubtreeIds(lib: PresenterLibrary, folderId: string): Set<string> {
+  if (!lib.folders.some(f => f.id === folderId)) return new Set();
+  const ids = new Set([folderId]);
+  const queue = [folderId];
+  const children = new Map<string, string[]>();
+  for (const folder of lib.folders) {
+    if (folder.parentId) children.set(folder.parentId, [...children.get(folder.parentId) ?? [], folder.id]);
+  }
+  for (let i = 0; i < queue.length; i++) {
+    for (const id of children.get(queue[i]) ?? []) if (!ids.has(id)) { ids.add(id); queue.push(id); }
+  }
+  return ids;
+}
+
+export function folderCount(lib: PresenterLibrary, folderId: string | null, recursive = false): number {
+  const ids = folderId && recursive ? folderSubtreeIds(lib, folderId) : null;
+  return lib.presentations.filter(p => ids ? ids.has(p.folderId || '') : (p.folderId || null) === folderId).length;
+}
+
+export function folderPath(lib: PresenterLibrary, folderId: string | null): PresenterFolder[] {
+  const path: PresenterFolder[] = [];
+  const seen = new Set<string>();
+  while (folderId && !seen.has(folderId)) {
+    seen.add(folderId);
+    const folder = lib.folders.find(f => f.id === folderId);
+    if (!folder) break;
+    path.unshift(folder);
+    folderId = folder.parentId;
+  }
+  return path;
 }
 
 // ── Pure reducers: each returns a NEW library, never mutating the input. ──────
@@ -213,22 +269,34 @@ export function renamePresentation(lib: PresenterLibrary, id: string, name: stri
   };
 }
 
-export function assignTag(lib: PresenterLibrary, id: string, tagId: string): PresenterLibrary {
+export function assignFolder(lib: PresenterLibrary, id: string, folderId: string | null): PresenterLibrary {
+  if (folderId && !lib.folders.some(f => f.id === folderId)) return lib;
   return {
     ...lib,
-    presentations: lib.presentations.map((p) => (p.id === id ? { ...p, tag: tagId || '' } : p)),
+    presentations: lib.presentations.map((p) => (p.id === id ? { ...p, folderId: folderId || null } : p)),
   };
 }
 
-export function addTag(lib: PresenterLibrary, tag: PresenterTag): PresenterLibrary {
-  return { ...lib, tags: [...lib.tags, tag] };
+export function addFolder(lib: PresenterLibrary, folder: PresenterFolder): PresenterLibrary {
+  if (!folder.id || !folder.name.trim() || lib.folders.some(f => f.id === folder.id) || (folder.parentId && !lib.folders.some(f => f.id === folder.parentId))) return lib;
+  return { ...lib, folders: [...lib.folders, { ...folder, name: folder.name.trim() }] };
 }
 
-/** Remove a tag; the presentations that carried it stay, untagged (never deleted). */
-export function removeTag(lib: PresenterLibrary, tagId: string): PresenterLibrary {
+export function updateFolder(lib: PresenterLibrary, id: string, patch: Partial<Pick<PresenterFolder, 'name' | 'icon' | 'color' | 'parentId'>>): PresenterLibrary {
+  if (patch.name !== undefined && !patch.name.trim()) return lib;
+  if (patch.parentId && (!lib.folders.some(f => f.id === patch.parentId) || folderSubtreeIds(lib, id).has(patch.parentId))) return lib;
+  return { ...lib, folders: lib.folders.map(f => f.id === id ? { ...f, ...patch, name: patch.name?.trim() ?? f.name } : f) };
+}
+
+/** Remove a subtree, explicitly keeping its decks at root or deleting them. */
+export function removeFolder(lib: PresenterLibrary, folderId: string, mode: PresenterFolderDeleteMode): PresenterLibrary {
+  const ids = folderSubtreeIds(lib, folderId);
+  if (!ids.size) return lib;
   return {
-    tags: lib.tags.filter((tg) => tg.id !== tagId),
-    presentations: lib.presentations.map((p) => (p.tag === tagId ? { ...p, tag: '' } : p)),
+    folders: lib.folders.filter(f => !ids.has(f.id)),
+    presentations: mode === 'delete-presentations'
+      ? lib.presentations.filter(p => !ids.has(p.folderId || ''))
+      : lib.presentations.map(p => ids.has(p.folderId || '') ? { ...p, folderId: null } : p),
   };
 }
 

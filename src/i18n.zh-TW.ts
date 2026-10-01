@@ -7874,4 +7874,28 @@ export const ZH_TW: Record<string, string> = {
   "Sent": "已傳送",
   ...CONCILIUM_TRANSLATIONS['zh-TW'],
   ...DRIFT_TRANSLATIONS['zh-TW'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "整理投影片，分享您的想法。",
+  "Buscar por número o notas…": "按編號或備註搜尋…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "編輯資料夾",
+  "Carpeta principal": "上層資料夾",
+  "Biblioteca principal": "主資料庫",
+  "Color personalizado": "自訂顏色",
+  "Ruta de carpetas": "資料夾路徑",
+  "Opciones de la carpeta {name}": "資料夾 {name} 的選項",
+  "No se pudo eliminar la carpeta.": "無法刪除資料夾。",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "將刪除資料夾「{name}」及其子資料夾（{n} 個）。",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "如何處理其中的 {n} 份簡報？",
+  "Conservar presentaciones": "保留簡報",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "將簡報連同備註和影片移至主資料庫。",
+  "Eliminar también las presentaciones": "同時刪除簡報",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "將刪除資料庫中的副本，保留原始檔案。",
+  "Eliminar carpeta y presentaciones": "刪除資料夾和簡報",
+  "Ciencia": "科學",
+  "Imagen": "影像",
+  "Arte": "藝術",
+  "Favoritos": "收藏",
+  "Inicio": "首頁",
 };

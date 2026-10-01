@@ -42,76 +42,117 @@ test.after(() => rm(outDir, { recursive: true, force: true }));
 test('normalizeLibrary tolerates legacy array and fills missing fields', () => {
   const legacy = types.normalizeLibrary([{ id: 'a', name: 'A' }]);
   assert.equal(legacy.presentations.length, 1);
-  assert.deepEqual(legacy.tags, []);
+  assert.deepEqual(legacy.folders, []);
   assert.deepEqual(legacy.presentations[0].notes, {});
   assert.deepEqual(legacy.presentations[0].videos, {});
   assert.equal(legacy.presentations[0].totalPages, 0);
-  assert.deepEqual(types.normalizeLibrary(null), { presentations: [], tags: [] });
+  assert.deepEqual(types.normalizeLibrary(null), { presentations: [], folders: [] });
 });
 
-// Tags used to be called folders and were stored under those exact field names.
-// Anyone who organised their shelf before the rename must find it intact.
-test('normalizeLibrary migrates the pre-rename folders/folder fields to tags/tag', () => {
-  const migrated = types.normalizeLibrary({
-    presentations: [{ id: 'a', name: 'A', folder: 'f1', totalPages: 2 }],
-    folders: [{ id: 'f1', name: 'Curso', createdAt: 'x' }],
-  });
-  assert.deepEqual(migrated.tags, [{ id: 'f1', name: 'Curso', createdAt: 'x' }]);
-  assert.equal(migrated.presentations[0].tag, 'f1');
-  assert.equal(migrated.presentations[0].folder, undefined);
-  // The migrated library really filters, so the chip is not just cosmetic.
-  assert.deepEqual(types.queryPresentations(migrated, { tag: 'f1' }).map((p) => p.id), ['a']);
-  assert.equal(types.tagCount(migrated, 'f1'), 1);
-  // A library already written with the new names is left alone.
-  const fresh = types.normalizeLibrary({ presentations: [], tags: [{ id: 't1', name: 'T', createdAt: 'x' }] });
-  assert.deepEqual(fresh.tags, [{ id: 't1', name: 'T', createdAt: 'x' }]);
+const folder = (id, parentId = null) => ({ id, parentId, name: id, icon: 'folder', color: '#6366f1', createdAt: 'x' });
+const deck = (id, folderId = null) => ({ id, folderId, name: id, fileName: `${id}.pdf`, createdAt: 'x', totalPages: 2, notes: { '1': 'Notas conservadas' }, videos: { '2': { url: 'https://youtu.be/example', x: 0, y: 0, w: 40, h: 30 } } });
+
+test('legacy tags and older folders migrate without losing memberships or notes', () => {
+  for (const [collection, membership] of [['tags', 'tag'], ['folders', 'folder']]) {
+    const migrated = types.normalizeLibrary({ [collection]: [{ id: 'f1', name: 'Curso', createdAt: 'x' }], presentations: [{ ...deck('a'), folderId: undefined, [membership]: 'f1' }] });
+    assert.deepEqual(migrated.folders, [{ ...folder('f1'), name: 'Curso' }]);
+    assert.equal(migrated.presentations[0].folderId, 'f1');
+    assert.equal(migrated.presentations[0].tag, undefined);
+    assert.deepEqual(migrated.presentations[0].notes, deck('a').notes);
+    assert.deepEqual(types.queryPresentations(migrated, { folderId: 'f1' }).map(p => p.id), ['a']);
+    assert.deepEqual(types.normalizeLibrary(migrated), migrated);
+  }
 });
 
-test('queryPresentations filters by tag + accent-insensitive search and sorts', () => {
-  const base = types.emptyLibrary();
-  const withAll = [
-    { id: '1', name: 'Canción', createdAt: '2026-01-01T00:00:00Z', tag: 't1', totalPages: 1, notes: {}, videos: {} },
-    { id: '2', name: 'Zebra', createdAt: '2026-03-01T00:00:00Z', tag: '', totalPages: 1, notes: {}, videos: {} },
-    { id: '3', name: 'Alpha', createdAt: '2026-02-01T00:00:00Z', tag: 't1', totalPages: 1, notes: {}, videos: {} },
-  ].reduce((acc, p) => types.upsertPresentation(acc, p), base);
-
-  // Accent/case-insensitive: "cancion" matches "Canción".
-  assert.deepEqual(types.queryPresentations(withAll, { search: 'cancion' }).map((p) => p.id), ['1']);
-  // Clicking a tag chip shows exactly the presentations carrying that tag — and
-  // only those; the untagged one stays out.
-  assert.deepEqual(types.queryPresentations(withAll, { tag: 't1', sort: 'name-asc' }).map((p) => p.id), ['3', '1']);
-  assert.deepEqual(types.queryPresentations(withAll, { tag: 't1' }).map((p) => p.tag), ['t1', 't1']);
-  assert.equal(types.tagCount(withAll, 't1'), 2);
-  // The "all" chip ('' = no filter) still shows everything.
-  assert.equal(types.queryPresentations(withAll, { tag: '' }).length, 3);
-  // recent-added is newest first by createdAt.
-  assert.deepEqual(types.queryPresentations(withAll, { sort: 'recent-added' }).map((p) => p.id), ['2', '3', '1']);
-  assert.deepEqual(types.queryPresentations(withAll, { sort: 'name-desc' }).map((p) => p.id), ['2', '1', '3']);
+test('normalization repairs invalid parents, cycles, orphan decks and unsafe colors', () => {
+  const raw = { folders: [folder('a', 'b'), folder('b', 'a'), { ...folder('c', 'missing'), color: 'red;display:none', icon: '<script>' }, folder('a')], presentations: [deck('p', 'missing')] };
+  const normalized = types.normalizeLibrary(raw);
+  assert.equal(normalized.folders.length, 3);
+  assert.equal(normalized.folders[2].parentId, null);
+  assert.equal(normalized.folders[2].color, '#6366f1');
+  assert.equal(normalized.folders[2].icon, 'folder');
+  assert.equal(normalized.presentations[0].folderId, null);
+  for (const f of normalized.folders) assert.ok(types.folderPath(normalized, f.id).length <= 3);
+  assert.equal(raw.folders[0].parentId, 'b');
 });
 
-test('removeTag untags its presentations instead of deleting them', () => {
-  let l = types.addTag(types.emptyLibrary(), { id: 't1', name: 'T', createdAt: 'x' });
-  l = types.upsertPresentation(l, { id: '1', name: 'P', createdAt: 'x', tag: 't1', totalPages: 0, notes: {}, videos: {} });
-  const after = types.removeTag(l, 't1');
-  assert.equal(after.tags.length, 0);
-  assert.equal(after.presentations.length, 1);
-  assert.equal(after.presentations[0].tag, '');
-  // The input library is untouched, so a cancelled confirmation loses nothing.
-  assert.equal(l.tags.length, 1);
-  assert.equal(l.presentations[0].tag, 't1');
+test('folder queries distinguish the main library, direct children and all presentations', () => {
+  const l = { folders: [folder('f1'), folder('sub', 'f1')], presentations: [
+    { ...deck('1', 'f1'), name: 'Canción', createdAt: '2026-01-01' },
+    { ...deck('2'), name: 'Zebra', createdAt: '2026-03-01' },
+    { ...deck('3', 'f1'), name: 'Alpha', createdAt: '2026-02-01' }, deck('4', 'sub'),
+  ] };
+  assert.deepEqual(types.queryPresentations(l, { folderId: 'f1', search: 'cancion' }).map(p => p.id), ['1']);
+  assert.deepEqual(types.queryPresentations(l, { folderId: 'f1', sort: 'name-asc' }).map(p => p.id), ['3', '1']);
+  assert.deepEqual(types.queryPresentations(l, { folderId: null }).map(p => p.id), ['2']);
+  assert.equal(types.queryPresentations(l).length, 4);
+  assert.equal(types.folderCount(l, 'f1'), 2);
+  assert.equal(types.folderCount(l, 'f1', true), 3);
+  assert.deepEqual(types.folderPath(l, 'sub').map(f => f.id), ['f1', 'sub']);
+  assert.deepEqual(types.queryPresentations(l, { sort: 'recent-added' }).slice(1).map(p => p.id), ['2', '3', '1']);
+  assert.deepEqual(types.queryPresentations(l, { folderId: 'f1', sort: 'name-desc' }).map(p => p.id), ['1', '3']);
 });
 
-test('assignTag moves one presentation between tags and clears it with the empty id', () => {
-  let l = types.addTag(types.emptyLibrary(), { id: 't1', name: 'T1', createdAt: 'x' });
-  l = types.addTag(l, { id: 't2', name: 'T2', createdAt: 'x' });
-  l = types.upsertPresentation(l, { id: '1', name: 'P', createdAt: 'x', tag: 't1', totalPages: 0, notes: {}, videos: {} });
-  assert.equal(types.assignTag(l, '1', 't2').presentations[0].tag, 't2');
-  assert.equal(types.assignTag(l, '1', '').presentations[0].tag, '');
-  assert.equal(l.presentations[0].tag, 't1'); // input untouched
+test('recursive search reaches nested decks from the main library and respects folder boundaries', () => {
+  const l = { folders: [folder('course'), folder('unit', 'course'), folder('chapter', 'unit'), folder('other')], presentations: [
+    { ...deck('root'), name: 'Fotografía: introducción' },
+    { ...deck('course', 'course'), name: 'Fotografía: teoría' },
+    { ...deck('unit', 'unit'), name: 'Fotografía: cámara' },
+    { ...deck('chapter', 'chapter'), name: 'Fotografía: retrato' },
+    { ...deck('other', 'other'), name: 'Fotografía: archivo' },
+    { ...deck('unrelated', 'chapter'), name: 'Pintura' },
+  ] };
+  const ids = q => types.queryPresentations(l, q).map(p => p.id).sort();
+  assert.deepEqual(ids({ folderId: null, search: 'FOTOGRAFIA', recursive: true }), ['chapter', 'course', 'other', 'root', 'unit']);
+  assert.deepEqual(ids({ folderId: 'course', search: 'fotografia', recursive: true }), ['chapter', 'course', 'unit']);
+  assert.deepEqual(ids({ folderId: 'unit', search: 'fotografia', recursive: true }), ['chapter', 'unit']);
+  assert.deepEqual(ids({ folderId: null }), ['root']);
+  assert.deepEqual(ids({ folderId: 'course', search: 'fotografia' }), ['course']);
+});
+
+test('folders can be created, styled and nested without cycles or input mutation', () => {
+  const original = types.addFolder(types.emptyLibrary(), folder('a'));
+  const nested = types.addFolder(original, folder('b', 'a'));
+  const styled = types.updateFolder(nested, 'b', { name: '  Seminario  ', icon: 'book', color: '#059669', parentId: null });
+  assert.equal(styled.folders[1].name, 'Seminario');
+  assert.equal(styled.folders[1].icon, 'book');
+  assert.equal(styled.folders[1].color, '#059669');
+  assert.equal(styled.folders[1].parentId, null);
+  assert.equal(nested.folders[1].parentId, 'a');
+  assert.equal(original.folders.length, 1);
+  assert.equal(types.updateFolder(nested, 'a', { parentId: 'b' }), nested);
+  assert.equal(types.updateFolder(nested, 'a', { parentId: 'a' }), nested);
+  assert.equal(types.addFolder(nested, folder('orphan', 'missing')), nested);
+  assert.equal(types.addFolder(nested, folder('a')), nested);
+});
+
+test('moving a deck to a folder and back preserves its notes and videos', () => {
+  const l = { folders: [folder('a'), folder('b')], presentations: [deck('1', 'a')] };
+  const moved = types.assignFolder(l, '1', 'b');
+  assert.equal(moved.presentations[0].folderId, 'b');
+  assert.deepEqual(moved.presentations[0].notes, l.presentations[0].notes);
+  assert.deepEqual(moved.presentations[0].videos, l.presentations[0].videos);
+  assert.equal(types.assignFolder(moved, '1', null).presentations[0].folderId, null);
+  assert.equal(types.assignFolder(l, '1', 'missing'), l);
+  assert.equal(l.presentations[0].folderId, 'a');
+});
+
+test('folder removal applies the policy to the entire subtree and spares unrelated decks', () => {
+  const l = { folders: [folder('a'), folder('child', 'a'), folder('other')], presentations: [deck('a', 'a'), deck('child', 'child'), deck('root'), deck('other', 'other')] };
+  const kept = types.removeFolder(l, 'a', 'move-to-root');
+  assert.deepEqual(kept.folders.map(f => f.id), ['other']);
+  assert.equal(kept.presentations.length, 4);
+  assert.equal(kept.presentations[1].folderId, null);
+  assert.deepEqual(kept.presentations[1].notes, l.presentations[1].notes);
+  const deleted = types.removeFolder(l, 'a', 'delete-presentations');
+  assert.deepEqual(deleted.presentations.map(p => p.id), ['root', 'other']);
+  assert.equal(l.folders.length, 3);
+  assert.equal(l.presentations[1].folderId, 'child');
+  assert.equal(types.removeFolder(l, 'missing', 'delete-presentations'), l);
 });
 
 test('reducers never mutate their input', () => {
-  const l = types.upsertPresentation(types.emptyLibrary(), { id: '1', name: 'P', createdAt: 'x', tag: '', totalPages: 0, notes: {}, videos: {} });
+  const l = types.upsertPresentation(types.emptyLibrary(), { id: '1', name: 'P', createdAt: 'x', folderId: null, totalPages: 0, notes: {}, videos: {} });
   const renamed = types.renamePresentation(l, '1', 'Q');
   assert.equal(l.presentations[0].name, 'P'); // original untouched
   assert.equal(renamed.presentations[0].name, 'Q');
@@ -119,7 +160,7 @@ test('reducers never mutate their input', () => {
 });
 
 test('setNote sets and clears a per-slide note', () => {
-  const p = { id: '1', name: 'P', createdAt: 'x', tag: '', totalPages: 3, notes: {}, videos: {} };
+  const p = { id: '1', name: 'P', createdAt: 'x', folderId: null, totalPages: 3, notes: {}, videos: {} };
   const withNote = types.setNote(p, 2, 'hola');
   assert.equal(withNote.notes['2'], 'hola');
   assert.equal(types.noteCount(withNote), 1);
@@ -137,7 +178,7 @@ test('importPdf copies the file, registers it, and leaves the original untouched
   const bytes = Buffer.from('%PDF-1.4 fake but distinctive bytes', 'utf-8');
   fs.writeFileSync(src, bytes);
 
-  assert.deepEqual(lib.readLibrary(dir), { presentations: [], tags: [] });
+  assert.deepEqual(lib.readLibrary(dir), { presentations: [], folders: [] });
 
   const p = lib.importPdf(dir, src);
   assert.equal(p.name, 'Mi Charla');
@@ -227,6 +268,33 @@ test('readLibrary recovers from a corrupt meta file instead of throwing', async 
   const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-presenter-corrupt-'));
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'library.json'), '{ this is not json');
-  assert.deepEqual(lib.readLibrary(dir), { presentations: [], tags: [] });
+  assert.deepEqual(lib.readLibrary(dir), { presentations: [], folders: [] });
   await rm(dir, { recursive: true, force: true });
 });
+
+for (const mode of ['move-to-root', 'delete-presentations']) {
+  test(`filesystem folder deletion (${mode}) persists its policy and never touches originals`, async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'nodus-presenter-folders-'));
+    const source = path.join(dir, 'original.pdf');
+    fs.writeFileSync(source, '%PDF-1.4 source stays');
+    try {
+      const first = lib.importPdf(dir, source), child = lib.importPdf(dir, source), loose = lib.importPdf(dir, source);
+      const data = { folders: [folder('a'), folder('child', 'a')], presentations: [ { ...first, folderId: 'a', notes: { '1': 'Keep me' } }, { ...child, folderId: 'child' }, loose ] };
+      lib.writeLibrary(dir, data);
+      assert.throws(() => lib.deleteFolder(dir, 'a', 'invalid'));
+      assert.equal(lib.readLibrary(dir).folders.length, 2);
+      const result = lib.deleteFolder(dir, 'a', mode);
+      assert.deepEqual(lib.readLibrary(dir), result);
+      assert.equal(result.folders.length, 0);
+      assert.equal(fs.readFileSync(source, 'utf8'), '%PDF-1.4 source stays');
+      assert.equal(fs.existsSync(lib.pdfPath(dir, loose.id)), true);
+      for (const p of [first, child]) assert.equal(fs.existsSync(lib.pdfPath(dir, p.id)), mode === 'move-to-root');
+      if (mode === 'move-to-root') {
+        assert.equal(result.presentations.length, 3);
+        assert.equal(result.presentations[0].folderId, null);
+        assert.equal(result.presentations[0].notes['1'], 'Keep me');
+      } else assert.deepEqual(result.presentations.map(p => p.id), [loose.id]);
+      assert.deepEqual(lib.deleteFolder(dir, 'a', mode), result);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+}

@@ -8819,4 +8819,26 @@ export const PT_BR: Record<string, string> = {
   "Sent": "Enviado",
   ...CONCILIUM_TRANSLATIONS['pt-BR'],
   ...DRIFT_TRANSLATIONS['pt-BR'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "Organize seus slides. Compartilhe suas ideias.",
+  "Buscar por número o notas…": "Buscar por número ou notas…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "Editar pasta",
+  "Carpeta principal": "Pasta superior",
+  "Biblioteca principal": "Biblioteca principal",
+  "Color personalizado": "Cor personalizada",
+  "Ruta de carpetas": "Caminho das pastas",
+  "Opciones de la carpeta {name}": "Opções da pasta {name}",
+  "No se pudo eliminar la carpeta.": "Não foi possível excluir a pasta.",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "A pasta “{name}” e suas subpastas ({n}) serão excluídas.",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "O que você deseja fazer com suas {n} apresentações?",
+  "Conservar presentaciones": "Manter apresentações",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "Movê-las para a biblioteca principal, com suas notas e vídeos.",
+  "Eliminar también las presentaciones": "Excluir também as apresentações",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "Suas cópias na biblioteca serão excluídas. Os arquivos originais serão mantidos.",
+  "Eliminar carpeta y presentaciones": "Excluir pasta e apresentações",
+  "Ciencia": "Ciência",
+  "Arte": "Arte",
+  "Favoritos": "Favoritos",
 };

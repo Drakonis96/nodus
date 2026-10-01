@@ -8231,4 +8231,26 @@ export const JA: Record<string, string> = {
   "Sent": "送信済み",
   ...CONCILIUM_TRANSLATIONS['ja'],
   ...DRIFT_TRANSLATIONS['ja'],
+  // PDF Presenter — editorial workspace
+  "Organiza tus diapositivas. Comparte tus ideas.": "スライドを整理し、アイデアを共有しましょう。",
+  "Buscar por número o notas…": "番号またはノートで検索…",
+
+  // PDF Presenter folder navigation.
+  "Editar carpeta": "フォルダーを編集",
+  "Carpeta principal": "親フォルダー",
+  "Biblioteca principal": "メインライブラリ",
+  "Color personalizado": "カスタムカラー",
+  "Ruta de carpetas": "フォルダーのパス",
+  "Opciones de la carpeta {name}": "フォルダー {name} のオプション",
+  "No se pudo eliminar la carpeta.": "フォルダーを削除できませんでした。",
+  "Se eliminará la carpeta «{name}» y sus subcarpetas ({n}).": "フォルダー「{name}」とそのサブフォルダー（{n} 個）を削除します。",
+  "¿Qué quieres hacer con sus {n} presentaciones?": "含まれる {n} 件のプレゼンテーションをどうしますか？",
+  "Conservar presentaciones": "プレゼンテーションを保持",
+  "Moverlas a la biblioteca principal, con sus notas y vídeos.": "ノートと動画を含めてメインライブラリに移動します。",
+  "Eliminar también las presentaciones": "プレゼンテーションも削除",
+  "Se eliminarán sus copias de la biblioteca. Los archivos originales se conservarán.": "ライブラリ内のコピーを削除します。元のファイルは保持されます。",
+  "Eliminar carpeta y presentaciones": "フォルダーとプレゼンテーションを削除",
+  "Ciencia": "科学",
+  "Arte": "アート",
+  "Favoritos": "お気に入り",
 };
