@@ -30,13 +30,15 @@ export interface PageSchemeLayout {
  *  Decluttered text is re-derived from the PDF whenever its extraction cache entry is gone, so
  *  changing these rules changes the text of every decluttered work at its next extraction and
  *  leaves its analysis out of date — like any extractor change. Change them with a rescan plan. */
-export const SCHEME_LAYOUT_CLASSIFIER = 'layout-3';
+export const SCHEME_LAYOUT_CLASSIFIER = 'layout-4';
 
 const WORD = /\p{L}[\p{L}\p{M}]{2,}/gu;
 // These scripts do not reliably separate words with spaces. Count their letters
-// for body-size estimation, and conservatively preserve their lines in every pass.
+// for body-size estimation.
 const UNSEGMENTED = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\p{Script=Thai}]/gu;
-const hasUnsegmentedText = (text: string) => (text.match(UNSEGMENTED) ?? []).length > 0;
+// The chemistry rules below describe Latin labels. Preserve other alphabets,
+// including caseless scripts whose prose cannot be recognized by capitalization.
+const NON_LATIN_LETTER = /(?=\p{L})\P{Script=Latin}/u;
 const wordCount = (text: string) => (text.match(WORD) ?? []).length + (text.match(UNSEGMENTED) ?? []).length;
 const FOOTNOTE_START = /^\d{1,4}\s+\S/;
 const REFERENCE = /[A-Z]\.\s|\(\d{4}\)|\bsee\b/;
@@ -46,7 +48,7 @@ const STRUCTURE_TOKEN = /^(?:[A-Z][a-z]?\d*|\d+|[+\-−–=≡→()]|\u2032)+$/;
 
 /** A caption names its figure; it is text a search should find, not part of the drawing. */
 const CAPTION = /^(?:fig(?:ure|ura)?\.?|scheme|schema|esquema|table|tableau|tabla|tabela|tabella|tabelle|chart|cuadro|abbildung|schaubild|şekil|şema|tablo)\s*(?:[A-Z]?\p{N}+|[IVXLCDM]+)(?=$|[\s.:)-])/iu;
-const protectedText = (text: string) => hasUnsegmentedText(text) || CAPTION.test(text)
+const protectedText = (text: string) => NON_LATIN_LETTER.test(text) || CAPTION.test(text)
   || (FOOTNOTE_START.test(text) && REFERENCE.test(text)) || VOLUME_YEAR.test(text);
 // Small type and a short line alone do not distinguish a quote or verse from a
 // drawing. Retain phrases of ordinary words; isolated labels and chemical symbols
@@ -55,9 +57,9 @@ const ordinaryProse = (text: string) => {
   const words = text.match(/[\p{L}\p{M}]+/gu) ?? [];
   return words.filter((word) => /\p{Ll}{2,}/u.test(word)).length >= 2
     // The structure-token grammar can also spell arbitrary all-caps headings.
-    // Preserve alphabetic phrases of long words, but retain numeric reagent steps
+    // Preserve alphabetic phrases containing a long word, but retain numeric reagent steps
     // such as "1) LDA, THF, HMPA" and rows of short element symbols as candidates.
-    || (/^[\p{L}\p{M}\s.,:;!?'"“”‘’–—-]+$/u.test(text) && words.filter((word) => /^\p{Lu}{3,}$/u.test(word)).length >= 2);
+    || (/^[\p{L}\p{M}\s.,:;!?'"“”‘’–—-]+$/u.test(text) && words.length >= 2 && words.some((word) => /^\p{Lu}{3,}$/u.test(word)));
 };
 
 function size(item: LayoutItem): number {

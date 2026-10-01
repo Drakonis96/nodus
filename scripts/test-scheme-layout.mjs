@@ -170,11 +170,23 @@ test('short ordinary phrases and verse in small type are not a run of scheme lab
 
 test('all-caps headings are not mistaken for chemical structure tokens at any font size', async () => {
   for (const size of [8, 10, 14]) {
-    for (const title of ['THIS IS A SHORT TITLE', 'THIS IS A SHORT TITLE.', 'THIS IS A SHORT TITLE:']) {
+    for (const title of ['THIS IS A SHORT TITLE', 'THIS IS A SHORT TITLE.', 'THIS IS A SHORT TITLE:', 'IT IS A BOX', 'ES UN CASO']) {
       const items = [...page, item(title, 111, 720, size, 300)];
       assert.equal(pageSchemeLayout(items, 10).scheme.at(-1), false);
       const result = await extractPage(items);
       assert.ok(result.declutteredText.includes(title));
     }
+  }
+});
+
+test('short Arabic and Hebrew prose is retained even without a reliable body-size estimate', async () => {
+  for (const lines of [
+    ['السماء صافية', 'النهر هادئ', 'الأشجار تنحني'],
+    ['השמים בהירים', 'הנהר שקט', 'העצים נעים'],
+  ]) {
+    const items = lines.map((line, index) => item(line, 111, 600 - index * 12, 8, 120));
+    assert.deepEqual(pageSchemeLayout(items, 10).scheme, [false, false, false]);
+    const result = await extractPage(items);
+    assert.equal(result.declutteredText, lines.join('\n'));
   }
 });
