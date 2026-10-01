@@ -63,6 +63,8 @@ export class ResearchCorpusRun {
   readonly matchedDocuments = new Set<string>();
   readonly readDocuments = new Set<string>();
   readonly attemptedDocuments = new Set<string>();
+  private readonly zoteroMcpReads = new Set<string>();
+  private readonly zoteroMcpAttempts = new Set<string>();
   private readonly contextDocuments = new Set<string>();
   readonly ideas = new Map<string, WritingWorkshopIdeaCandidate>();
   readonly traversal: Array<{ query: string; sources: string[]; candidates: number; partial: boolean }> = [];
@@ -281,6 +283,7 @@ export class ResearchCorpusRun {
       }
     }
     if (!pages && document.origin.kind === 'zotero') {
+      this.zoteroMcpAttempts.add(document.id);
       const raw = await readAutomaticResearchZotero(this.scope, { documentId, from: read.from, to: read.to,
         attachmentKey: read.attachmentId ? library?.attachments.find(item => item.id === read.attachmentId)?.sourceKey ?? read.attachmentId : undefined }, this.signal, this.pinRevisions ? await (this.originalPins ?? Promise.resolve(new Map())) : undefined) as { structuredContent?: unknown; content?: Array<{ type: string; text?: string }> };
       const content = raw.structuredContent ?? JSON.parse(raw.content?.find(item => item.type === 'text')?.text ?? 'null');
@@ -298,6 +301,7 @@ export class ResearchCorpusRun {
         return { text, pageNumber: page.pageNumber, pageLabel: null, partial: !!page.partial || text !== page.text, ocr: false };
       }).filter(page => page.text.trim());
       if (value.needsOcr?.length) { this.limitations.add('ocr_pending'); this.budget.partial = true; }
+      if (pages.length) this.zoteroMcpReads.add(document.id);
     }
     if (!pages) { this.limitations.add('original_unavailable'); this.budget.partial = true; return { evidence: [], scopeId: this.scope.id, partial: true }; }
     this.validate(); assertResearchDocument(this.scope, documentId, researchCorpusInventory().documents.find(item => item.id === documentId));
@@ -407,6 +411,11 @@ export class ResearchCorpusRun {
     if (inside.length) log.push(`Searched inside: ${inside.join('; ')}.`);
     const read = [...this.readDocuments].map(title).filter(Boolean);
     if (read.length) log.push(`Read pages or the surrounding passages of: ${read.join('; ')}.`);
+    const mcpRead = [...this.zoteroMcpReads].map(title).filter(Boolean);
+    const mcpFailed = [...this.zoteroMcpAttempts].filter(id => !this.zoteroMcpReads.has(id)).map(title).filter(Boolean);
+    log.push(this.zoteroMcpAttempts.size ? 'Zotero MCP was requested for original pages.' : 'Zotero MCP was not called in this turn; Zotero-derived records and text, if used, were consulted through the local Nodus library.');
+    if (mcpRead.length) log.push(`Original pages returned by Zotero MCP: ${mcpRead.join('; ')}.`);
+    if (mcpFailed.length) log.push(`Zotero MCP attempts without readable pages: ${mcpFailed.join('; ')}. Do not claim these originals were read.`);
     const supported = [...this.supportedDocuments()].map(title).filter(Boolean);
     log.push(supported.length ? `Sources whose own text reached this answer: ${supported.join('; ')}.` : 'No source text was found for this turn.');
     return log;

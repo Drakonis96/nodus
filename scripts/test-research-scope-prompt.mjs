@@ -67,9 +67,20 @@ test('the research scope names the turn\'s sources with their authors and counts
     const text = JSON.stringify(scope);
     assert.ok(text.length < 20_000, `the scope stays small (${text.length} characters)`);
     for (const internal of ['text_pending', 'ocr_required', 'doc-1102', 'f'.repeat(64)]) assert.ok(!text.includes(internal), `${internal} stays out of the prompt`);
-    const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
-    assert.match(assistant, /Never say that you lack tools, that Zotero or its MCP is unavailable or must be enabled/, 'the answer owns the research instead of disowning Zotero');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
+test('the chat instruction distinguishes local Zotero evidence, actual MCP reads and failed attempts', () => {
+  const assistant = fs.readFileSync(path.join(import.meta.dirname, '../electron/ai/researchAssistant.ts'), 'utf8');
+  const declaration = assistant.match(/^const RESEARCH_LOG_INSTRUCTION = '(.*)';$/m);
+  assert.ok(declaration, 'the chat supplies a research-log instruction');
+  const instruction = declaration[1];
+  assert.match(instruction, /Never say that you lack research tools/, 'the answer owns its available research tools');
+  assert.match(instruction, /Local Zotero-derived records or indexed passages are library access, not a Zotero MCP call/, 'local evidence does not imply MCP access');
+  assert.match(instruction, /Only claim MCP access when research_log records it/, 'MCP claims require a recorded attempt');
+  assert.match(instruction, /disclose attempts that returned no readable pages/, 'failed or empty reads are disclosed');
+  assert.match(instruction, /unless the limits or research_log report a failed connection/, 'a real connection failure can be reported');
+  assert.doesNotMatch(instruction, /that request has already been carried out/, 'a request alone does not prove that the connector ran');
 });
 
 test('the coverage kept with a chat turn lists only consulted sources in a large scope', async () => {

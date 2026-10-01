@@ -219,7 +219,7 @@ export async function connectResearchZotero(input: ConnectionInput) {
   setExternalChoice(scope, input.mode === 'external' ? input.externalUrl : undefined);
   return getResearchZoteroStatus(scope.notebookId);
 }
-async function readSession(session: Session, input: { documentId: string; operation: 'metadata' | 'fulltext' | 'pages'; attachmentKey?: string; from?: number; to?: number }): Promise<unknown> {
+async function readSession(session: Session, input: { documentId: string; operation: 'metadata' | 'fulltext' | 'pages'; attachmentKey?: string; from?: number; to?: number }, observe = true): Promise<unknown> {
   session.controller.signal.throwIfAborted(); validateScope(session.scope);
   const document = session.scope.documents.find(item => item.id === input.documentId);
   if (!document || document.origin.kind !== 'zotero') throw new Error('research_source_not_authorized');
@@ -228,11 +228,12 @@ async function readSession(session: Session, input: { documentId: string; operat
   const available = session.manifest?.items.find(item => item.itemKey === origin.itemKey && item.libraryId === origin.libraryId && item.libraryType === origin.libraryType)?.attachments ?? [];
   const key = input.attachmentKey ?? (available.length === 1 ? available[0].key : undefined);
   if (input.operation !== 'metadata' && !key) throw new Error('research_attachment_selection_required');
-  const result = await researchActivityStep('zotero', input.operation, () => session.connection.call(tool, {
+  const call = () => session.connection.call(tool, {
     library_type: origin.libraryType, library_id: origin.libraryId, item_key: origin.itemKey,
     ...(input.operation !== 'metadata' ? { attachment_key: key } : {}),
     ...(input.operation === 'pages' ? { start_page: input.from, end_page: input.to ?? input.from } : {}),
-  }, session.controller.signal), document.title);
+  }, session.controller.signal);
+  const result = await (observe ? researchActivityStep('zotero', input.operation, call, document.title) : call());
   session.controller.signal.throwIfAborted(); validateScope(session.scope);
   return result;
 }
@@ -246,17 +247,21 @@ export async function readResearchZotero(input: { notebookId?: string | null; do
 export async function readAutomaticResearchZotero(scope: ResolvedResearchScope, input: { documentId: string; from: number; to?: number; attachmentKey?: string }, signal?: AbortSignal, pins?: ZoteroOriginalPins): Promise<unknown> {
   const document = scope.documents.find(item => item.id === input.documentId);
   if (!document) throw new Error('research_source_not_authorized');
-  const external = externalChoice(scope);
-  for (let attempt = 0; ; attempt++) {
-    let session: Session | undefined;
-    try {
-      session = await createSession(external ? scope : { ...scope, documents: [document] }, external ? 'external' : 'managed', external, false, signal, pins);
-      return await readSession(session, { ...input, operation: 'pages' });
-    } catch (error) {
-      signal?.throwIfAborted(); validateScope(scope);
-      // One fresh managed process may recover a dead transport. Identity,
-      // permission, revision and capability failures are never retried.
-      if (external || attempt > 0 || !/Connection closed|EPIPE|ECONNRESET|managed_zotero_unavailable/.test(error instanceof Error ? error.message : '')) throw error;
-    } finally { if (session) await closeSession(session); }
-  }
+  // Startup can fail before a tool is called. Observe the whole attempt so a
+  // missing runtime or unavailable Zotero appears as an error, never as idle.
+  return researchActivityStep('zotero', 'pages', async () => {
+    const external = externalChoice(scope);
+    for (let attempt = 0; ; attempt++) {
+      let session: Session | undefined;
+      try {
+        session = await createSession(external ? scope : { ...scope, documents: [document] }, external ? 'external' : 'managed', external, false, signal, pins);
+        return await readSession(session, { ...input, operation: 'pages' }, false);
+      } catch (error) {
+        signal?.throwIfAborted(); validateScope(scope);
+        // One fresh managed process may recover a dead transport. Identity,
+        // permission, revision and capability failures are never retried.
+        if (external || attempt > 0 || !/Connection closed|EPIPE|ECONNRESET|managed_zotero_unavailable/.test(error instanceof Error ? error.message : '')) throw error;
+      } finally { if (session) await closeSession(session); }
+    }
+  }, document.title);
 }

@@ -26,6 +26,8 @@ import { buildIdeaGraph, getContradictions } from '../graph/graphService';
 import { getImmersionSession, recordImmersionAnswer, saveImmersionSession } from '../db/immersionRepo';
 import { buildWritingWorkshopSnapshot } from './writingWorkshop';
 import { completeJson, embed } from './aiClient';
+import { ResearchCorpusRun, resolveAcademicRunScope } from './researchCorpusRun';
+import { RETRIEVAL_PRESETS } from '@shared/researchCorpus';
 import {
   IMMERSION_LIMITS,
   orchestrateImmersion,
@@ -160,13 +162,16 @@ function lexicalPassageFallback(topic: string, workIds: string[]): { id: string;
 /**
  * Assemble everything the orchestrator needs about one topic. Pure retrieval:
  * embeddings rank the corpus, the graph provides edges/debates, the passages
- * table provides the REAL full text. No AI calls happen here.
+ * table provides the REAL full text. The scope preview only retrieves stored
+ * material; generation also grants bounded research and original-file access.
  */
 export async function buildImmersionMaterial(
   topic: string,
   language: PromptLanguage = normalizeImmersionLanguage(getSettings().promptLanguage),
+  researchModel?: ModelRef | null,
 ): Promise<ImmersionMaterial> {
   const query = topic.trim();
+  const research = researchModel === undefined ? null : new ResearchCorpusRun(resolveAcademicRunScope(), RETRIEVAL_PRESETS.balanced);
   const vector = await embed(query);
   const snapshot = await buildWritingWorkshopSnapshot({ kind: 'deep_research', objective: query });
   await yieldLoop();
@@ -244,6 +249,23 @@ export async function buildImmersionMaterial(
       });
     }
     passages.sort((a, b) => b.score - a.score);
+  }
+  if (research) {
+    await research.investigate(query, researchModel);
+    // Keep the existing topic ranking, profiles and graph. Shared retrieval adds
+    // indexed documents and original pages (local or Zotero MCP) with resolvable
+    // citation receipts. Abstracts and generated notes are not literal sources.
+    const seen = new Set(passages.map(passage => JSON.stringify([passage.workId, passage.text, passage.pageLabel])));
+    for (const passage of research.evidence.values()) {
+      if (passage.reason !== 'source') continue;
+      const key = JSON.stringify([passage.nodus_id, passage.summary, passage.pageLabel]);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      passages.push({ id: passage.id, workId: passage.nodus_id, workTitle: passage.label, authors: passage.authors,
+        year: passage.year, zoteroKey: passage.zotero_key || null, pageLabel: passage.pageLabel, text: passage.summary, score: passage.score });
+    }
+    passages.sort((a, b) => b.score - a.score);
+    passages.splice(PASSAGE_MAX_KEEP);
   }
   await yieldLoop();
 
@@ -463,7 +485,7 @@ async function generateImmersionWithVisualPlan(
     try { onProgress?.(progress); } catch { /* progress cannot abort generation */ }
   };
   emit({ phase: 'discovery', message: copy.material });
-  const material = await buildImmersionMaterial(request.topic, language);
+  const material = await buildImmersionMaterial(request.topic, language, model);
   emit({
     phase: 'document_preparation',
     message: language === 'es'
@@ -570,7 +592,7 @@ function realDeps(model: ModelRef | null, preparedMaterial?: ImmersionMaterial):
         material = undefined;
         return cached;
       }
-      return buildImmersionMaterial(topic);
+      return buildImmersionMaterial(topic, undefined, model);
     },
     planCurriculum: (input) => aiPlanCurriculum(input, model),
     writePanorama: (input) => aiWritePanorama(input, model),
