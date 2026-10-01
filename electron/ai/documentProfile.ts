@@ -26,6 +26,7 @@ import {
 } from '../db/documentProfilesRepo';
 import { cosineSimilarity, currentEmbeddingConfig, decodeEmbedding } from '../db/ideasRepo';
 import { prepareLegacyDocumentaryPassages, type PreparedLegacyPassages } from './documentaryLegacyPreparation';
+import { waitForPassageWork } from './passageEmbeddingActivity';
 import { resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExtractor';
 import { setResolvedTextState } from '../db/worksRepo';
 import { analysisFingerprint, analysisModelFingerprint, upsertLibraryAnalysisProvenance } from '../db/libraryAnalysisProvenance';
@@ -1286,6 +1287,9 @@ export async function runDocumentProfileScan(work: Work, options: RunDocumentPro
   if (!sections.length) throw new Error('El documento no contiene texto estructurable.');
 
   emit(options, 'embedding', 0.05, 'Indexando los pasajes del texto completo…');
+  // A passage run that has this work queued would fence these passages while the sections are
+  // analysed and void the index at publication; let it finish first (passageEmbeddingActivity.ts).
+  await waitForPassageWork(work.nodus_id, options.signal);
   const preparedPassages = await preparePassages(
     work,
     document.text,
