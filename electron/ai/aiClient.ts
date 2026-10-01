@@ -1964,8 +1964,14 @@ async function rawCompleteStreamTransport(
   // Placeholders arrive split across chunk boundaries ("STU_" + "7K3Q"), so the reverse
   // mapping has to buffer rather than rewrite each delta on its own. Content and
   // reasoning are independent streams and MUST NOT share a rewriter.
-  const contentRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
-  const reasoningRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+  let contentRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+  let reasoningRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+  // A replay is a new generation. Any privacy rewriter tail belongs to the failed
+  // attempt and must be discarded rather than prepended to the replay.
+  const resetStreamRewriters = () => {
+    contentRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+    reasoningRw = privacy ? createStreamDeanonymizer(privacy.scope) : null;
+  };
 
   // Content deltas accumulate into the returned answer; reasoning deltas are streamed
   // for live display only and never become part of the saved answer.
@@ -2282,6 +2288,7 @@ async function rawCompleteStreamTransport(
         // 84 KB of thinking: "read ETIMEDOUT"): nothing was shown that a replay could repeat,
         // so ask once more. Once answer text has streamed, the error stands.
         console.warn(`[compat-stream] connection lost before the answer (${e instanceof Error ? e.message : String(e)}); retrying once`);
+        resetStreamRewriters();
         await replayStream(extras);
       } else {
         throw e;

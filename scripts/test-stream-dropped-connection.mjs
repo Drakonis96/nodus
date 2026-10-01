@@ -25,10 +25,13 @@ const server = createServer((req, res) => {
     requests += 1;
     res.writeHead(200, { 'content-type': 'text/event-stream' });
     res.write(chunk({ reasoning_content: 'Thinking about the route… ' }));
-    const drop = (mode === 'drop-before-answer' && requests === 1) || mode === 'drop-after-answer';
+    const drop = (mode === 'drop-before-answer' && requests === 1)
+      || (mode === 'drop-with-buffered-pseudonym' && requests === 1)
+      || mode === 'drop-after-answer';
     if (mode === 'drop-after-answer') res.write(chunk({ content: 'Partial answer' }));
+    if (mode === 'drop-with-buffered-pseudonym' && requests === 1) res.write(chunk({ content: 'STU_7K3Q' }));
     if (drop) { setTimeout(() => req.socket.destroy(), 20); return; }
-    res.write(chunk({ content: 'Answer' }));
+    res.write(chunk({ content: mode === 'drop-with-buffered-pseudonym' ? 'STU_7K3Q has improved.' : 'Answer' }));
     res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`);
     res.end('data: [DONE]\n\n');
   });
@@ -48,13 +51,27 @@ try {
   assert.equal(answer, 'Answer');
   assert.equal(requests, 2, 'exactly one retry');
 
+  // A privacy rewriter may be holding a complete pseudonym while full is still empty.
+  // The failed attempt's held tail must be discarded before replay, or it is prepended
+  // to the second generation and corrupts the deanonymized answer.
+  requests = 0;
+  mode = 'drop-with-buffered-pseudonym';
+  load('electron/db/settingsRepo.ts').updateSettings({ studentPseudonymsEnabled: true });
+  const { withStudentPseudonyms } = load('electron/ai/studentPrivacyContext.ts');
+  const privacyAnswer = await withStudentPseudonyms({
+    groupId: 'fixture-group',
+    students: [{ id: 'student-1', code: 'STU_7K3Q', givenNames: 'Ana', surnames: 'Peña' }],
+  }, () => ai.completeTextStream(opts, () => {}, model));
+  assert.equal(privacyAnswer, 'Ana Peña has improved.');
+  assert.equal(requests, 2, 'privacy-buffered drop is retried exactly once');
+
   // Dropped after answer text streamed: the error stands and nothing is replayed.
   requests = 0;
   mode = 'drop-after-answer';
   const shown = [];
   await assert.rejects(ai.completeTextStream(opts, (delta) => shown.push(delta), model));
   assert.equal(requests, 1, 'no retry once the answer began');
-  console.log('OK: a stream dropped before the answer is retried once; after the answer began it is not.');
+  console.log('OK: pre-answer drops retry once with clean stream state; post-answer drops are not replayed.');
 } finally {
   load('electron/db/database.ts').closeDb();
   server.closeAllConnections();
