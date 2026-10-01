@@ -14,7 +14,10 @@ test.after(() => rm(dir, { recursive: true, force: true }));
 const stubs = new Map([
   ['adm-zip', 'export default class AdmZip {}'],
   ['../zotero/zoteroClient', 'export const itemChildren = () => []; export const itemAsAttachment = () => null; export const getFulltext = () => null; export const attachmentFilePath = () => null; export class ZoteroRequestError extends Error {}'],
-  ['./pdfjsLoader', 'export const openPdf = async () => globalThis.__pdfOcrProvenance.pdf; export const pageText = async page => page.text;'],
+  ['./pdfjsLoader', 'export const openPdf = async () => globalThis.__pdfOcrProvenance.pdf; export const pageText = async page => page.text; export const pageTextWithSchemes = async page => ({ text: page.text, declutteredText: "[scheme]", schemeLines: [], marginLines: [] });'],
+  // Durable work/attachment choices have real-SQLite coverage in test-scheme-declutter.
+  ['./schemeDeclutter', 'export const declutterForWorkSource = () => false; export const declutterCacheKey = file => `${file}#declutter`; export const pdfBodySize = async () => 0;'],
+  ['../db/settingsRepo', 'export const getSettings = () => ({ declutterNewDocuments: true });'],
   ['./pdfAnalyzer', 'export const analyzePdf = async () => globalThis.__pdfOcrProvenance.analysis;'],
   ['./ocr', 'export const ocrPdfPages = (...args) => globalThis.__pdfOcrProvenance.ocr(...args); export const ocrImageFile = async () => ({text:""});'],
   ['./tabular', 'export const csvFileToText = () => ""; export const xlsxFileToText = () => "";'],
@@ -160,4 +163,33 @@ test('an OCR failure is not cached, so a retry with unchanged settings can recov
   assert.equal(fixture.cacheWrites, 1);
   assert.deepEqual(await extractFromPath(file, opts), recovered);
   assert.equal(fixture.ocrCalls, 2, 'successful extraction still benefits from the cache');
+});
+
+test('plain and explicitly decluttered extraction of a shared PDF keep independent cache entries', async () => {
+  await extract({ total: 2, cap: 1000, scanPages: [] });
+  const fixture = globalThis.__pdfOcrProvenance;
+  const file = path.join(dir, 'new-book.pdf');
+  await writeFile(file, 'PDF fixture handled by the controlled reader');
+  const opts = { ocr: { enabled: false, languages: 'eng', maxPages: 1000 } };
+  fixture.cache = new Map();
+  const cleaned = await extractFromPath(file, { ...opts, declutter: true });
+  assert.match(cleaned.text, /\[scheme\]/);
+  const keys = [...fixture.cache.keys()].map((key) => JSON.parse(key).filePath);
+  assert.deepEqual(keys, [`${file}#declutter`], 'cached under the decluttered key only');
+  const plain = await extractFromPath(file, opts);
+  assert.match(plain.text, /Scientific text/);
+  assert.notEqual(plain.text, cleaned.text);
+  assert.deepEqual([...fixture.cache.keys()].map((key) => JSON.parse(key).filePath), [`${file}#declutter`, file]);
+  assert.deepEqual(await extractFromPath(file, { ...opts, declutter: true }), cleaned);
+  assert.deepEqual(await extractFromPath(file, opts), plain);
+});
+
+test('scheme-only text stays decluttered without triggering OCR just because the result is short', async () => {
+  await extract({ total: 2, cap: 1000, scanPages: [] });
+  const fixture = globalThis.__pdfOcrProvenance;
+  const doc = await extractPdfStreaming('/fixture.pdf', {
+    declutter: true, ocr: { enabled: true, languages: 'eng', maxPages: 1000 }, analysis: fixture.analysis,
+  });
+  assert.match(doc.text, /\[scheme\]/);
+  assert.equal(fixture.ocrCalls, 0);
 });
