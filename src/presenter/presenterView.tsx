@@ -288,7 +288,7 @@ function PresenterViewApp() {
               active={volumeOpen}
               onClick={() => {
                 setVolumeOpen((v) => !v);
-                void window.nodus.getPresenterVolume().then(setVolume);
+                void window.nodus.getPresenterVolume().then(setVolume).catch(() => undefined);
               }}
             >
               <Icon name="volume" size={16} />
@@ -305,7 +305,7 @@ function PresenterViewApp() {
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     setVolume(v);
-                    void window.nodus.setPresenterVolume(v);
+                    void window.nodus.setPresenterVolume(v).catch(() => undefined);
                   }}
                   className="w-32 accent-amber-400"
                 />

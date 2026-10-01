@@ -34,14 +34,13 @@ import { isNodusResearchSiteUrl } from '../../shared/browser';
 import { detectCaptureCandidates } from '../../browser-extension/lib/multi-capture.js';
 import { collectPageSnapshot } from './browserPageSnapshot';
 import {
-  anyPlaying,
   applyMediaCommand,
   applySemanticMediaCommand,
   collectMediaElements,
   isPlayableMedia,
   kindOf,
+  pagePlaybackState,
   playbackAfterCommand,
-  semanticPlaybackState,
   type MediaCommand,
   type MediaEl,
   type MediaRoot,
@@ -140,7 +139,9 @@ let lastSemanticScope: SemanticMediaScope | null = null;
  */
 function reportPlaybackState(target?: unknown): void {
   const elements = mediaElements();
-  const playing = anyPlaying(elements);
+  const playing = pagePlaybackState(elements, page.document, lastSemanticScope);
+  // Empty standby elements cannot override Chromium's state for a custom player.
+  if (playing === null) return;
   const active = elements.find((element) => element.paused === false);
   const kind = kindOf(target) !== 'unknown' ? kindOf(target) : kindOf(active ?? lastPlayed);
   ipcRenderer.send('nodus-browser:page:media', { playing, kind });
@@ -162,7 +163,7 @@ function scheduleReport(target?: unknown): void {
     // by the time the timer runs there may be nothing playing to ask.
     lastReportTarget = target;
   }
-  if (reportTimer) clearTimeout(reportTimer);
+  if (reportTimer) return;
   reportTimer = setTimeout(() => {
     reportTimer = null;
     const captured = lastReportTarget;
@@ -178,6 +179,25 @@ page.document?.addEventListener('play', (event) => {
 }, true);
 page.document?.addEventListener('pause', (event) => scheduleReport(event.target), true);
 page.document?.addEventListener('ended', (event) => scheduleReport(event.target), true);
+
+// WebAudio players emit no element play/pause events. Watch their accessible
+// controls so a page-side click also updates the header, including initial play.
+const observerPage = globalThis as unknown as {
+  MutationObserver?: new (callback: () => void) => { observe(target: unknown, options: object): void };
+};
+if (page.document && observerPage.MutationObserver) {
+  const observer = new observerPage.MutationObserver(() => {
+    // Ordinary HTML players already emit play/pause events. Avoid walking a
+    // large, constantly changing video page for every unrelated DOM mutation.
+    const hasElementPlayer = Array.prototype.some.call(
+      page.document?.querySelectorAll('audio, video') ?? [], isPlayableMedia,
+    );
+    if (!hasElementPlayer || lastSemanticScope) scheduleReport();
+  });
+  observer.observe(page.document, {
+    subtree: true, childList: true, attributes: true, attributeFilter: ['aria-label', 'title', 'disabled', 'aria-disabled'],
+  });
+}
 
 /**
  * The page's own Media Session handlers, captured at document start.
@@ -235,7 +255,6 @@ ipcRenderer.on('nodus-browser:page:mediaCommand', async (_event, command: string
   const plan = planMediaCommand(command as MediaCommand);
 
   let sessionHandled = false;
-  let semanticHandled = false;
 
   // The page's own handler, as the one channel that reaches a playlist kept
   // inside a single element. A page that registered none answers 'no-handler'
@@ -252,7 +271,6 @@ ipcRenderer.on('nodus-browser:page:mediaCommand', async (_event, command: string
     if (applyMediaCommand(elements, command as MediaCommand, lastPlayed)) return true;
     const semantic = applySemanticMediaCommand(page.document, command as MediaCommand, lastSemanticScope);
     if (semantic.scope) lastSemanticScope = semantic.scope;
-    semanticHandled = semantic.handled;
     return semantic.handled;
   };
 
@@ -264,26 +282,13 @@ ipcRenderer.on('nodus-browser:page:mediaCommand', async (_event, command: string
   }
 
   const reported = playbackAfterCommand(command as MediaCommand);
-  // An aggregate report is authoritative only when this preload can actually see
-  // media elements. A WebAudio player such as ElevenReader exposes none:
-  // reporting `false` after its visible Pause button was clicked overwrote
-  // Chromium's real event and made the header lie while the audio kept going.
-  if (elements.length > 0) {
-    // Long enough for a resolved play() to have flipped `paused`, short enough
-    // that the button does not sit wrong while the user is looking at it.
-    setTimeout(() => reportPlaybackState(), 120);
-  } else if (reported !== null && (semanticHandled || sessionHandled)) {
-    // WebAudio/custom players do not emit HTMLMediaElement events, so Chromium
-    // may keep reporting the pre-command state forever. Read the replacement
-    // Play/Pause control after React has rendered it and update the header from
-    // that. Falling back to what the command asked for covers players whose
-    // accessible label does not change, while a refused click remains detectable
-    // because the old control is still present.
-    setTimeout(() => {
-      const observed = semanticPlaybackState(page.document, lastSemanticScope);
-      ipcRenderer.send('nodus-browser:page:media', { playing: observed ?? reported, kind: 'unknown' });
-    }, 120);
-  }
+  setTimeout(() => {
+    const observed = pagePlaybackState(mediaElements(), page.document, lastSemanticScope);
+    if (observed !== null) reportPlaybackState();
+    else if (reported !== null && sessionHandled) {
+      ipcRenderer.send('nodus-browser:page:media', { playing: reported, kind: 'unknown' });
+    }
+  }, 120);
 });
 
 /** Everything main can ask this page for. The command set is closed. */

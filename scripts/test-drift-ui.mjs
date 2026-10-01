@@ -254,7 +254,13 @@ test('the Drift volume moves the Drift bus and nothing else', () => {
   assert.match(mini, /drift\.setMaster\(Number\(event\.currentTarget\.value\) \/ 100\)/);
   assert.doesNotMatch(mini, /window\.nodus|BrowserDeviceVolume/);
   const media = read('src/components/browser/BrowserMedia.tsx');
-  assert.equal((media.match(/setBrowserDeviceVolume\(/g) ?? []).length, 1, 'the Browser slider is untouched and still the only caller');
+  const deviceVolume = code('src/components/browser/useDeviceVolume.ts');
+  assert.match(media, /changeVolume \} = useDeviceVolume\(Boolean\(anchorEl\)\)/, 'the Browser slider uses the device-volume hook');
+  assert.match(media, /changeVolume\(Number\(event\.currentTarget\.value\)\)/, 'only its slider input requests a device-volume change');
+  assert.equal(((media + deviceVolume).match(/setBrowserDeviceVolume\(/g) ?? []).length, 1, 'the device-volume hook owns the only system-volume write in the Browser controls');
+  for (const file of DRIFT_RENDERER_FILES) {
+    assert.doesNotMatch(code(file), /setBrowserDeviceVolume|useDeviceVolume/, `${file} cannot change the system volume`);
+  }
 });
 
 test('which tab a popover opens on', () => {
