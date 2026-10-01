@@ -61,9 +61,9 @@ const ROUTE_TOOL = 'verify-route';
 const COMPILE_TOOL = 'compile';
 const KNOWN_REACTIONS_TOOL = 'known-reactions';
 const MAX_BATCH = 24;
-/** Each step is a full validated compile. The route checker refuses a plan with more than
- *  sixteen steps, so every step it accepted fits; keep the cap aligned so a long route never
- *  drops its tail — the final product step is the last one this could ever drop. */
+/** Each step is a full validated compile, so at most this many are drawn. The checker accepts
+ *  longer routes (peptide syntheses run to ~80 steps); those are drawn first steps and last
+ *  steps, so the step that forms the target is always drawn and the middle is listed as skipped. */
 const MAX_ROUTE_DRAWINGS = 16;
 /** Open Reaction Database reactions drawn under the precedent section, one per step at most. */
 const MAX_PRECEDENT_DRAWINGS = 8;
@@ -220,7 +220,9 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
     steps,
     ...(racemic ? { racemic } : {}),
     ...(target ? { target } : {}),
-    ...(named && routeAcceptsLabels(provider) ? { labels } : {}),
+    // A long protected-peptide name is still sent, cut to the schema's 1,000 characters: one
+    // overlong name must not make the package reject the whole route.
+    ...(named && routeAcceptsLabels(provider) ? { labels: labels!.map((entries) => entries.map((entry) => ({ ...entry, name: entry.name.slice(0, 1000) }))) } : {}),
     ...(await stereoEnumerationAvailable(provider) ? { enumerateStereo: true } : {}),
   };
   const result = await runner.invoke({ provider, toolId: ROUTE_TOOL, input });
@@ -714,13 +716,21 @@ async function drawRouteSteps(
 ): Promise<string> {
   const drawable: RouteStepAudit[] = [];
   const skipped: string[] = [];
+  const passing: RouteStepAudit[] = [];
   for (const step of audit.steps) {
     // The same verdict as the route report, so a step the report marks FAIL (an assembly
     // problem included) is never drawn.
     const reason = routeStepFailure(step) ?? '';
     if (reason) { skipped.push(`- Step ${step.index + 1} — ${reason}`); continue; }
-    if (drawable.length >= MAX_ROUTE_DRAWINGS) { skipped.push(`- Step ${step.index + 1} — not drawn (limit of ${MAX_ROUTE_DRAWINGS} reached)`); continue; }
-    drawable.push(step);
+    passing.push(step);
+  }
+  // Too many to draw: the first ones and the last ones, so the target-forming step is drawn.
+  const head = Math.ceil(MAX_ROUTE_DRAWINGS / 2);
+  const tail = MAX_ROUTE_DRAWINGS - head;
+  const drawn = passing.length <= MAX_ROUTE_DRAWINGS ? passing : [...passing.slice(0, head), ...passing.slice(-tail)];
+  for (const step of passing) {
+    if (drawn.includes(step)) drawable.push(step);
+    else skipped.push(`- Step ${step.index + 1} — not drawn (a long route draws its first ${head} and last ${tail} steps)`);
   }
   const figures: Array<{ index: number; view: string } | null> = new Array(drawable.length).fill(null);
   let cursor = 0;
