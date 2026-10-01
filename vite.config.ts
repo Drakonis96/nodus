@@ -47,6 +47,7 @@ const mainExternals = [
   // try/catch; keep them external so that fallback works instead of the bundler
   // hard-failing to resolve an uninstalled optional dependency.
   'ws',
+  'selfsigned',
   'bufferutil',
   'utf-8-validate',
   '@modelcontextprotocol/sdk',

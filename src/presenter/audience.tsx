@@ -33,6 +33,7 @@ function AudienceApp() {
   const toolsSlideChangedRef = useRef<() => void>(() => {});
   const videosRef = useRef<Record<string, PresenterVideo>>({});
   const ytCtlRef = useRef<YouTubeOverlayController | null>(null);
+  const videoVolumeRef = useRef<number | null>(null);
   const [barVisible, setBarVisible] = useState(false);
   const barHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -40,7 +41,10 @@ function AudienceApp() {
     const yt = ytCtlRef.current;
     if (!yt) return;
     const v = videosRef.current[String(slide)];
-    if (v) yt.show(v);
+    if (v) {
+      yt.show(v);
+      if (videoVolumeRef.current !== null) yt.setVolume(videoVolumeRef.current);
+    }
     else yt.hide();
   };
 
@@ -63,6 +67,9 @@ function AudienceApp() {
       else ytCtlRef.current?.pause();
     } else if (action.type === 'videoSeek') {
       ytCtlRef.current?.seek(action.time);
+    } else if (action.type === 'videoVolume') {
+      videoVolumeRef.current = action.volume;
+      ytCtlRef.current?.setVolume(action.volume);
     }
   };
   const dispatchRef = useRef(dispatch);

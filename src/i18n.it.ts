@@ -8302,4 +8302,6 @@ export const IT: Record<string, string> = {
   "App iPhone–iPad": "App iPhone–iPad",
   "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Scansiona con Nodus Presenter. Mantieni il Wi-Fi acceso sul Mac e sul dispositivo mobile; il router della sala non è necessario.",
   "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "La connessione nativa non è disponibile. Richiede macOS e il permesso per la rete locale.",
+  "Escanea desde Nodus Presenter. Conecta el ordenador y el móvil a la misma red local.": "Scansiona da Nodus Presenter. Collega il computer e il telefono alla stessa rete locale.",
+  "El enlace de la app no está disponible. Comprueba la conexión de red e inicia de nuevo la presentación.": "Il collegamento all’app non è disponibile. Controlla la connessione di rete e riavvia la presentazione.",
 };

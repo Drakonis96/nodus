@@ -179,7 +179,8 @@
     "prebuild": "node scripts/build-apple-calendar.cjs && node scripts/build-presenter-native.cjs && node scripts/build-system-audio.cjs",
     "build:apple-calendar": "node scripts/build-apple-calendar.cjs",
     "build:presenter-native": "node scripts/build-presenter-native.cjs",
-    "test:presenter-native": "node scripts/test-presenter-native.mjs"
+    "test:presenter-native": "node scripts/test-presenter-native.mjs",
+    "test:presenter-lan": "node scripts/verify-presenter-lan.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -235,6 +236,7 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "selfsigned": "5.5.0",
     "sigma": "^3.0.3",
     "subset-font": "^2.7.0",
     "tesseract.js": "^5.1.1",

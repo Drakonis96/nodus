@@ -75,6 +75,8 @@ export type PresenterAction =
   | { type: 'setToolColor'; color: string }
   | { type: 'setZoomFactor'; factor: number }
   | { type: 'videoToggle' }
+  // Windows/Linux control the presentation player's volume, without changing other apps.
+  | { type: 'videoVolume'; volume: number }
   // Streamed updates — the reducer leaves state untouched; windows act on them.
   | { type: 'toolData'; data: ToolData }
   | { type: 'clearDraw' }

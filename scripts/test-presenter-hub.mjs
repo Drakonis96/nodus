@@ -19,23 +19,27 @@ const stubs = {
     }`,
   settingsRepo: `export const getSettings=()=>({uiLanguage:'es'});`,
   server: `const m=globalThis.__presenterHubTest; export const startPresenterServer=async d=>{m.web=d}; export const stopPresenterServer=()=>{}; export const broadcastToClients=(a,id)=>m.webEvents.push({a,id}); export const getPresenterServerInfo=()=>({ip:'127.0.0.1',port:1234,pin:'123456',url:'http://127.0.0.1:1234/presenterRemote.html'});`,
-  native: `const m=globalThis.__presenterHubTest; export const startNativePresenter=d=>{m.native=d}; export const stopNativePresenter=()=>{}; export const broadcastNativePresenter=(a,origin)=>m.nativeEvents.push({a,origin}); export const getNativePresenterInfo=()=>({url:'nodus-presenter://pair?test',name:'Test Mac'});`,
+  native: `const m=globalThis.__presenterHubTest; export const startNativePresenter=d=>{if(process.platform==='darwin')m.native=d}; export const stopNativePresenter=()=>{}; export const broadcastNativePresenter=(a,origin)=>m.nativeEvents.push({a,origin}); export const getNativePresenterInfo=()=>({url:'nodus-presenter://pair?test',name:'Test Mac'});`,
+  lan: `const m=globalThis.__presenterHubTest; export const startLanPresenter=async d=>{m.lan=d}; export const stopLanPresenter=()=>{}; export const broadcastLanPresenter=(a,origin)=>m.lanEvents.push({a,origin}); export const broadcastLanVolume=value=>m.volume=value; export const getLanPresenterInfo=()=>({url:'nodus-presenter://pair?version=2',name:'Test PC',transport:'lan'});`,
   systemAudio: `export const getSystemVolume=async()=>50; export const setSystemVolume=async()=>{};`,
 };
 try {
-  m.windowEvents=[];
-  await build({entryPoints:['electron/toolkit/presenter/windows.ts'],outfile:path.join(temp,'hub.cjs'),bundle:true,platform:'node',format:'cjs',plugins:[{name:'hub-boundaries',setup(b){
-    b.onResolve({filter:/^(electron|.*settingsRepo|\.\/server|\.\/native|\.\/systemAudio)$/}, args=>path.basename(args.importer) === 'windows.ts' ? ({path:args.path==='electron'?'electron':args.path.split('/').at(-1),namespace:'mock'}) : undefined);
+  for (const platform of ['darwin','win32','linux']) {
+  m.windows=[];m.nativeEvents=[];m.webEvents=[];m.lanEvents=[];m.windowEvents=[];delete m.native;delete m.lan;
+  await build({entryPoints:['electron/toolkit/presenter/windows.ts'],outfile:path.join(temp,`hub-${platform}.cjs`),define:{'process.platform':JSON.stringify(platform)},bundle:true,platform:'node',format:'cjs',plugins:[{name:'hub-boundaries',setup(b){
+    b.onResolve({filter:/^(electron|.*settingsRepo|\.\/server|\.\/native|\.\/lan|\.\/systemAudio)$/}, args=>path.basename(args.importer) === 'windows.ts' ? ({path:args.path==='electron'?'electron':args.path.split('/').at(-1),namespace:'mock'}) : undefined);
     b.onLoad({filter:/.*/,namespace:'mock'},args=>({contents:stubs[args.path],loader:'js'}));
   }}]});
-  const h = require(path.join(temp,'hub.cjs'));
+  const h = require(path.join(temp,`hub-${platform}.cjs`));
   h.startPresentation('fixture',1,false);
   assert.equal(h.getPresenterRuntimeState().timerRunning,false);
+  const remote=platform==='darwin'?m.native:m.lan;
+  assert.ok(remote);assert.equal(Boolean(m.lan),platform!=='darwin');assert.equal(Boolean(m.native),platform==='darwin');
   h.handlePresenterControl(m.windows[0].webContents,{type:'setTotal',total:5});
-  m.native.onAction({type:'next'},'iphone');
+  remote.onAction({type:'next'},'iphone');
   assert.equal(h.getPresenterRuntimeState().currentSlide,2);
-  assert.equal(m.webEvents.at(-1).a.type,'next'); assert.equal(m.nativeEvents.at(-1).origin,'iphone');
-  m.native.onAction({type:'timerToggle'},'iphone');
+  assert.equal(m.webEvents.at(-1).a.type,'next'); assert.equal((platform==='darwin'?m.nativeEvents:m.lanEvents).at(-1).origin,'iphone');
+  remote.onAction({type:'timerToggle'},'iphone');
   // The tick is anchored at presentation start, before the control message.
   // Its first callback can therefore precede a full elapsed second. Wait for
   // the observed tick with a bounded deadline instead of assuming its phase.
@@ -48,8 +52,11 @@ try {
   const paused=h.getPresenterRuntimeState().timerSeconds;
   await new Promise(r=>setTimeout(r,1100));
   assert.equal(h.getPresenterRuntimeState().timerSeconds,paused);
-  m.native.onAction({type:'timerReset'},'iphone'); assert.equal(h.getPresenterRuntimeState().timerSeconds,0);
+  remote.onAction({type:'timerReset'},'iphone'); assert.equal(h.getPresenterRuntimeState().timerSeconds,0);
   const info=await h.getServerInfoWithQr(); assert.equal(info.pin,'123456'); assert.ok(info.native.qr.startsWith('data:image/png')); assert.ok(!info.url.includes('pin'));
+  assert.equal(info.native.transport,platform==='darwin'?undefined:'lan');
+  if(platform!=='darwin'){await m.web.setVolume(27);assert.equal(await m.web.getVolume(),27);assert.equal(m.windowEvents.at(-1)[1].type,'videoVolume');}
   h.stopPresentation(); assert.equal(h.getPresenterRuntimeState().presenting,false);
-  console.log('PASS: native/web/window fanout, audience-only timer, stop and QR choices');
+  console.log(`PASS: ${platform} native/web/window fanout, timer, volume, stop and QR choices`);
+  }
 } finally { rmSync(temp,{recursive:true,force:true}); delete globalThis.__presenterHubTest; }

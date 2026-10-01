@@ -102,6 +102,11 @@ export class YouTubeOverlayController {
     this.command('seekTo', [time, true]);
   }
 
+  setVolume(volume: number): void {
+    if (!Number.isFinite(volume)) return;
+    this.command('setVolume', [Math.max(0, Math.min(100, Math.round(volume)))]);
+  }
+
   private command(func: string, args: unknown = ''): void {
     if (!this.widgetId) return;
     if (this.ready) this.send({ event: 'command', func, args });

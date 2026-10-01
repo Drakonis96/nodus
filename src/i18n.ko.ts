@@ -8258,4 +8258,6 @@ export const KO: Record<string, string> = {
   "App iPhone–iPad": "iPhone–iPad 앱",
   "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Nodus Presenter로 스캔하세요. Mac과 모바일 기기의 Wi-Fi를 켜 두세요. 현장 라우터는 필요하지 않습니다.",
   "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "네이티브 연결을 사용할 수 없습니다. macOS와 로컬 네트워크 권한이 필요합니다.",
+  "Escanea desde Nodus Presenter. Conecta el ordenador y el móvil a la misma red local.": "Nodus Presenter로 스캔하세요. 컴퓨터와 휴대폰을 같은 로컬 네트워크에 연결하세요.",
+  "El enlace de la app no está disponible. Comprueba la conexión de red e inicia de nuevo la presentación.": "앱 연결을 사용할 수 없습니다. 네트워크 연결을 확인하고 프레젠테이션을 다시 시작하세요.",
 };
