@@ -25,7 +25,7 @@ const stubs = {
 try {
   m.windowEvents=[];
   await build({entryPoints:['electron/toolkit/presenter/windows.ts'],outfile:path.join(temp,'hub.cjs'),bundle:true,platform:'node',format:'cjs',plugins:[{name:'hub-boundaries',setup(b){
-    b.onResolve({filter:/^(electron|.*settingsRepo|\.\/server|\.\/native|\.\/systemAudio)$/}, args=>args.importer.endsWith('/windows.ts') ? ({path:args.path==='electron'?'electron':args.path.split('/').at(-1),namespace:'mock'}) : undefined);
+    b.onResolve({filter:/^(electron|.*settingsRepo|\.\/server|\.\/native|\.\/systemAudio)$/}, args=>path.basename(args.importer) === 'windows.ts' ? ({path:args.path==='electron'?'electron':args.path.split('/').at(-1),namespace:'mock'}) : undefined);
     b.onLoad({filter:/.*/,namespace:'mock'},args=>({contents:stubs[args.path],loader:'js'}));
   }}]});
   const h = require(path.join(temp,'hub.cjs'));

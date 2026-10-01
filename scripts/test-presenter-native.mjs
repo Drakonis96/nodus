@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { buildSync } from 'esbuild';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -7,7 +8,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url), temp = mkdtempSync(path.join(os.tmpdir(), 'nodus-native-'));
 try {
   const output = path.join(temp, 'protocol.cjs');
-  execFileSync('node_modules/.bin/esbuild', ['electron/toolkit/presenter/nativeProtocol.ts','--bundle','--platform=node','--format=cjs',`--outfile=${output}`]);
+  buildSync({ entryPoints: ['electron/toolkit/presenter/nativeProtocol.ts'], bundle: true, platform: 'node', format: 'cjs', outfile: output });
   const { nativeAction, CommandWindow } = require(output);
   for (const value of [null, {}, {type:'setTotal',total:900}, {type:'timerSync',timerSeconds:2}, {type:'navigate',slide:NaN}, {type:'videoSeek',time:Infinity}, {type:'toolData',data:{tool:'draw',x:101,y:4}}, {type:'setToolColor',color:'url(secret)'}]) assert.equal(nativeAction(value), null);
   assert.deepEqual(nativeAction({type:'next',path:'/private'}), {type:'next'});
