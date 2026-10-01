@@ -19,6 +19,7 @@ import path from 'node:path';
 import { createServer } from 'node:net';
 import test from 'node:test';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import {
   cookieFrom, hidden, postForm, repoRoot, serverEnvironment, stopServer, waitForHealth,
 } from './lib/nodusServerHarness.mjs';
@@ -207,7 +208,7 @@ test('compiled Server Web badge closes on second click and activates a native va
 
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-native-web-ui-e2e-'));
   let server;
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   try {
     server = await boot(root);
     const cookie = await signIn(server);
@@ -245,7 +246,7 @@ test('compiled Server Web badge closes on second click and activates a native va
     assert.deepEqual(errors, [], 'activating a native vault must not produce browser errors');
     await context.close();
   } finally {
-    await browser.close();
+    await closeBrowser();
     if (server) await stopServer(server.child);
     await rm(root, { recursive: true, force: true });
   }

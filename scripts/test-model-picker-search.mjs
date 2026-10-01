@@ -8,6 +8,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -31,7 +32,7 @@ test('real model menus support search, selection, themes and clipped containers'
   const bundle = await build({ entryPoints: [path.join(root, 'scripts/fixtures/model-picker/renderer.tsx')], outfile: path.join(dir, 'fixture.js'), bundle: true, write: false, platform: 'browser', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
   const stylesheet = componentStyles();
   const css = await readFile(stylesheet, 'utf8');
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   const errors = [];
   let page;
   async function fresh(config = {}) {
@@ -152,5 +153,5 @@ test('real model menus support search, selection, themes and clipped containers'
       }
     });
     assert.deepEqual(errors, []);
-  } finally { await browser.close(); }
+  } finally { await closeBrowser(); }
 });

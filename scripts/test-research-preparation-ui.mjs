@@ -7,6 +7,7 @@ import os from 'node:os';
 import test from 'node:test';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
+import { launchComponentBrowser } from './lib/component-test-browser.mjs';
 import { componentStyles } from './lib/component-test-styles.mjs';
 const repo = path.resolve(import.meta.dirname, '..');
 // Same candidates as the other browser fixtures: CI's macOS runner ships Chrome here.
@@ -14,7 +15,7 @@ const chrome = [process.env.CHROME_BIN, '/Applications/Google Chrome.app/Content
 test('preparation welcome fixes selection and supports refusal, local text and independent future consent', { timeout: 300_000 }, async t => {
   if (!chrome) { t.skip('An isolated test browser is required'); return; }
   const root = await mkdtemp(path.join(os.tmpdir(), 'nodus-preparation-ui-'));
-  const browser = await chromium.launch({ executablePath: chrome, headless: true });
+  const { browser, close: closeBrowser } = await launchComponentBrowser(chromium, { executablePath: chrome, headless: true });
   let page;
   const errors = [];
   try {
@@ -88,5 +89,5 @@ test('preparation welcome fixes selection and supports refusal, local text and i
     await page.keyboard.press('Escape'); await dialog().waitFor({ state: 'detached' });
     assert.equal(await page.getByTestId('open-preparation').evaluate(el => el === document.activeElement), true);
     assert.deepEqual(errors, []);
-  } finally { await browser.close(); await rm(root, { recursive: true, force: true }); }
+  } finally { await closeBrowser(); await rm(root, { recursive: true, force: true }); }
 });
