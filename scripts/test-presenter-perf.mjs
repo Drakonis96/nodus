@@ -55,6 +55,7 @@ class FakeCanvas {
 }
 globalThis.window = { devicePixelRatio: 1, addEventListener() {}, removeEventListener() {} };
 globalThis.document = { createElement: () => new FakeCanvas() };
+globalThis.getComputedStyle = (element) => element.padding ?? {};
 
 // A controllable IntersectionObserver: records the callback + observed elements so
 // the test can drive intersection deterministically.
@@ -226,4 +227,45 @@ test('slide render: 50 rapid navigations collapse to a single heavy render (last
   await Promise.allSettled(runs);
   await flush();
   assert.equal(heavyRenders, 1, 'only the last navigation runs a heavy render; the other 49 cancel');
+});
+
+test('slide fit preserves landscape and portrait ratios after panel resizing, excluding padding', async () => {
+  for (const [width, height] of [[1600, 900], [600, 900], [1200, 900]]) {
+    const doc = {
+      getPage: async () => ({
+        getViewport: ({ scale }) => ({ width: width * scale, height: height * scale }),
+        render: () => ({ promise: Promise.resolve() }),
+        cleanup() {},
+      }),
+    };
+    const canvas = new FakeCanvas();
+    const container = { clientWidth: 1000, clientHeight: 700, padding: { paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' } };
+    const renderer = new FittedSlideRenderer(canvas, container);
+    for (const [cw, ch] of [[1000, 700], [350, 220], [620, 490]]) {
+      container.clientWidth = cw;
+      container.clientHeight = ch;
+      await renderer.render(doc, 1);
+      const displayedWidth = parseFloat(canvas.style.width);
+      const displayedHeight = parseFloat(canvas.style.height);
+      assert.ok(Math.abs(displayedWidth / displayedHeight - width / height) < 1e-10, 'the PDF ratio is unchanged');
+      assert.ok(displayedWidth <= cw - 24 + 1e-10 && displayedHeight <= ch - 24 + 1e-10, 'the entire slide fits inside the padding');
+      assert.ok(Math.abs(displayedWidth - (cw - 24)) < 1e-10 || Math.abs(displayedHeight - (ch - 24)) < 1e-10, 'one dimension fills the available space');
+    }
+  }
+});
+
+test('large displays fit the slide while the backing bitmap remains capped', async () => {
+  const doc = {
+    getPage: async () => ({
+      getViewport: ({ scale }) => ({ width: 1600 * scale, height: 900 * scale }),
+      render: () => ({ promise: Promise.resolve() }),
+      cleanup() {},
+    }),
+  };
+  const canvas = new FakeCanvas();
+  await new FittedSlideRenderer(canvas, { clientWidth: 6400, clientHeight: 3600 }).render(doc, 1);
+  assert.equal(parseFloat(canvas.style.width), 6400);
+  assert.equal(parseFloat(canvas.style.height), 3600);
+  assert.equal(canvas.width, 3200);
+  assert.equal(canvas.height, 1800);
 });

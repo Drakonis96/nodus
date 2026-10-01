@@ -13,7 +13,9 @@ import crypto from 'node:crypto';
 import {
   normalizeLibrary,
   removePresentation,
+  removeFolder,
   type Presentation,
+  type PresenterFolderDeleteMode,
   type PresenterLibrary,
 } from '@shared/presenterTypes';
 
@@ -56,7 +58,7 @@ export function writeLibrary(baseDir: string, lib: PresenterLibrary): void {
   ensureDir(baseDir);
   const { metaFile } = presenterPaths(baseDir);
   const tmp = `${metaFile}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(lib, null, 2));
+  fs.writeFileSync(tmp, JSON.stringify(normalizeLibrary(lib), null, 2));
   fs.renameSync(tmp, metaFile);
 }
 
@@ -86,7 +88,7 @@ export function importPdf(
     name: fileName.replace(/\.[^.]+$/i, ''),
     fileName,
     createdAt: now.toISOString(),
-    tag: '',
+    folderId: null,
     totalPages: 0,
     notes: { ...(options.notes ?? {}) },
     videos: {},
@@ -111,4 +113,18 @@ export function deletePresentation(baseDir: string, id: string): void {
   writeLibrary(baseDir, removePresentation(lib, id));
   const file = pdfPath(baseDir, id);
   if (fs.existsSync(file)) fs.unlinkSync(file);
+}
+
+/** Delete one folder subtree, applying the chosen policy to its copied PDFs. */
+export function deleteFolder(baseDir: string, id: string, mode: PresenterFolderDeleteMode): PresenterLibrary {
+  if (mode !== 'move-to-root' && mode !== 'delete-presentations') throw new Error('Invalid folder deletion mode');
+  const before = readLibrary(baseDir);
+  const after = removeFolder(before, id, mode);
+  if (after === before) return before;
+  writeLibrary(baseDir, after);
+  const remaining = new Set(after.presentations.map(p => p.id));
+  for (const p of before.presentations) {
+    if (!remaining.has(p.id)) fs.rmSync(pdfPath(baseDir, p.id), { force: true });
+  }
+  return after;
 }

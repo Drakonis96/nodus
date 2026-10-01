@@ -24,6 +24,7 @@ import { createThumbSession, type ThumbSession } from '../../lib/presenter/thumb
 import { PresenterToolbar } from '../PresenterToolbar';
 import { noteParagraphs } from '../deck';
 import { loadMobilePdf } from './mobilePdf';
+import { installTooltipLayer } from '../../tooltipLayer';
 import '../../index.css';
 
 function apiUrl(p: string, pin: string): string {
@@ -114,6 +115,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
       if (ctl && live) {
         if (action.type === 'setTool') ctl.setActiveTool(action.tool);
         else if (action.type === 'setToolSize') ctl.setSize(action.tool, action.size);
+        else if (action.type === 'setToolColor') ctl.setColor(action.color);
         else if (action.type === 'setZoomFactor') ctl.setZoomFactor(action.factor);
         else if (action.type === 'toolData') ctl.applyToolData(action.data);
         else if (action.type === 'clearDraw') ctl.clearDraw();
@@ -190,6 +192,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
     }
     if (previewWrapRef.current) {
       toolCtlRef.current = new ToolOverlayController(previewWrapRef.current, () => previewCanvasRef.current);
+      toolCtlRef.current.setColor(stateRef.current.toolColor);
       toolCtlRef.current.setActiveTool(stateRef.current.toolMode);
     }
     renderDisplayed(displayedRef.current); // paint the current slide onto the fresh canvas
@@ -198,6 +201,18 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
       toolCtlRef.current = null;
       rendererRef.current = null;
     };
+  }, [previewMounted, renderDisplayed]);
+
+  // Fitting follows the notes divider and mobile viewport changes as well.
+  useEffect(() => {
+    if (!previewMounted || !previewContainerRef.current) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => renderDisplayed(displayedRef.current));
+    });
+    observer.observe(previewContainerRef.current);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
   }, [previewMounted, renderDisplayed]);
 
   // Re-render when the displayed slide changes.
@@ -374,6 +389,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
             <button
               type="button"
               onClick={() => emit({ type: 'timerToggle', timerSeconds: ui.timerSeconds })}
+              title={ui.timerRunning ? t('Pausar') : t('Iniciar')}
               className={`text-sm tabular-nums ${ui.timerRunning ? 'text-emerald-400' : 'text-neutral-400'}`}
             >
               {formatTimer(ui.timerSeconds)}
@@ -402,12 +418,13 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
           <div ref={previewContainerRef} className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black p-2">
             <div
               ref={previewWrapRef}
+              className="shrink-0"
               style={zoom.scale > 1 ? { transform: `scale(${zoom.scale})`, transformOrigin: `${zoom.originX}% ${zoom.originY}%` } : undefined}
             >
-              <canvas ref={previewCanvasRef} className="block max-h-full" />
+              <canvas ref={previewCanvasRef} className="block max-w-none" />
             </div>
             {ui.blackScreen && !localPreview && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black text-xs text-neutral-600">{t('Pantalla en negro')}</div>
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-xs text-neutral-600">{t('Pantalla en negro')}</div>
             )}
             {/* Touch surface (tools / swipe / pinch). touch-action:none keeps the browser
                 from scrolling/refreshing so the tool tracks the finger 1:1. */}
@@ -448,6 +465,8 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
               min={0}
               max={100}
               value={volume}
+              title={t('Volumen')}
+              aria-label={t('Volumen')}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
                 setVolume(v);
@@ -481,11 +500,11 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
             <div className="mb-1 flex items-center justify-between text-xs text-neutral-500">
               <span>{t('Notas')}</span>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setNotesFont((f) => Math.max(10, f - 2))}>
+                <button type="button" title={t('Reducir')} aria-label={t('Reducir')} onClick={() => setNotesFont((f) => Math.max(10, f - 2))}>
                   <Icon name="minus" size={14} />
                 </button>
                 <span className="w-6 text-center">{notesFont}</span>
-                <button type="button" onClick={() => setNotesFont((f) => Math.min(32, f + 2))}>
+                <button type="button" title={t('Aumentar')} aria-label={t('Aumentar')} onClick={() => setNotesFont((f) => Math.min(32, f + 2))}>
                   <Icon name="plus" size={14} />
                 </button>
               </div>
@@ -493,7 +512,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" style={{ fontSize: `${notesFont}px` }}>
               {paras.length ? (
                 paras.map((p, i) => (
-                  <p key={i} className="mb-2 whitespace-pre-wrap leading-relaxed text-neutral-200">
+                  <p key={i} className="mb-2 indent-[1em] whitespace-pre-wrap leading-relaxed text-neutral-200">
                     {p}
                   </p>
                 ))
@@ -507,7 +526,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
           <div className="flex items-center gap-2 border-t border-white/10 p-2" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
             <button
               type="button"
-              onClick={() => emit({ type: 'blackScreen' })}
+              onClick={() => emit({ type: 'blackScreen', enabled: !ui.blackScreen })}
               title={t('Pantalla en negro')}
               className={`rounded-lg p-2.5 ${ui.blackScreen ? 'bg-amber-500/25 text-amber-300' : 'bg-white/5 hover:bg-white/10'}`}
             >
@@ -523,10 +542,10 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
                 <Icon name={ui.videoPlaying ? 'pause' : 'play'} size={18} />
               </button>
             )}
-            <button type="button" onClick={() => nudge(-1)} className="flex flex-1 items-center justify-center rounded-lg bg-white/5 py-3 active:bg-white/15">
+            <button type="button" title={t('Anterior')} aria-label={t('Anterior')} onClick={() => nudge(-1)} className="flex flex-1 items-center justify-center rounded-lg bg-white/5 py-3 active:bg-white/15">
               <Icon name="chevronLeft" size={24} />
             </button>
-            <button type="button" onClick={() => nudge(1)} className="flex flex-1 items-center justify-center rounded-lg bg-white/5 py-3 active:bg-white/15">
+            <button type="button" title={t('Siguiente')} aria-label={t('Siguiente')} onClick={() => nudge(1)} className="flex flex-1 items-center justify-center rounded-lg bg-white/5 py-3 active:bg-white/15">
               <Icon name="chevronRight" size={24} />
             </button>
           </div>
@@ -537,7 +556,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
               <div className="bg-neutral-900 p-3" onClick={(e) => e.stopPropagation()}>
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-sm font-medium">{t('Diapositivas')}</span>
-                  <button type="button" onClick={() => setCarouselOpen(false)}>
+                  <button type="button" title={t('Cerrar')} aria-label={t('Cerrar')} onClick={() => setCarouselOpen(false)}>
                     <Icon name="x" size={20} />
                   </button>
                 </div>
@@ -606,6 +625,8 @@ function formatTimer(sec: number): string {
 function buildRemoteThumb(pageNum: number, onClick: () => void) {
   const element = document.createElement('button');
   element.type = 'button';
+  element.title = `${t('Diapositiva')} ${pageNum}`;
+  element.setAttribute('aria-label', element.title);
   element.dataset.carousel = String(pageNum);
   element.className = 'relative h-full shrink-0 overflow-hidden rounded border border-white/10 bg-neutral-800';
   element.addEventListener('click', onClick);
@@ -622,5 +643,6 @@ function buildRemoteThumb(pageNum: number, onClick: () => void) {
 const el = document.getElementById('presenter-root');
 if (el) {
   setActiveLang(normalizeBrowserUiLanguage(navigator.language));
+  installTooltipLayer();
   createRoot(el).render(<PresenterRemoteRoot />);
 }

@@ -38,6 +38,7 @@ export function useTools({ stageRef, getSlideCanvas, getState, emit }: UseToolsO
     // presenter timer re-renders every second; rebuilding here would blank the
     // drawing and reset the active tool on every tick.)
     controllerRef.current = new ToolOverlayController(stageRef.current, () => slideCanvasRef.current());
+    controllerRef.current.setColor(stateRef.current().toolColor);
     return () => {
       controllerRef.current?.destroy();
       controllerRef.current = null;
@@ -55,6 +56,9 @@ export function useTools({ stageRef, getSlideCanvas, getState, emit }: UseToolsO
         break;
       case 'setToolSize':
         c.setSize(action.tool, action.size);
+        break;
+      case 'setToolColor':
+        c.setColor(action.color);
         break;
       case 'setZoomFactor':
         c.setZoomFactor(action.factor);

@@ -50,7 +50,7 @@ export interface PresenterRuntimeState {
   timerRunning: boolean;
   /** Active annotation tool, or null. */
   toolMode: ToolName | null;
-  /** Draw colour. */
+  /** Shared drawing and laser-pointer colour. */
   toolColor: string;
   /** Per-tool size (flashlight/draw radius or width, pointer/zoom diameter). */
   toolSizes: ToolSizes;

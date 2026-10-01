@@ -61,6 +61,9 @@ module.exports = async function signMacApplication(options) {
     throw new Error(`Missing required DockTile signing target: ${pluginBundle}`);
   }
 
+  const presenterHelper = path.join(options.app, 'Contents', 'Resources', 'presenter-native', 'nodus-presenter-native');
+  if (!existsSync(presenterHelper)) throw new Error('Missing native Presenter signing target');
+
   const originalIgnore = options.ignore;
   const originalOptionsForFile = options.optionsForFile;
   const emptyEntitlements = path.join(__dirname, 'entitlements.mac.empty.plist');
@@ -95,6 +98,7 @@ module.exports = async function signMacApplication(options) {
     binaries: [...new Set([
       ...(options.binaries ?? []),
       pluginExecutable,
+      presenterHelper,
       ...additionalBundles,
     ])],
     // Override only electron-builder's blanket PlugIns exclusion. Every other

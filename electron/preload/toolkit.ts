@@ -113,6 +113,7 @@ export const toolkitApi: ToolkitApi = {
   importPresenterFile: (token) => ipcRenderer.invoke('presenter:import:file', token),
   getPresenterPdfData: (id) => ipcRenderer.invoke('presenter:pdf:getData', id),
   deletePresenterPresentation: (id) => ipcRenderer.invoke('presenter:delete', id).then(() => undefined),
+  deletePresenterFolder: (id, mode) => ipcRenderer.invoke('presenter:folder:delete', id, mode),
   importPresenterPptxNotes: () => ipcRenderer.invoke('presenter:import:pptxNotes'),
   exportPresenterNotesTxt: (presentation) => ipcRenderer.invoke('presenter:export:txtNotes', presentation),
   importPresenterNotesTxt: () => ipcRenderer.invoke('presenter:import:txtNotes'),

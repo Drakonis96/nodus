@@ -136,3 +136,7 @@ build/apple-calendar/x64/
 # directory is ever versioned; only the README is.
 electron/assets/drift/audio/*
 !electron/assets/drift/audio/README.md
+
+# Compiled native presenter bridge
+build/presenter-native/arm64/
+build/presenter-native/x64/

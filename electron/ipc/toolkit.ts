@@ -20,7 +20,7 @@ import { buildToolkitAppPackage, toolkitAppPackageFileName } from '../toolkit/ap
 import { isToolkitAppManifest } from '@shared/toolkitApps';
 import type { ToolkitAppGenerationProgress, ToolkitAppGenerationRequest, ToolkitAppJsonValue, ToolkitAppManifest } from '@shared/toolkitApps';
 import { getSystemVolume, setSystemVolume, openCastPicker } from '../toolkit/presenter/systemAudio';
-import { normalizeLibrary, PresenterLibrary } from '@shared/presenterTypes';
+import { normalizeLibrary, PresenterLibrary, type PresenterFolderDeleteMode } from '@shared/presenterTypes';
 import { parsePresenterNotesTxt, serializePresenterNotesTxt } from '@shared/presenterNotesTxt';
 import type { PresenterAction } from '@shared/presenterState';
 import type { ProtectArtifact, ProtectListSourcesRequest, ProtectSourceRef } from '@shared/protectTypes';
@@ -199,7 +199,7 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   });
 
   // ── PDF Presenter (Toolkit) ─────────────────────────────────────────────────
-  // A global library of imported PDFs (copies) + tags, independent of the
+  // A global library of imported PDFs (copies) + folders, independent of the
   // active vault, under userData/toolkit/presenter. The pure model + reducers
   // live in @shared/presenterTypes; the filesystem side in toolkit/presenter.
   const presenterDir = () => path.join(app.getPath('userData'), 'toolkit', 'presenter');
@@ -293,6 +293,10 @@ export function registerToolkitIpc({ h, getWindow }: IpcContext): void {
   });
   h('presenter:delete', async (_e, id: string) => {
     presenterLibrary.deletePresentation(presenterDir(), id);
+  });
+  h('presenter:folder:delete', async (_e, id: string, mode: PresenterFolderDeleteMode) => {
+    if (typeof id !== 'string' || !id) throw new Error('Invalid folder id');
+    return presenterLibrary.deleteFolder(presenterDir(), id, mode);
   });
   h('presenter:import:pptxNotes', async (e) => {
     const win = BrowserWindow.fromWebContents(e.sender);

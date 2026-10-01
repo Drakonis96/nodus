@@ -1,6 +1,6 @@
 // The toolkit slice of the window.nodus contract. NodusApi extends it, so the
 // renderer surface stays flat and every call site is unchanged.
-import type { Presentation, PresenterImportResult, PresenterImportSelection, PresenterLibrary, PptxNotes } from '../presenterTypes';
+import type { Presentation, PresenterImportResult, PresenterImportSelection, PresenterLibrary, PresenterFolderDeleteMode, PptxNotes } from '../presenterTypes';
 import type { PresenterAction, PresenterRuntimeState } from '../presenterState';
 import type { ToolkitJobRequest, ToolkitJobProgress, ToolkitJobResult } from '../toolkitTypes';
 import type { ToolkitAppGenerationRequest, ToolkitAppGenerationProgress, ToolkitAppGenerationResult, ToolkitAppManifest, ToolkitAppJsonValue, ToolkitAppSessionEvent, ToolkitAppSessionInfo, ToolkitAppSessionSnapshot } from '../toolkitApps';
@@ -103,6 +103,7 @@ export interface ToolkitApi {
   /** Raw PDF bytes for a presentation, or null if its copy is missing. */
   getPresenterPdfData(id: string): Promise<Uint8Array | null>;
   deletePresenterPresentation(id: string): Promise<void>;
+  deletePresenterFolder(id: string, mode: PresenterFolderDeleteMode): Promise<PresenterLibrary>;
   /** Open a .pptx picker and extract its speaker notes; null when cancelled. */
   importPresenterPptxNotes(): Promise<PptxNotes | null>;
   /** Save every slide's speaker notes in the versioned, re-importable TXT format. */
@@ -121,7 +122,7 @@ export interface ToolkitApi {
   stopPresenter(): Promise<void>;
   getPresenterState(): Promise<PresenterRuntimeState>;
   /** Mobile-remote server info + a QR data URL, or null when not presenting. */
-  getPresenterServerInfo(): Promise<{ ip: string; port: number; pin: string; url: string; qr: string } | null>;
+  getPresenterServerInfo(): Promise<{ ip: string; port: number; pin: string; url: string; qr: string; native?: { url: string; qr: string; name: string } } | null>;
   /** System output volume 0–100 (macOS; 50 elsewhere). */
   getPresenterVolume(): Promise<number>;
   setPresenterVolume(volume: number): Promise<void>;

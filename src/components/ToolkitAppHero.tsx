@@ -18,6 +18,8 @@ type ToolkitAppHeroProps = {
   backLabel?: string;
   /** Extra classes for the primary action, for a tool whose action is inert at rest (Drift with an empty mix). */
   actionClassName?: string;
+  /** Compact editorial header for workspaces with a prominent document preview. */
+  compact?: boolean;
 };
 
 /** Shared first-screen header for every app in Nodus Toolkit. */
@@ -37,9 +39,10 @@ export function ToolkitAppHero({
   actionBusy = false,
   backLabel = 'Nodus Toolkit',
   actionClassName,
+  compact = false,
 }: ToolkitAppHeroProps) {
   return (
-    <div className="space-y-4">
+    <div className={compact ? 'toolkit-header-compact' : 'space-y-4'}>
       <div>
         <button
           data-testid={backTestId}

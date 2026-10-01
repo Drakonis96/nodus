@@ -1,8 +1,7 @@
 // PDF Presenter — the presenter window: current slide + next-slide preview +
 // speaker notes + timer + system clock + thumbnail carousel. Navigation, black
 // screen and slide zoom run through the shared reducer and relay to the audience;
-// the timer is owned here and broadcast outward (canonical state + the future
-// mobile remote). No app shell, no DB — just the exposed nodus bridge + pdfjs.
+// the timer is owned by the main process and shared with both mobile remotes. No app shell, no DB — just the exposed nodus bridge + pdfjs.
 import { createRoot } from 'react-dom/client';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +15,8 @@ import { createThumbSession, type ThumbSession } from '../lib/presenter/thumbSes
 import { loadDeck, noteParagraphs, readDeckParams } from './deck';
 import { useTools } from './useTools';
 import { PresenterToolbar } from './PresenterToolbar';
+import { PresenterDivider } from './PresenterDivider';
+import { installTooltipLayer } from '../tooltipLayer';
 import '../index.css';
 
 function pad2(n: number): string {
@@ -35,15 +36,20 @@ function PresenterViewApp() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [videos, setVideos] = useState<Record<string, unknown>>({});
   const [notesFont, setNotesFont] = useState(16);
-  const [timerSeconds, setTimerSeconds] = useState(0);
-  const [timerRunning, setTimerRunning] = useState(false);
+  const timerSeconds = ui.timerSeconds;
+  const timerRunning = ui.timerRunning;
   const [clock, setClock] = useState(() => '');
   const [qrOpen, setQrOpen] = useState(false);
-  const [qrInfo, setQrInfo] = useState<{ url: string; pin: string; qr: string } | null>(null);
+  const [qrInfo, setQrInfo] = useState<{ url: string; pin: string; qr: string; native?: { url: string; qr: string; name: string } } | null>(null);
+  const [qrMode, setQrMode] = useState<'web' | 'native'>('web');
   const [volume, setVolume] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(34);
+  const [previewHeight, setPreviewHeight] = useState(40);
 
   const stateRef = useRef(ui);
+  const splitRef = useRef<HTMLDivElement | null>(null);
+  const sidebarRef = useRef<HTMLDivElement | null>(null);
   const docRef = useRef<PDFDocumentProxy | null>(null);
   const currentRenderer = useRef<FittedSlideRenderer | null>(null);
   const nextRenderer = useRef<FittedSlideRenderer | null>(null);
@@ -54,9 +60,6 @@ function PresenterViewApp() {
   const nextCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const sessionRef = useRef<ThumbSession | null>(null);
-  const timerTick = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerStartedAt = useRef<number | null>(null);
-  const timerSecondsRef = useRef(0);
   const toolsApplyRef = useRef<(action: PresenterAction) => void>(() => {});
   const toolsSlideChangedRef = useRef<() => void>(() => {});
 
@@ -99,37 +102,9 @@ function PresenterViewApp() {
   toolsApplyRef.current = tools.apply;
   toolsSlideChangedRef.current = tools.onSlideChanged;
 
-  // ── Timer (owned here; broadcast so canonical state + mobile stay in sync) ────
-  const pushTimer = useCallback((sec: number, running: boolean) => {
-    window.nodus.sendPresenterControl({ type: 'timerSync', timerSeconds: sec, timerRunning: running });
-  }, []);
-  const startTimer = useCallback(() => {
-    setTimerRunning(true);
-    timerStartedAt.current = Date.now() - timerSecondsRef.current * 1000;
-    if (timerTick.current) clearInterval(timerTick.current);
-    timerTick.current = setInterval(() => {
-      const sec = Math.floor((Date.now() - (timerStartedAt.current ?? Date.now())) / 1000);
-      timerSecondsRef.current = sec;
-      setTimerSeconds(sec);
-      pushTimer(sec, true);
-    }, 1000);
-  }, [pushTimer]);
-  const pauseTimer = useCallback(() => {
-    setTimerRunning(false);
-    if (timerTick.current) clearInterval(timerTick.current);
-    timerTick.current = null;
-    pushTimer(timerSecondsRef.current, false);
-  }, [pushTimer]);
-  const resetTimer = useCallback(() => {
-    timerSecondsRef.current = 0;
-    setTimerSeconds(0);
-    if (timerStartedAt.current !== null) timerStartedAt.current = Date.now();
-    pushTimer(0, timerTick.current !== null);
-  }, [pushTimer]);
-  const toggleTimer = useCallback(() => {
-    if (timerTick.current) pauseTimer();
-    else startTimer();
-  }, [pauseTimer, startTimer]);
+  // The main process owns the clock, including audience-only presentations.
+  const resetTimer = useCallback(() => window.nodus.sendPresenterControl({ type: 'timerReset' }), []);
+  const toggleTimer = useCallback(() => window.nodus.sendPresenterControl({ type: 'timerToggle' }), []);
 
   // Load deck + wire renderers, then render the starting slide and auto-start timer.
   useEffect(() => {
@@ -163,16 +138,14 @@ function PresenterViewApp() {
           .querySelector<HTMLElement>(`[data-carousel="${stateRef.current.currentSlide}"]`)
           ?.scrollIntoView({ inline: 'center', block: 'nearest' });
       }
-      startTimer();
     })();
     return () => {
       cancelled = true;
       sessionRef.current?.destroy();
-      if (timerTick.current) clearInterval(timerTick.current);
       void docRef.current?.destroy();
       docRef.current = null;
     };
-  }, [params.pdfId, renderPair, startTimer]);
+  }, [params.pdfId, renderPair]);
 
   // Highlight the active carousel thumbnail.
   useEffect(() => {
@@ -181,22 +154,7 @@ function PresenterViewApp() {
     });
   }, [ui.currentSlide]);
 
-  // Relayed control (from the audience window or a phone). Timer toggles/resets
-  // must drive the real local timer here (it is the timer's owner), not just the
-  // reducer, so a phone can pause/reset it.
-  const toggleTimerRef = useRef(toggleTimer);
-  const resetTimerRef = useRef(resetTimer);
-  toggleTimerRef.current = toggleTimer;
-  resetTimerRef.current = resetTimer;
-  useEffect(
-    () =>
-      window.nodus.onPresenterControl((action) => {
-        if (action.type === 'timerToggle') toggleTimerRef.current();
-        else if (action.type === 'timerReset') resetTimerRef.current();
-        else dispatchRef.current(action, false);
-      }),
-    [],
-  );
+  useEffect(() => window.nodus.onPresenterControl((action) => dispatchRef.current(action, false)), []);
 
   // System clock.
   useEffect(() => {
@@ -206,11 +164,17 @@ function PresenterViewApp() {
     return () => clearInterval(id);
   }, []);
 
-  // Re-render on resize.
+  // Panel resizing does not fire window.resize. Watch both slide containers and
+  // coalesce drag events into one fit per frame.
   useEffect(() => {
-    const onResize = () => renderPair(stateRef.current.currentSlide);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => renderPair(stateRef.current.currentSlide));
+    });
+    if (currentContainerRef.current) observer.observe(currentContainerRef.current);
+    if (nextContainerRef.current) observer.observe(nextContainerRef.current);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
   }, [renderPair]);
 
   // Keyboard navigation.
@@ -316,7 +280,7 @@ function PresenterViewApp() {
               void window.nodus.getPresenterServerInfo().then((info) => setQrInfo(info));
             }}
           >
-            <Icon name="grid" size={16} />
+            <Icon name="qrCode" size={16} />
           </TopBtn>
           <div className="relative">
             <TopBtn
@@ -336,6 +300,8 @@ function PresenterViewApp() {
                   min={0}
                   max={100}
                   value={volume}
+                  title={t('Volumen')}
+                  aria-label={t('Volumen')}
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     setVolume(v);
@@ -353,6 +319,7 @@ function PresenterViewApp() {
           <span className="ml-1 text-xs text-neutral-500 tabular-nums">{clock}</span>
           <button
             type="button"
+            title={t('Finalizar')}
             onClick={() => window.nodus.stopPresenter()}
             className="ml-1 flex h-8 items-center gap-1.5 rounded-md bg-red-600 px-2.5 text-sm font-medium text-white hover:bg-red-700"
           >
@@ -363,7 +330,7 @@ function PresenterViewApp() {
       </div>
 
       {/* Main: current slide | next + notes */}
-      <div className="flex min-h-0 flex-1">
+      <div ref={splitRef} className="flex min-h-0 flex-1">
         <div className="flex min-w-0 flex-1 flex-col">
           <div
             ref={currentContainerRef}
@@ -371,14 +338,16 @@ function PresenterViewApp() {
             onMouseDown={tools.onMouseDown}
             onMouseMove={tools.onMouseMove}
             onMouseUp={tools.onMouseUp}
-            className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black p-3"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black p-3"
           >
             <div
               ref={currentWrapRef}
+              className="shrink-0"
               style={zoom.scale > 1 ? { transform: `scale(${zoom.scale})`, transformOrigin: `${zoom.originX}% ${zoom.originY}%` } : undefined}
             >
-              <canvas ref={currentCanvasRef} className="block" />
+              <canvas ref={currentCanvasRef} className="block max-w-none" />
             </div>
+            {ui.blackScreen && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-xs text-neutral-500">{t('Pantalla en negro')}</div>}
           </div>
           <div className="flex justify-center border-t border-white/10 bg-neutral-950 p-2">
             <PresenterToolbar
@@ -395,21 +364,22 @@ function PresenterViewApp() {
             />
           </div>
         </div>
-        <div className="flex w-[34%] min-w-72 flex-col border-l border-white/10">
-          <div className="flex h-2/5 flex-col border-b border-white/10 p-2">
+        <PresenterDivider orientation="vertical" containerRef={splitRef} value={sidebarWidth} min={20} max={60} defaultValue={34} label={t('Ajustar ancho')} onChange={setSidebarWidth} />
+        <div ref={sidebarRef} className="flex min-h-0 shrink-0 flex-col border-l border-white/10" style={{ width: `${sidebarWidth}%` }}>
+          <div className="flex min-h-0 shrink-0 flex-col p-2" style={{ height: `${previewHeight}%` }}>
             <span className="mb-1 text-xs uppercase tracking-wide text-neutral-500">{t('Siguiente diapositiva')}</span>
             <div ref={nextContainerRef} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded bg-black">
-              {atEnd ? (
+              <canvas ref={nextCanvasRef} className={`shrink-0 max-w-none ${atEnd ? 'hidden' : 'block'}`} />
+              {atEnd && (
                 <span className="text-sm text-neutral-500">{t('Fin de la presentación')}</span>
-              ) : (
-                <canvas ref={nextCanvasRef} className="block" />
               )}
             </div>
           </div>
+          <PresenterDivider orientation="horizontal" containerRef={sidebarRef} value={previewHeight} min={20} max={75} defaultValue={40} label={t('Ajustar tamaño de las notas')} onChange={setPreviewHeight} />
           <div className="flex min-h-0 flex-1 flex-col p-2">
             <div className="mb-1 flex items-center justify-between">
-              <span className="text-xs uppercase tracking-wide text-neutral-500">{t('Notas del presentador')}</span>
-              <div className="flex items-center gap-1">
+              <span title={t('Notas del presentador')} className="min-w-0 truncate text-xs uppercase tracking-wide text-neutral-500">{t('Notas del presentador')}</span>
+              <div className="flex shrink-0 items-center gap-1">
                 <TopBtn title={t('Reducir')} onClick={() => setNotesFont((f) => Math.max(10, f - 1))}>
                   <Icon name="minus" size={13} />
                 </TopBtn>
@@ -422,7 +392,7 @@ function PresenterViewApp() {
             <div className="min-h-0 flex-1 overflow-y-auto pr-1" style={{ fontSize: `${notesFont}px` }}>
               {paras.length ? (
                 paras.map((p, i) => (
-                  <p key={i} className="mb-2 whitespace-pre-wrap leading-relaxed text-neutral-200">
+                  <p key={i} className="mb-2 indent-[1em] whitespace-pre-wrap leading-relaxed text-neutral-200">
                     {p}
                   </p>
                 ))
@@ -449,16 +419,25 @@ function PresenterViewApp() {
             <h3 className="text-base font-semibold">{t('Escanea para controlar desde el móvil')}</h3>
             {qrInfo ? (
               <>
+                <div className="mt-4 flex rounded-lg bg-white/5 p-1" role="group" aria-label={t('Conexión móvil')}>
+                  <button type="button" onClick={() => setQrMode('web')} className={`flex-1 rounded-md p-2 text-xs ${qrMode === 'web' ? 'bg-white/15' : ''}`}>{t('Navegador web')}</button>
+                  <button type="button" onClick={() => setQrMode('native')} className={`flex-1 rounded-md p-2 text-xs ${qrMode === 'native' ? 'bg-white/15' : ''}`}>{t('App iPhone–iPad')}</button>
+                </div>
+                {qrMode === 'native' ? (qrInfo.native ? <>
+                  <img src={qrInfo.native.qr} alt="QR" width={240} height={240} className="mx-auto my-3 rounded-lg bg-white p-2" />
+                  <p className="text-xs text-neutral-400">{t('Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.')}</p>
+                </> : <p className="my-6 text-sm text-neutral-400">{t('El enlace nativo no está disponible. Requiere macOS y permiso de red local.')}</p>) : <>
                 <img src={qrInfo.qr} alt="QR" width={240} height={240} className="mx-auto my-3 rounded-lg bg-white p-2" />
                 <p className="break-all text-xs text-neutral-400">{qrInfo.url}</p>
                 <p className="mt-1 text-sm">
                   {t('PIN')}: <span className="font-mono tracking-widest">{qrInfo.pin}</span>
                 </p>
+                </>}
               </>
             ) : (
               <p className="my-6 text-sm text-neutral-500">{t('Cargando…')}</p>
             )}
-            <button type="button" onClick={() => setQrOpen(false)} className="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/20">
+            <button type="button" title={t('Cerrar')} onClick={() => setQrOpen(false)} className="mt-4 rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/20">
               {t('Cerrar')}
             </button>
           </div>
@@ -483,6 +462,7 @@ function TopBtn({
     <button
       type="button"
       title={title}
+      aria-label={title}
       onClick={onClick}
       className={`flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
         active ? 'bg-amber-500/20 text-amber-300' : 'text-neutral-300 hover:bg-white/10 hover:text-white'
@@ -496,6 +476,8 @@ function TopBtn({
 function buildCarouselItem(pageNum: number, onClick: () => void) {
   const element = document.createElement('button');
   element.type = 'button';
+  element.title = `${t('Diapositiva')} ${pageNum}`;
+  element.setAttribute('aria-label', element.title);
   element.dataset.carousel = String(pageNum);
   element.className =
     'group relative h-full shrink-0 overflow-hidden rounded border border-white/10 bg-neutral-900 data-[active=true]:border-amber-400 data-[active=true]:ring-1 data-[active=true]:ring-amber-400';
@@ -516,5 +498,6 @@ function buildCarouselItem(pageNum: number, onClick: () => void) {
 const el = document.getElementById('presenter-root');
 if (el) {
   setActiveLang(normalizeUiLanguage(new URLSearchParams(window.location.search).get('language')));
+  installTooltipLayer();
   createRoot(el).render(<PresenterViewApp />);
 }
