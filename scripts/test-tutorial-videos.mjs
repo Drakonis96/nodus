@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
@@ -353,7 +353,7 @@ test('the announcement speaks every interface language', async () => {
   // per-key check above.
   // Languages the other catalogues render keep single quotes; a generated table may
   // use double quotes, so both are read.
-  const summaries = [...table.matchAll(/\n    summary: (['"])(.+)\1,/g)].map((match) => match[2]);
+  const summaries = [...table.matchAll(/\n {4}summary: (['"])(.+)\1,/g)].map((match) => match[2]);
   assert.equal(summaries.length, 12);
   assert.equal(new Set(summaries).size, 12, 'one of the languages falls back to another');
 });

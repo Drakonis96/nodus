@@ -8,6 +8,8 @@ The native QR contains a fresh 256-bit session PSK. It is returned only through 
 
 The helper runs only during a presentation. It advertises `_nodus-presenter._tcp`, accepts TLS-PSK AES-GCM connections for control/assets, frames JSON with a bounded 32-bit length, serves only the current PDF, sends preview JPEGs and streams the PDF in 64 KiB chunks with resume offsets and SHA-256 verification. At most 16 peers and 12 pending previews are accepted. Terminating the presentation rotates away the key, stops the advertisement and closes the helper. A missing/failed helper does not interrupt the audience or web remote.
 
+The native app's video playback and Mac-volume controls appear only on the projected slide when it has a video; private reading and slides without video hide them, including in the app's settings. Demo playback is simulated. In real sessions the audience owns the YouTube player and the volume command adjusts macOS output volume. The player establishes the YouTube widget channel before sending commands, retains the latest playback/seek intent during loading, and discards it when leaving the slide. Messages are restricted to the active YouTube frame and origin. A single Electron request-header listener preserves both YouTube embedding identification and OpenStreetMap identification.
+
 ## Build and verify
 
 `npm run build:presenter-native` builds and ad-hoc signs the local helper on macOS. Development/build hooks invoke it; packaging builds the selected arm64/x64 slice, carries it as an extra resource and verifies its architecture before release signing. The source uses macOS 11 APIs and no downloaded Swift libraries. Windows/Linux omit the helper and retain the web remote.
@@ -16,6 +18,7 @@ The helper runs only during a presentation. It advertises `_nodus-presenter._tcp
 - `node scripts/test-presenter-hub.mjs`: native/web/window fanout, authoritative timer in audience-only mode, stop and QR choices.
 - `node scripts/test-presenter-state.mjs`: shared reducer.
 - `node scripts/test-presenter-server.mjs`: unchanged browser PIN and path guards.
+- `node --test scripts/test-presenter-youtube.mjs scripts/test-tutorial-videos.mjs`: video readiness, queued playback/seek, slide-change cleanup and the combined media request-header rules.
 - `npm run typecheck:ci`: renderer and Electron types.
 
 The native test disables Bonjour advertising by setting `NODUS_PRESENTER_TEST_LOOPBACK=1` on its child helper. It verifies the transport without granting local-network discovery permission and **does not validate AWDL, an iPhone session, router-off recovery or radio coexistence**. Those require a Mac and physical iPhone/iPad, with the integrated Nodus build.
