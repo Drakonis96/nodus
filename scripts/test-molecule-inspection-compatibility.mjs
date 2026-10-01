@@ -20,8 +20,9 @@ await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')
       // The reaction index and the route evidence are optional; with no index they add nothing.
       '../reactionIndex': `export const reactionIndexService=()=>({localDirectory:async()=>null})`,
       './synthesisEvidence': `export async function invokeDisconnections(){return null} export function synthesisEvidenceWorkIds(){return []} export async function textbookPassages(){return []}`,
+      './chemistryStock': `export const chemistryStockDirectory=()=>null`,
     };
-    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
   } }],
 });
