@@ -1,3 +1,4 @@
+import { RELEASE_5_7_4_HIGHLIGHTS } from './releaseNotes574';
 import { RELEASE_5_7_3_HIGHLIGHTS } from './releaseNotes573';
 import { RELEASE_5_6_0_HIGHLIGHTS } from './releaseNotes560';
 import { RELEASE_5_7_0_HIGHLIGHTS } from './releaseNotes570';
@@ -176,6 +177,7 @@ const RELEASE_5_1_0_IT = [
 ];
 
 export const RELEASE_NOTES_IT: Record<string, string[]> = {
+  "5.7.4": RELEASE_5_7_4_HIGHLIGHTS.map(highlight => highlight['it']),
   "5.7.3": RELEASE_5_7_3_HIGHLIGHTS.map(highlight => highlight['it']),
   "5.7.2": RELEASE_5_7_2_HIGHLIGHTS.map(highlight => highlight['it']),
   "5.7.1": RELEASE_5_7_0_HIGHLIGHTS.map(highlight => highlight['it']),
