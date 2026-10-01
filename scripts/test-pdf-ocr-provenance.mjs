@@ -14,7 +14,11 @@ test.after(() => rm(dir, { recursive: true, force: true }));
 const stubs = new Map([
   ['adm-zip', 'export default class AdmZip {}'],
   ['../zotero/zoteroClient', 'export const itemChildren = () => []; export const itemAsAttachment = () => null; export const getFulltext = () => null; export const attachmentFilePath = () => null; export class ZoteroRequestError extends Error {}'],
-  ['./pdfjsLoader', 'export const openPdf = async () => globalThis.__pdfOcrProvenance.pdf; export const pageText = async page => page.text;'],
+  ['./pdfjsLoader', 'export const openPdf = async () => globalThis.__pdfOcrProvenance.pdf; export const pageText = async page => page.text; export const pageTextWithSchemes = async page => ({ text: page.text, declutteredText: page.text, schemeLines: [], marginLines: [] });'],
+  // Scheme decluttering is opt-in per file; nothing here is listed.
+  // Scheme decluttering: a per-file list, recorded here so the new-work path can be checked.
+  ['./schemeDeclutter', 'const listed = (globalThis.__declutter ??= new Set()); export const declutterEnabledFor = file => listed.has(file); export const addToDeclutterList = file => { listed.add(file); }; export const workTextUnused = () => false; export const declutterCacheKey = file => `${file}#declutter`; export const pdfBodySize = async () => 0;'],
+  ['../db/settingsRepo', 'export const getSettings = () => ({ declutterNewDocuments: true });'],
   ['./pdfAnalyzer', 'export const analyzePdf = async () => globalThis.__pdfOcrProvenance.analysis;'],
   ['./ocr', 'export const ocrPdfPages = (...args) => globalThis.__pdfOcrProvenance.ocr(...args); export const ocrImageFile = async () => ({text:""});'],
   ['./tabular', 'export const csvFileToText = () => ""; export const xlsxFileToText = () => "";'],
@@ -160,4 +164,25 @@ test('an OCR failure is not cached, so a retry with unchanged settings can recov
   assert.equal(fixture.cacheWrites, 1);
   assert.deepEqual(await extractFromPath(file, opts), recovered);
   assert.equal(fixture.ocrCalls, 2, 'successful extraction still benefits from the cache');
+});
+
+test('a new work\'s PDF joins the declutter list on its first extraction and keeps its own cache entry', async () => {
+  await extract({ total: 2, cap: 1000, scanPages: [] });
+  const fixture = globalThis.__pdfOcrProvenance;
+  const file = path.join(dir, 'new-book.pdf');
+  await writeFile(file, 'PDF fixture handled by the controlled reader');
+  const opts = { ocr: { enabled: false, languages: 'eng', maxPages: 1000 } };
+  fixture.cache = new Map();
+  await extractFromPath(file, { ...opts, declutterIfNew: true });
+  assert.ok(globalThis.__declutter.has(file), 'listed before its first extraction');
+  const keys = [...fixture.cache.keys()].map((key) => JSON.parse(key).filePath);
+  assert.deepEqual(keys, [`${file}#declutter`], 'cached under the decluttered key only');
+  // A later extraction without the flag (the work is no longer new) stays decluttered.
+  await extractFromPath(file, opts);
+  assert.deepEqual([...fixture.cache.keys()].map((key) => JSON.parse(key).filePath), [`${file}#declutter`]);
+  // A work whose text is in use is never added.
+  const used = path.join(dir, 'used-book.pdf');
+  await writeFile(used, 'PDF fixture handled by the controlled reader');
+  await extractFromPath(used, opts);
+  assert.ok(!globalThis.__declutter.has(used));
 });

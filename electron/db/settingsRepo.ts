@@ -223,6 +223,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   ocrEnabled: false,
   ocrLanguages: 'spa+eng',
   ocrMaxPages: 300,
+  declutterNewDocuments: true,
   toolkitOcrLanguages: 'spa+eng',
   toolkitOutputDir: null,
   toolkitOpenFolderOnDone: false,
