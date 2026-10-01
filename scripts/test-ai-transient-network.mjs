@@ -47,6 +47,9 @@ test('undici-style socket failures are transient', () => {
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' })), true);
   assert.equal(isTransientNetworkFailure(new Error('other side closed')), true);
   assert.equal(isTransientNetworkFailure(new Error('network error')), true);
+  // A connection dropped mid-read (a long reasoning stream), as Node reports it.
+  assert.equal(isTransientNetworkFailure(Object.assign(new Error('read ETIMEDOUT'), { code: 'ETIMEDOUT', syscall: 'read' })), true);
+  assert.equal(isTransientNetworkFailure(new TypeError('terminated', { cause: Object.assign(new Error('read ETIMEDOUT'), { code: 'ETIMEDOUT' }) })), true);
 });
 
 test('an abort, a timeout and a status-bearing error are NOT transient network failures', () => {
@@ -57,6 +60,7 @@ test('an abort, a timeout and a status-bearing error are NOT transient network f
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' })), false);
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('AI transport timed out after 180000 ms.'), { name: 'TimeoutError' })), false);
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('timed out'), { cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } })), false);
+  assert.equal(isTransientNetworkFailure(Object.assign(new Error('connect ETIMEDOUT 1.2.3.4:443'), { code: 'ETIMEDOUT', syscall: 'connect' })), false, 'a connect timeout stays excluded');
   // A status means another branch of wrapProviderError owns the decision.
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('Connection error'), { status: 503 })), false);
   assert.equal(isTransientNetworkFailure(Object.assign(new Error('connection refused'), { response: { status: 502 } })), false);

@@ -101,7 +101,10 @@ export function classifyProviderError(error: unknown): ProviderErrorClassificati
  *    transport deadline, must not be replayed blindly);
  *  · anything carrying a status — another branch owns that decision.
  */
-const TRANSIENT_NETWORK = /connection error|connection reset|connection refused|connection closed|connection lost|socket hang up|socket closed|network error|fetch failed|other side closed|premature close|terminated|econnreset|econnrefused|econnaborted|enotfound|eai_again|epipe|und_err/i;
+// `read ETIMEDOUT` is an established connection the OS dropped mid-read (a long reasoning stream
+// lost after 84 KB of thinking, before any answer text) — the same class as a reset. A connect
+// timeout is not matched and stays excluded below.
+const TRANSIENT_NETWORK = /connection error|connection reset|connection refused|connection closed|connection lost|socket hang up|socket closed|network error|fetch failed|other side closed|premature close|terminated|econnreset|econnrefused|econnaborted|enotfound|eai_again|epipe|und_err|read etimedout/i;
 
 export function isTransientNetworkFailure(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
