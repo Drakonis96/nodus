@@ -185,6 +185,9 @@ export async function runSummaryScan(work: Work, model?: ModelRef | null, option
       system: coreStructuredPrompt('summary', getSettings().promptLanguage ?? 'es'),
       user: JSON.stringify(input),
       temperature: 0.2,
+      // A two-paragraph orientation summary needs no thinking trace. Without this the call
+      // inherited the chat reasoning setting, so a library scan paid for reasoning on every work.
+      reasoning: 'off' as const,
       task: 'summary' as const,
       requestClass: 'background' as const,
       jobId: `${work.nodus_id}:summary`,

@@ -147,6 +147,10 @@ try {
       globalThis.__summaryEvents.completes.every((opts) => opts.requireCompleteOutput === true),
       'every summary attempt opts into the complete-output contract',
     );
+    assert.ok(
+      globalThis.__summaryEvents.completes.every((opts) => opts.reasoning === 'off'),
+      'a summary never inherits the chat reasoning setting',
+    );
     assert.equal(globalThis.__summaryEvents.upserts[0].summary, 'Un resumen completo tras ampliar el presupuesto.');
     assert.equal(globalThis.__summaryEvents.results[0][1], 'done');
 

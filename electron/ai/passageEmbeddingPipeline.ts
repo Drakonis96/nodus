@@ -7,6 +7,7 @@ import { resolveWorkText, resolvedTextStateFromDoc } from '../extraction/textExt
 import { setResolvedTextState } from '../db/worksRepo';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { prepareLegacyDocumentaryPassages } from './documentaryLegacyPreparation';
+import { addPassageWorkPending, passageWorkDone, setPassageWorksPending } from './passageEmbeddingActivity';
 import { addNotification } from '../notifications';
 import { nodiText } from '@shared/nodiNotifications';
 import { recordLinkedLibraryAnalysis } from '../library/libraryVaultProvenance';
@@ -142,6 +143,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         const index = existingIndex.get(work.nodus_id);
         if (index === undefined || index < state.currentWorkIndex) {
           state.works.push({ work, title: work.title, chunks: 0 });
+          addPassageWorkPending(work.nodus_id);
         }
       }
       emit();
@@ -179,6 +181,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
       // whether its old passages are current; the persisted hash may itself be stale.
       .filter((work) => ids.length > 0 || statuses.get(work.nodus_id)?.status !== 'complete')
       .map((work) => ({ work, title: work.title, chunks: 0 }));
+    setPassageWorksPending(state.works.map((entry) => entry.work.nodus_id));
 
     if (state.works.length === 0) {
       if (candidates.length === 0) state.error = 'No hay obras disponibles para indexar.';
@@ -239,6 +242,7 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
         documentFingerprint: contentHash,
       });
       state.currentWorkFinishedAt = new Date().toISOString();
+      passageWorkDone(entry.work.nodus_id);
       emit();
     }
   } catch (error) {
@@ -246,6 +250,8 @@ export async function startPassageEmbedding(nodusIds?: string[]): Promise<void> 
     state.error = terminalError.message;
     console.error('[passageEmbeddingPipeline] fatal error:', state.error);
   } finally {
+    // A stopped or failed run has nothing left ahead of it: no index may wait on it.
+    setPassageWorksPending([]);
     const finishedAt = new Date().toISOString();
     if (state.currentWorkStartedAt && !state.currentWorkFinishedAt) state.currentWorkFinishedAt = finishedAt;
     state.finishedAt = finishedAt;
