@@ -22,7 +22,7 @@ and recovery of the previous release are not presented as application features.
 | Fixes | 5 | One retry for a dropped connection before answer text and for a Research Chat answer reaching the output limit | AI | #1014, #1015, #1016, `electron/ai/aiClient.ts`, `electron/ai/cutOffRetry.ts` |
 | Fixes | 6 | Immersion original-page access through Zotero and truthful local-versus-MCP activity reporting | Academic | #1018, `docs/research-chat-views.md` |
 | Fixes | 7 | Month calendar day numbers no longer overlap events | General | #1020, `src/views/StudyCalendarView.tsx` |
-| Fixes | 8 | macOS volume synchronization and active custom-audio reader pause/resume | Browser | #1026, `electron/toolkit/presenter/systemVolume.ts`, `src/hooks/useDeviceVolume.ts` |
+| Fixes | 8 | macOS volume synchronization and active custom-audio reader pause/resume | Browser | #1026, `electron/toolkit/presenter/systemVolume.ts`, `src/components/browser/useDeviceVolume.ts` |
 | Fixes | 9 | Documentary Index waits for pending passage indexing and passage preparation shows a preparation label | Library | #1031, `electron/ai/passageEmbeddingActivity.ts` |
 
 ## Version and publication metadata
@@ -53,6 +53,7 @@ at draft creation and publication. No independent release body is maintained.
 - Visual checks pass for the current release in all twelve languages and both
   themes, all historical v5 entries in every language, the v4 layout and
   small-window scrolling. Exact text, section order and icon scopes are checked.
+- Regenerated sitemap freshness after the metadata commit. Sitemap checks pass.
 - Reviewed modal captures are saved in `docs/verification/release-5.7.4/`.
 
 ## Native Presenter validation limits
