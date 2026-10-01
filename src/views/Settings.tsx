@@ -3495,7 +3495,7 @@ export function Settings({
             </p>
             <Row
               label={t('Simplificar esquemas y figuras en PDFs nuevos')}
-              hint={t('Las etiquetas sueltas de esquemas de reacción, figuras y tablas se sustituyen por «[scheme]» y se quitan los encabezados de página. Solo se aplica a obras cuyo texto aún no se ha usado; cada PDF conserva la elección.')}
+              hint={t('Las etiquetas sueltas de esquemas de reacción, figuras y tablas se sustituyen por «[scheme]» y se quitan los encabezados de página. Solo se aplica a obras cuyo texto aún no se ha usado; la elección se conserva para cada obra.')}
             >
               <input
                 type="checkbox"

@@ -14,7 +14,7 @@ import type {
 } from '@shared/types';
 import { itemChildren, itemAsAttachment, getFulltext, attachmentFilePath, ZoteroAttachment, ZoteroRequestError } from '../zotero/zoteroClient';
 import { openPdf, pageText, pageTextWithSchemes } from './pdfjsLoader';
-import { addToDeclutterList, declutterCacheKey, declutterEnabledFor, pdfBodySize, workTextUnused } from './schemeDeclutter';
+import { declutterCacheKey, declutterForWorkSource, pdfBodySize } from './schemeDeclutter';
 import { getSettings } from '../db/settingsRepo';
 import { analyzePdf } from './pdfAnalyzer';
 import { ocrPdfPages, ocrImageFile } from './ocr';
@@ -349,8 +349,14 @@ export async function extractPdfStreaming(
   const pageTexts = new Map<number, string>();
   const blanks: number[] = [];
   const lowQuality: number[] = [];
-  // Opted-in books (schemeDeclutter.ts): schemes become "[scheme]", margin lines go.
-  const body = opts.declutter ? await pdfBodySize(pdf) : 0;
+  // Opted-in works: schemes become "[scheme]", margin lines go.
+  let body = 0;
+  try {
+    if (opts.declutter) body = await pdfBodySize(pdf, opts.signal);
+  } catch (error) {
+    await pdf.destroy?.();
+    throw error;
+  }
   const layerQuality = new Map<number, number>();
   if (opts.declutter) perfLog('scheme declutter', 0, opts.perf, { file: path.basename(filePath), body });
 
@@ -604,16 +610,15 @@ export function extractEpub(filePath: string): string {
 
 export async function extractFromPath(
   filePath: string,
-  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext; signal?: AbortSignal; declutterIfNew?: boolean } = {}
+  opts: { ocr?: OcrOptions; onProgress?: OnExtractProgress; perf?: PerfContext; signal?: AbortSignal; declutter?: boolean } = {}
 ): Promise<ExtractedDoc> {
   opts.signal?.throwIfAborted();
   const ext = path.extname(filePath).toLowerCase();
   const ocr = opts.ocr ?? { enabled: false, languages: 'spa+eng', maxPages: 300 };
   const stat = fs.statSync(filePath);
-  // A new work's PDF joins the declutter list before its first extraction, so this and every
-  // later extraction of it give the same text (schemeDeclutter.ts).
-  if (ext === '.pdf' && opts.declutterIfNew && !declutterEnabledFor(filePath)) addToDeclutterList(filePath);
-  const declutter = ext === '.pdf' && declutterEnabledFor(filePath);
+  // The caller passes this work/attachment's durable choice. A bare file path
+  // never enables decluttering for other works or tools that happen to read it.
+  const declutter = ext === '.pdf' && opts.declutter === true;
   const cacheKey = { filePath: declutter ? declutterCacheKey(filePath) : filePath, fileSize: stat.size, fileMtimeMs: stat.mtimeMs, ocr };
   const cacheLookupDone = startPerf('extraction cache lookup', opts.perf, { file: path.basename(filePath) });
   const cached = getExtractionCache(cacheKey);
@@ -708,8 +713,6 @@ export function isTextAttachment(att: ZoteroAttachment): boolean {
 
 export interface ResolveOptions {
   allowExternalRetrieval?: boolean;
-  /** Set by resolveWorkText: the work's text is unused, so its PDFs may be decluttered. */
-  declutterIfNew?: boolean;
   unpaywallEmail: string;
   preferZoteroFulltext: boolean;
   ocr: OcrOptions;
@@ -794,7 +797,8 @@ async function readTextAttachments(
   textAttachments: ZoteroAttachment[],
   userId: string,
   effectiveStorage: string,
-  opts: ResolveOptions
+  opts: ResolveOptions,
+  workKey: string,
 ): Promise<{ doc: ExtractedDoc | null; scanNote: string | null; blockReason: TextBlockReason | null }> {
   // The file is the source of truth for citations. Zotero's index is consulted only
   // for an attachment whose local file is absent or unusable, and never supplies pages.
@@ -813,7 +817,9 @@ async function readTextAttachments(
     }
     if (filePath && fs.existsSync(filePath)) {
       try {
-        localDoc = await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf, signal: opts.signal, declutterIfNew: opts.declutterIfNew });
+        const declutter = path.extname(filePath).toLowerCase() === '.pdf'
+          && declutterForWorkSource(workKey, sourceRefForAttachment(att), getSettings().declutterNewDocuments !== false);
+        localDoc = await extractFromPath(filePath, { ocr: opts.ocr, onProgress: opts.onProgress, perf: opts.perf, signal: opts.signal, declutter });
       } catch (error) {
         console.error(`[resolveWorkText] Error extracting from ${filePath}:`, error);
       }
@@ -877,8 +883,6 @@ async function readTextAttachments(
  *   3) Curated Library copy, then Unpaywall open-access PDF (by DOI)
  *   4) Abstract only / none
  */
-const isNodusLibraryKey = (key: string) => key.startsWith('nodus-library:');
-
 export async function resolveWorkText(
   userId: string,
   zoteroKey: string,
@@ -892,8 +896,6 @@ export async function resolveWorkText(
   // Fall back to the standard Zotero storage location when the user left it blank,
   // so deep scans can still find local PDFs instead of degrading to abstract-only.
   const effectiveStorage = storagePath || defaultZoteroStorage();
-  // A work whose full text nothing uses yet is extracted decluttered (declutterNewDocuments).
-  const declutterNew = !isNodusLibraryKey(zoteroKey) && getSettings().declutterNewDocuments !== false && workTextUnused(zoteroKey);
   const isAttachmentItem = (itemType ?? '').toLowerCase() === 'attachment';
   const isNodusLibraryItem = zoteroKey.startsWith('nodus-library:');
 
@@ -929,7 +931,7 @@ export async function resolveWorkText(
     }
     if (textAttachments.length > 0) hadTextAttachment = true;
 
-    const result = await readTextAttachments(textAttachments, userId, effectiveStorage, { ...opts, declutterIfNew: declutterNew });
+    const result = await readTextAttachments(textAttachments, userId, effectiveStorage, opts, zoteroKey);
     if (result.doc) return { ...result.doc, hadTextAttachment: true };
     if (result.scanNote) scanNote = result.scanNote;
     if (result.blockReason) blockReason = result.blockReason;

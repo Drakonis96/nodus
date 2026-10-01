@@ -1,62 +1,31 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { app } from 'electron';
+import { createHash } from 'node:crypto';
 import { getDb } from '../db/database';
 import { bodySizeOf, typeSizeWeights, SCHEME_LAYOUT_CLASSIFIER, type LayoutItem } from './schemeLayout';
 
 /**
- * Opt-in scheme decluttering at extraction: PDFs listed in <userData>/scheme-declutter.json
- * ({ "files": ["/abs/path.pdf", …] }) are extracted with each run of reaction-scheme, figure
- * and table lines as one "[scheme]" and without margin lines (running heads, tabs). Only
- * listed files: changing a book's text makes its analysis out of date. A file is listed when
- * its work is first extracted and nothing has used its text yet (`declutterNewDocuments`), or
- * by hand, before a book is rescanned in full.
+ * A PDF's extraction choice belongs to its work and attachment in the owning vault.
+ * Persist both choices in that vault's settings before extraction: a later settings
+ * change, a moved file or another work sharing the PDF must not change existing text.
+ * Direct file extraction (Toolkit, translation, etc.) stays plain unless requested.
  */
 
-export const DECLUTTER_LIST = 'scheme-declutter.json';
 const SAMPLE_PAGES = 40;
 
-let cache: { mtimeMs: number; files: Set<string> } | null = null;
-
-export function declutterListPath(): string {
-  return path.join(app.getPath('userData'), DECLUTTER_LIST);
-}
-
-export function declutterEnabledFor(filePath: string): boolean {
-  const listPath = declutterListPath();
-  let mtimeMs: number;
-  try { mtimeMs = fs.statSync(listPath).mtimeMs; } catch { return false; }
-  if (cache?.mtimeMs !== mtimeMs) {
-    try {
-      const parsed = JSON.parse(fs.readFileSync(listPath, 'utf8')) as { files?: unknown };
-      cache = { mtimeMs, files: new Set(Array.isArray(parsed.files) ? parsed.files.filter((entry): entry is string => typeof entry === 'string').map((entry) => path.resolve(entry)) : []) };
-    } catch (error) {
-      console.warn('[scheme-declutter] unreadable list:', error instanceof Error ? error.message : String(error));
-      cache = { mtimeMs, files: new Set() };
-    }
-  }
-  return cache.files.has(path.resolve(filePath));
-}
-
-/** Adds a file to the list, so every later extraction of it is decluttered too. */
-export function addToDeclutterList(filePath: string): void {
-  const listPath = declutterListPath();
-  let files: string[] = [];
-  try { files = (JSON.parse(fs.readFileSync(listPath, 'utf8')) as { files?: string[] }).files ?? []; } catch { /* a new list */ }
-  const resolved = path.resolve(filePath);
-  if (files.includes(resolved)) return;
-  const tmp = `${listPath}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify({ files: [...files, resolved] }, null, 2));
-  fs.renameSync(tmp, listPath);
-  cache = null;
-}
-
-/** Whether nothing yet depends on a work's full text: it was never resolved and never deep
- *  analysed (a light scan reads only the title and abstract). Decluttering it changes nothing
- *  that exists. Unknown works count as used. */
-export function workTextUnused(zoteroKey: string): boolean {
-  const row = getDb().prepare('SELECT resolved_text_hash, deep_hash FROM works WHERE zotero_key = ?').get(zoteroKey) as { resolved_text_hash: string | null; deep_hash: string | null } | undefined;
-  return !!row && !row.resolved_text_hash && !row.deep_hash;
+export function declutterForWorkSource(zoteroKey: string, sourceRef: string, preferred: boolean): boolean {
+  const db = getDb();
+  const work = db.prepare('SELECT nodus_id, resolved_text_hash, deep_hash FROM works WHERE zotero_key = ?').get(zoteroKey) as {
+    nodus_id: string; resolved_text_hash: string | null; deep_hash: string | null;
+  } | undefined;
+  if (!work) return false;
+  const identity = createHash('sha256').update(JSON.stringify([work.nodus_id, sourceRef])).digest('hex');
+  const key = `pdf_declutter:${identity}`;
+  const read = () => (db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined)?.value;
+  const saved = read();
+  if (saved !== undefined) return saved === 'declutter';
+  const unused = !work.resolved_text_hash && !work.deep_hash;
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING')
+    .run(key, preferred && unused ? 'declutter' : 'plain');
+  return read() === 'declutter';
 }
 
 /** The extraction cache key for a decluttered file: its own entry, so the plain and the
@@ -66,14 +35,20 @@ export function declutterCacheKey(filePath: string): string {
 }
 
 /** A book's body type size, from up to 40 evenly spaced pages. */
-export async function pdfBodySize(pdf: { numPages: number; getPage(page: number): Promise<any> }): Promise<number> {
+export async function pdfBodySize(pdf: { numPages: number; getPage(page: number): Promise<any> }, signal?: AbortSignal): Promise<number> {
   const weights = new Map<number, number>();
   const total = pdf.numPages;
   const samples = Math.min(SAMPLE_PAGES, total);
   for (let k = 0; k < samples; k++) {
+    signal?.throwIfAborted();
     const page = await pdf.getPage(1 + Math.floor(samples > 1 ? k * (total - 1) / (samples - 1) : 0));
-    typeSizeWeights(((await page.getTextContent()).items as LayoutItem[]).filter((item) => typeof item?.str === 'string' && Array.isArray(item.transform)), weights);
-    page.cleanup?.();
+    try {
+      const content = await page.getTextContent();
+      signal?.throwIfAborted();
+      typeSizeWeights((content.items as LayoutItem[]).filter((item) => typeof item?.str === 'string' && Array.isArray(item.transform)), weights);
+    } finally {
+      page.cleanup?.();
+    }
   }
   return bodySizeOf(weights);
 }

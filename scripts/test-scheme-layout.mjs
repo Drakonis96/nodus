@@ -11,6 +11,9 @@ const tmp = await mkdtemp(path.join(os.tmpdir(), 'nodus-scheme-layout-'));
 const outfile = path.join(tmp, 'schemeLayout.mjs');
 await build({ entryPoints: [path.join(root, 'electron/extraction/schemeLayout.ts')], outfile, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent' });
 const { pageSchemeLayout } = await import(pathToFileURL(outfile).href);
+const loaderFile = path.join(tmp, 'pdfjsLoader.mjs');
+await build({ entryPoints: [path.join(root, 'electron/extraction/pdfjsLoader.ts')], outfile: loaderFile, bundle: true, format: 'esm', platform: 'node', logLevel: 'silent' });
+const { pageTextWithSchemes } = await import(pathToFileURL(loaderFile).href);
 test.after(() => rm(tmp, { recursive: true, force: true }));
 
 // A textbook page modelled on a real one: 10 pt prose in a column at x=111, a reaction scheme
@@ -97,4 +100,70 @@ test('a row of structure fragments at body size is a scheme; an equation or a nu
   ];
   const layout = pageSchemeLayout(rows);
   assert.deepEqual(rows.filter((_, index) => layout.scheme[index]).map((entry) => entry.str), ['OH', 'O', 'O', 'N', 'O']);
+});
+
+const extractPage = items => pageTextWithSchemes({ getTextContent: async () => ({ items: items.map(entry => ({ ...entry, hasEOL: true })) }) });
+
+test('small Japanese, Chinese and Korean prose survives both classification and extraction', async () => {
+  for (const text of [
+    'これは学術論文の本文であり、化学構造式ではありません。',
+    '研究结果与讨论以普通的学术文章形式呈现，这些内容必须保留。',
+    '이 문장은 학술 논문의 본문이며 화학 구조식이 아닙니다.',
+  ]) {
+    const items = [item(text, 111, 600, 8, 340), item(text, 111, 588, 8, 340), item(text, 111, 576, 8, 340)];
+    const layout = pageSchemeLayout(items);
+    assert.equal(layout.body, 8, 'non-Latin prose contributes to the body-size estimate');
+    assert.deepEqual(layout.scheme, [false, false, false]);
+    const result = await extractPage(items);
+    assert.equal(result.declutteredText, result.text, text);
+    // A book-wide body hint must not discard a smaller sidebar or a short line in the margin.
+    const sidebar = [...page, item(text, 20, 440, 8, 70), item('結果', 20, 428, 8, 20)];
+    const hinted = pageSchemeLayout(sidebar, 10);
+    assert.equal(hinted.scheme.at(-2), false);
+    assert.equal(hinted.margin.at(-2), false);
+    assert.equal(hinted.margin.at(-1), false);
+  }
+});
+
+test('small Cyrillic and accented Latin prose is counted as prose', () => {
+  for (const text of [
+    'Исследование объясняет важные результаты научной работы подробно',
+    'Éléments étudiés révèlent différentes réactions chimiques intéressantes',
+  ]) {
+    const items = [item(text, 111, 600, 8, 340), item(text, 111, 588, 8, 340), item(text, 111, 576, 8, 340)];
+    assert.equal(pageSchemeLayout(items).body, 8);
+    assert.deepEqual(pageSchemeLayout(items).scheme, [false, false, false]);
+  }
+});
+
+test('captions and references remain protected between two scheme rows', async () => {
+  for (const label of ['Figure 1. Reaction pathways', 'Figure S1', 'Fig. IV', 'Figura 1. Rutas de reacción', 'Tabelle 1. Reaktionswege', 'Şekil 1. Tepkime yolları', '1 S. Smith (1990)']) {
+    const items = [
+      prose(700, 'ordinary body prose containing enough words to estimate the main font size'),
+      prose(688, 'another line of ordinary body prose continues in the main text column'),
+      prose(676, 'a third line of ordinary body prose completes the main text paragraph'),
+      item('OH O N O', 150, 620, 8, 100),
+      item(label, 111, 605, 8, 160),
+      item('OH O N O', 150, 590, 8, 100),
+    ];
+    assert.equal(pageSchemeLayout(items).scheme[4], false, label);
+    const result = await extractPage(items);
+    assert.ok(result.declutteredText.includes(label), label);
+    assert.ok(result.declutteredText.includes('[scheme]'), 'the surrounding schemes are still removed');
+  }
+});
+
+test('a caption outside the main text column is not discarded as margin', () => {
+  const items = [...page, item('Figure 1. Pathways', 20, 440, 8, 70)];
+  const layout = pageSchemeLayout(items);
+  assert.equal(layout.scheme.at(-1), false);
+  assert.equal(layout.margin.at(-1), false);
+});
+
+test('short ordinary phrases and verse in small type are not a run of scheme labels', async () => {
+  const text = ['This is a line', 'A quiet river', 'The trees bend', 'We watch the sky'];
+  const items = text.map((line, index) => item(line, 111, 600 - index * 12, 8, 120));
+  assert.deepEqual(pageSchemeLayout(items, 10).scheme, [false, false, false, false]);
+  const result = await extractPage(items);
+  assert.equal(result.declutteredText, text.join('\n'));
 });

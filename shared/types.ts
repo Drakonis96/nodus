@@ -2278,7 +2278,8 @@ export interface AppSettings {
   ocrMaxPages: number;
   /** PDFs of works whose text has never been used (no resolved text, no deep analysis) are
    *  extracted with reaction schemes, figure labels and tables as "[scheme]" and without running
-   *  heads. The choice sticks per file, so later extractions of it give the same text. */
+   *  heads. The choice sticks per work and attachment in its vault, so later extractions
+   *  of it give the same text without affecting other works that share the PDF. */
   declutterNewDocuments: boolean;
   // Nodus Toolkit (Convert). No DB schema; plain JSON settings.
   /** Tesseract languages the Toolkit's OCR operations use, e.g. "spa+eng". */
