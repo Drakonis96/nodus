@@ -369,4 +369,7 @@ not a confidential legal advice service.
 
 ## Native Presenter remote
 
+The iPhone/iPad companion's own data handling, camera permissions and cache
+retention are described in [Nodus Presenter Privacy Policy](PRESENTER_PRIVACY.md).
+
 While a PDF presentation is active, Nodus for macOS can advertise an Apple local/peer-to-peer service for the optional iPhone/iPad Presenter companion. Scanning its native QR grants that device access to the current PDF, speaker notes and presentation controls through a TLS session with a fresh per-presentation key. That key is discarded when presenting ends. The helper reads only the PDF chosen for that session; no vault or unrelated file paths are exposed. This feature does not create a cloud account, upload presentations to a Nodus server or change the Mac's Wi-Fi configuration. The existing PIN-protected browser remote remains available.
