@@ -48,8 +48,9 @@ import { buildGenealogyContext } from './genealogyChatContext';
 import { buildAuthorGraph, buildIdeaGraph, buildReadingPath, getContradictions } from '../graph/graphService';
 import { getItem, LOCAL_USER_ID } from '../zotero/zoteroClient';
 import { resolveWorkText } from '../extraction/textExtractor';
-import { completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
+import { AiError, completeText, completeTextStream, resolveModelRef, localModelContextWindow } from './aiClient';
 import { embed } from './aiClient';
+import { retryOnceWhenCutOff } from './cutOffRetry';
 import { enforceContextBudget, humanizeCitationLabels } from './researchContextFit';
 import { ResearchWebGrant, webDepth } from './researchWebStep';
 import { WEB_RESEARCH_LIMITS } from '../websearch/webResearch';
@@ -362,7 +363,9 @@ async function streamResearchChatTurn(
   const sourceContext = council?.assessments ? JSON.stringify(evidence) : user;
   const attachments = request.attachmentIds?.length ? await researchActivityStep('attachments', 'read', () => prepareResearchAttachments(request, 'research', request.model)) : await prepareResearchAttachments(request, 'research', request.model);
   const opts = { corpusContext: !!requestNotebookScope(request) && !attachments.images?.length, system: system + attachments.system, user: user + attachments.text, images: attachments.images, englishImagePrompts: execution.skills.some(skill => skillHasCapability(skill, 'image')), temperature: 0.2, ...await researchGenerationOptions(request, maxTokens, local, signal), signal };
-  let answer = await researchActivityStep('response', 'write', () => withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), request.model?.model);
+  const write = () => researchActivityStep('response', 'write', () => withResearchAttachmentFallback(attachments, opts, options => completeTextStream(options, onDelta, request.model, signal)), request.model?.model);
+  // Streamed thinking is provisional; the retry repaints from nothing.
+  let answer = await retryOnceWhenCutOff(write, { isCutOff: error => error instanceof AiError && error.code === 'output_truncated', beforeRetry: () => onDelta('', 'replace'), signal });
   answer = await researchActivityStep('response', 'citations', () => finalizeAnswer(answer, local, sourceContext));
   // A user-triggered stop ends the turn with the text that already streamed. Running
   // the citation-recovery resample or the skill tools now would either throw an
