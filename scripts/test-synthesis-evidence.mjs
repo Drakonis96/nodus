@@ -161,6 +161,11 @@ test('starting materials are organic reactants no earlier step makes, in first-u
     [label('reactant', '4-nitrobenzoic acid', 'O=C(O)c1ccc([N+](=O)[O-])cc1'), label('reactant', 'ethanol', 'CCO'), label('product', 'ethyl 4-nitrobenzoate', 'CCOC(=O)c1ccc([N+](=O)[O-])cc1'), label('product', 'water', 'O', true)],
   ];
   assert.deepEqual(routeStartingMaterials(labels).map((entry) => entry.name), ['4-nitrotoluene', 'ethanol']);
+  // Inorganic reagents are not starting materials, even with a C in an element symbol.
+  const dichromate = [[label('reactant', 'sodium dichromate', 'O=[Cr](=O)([O-])O[Cr](=O)(=O)[O-].[Na+].[Na+]'), label('reactant', 'thionyl chloride', 'O=S(Cl)Cl'), label('reactant', 'benzene', 'c1ccccc1'), label('product', 'x', 'CC')]];
+  assert.deepEqual(routeStartingMaterials(dichromate).map((entry) => entry.name), ['benzene']);
+  const { hasCarbon } = evidence;
+  assert.deepEqual(['CCO', 'c1ccccc1', 'O=C=O', '[Cu+2]', 'ClCl', '[Ca+2]', '[Sc+3]', 'C'].map(hasCarbon), [true, true, true, false, false, false, false, true]);
 });
 
 test('the stock line names each starting material and the lists that hold it; no lists, no line', () => {

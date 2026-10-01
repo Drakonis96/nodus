@@ -392,13 +392,18 @@ export function synthesisEvidencePayload(evidence: SynthesisEvidence | null): Re
   };
 }
 
+/** A carbon atom in a SMILES: `C` not starting Cl, Cr, Ca, Cu…, or aromatic `c` not ending Sc, Tc… */
+export function hasCarbon(smiles: string): boolean {
+  return /C(?![a-z])/.test(smiles) || /(?<![A-Z])c/.test(smiles);
+}
+
 /** A route's starting materials: organic reactants no earlier step makes, in first-use order. */
 export function routeStartingMaterials(labels: Array<Array<{ role: string; byproduct: boolean; name: string; smiles: string }>>): Array<{ name: string; smiles: string }> {
   const made = new Set<string>();
   const out = new Map<string, { name: string; smiles: string }>();
   for (const step of labels) {
     for (const label of step) {
-      if (label.role === 'reactant' && !label.byproduct && /[Cc]/.test(label.smiles) && !made.has(label.smiles) && !out.has(label.smiles)) {
+      if (label.role === 'reactant' && !label.byproduct && hasCarbon(label.smiles) && !made.has(label.smiles) && !out.has(label.smiles)) {
         out.set(label.smiles, { name: label.name || label.smiles, smiles: label.smiles });
       }
     }
