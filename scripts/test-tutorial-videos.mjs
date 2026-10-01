@@ -556,12 +556,34 @@ test('the catalogue is fetched in the main process, cached, and never fatal', as
 
 test('a packaged renderer still gets the real player, not YouTube error 153', async () => {
   const main = await read('electron/main.ts');
-  // file:// sends no http referer, and YouTube answers framed embeds without one with
-  // its "video player configuration error" card. Naming the Nodus site fixes it, and
-  // the rewrite must stay scoped to the single host Nodus frames.
-  assert.match(main, /onBeforeSendHeaders\(\s*\{ urls: \[`\$\{TUTORIAL_VIDEO_EMBED_ORIGIN\}\/\*`\] \}/);
-  assert.match(main, /Referer: 'https:\/\/nodusresearch\.com\/'/);
-  assert.match(main, /import \{ TUTORIAL_VIDEO_EMBED_ORIGIN \} from '@shared\/tutorialVideos'/);
+  assert.match(main, /installMediaRequestHeaders\(session\.defaultSession\.webRequest, app\.getVersion\(\)\)/);
+  assert.doesNotMatch(main, /\.onBeforeSendHeaders\(/, 'another listener in main would replace the media rules');
+  const out = path.join(outDir, 'mediaRequestHeaders.cjs');
+  execFileSync(path.join(repoRoot, 'node_modules/.bin/esbuild'), [
+    path.join(repoRoot, 'electron/mediaRequestHeaders.ts'), '--bundle', '--platform=node', '--format=cjs',
+    `--alias:@shared=${path.join(repoRoot, 'shared')}`, `--outfile=${out}`,
+  ], { cwd: repoRoot, stdio: 'inherit' });
+  let active;
+  let registrations = 0;
+  const webRequest = { onBeforeSendHeaders(filter, listener) { active = { filter, listener }; registrations++; } };
+  require(out).installMediaRequestHeaders(webRequest, '5.7.3');
+  assert.equal(registrations, 1, 'Electron uses only the last listener, so the rules must share it');
+  assert.deepEqual(active.filter.urls, ['https://www.youtube-nocookie.com/*', '*://*.tile.openstreetmap.org/*']);
+  const original = { 'User-Agent': 'Clean Chromium', Accept: '*/*' };
+  function headers(url) {
+    let response;
+    active.listener({ url, requestHeaders: original }, result => { response = result.requestHeaders; });
+    return response;
+  }
+  assert.deepEqual(headers('https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ'), {
+    ...original, Referer: 'https://nodusresearch.com/',
+  });
+  assert.deepEqual(headers('https://a.tile.openstreetmap.org/3/4/5.png'), {
+    ...original, 'User-Agent': 'Nodus/5.7.3 (+https://nodusresearch.com)', Referer: 'https://nodusresearch.com/',
+  });
+  assert.deepEqual(headers('https://example.com/'), original, 'unrelated hosts keep their headers');
+  assert.deepEqual(headers('https://tile.openstreetmap.org.example.com/'), original);
+  assert.deepEqual(original, { 'User-Agent': 'Clean Chromium', Accept: '*/*' }, 'incoming headers are not mutated');
 });
 
 test('PDF Presenter queues after release notes and before every other startup announcement', async () => {
