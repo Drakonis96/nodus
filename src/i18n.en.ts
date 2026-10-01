@@ -9118,4 +9118,9 @@ export const EN: Record<string, string> = {
   "Ciencia": "Science",
   "Arte": "Art",
   "Favoritos": "Favorites",
+  "Conexión móvil": "Mobile connection",
+  "Navegador web": "Web browser",
+  "App iPhone–iPad": "iPhone–iPad app",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Scan with Nodus Presenter. Keep Wi-Fi on for your Mac and mobile device; the venue router is not required.",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "The native connection is unavailable. It requires macOS and local network permission.",
 };

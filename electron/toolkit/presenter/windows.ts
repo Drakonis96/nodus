@@ -24,6 +24,7 @@ import {
   type PresenterServerInfo,
 } from './server';
 import { getSystemVolume, setSystemVolume } from './systemAudio';
+import { startNativePresenter, stopNativePresenter, broadcastNativePresenter, getNativePresenterInfo } from './native';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
@@ -32,6 +33,8 @@ let audienceWindow: BrowserWindow | null = null;
 let presenterWindow: BrowserWindow | null = null;
 let state: PresenterRuntimeState = initialPresenterState();
 let powerSaveBlockerId: number | null = null;
+let timerTick: ReturnType<typeof setInterval> | null = null;
+let timerAnchor = 0;
 
 function presenterDir(): string {
   return path.join(app.getPath('userData'), 'toolkit', 'presenter');
@@ -124,6 +127,14 @@ function stopPowerSave(): void {
 export function startPresentation(pdfId: string, startSlide = 1, withPresenter = false): void {
   stopPresentation();
   state = beginPresentation(pdfId, startSlide);
+  state.timerRunning = withPresenter;
+  timerAnchor = Date.now();
+  timerTick = setInterval(() => {
+    if (state.timerRunning) {
+      const seconds = Math.floor((Date.now() - timerAnchor) / 1000);
+      applyAndRelay({ type: 'timerSync', timerSeconds: seconds, timerRunning: true }, {});
+    }
+  }, 1000);
   // On a single display, presenter mode can't show BOTH windows fullscreen at once:
   // macOS gives each fullscreen window its own Space, so the audience (opened first)
   // ends up hiding the presenter console entirely. Keep the audience as a plain
@@ -133,6 +144,17 @@ export function startPresentation(pdfId: string, startSlide = 1, withPresenter =
   createAudienceWindow(pdfId, startSlide, !(withPresenter && singleDisplay));
   if (withPresenter) createPresenterWindow(pdfId, startSlide);
   startPowerSave();
+  try {
+    startNativePresenter({
+      libraryDir: presenterDir,
+      getState: () => state,
+      onAction: (action, origin) => applyAndRelay(action, { nativeOrigin: origin }),
+      getVolume: getSystemVolume,
+      setVolume: setSystemVolume,
+    });
+  } catch {
+    stopNativePresenter();
+  }
   // The mobile remote is best-effort: a server failure must not break presenting.
   void startPresenterServer({
     libraryDir: presenterDir,
@@ -154,6 +176,9 @@ export function stopPresentation(): void {
     if (w && !w.isDestroyed()) w.close();
   }
   stopPowerSave();
+  if (timerTick) clearInterval(timerTick);
+  timerTick = null;
+  stopNativePresenter();
   stopPresenterServer();
   state = initialPresenterState();
   for (const w of BrowserWindow.getAllWindows()) {
@@ -163,13 +188,22 @@ export function stopPresentation(): void {
 }
 
 /** Reduce an action into the canonical state and fan it out to every other consumer. */
-function applyAndRelay(action: PresenterAction, exclude: { wc?: Electron.WebContents; clientId?: number }): void {
+function applyAndRelay(action: PresenterAction, exclude: { wc?: Electron.WebContents; clientId?: number; nativeOrigin?: string }): void {
+  if (action.type === 'timerToggle' || action.type === 'timerReset') {
+    timerAnchor = Date.now() - (action.type === 'timerReset' ? 0 : state.timerSeconds * 1000);
+  }
   state = presenterReducer(state, action);
   const originWin = exclude.wc ? BrowserWindow.fromWebContents(exclude.wc) : null;
   for (const w of [audienceWindow, presenterWindow]) {
     if (w && w !== originWin && !w.isDestroyed()) w.webContents.send('presenter:control:event', action);
   }
   broadcastToClients(action, exclude.clientId);
+  broadcastNativePresenter(action, exclude.nativeOrigin);
+  if (action.type === 'timerToggle' || action.type === 'timerReset') {
+    const sync: PresenterAction = { type: 'timerSync', timerSeconds: state.timerSeconds, timerRunning: state.timerRunning };
+    for (const w of [audienceWindow, presenterWindow]) if (w && !w.isDestroyed()) w.webContents.send('presenter:control:event', sync);
+    broadcastToClients(sync);
+  }
 }
 
 /** Control from an Electron window (audience or presenter). */
@@ -187,9 +221,10 @@ export function getPresenterRuntimeState(): PresenterRuntimeState {
 }
 
 /** Server info + a QR data URL for the presenter window's "scan to connect" panel. */
-export async function getServerInfoWithQr(): Promise<(PresenterServerInfo & { qr: string }) | null> {
+export async function getServerInfoWithQr(): Promise<(PresenterServerInfo & { qr: string; native?: { url: string; qr: string; name: string } }) | null> {
   const info = getPresenterServerInfo();
   if (!info) return null;
   const qr = await QRCode.toDataURL(info.url, { width: 320, margin: 2 });
-  return { ...info, qr };
+  const native = getNativePresenterInfo();
+  return { ...info, qr, ...(native ? { native: { ...native, qr: await QRCode.toDataURL(native.url, { width: 320, margin: 2 }) } } : {}) };
 }

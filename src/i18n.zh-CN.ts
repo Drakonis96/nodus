@@ -7898,4 +7898,9 @@ export const ZH_CN: Record<string, string> = {
   "Arte": "艺术",
   "Favoritos": "收藏",
   "Inicio": "首页",
+  "Conexión móvil": "移动连接",
+  "Navegador web": "网页浏览器",
+  "App iPhone–iPad": "iPhone–iPad 应用",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "使用 Nodus Presenter 扫描。请保持 Mac 和移动设备的 Wi-Fi 开启；无需场地路由器。",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "原生连接不可用。需要 macOS 和本地网络权限。",
 };

@@ -8642,4 +8642,9 @@ export const TR: Record<string, string> = {
   "Ciencia": "Bilim",
   "Arte": "Sanat",
   "Favoritos": "Favoriler",
+  "Conexión móvil": "Mobil bağlantı",
+  "Navegador web": "Web tarayıcısı",
+  "App iPhone–iPad": "iPhone–iPad uygulaması",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Nodus Presenter ile tarayın. Mac ve mobil cihazda Wi-Fi açık kalsın; salonun yönlendiricisi gerekli değildir.",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "Yerel uygulama bağlantısı kullanılamıyor. macOS ve yerel ağ izni gerekir.",
 };
