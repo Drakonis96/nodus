@@ -73,7 +73,7 @@ async function fixture() {
     onAction: (action, origin) => { count++; state = presenterReducer(state, action); server.broadcast(action, origin); },
     getVolume: () => volume, setVolume: value => { volume = value; } });
   await server.start('127.0.0.1');
-  return { server, info: server.info(['127.0.0.1']), bytes, get count() { return count; } };
+  return { server, info: server.info(['127.0.0.1']), file: path.join(dir, 'fixture.pdf'), bytes, get count() { return count; } };
 }
 
 test('LAN QR rotates credentials and Mac never starts the additional listener', async () => {
@@ -169,4 +169,54 @@ test('JPEG preview, complete PDF/hash, resumed transfer and asset guards work in
 test('QR addresses prefer physical interfaces over VPNs and exclude loopback/link-local', () => {
   const value = address => ({ address, family: 'IPv4', internal: false });
   assert.deepEqual(presenterLanHosts({ utun0: [value('10.2.3.4')], en0: [value('192.168.1.3')], lo: [{ ...value('127.0.0.1'), internal: true }], eth0: [value('169.254.1.2')] }), ['192.168.1.3', '10.2.3.4']);
+});
+
+test('PDF completion waits for file cleanup and accepts an immediate resumed transfer', async () => {
+  const f = await fixture(); let control, assets;
+  const open = fs.promises.open;
+  let releaseClose, closeStarted;
+  const closing = new Promise(resolve => { closeStarted = resolve; });
+  const closeGate = new Promise(resolve => { releaseClose = resolve; });
+  let delayClose = true;
+  fs.promises.open = async (...args) => {
+    const file = await open(...args);
+    if (args[0] === f.file && delayClose) {
+      delayClose = false;
+      const close = file.close.bind(file);
+      file.close = async () => { closeStarted(); await closeGate; return close(); };
+    }
+    return file;
+  };
+  try {
+    control = await Client.open(f.info);
+    const { deck } = await control.next(m => m.kind === 'update');
+    assets = await Client.open(f.info, 'assets');
+    assets.send({ kind: 'pdf', offset: 0, assetVersion: deck.assetVersion });
+    await assets.next(m => m.kind === 'pdfBegin');
+    let transferred = 0;
+    while (transferred < f.bytes.length) {
+      const chunk = await assets.next(m => m.kind === 'pdfChunk');
+      transferred += Buffer.from(chunk.data, 'base64').length;
+    }
+    await closing;
+    // A pong on the same socket proves all earlier frames reached the client.
+    assets.send({ kind: 'ping' }); await assets.next(m => m.kind === 'pong');
+    assert.equal(assets.messages.some(m => m.kind === 'pdfEnd'), false, 'pdfEnd must mean the server is ready for another transfer');
+    releaseClose();
+    await assets.next(m => m.kind === 'pdfEnd');
+    const offset = Math.floor(f.bytes.length / 2);
+    assets.send({ kind: 'pdf', offset, assetVersion: deck.assetVersion });
+    assert.equal((await assets.next(m => m.kind === 'pdfBegin')).offset, offset);
+    const chunks = [];
+    let received = 0;
+    while (offset + received < f.bytes.length) {
+      const chunk = await assets.next(m => m.kind === 'pdfChunk'); chunks.push(chunk);
+      received += Buffer.from(chunk.data, 'base64').length;
+    }
+    assert.deepEqual(Buffer.concat(chunks.map(chunk => Buffer.from(chunk.data, 'base64'))), f.bytes.subarray(offset));
+    assert.equal((await assets.next(m => m.kind === 'pdfEnd')).sha256, crypto.createHash('sha256').update(f.bytes).digest('hex'));
+  } finally {
+    releaseClose(); fs.promises.open = open;
+    control?.close(); assets?.close(); f.server.stop();
+  }
 });

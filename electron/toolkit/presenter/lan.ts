@@ -176,6 +176,7 @@ export class LanPresenter {
   private async streamPDF(peer: Peer, offset: number): Promise<void> {
     const assets = this.assets!; peer.transferring = true;
     let file: fs.promises.FileHandle | null = null;
+    let completion: Message | null = null;
     try {
       file = await fs.promises.open(assets.file, 'r');
       await this.send(peer, { kind: 'pdfBegin', assetVersion: this.deck.assetVersion, size: assets.size, offset });
@@ -186,9 +187,12 @@ export class LanPresenter {
         await this.send(peer, { kind: 'pdfChunk', assetVersion: this.deck.assetVersion, offset, data: buffer.subarray(0, bytesRead).toString('base64') });
         offset += bytesRead;
       }
-      if (offset === assets.size) await this.send(peer, { kind: 'pdfEnd', assetVersion: this.deck.assetVersion, sha256: await assets.hash() });
-    } catch { if (!this.stopped && !peer.socket.destroyed) this.assetError(peer); }
+      if (offset === assets.size) completion = { kind: 'pdfEnd', assetVersion: this.deck.assetVersion, sha256: await assets.hash() };
+    } catch { completion = { kind: 'assetError' }; }
     finally { await file?.close().catch(() => {}); peer.transferring = false; }
+    // Completion lets the client request another transfer immediately. Release
+    // the file and guard first, so that request cannot be silently discarded.
+    if (completion && !this.stopped && !peer.socket.destroyed) this.deliver(peer, completion);
   }
 
   broadcast(action: PresenterAction, origin?: string): void {
