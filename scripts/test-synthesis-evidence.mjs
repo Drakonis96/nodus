@@ -167,7 +167,9 @@ test('the stock line names each starting material and the lists that hold it; no
   const { formatStartingMaterialStock } = evidence;
   const starting = [{ name: '4-nitrotoluene', smiles: 'A' }, { name: 'ethanol', smiles: 'B' }];
   assert.equal(formatStartingMaterialStock(starting, { A: ['mcule'], B: [] }, ['enamine', 'mcule']),
-    '**Starting materials:** 1 of 2 on your stock lists (enamine, mcule) — 4-nitrotoluene (in stock: mcule); ethanol (not on your stock lists).');
+    '**Starting materials:** 1 of 2 in stock (enamine, mcule) — 4-nitrotoluene (in stock: mcule); ethanol (not on your stock lists).');
+  assert.equal(formatStartingMaterialStock(starting, { A: [], B: [] }, ['mcule'], { B: ['mcule-full'] }, ['mcule-full']),
+    '**Starting materials:** 0 of 2 in stock (mcule, mcule-full (make-on-demand)) — 4-nitrotoluene (not on your stock lists); ethanol (orderable, make-on-demand: mcule-full).');
   assert.equal(formatStartingMaterialStock(starting, {}, []), '');
 });
 

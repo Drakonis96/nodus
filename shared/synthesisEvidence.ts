@@ -407,13 +407,23 @@ export function routeStartingMaterials(labels: Array<Array<{ role: string; bypro
   return [...out.values()];
 }
 
-/** One line under the route report: which starting materials the user's stock lists hold. */
-export function formatStartingMaterialStock(starting: Array<{ name: string; smiles: string }>, stock: Record<string, string[]>, lists: string[]): string {
-  if (!starting.length || !lists.length) return '';
+/** One line under the route report: which starting materials the user's stock lists hold
+ *  (ready to ship), and which are only orderable from a make-on-demand catalogue. */
+export function formatStartingMaterialStock(
+  starting: Array<{ name: string; smiles: string }>,
+  stock: Record<string, string[]>,
+  lists: string[],
+  orderable: Record<string, string[]> = {},
+  orderLists: string[] = [],
+): string {
+  if (!starting.length || !(lists.length || orderLists.length)) return '';
   const parts = starting.map(({ name, smiles }) => {
     const vendors = stock[smiles] ?? [];
-    return vendors.length ? `${name} (in stock: ${vendors.join(', ')})` : `${name} (not on your stock lists)`;
+    if (vendors.length) return `${name} (in stock: ${vendors.join(', ')})`;
+    const order = orderable[smiles] ?? [];
+    return order.length ? `${name} (orderable, make-on-demand: ${order.join(', ')})` : `${name} (not on your stock lists)`;
   });
   const held = starting.filter(({ smiles }) => (stock[smiles] ?? []).length).length;
-  return `**Starting materials:** ${held} of ${starting.length} on your stock lists (${lists.join(', ')}) — ${parts.join('; ')}.`;
+  const listed = [...lists, ...orderLists.map((list) => `${list} (make-on-demand)`)].join(', ');
+  return `**Starting materials:** ${held} of ${starting.length} in stock (${listed}) — ${parts.join('; ')}.`;
 }

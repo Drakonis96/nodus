@@ -2,7 +2,9 @@
 // Imports a vendor catalogue you downloaded (Mcule, Enamine, …) as a stock list for Chemistry
 // Studio: precursors and starting materials on it are then marked purchasable in route checks.
 //
-//   node scripts/import-stock.mjs <catalogue file> <vendor name>   # .smi/.txt, .csv/.tsv, .sdf(.gz)
+//   node scripts/import-stock.mjs <catalogue file> <vendor name> [--order]   # .smi/.txt, .csv/.tsv, .sdf(.gz)
+//     --order: a make-on-demand catalogue (e.g. Mcule's full purchasable file): reported as
+//     orderable, never treated as a ready starting material.
 //   node scripts/import-stock.mjs --list
 //   node scripts/import-stock.mjs --remove <vendor name>
 //
@@ -23,7 +25,7 @@ function listStock() {
   if (!metas.length) return console.log(`no stock lists in ${stockDir}`);
   for (const name of metas.sort()) {
     const meta = JSON.parse(fs.readFileSync(path.join(stockDir, name), 'utf8'));
-    console.log(`${meta.vendor.padEnd(12)} ${String(meta.compounds).padStart(10)} compounds  from ${meta.source}  imported ${meta.importedAt}`);
+    console.log(`${meta.vendor.padEnd(14)} ${(meta.tier ?? 'stock').padEnd(6)} ${String(meta.compounds).padStart(11)} compounds  from ${meta.source}  imported ${meta.importedAt}`);
   }
 }
 
@@ -57,12 +59,13 @@ if (args[0] === '--list') {
   for (const ext of ['.u64', '.json']) fs.rmSync(path.join(stockDir, vendor + ext), { force: true });
   console.log(`removed ${vendor}`);
   listStock();
-} else if (args.length === 2 && fs.existsSync(args[0])) {
+} else if ((args.length === 2 || (args.length === 3 && args[2] === '--order')) && fs.existsSync(args[0])) {
   fs.mkdirSync(stockDir, { recursive: true });
-  const out = execFileSync(python(), [worker(), '--import-stock', path.resolve(args[0]), args[1], stockDir], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  const tier = args[2] === '--order' ? 'order' : 'stock';
+  const out = execFileSync(python(), [worker(), '--import-stock', path.resolve(args[0]), args[1], stockDir, tier], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
   const meta = JSON.parse(out.trim().split('\n').at(-1));
-  console.log(`imported ${meta.compounds.toLocaleString()} compounds as "${meta.vendor}" (${meta.records.toLocaleString()} records, ${meta.unreadable} unreadable) in ${meta.seconds} s → ${stockDir}`);
+  console.log(`imported ${meta.compounds.toLocaleString()} compounds as "${meta.vendor}" (${meta.tier ?? 'stock'}; ${meta.records.toLocaleString()} records, ${meta.unreadable} unreadable) in ${meta.seconds} s → ${stockDir}`);
 } else {
-  console.error('usage: import-stock.mjs <catalogue file> <vendor> | --list | --remove <vendor>');
+  console.error('usage: import-stock.mjs <catalogue file> <vendor> [--order] | --list | --remove <vendor>');
   process.exit(2);
 }
