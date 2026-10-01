@@ -85,3 +85,14 @@ test('leaving a slide discards pending playback and stops the handshake',()=>{
   assert.equal(p.messages.at(-1).data.func,'playVideo');
   p.controller.destroy();
 });
+
+test('video volume keeps the latest loading intent, clamps and reaches the active player',()=>{
+  const p=player();
+  p.controller.setVolume(80);p.controller.setVolume(27);p.controller.setVolume(NaN);
+  assert.equal(p.messages.some(m=>m.data.event==='command'),false);
+  p.deliver();
+  assert.deepEqual(p.messages.filter(m=>m.data.func==='setVolume').map(m=>m.data.args),[[27]]);
+  p.controller.setVolume(-10);assert.deepEqual(p.messages.at(-1).data.args,[0]);
+  p.controller.setVolume(120);assert.deepEqual(p.messages.at(-1).data.args,[100]);
+  p.controller.destroy();
+});

@@ -122,7 +122,7 @@ export interface ToolkitApi {
   stopPresenter(): Promise<void>;
   getPresenterState(): Promise<PresenterRuntimeState>;
   /** Mobile-remote server info + a QR data URL, or null when not presenting. */
-  getPresenterServerInfo(): Promise<{ ip: string; port: number; pin: string; url: string; qr: string; native?: { url: string; qr: string; name: string } } | null>;
+  getPresenterServerInfo(): Promise<{ ip: string; port: number; pin: string; url: string; qr: string; native?: { url: string; qr: string; name: string; transport?: 'lan' } } | null>;
   /** System output volume 0–100 (macOS; 50 elsewhere). */
   getPresenterVolume(): Promise<number>;
   setPresenterVolume(volume: number): Promise<void>;

@@ -25,6 +25,7 @@ import {
 } from './server';
 import { getSystemVolume, setSystemVolume } from './systemAudio';
 import { startNativePresenter, stopNativePresenter, broadcastNativePresenter, getNativePresenterInfo } from './native';
+import { startLanPresenter, stopLanPresenter, broadcastLanPresenter, broadcastLanVolume, getLanPresenterInfo } from './lan';
 
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const RENDERER_DIST = path.join(__dirname, '../dist');
@@ -35,6 +36,15 @@ let state: PresenterRuntimeState = initialPresenterState();
 let powerSaveBlockerId: number | null = null;
 let timerTick: ReturnType<typeof setInterval> | null = null;
 let timerAnchor = 0;
+let videoVolume = 50;
+
+function getVideoVolume(): Promise<number> { return Promise.resolve(videoVolume); }
+async function setVideoVolume(value: number): Promise<void> {
+  if (!Number.isFinite(value)) return;
+  videoVolume = Math.max(0, Math.min(100, Math.round(value)));
+  applyAndRelay({ type: 'videoVolume', volume: videoVolume }, {});
+  broadcastLanVolume(videoVolume);
+}
 
 function presenterDir(): string {
   return path.join(app.getPath('userData'), 'toolkit', 'presenter');
@@ -127,6 +137,7 @@ function stopPowerSave(): void {
 export function startPresentation(pdfId: string, startSlide = 1, withPresenter = false): void {
   stopPresentation();
   state = beginPresentation(pdfId, startSlide);
+  videoVolume = 50;
   state.timerRunning = withPresenter;
   timerAnchor = Date.now();
   timerTick = setInterval(() => {
@@ -155,13 +166,22 @@ export function startPresentation(pdfId: string, startSlide = 1, withPresenter =
   } catch {
     stopNativePresenter();
   }
+  if (process.platform === 'win32' || process.platform === 'linux') {
+    void startLanPresenter({
+      libraryDir: presenterDir,
+      getState: () => state,
+      onAction: (action, origin) => applyAndRelay(action, { nativeOrigin: origin }),
+      getVolume: getVideoVolume,
+      setVolume: setVideoVolume,
+    });
+  }
   // The mobile remote is best-effort: a server failure must not break presenting.
   void startPresenterServer({
     libraryDir: presenterDir,
     getState: () => state,
     onRemoteAction: handleRemoteControl,
-    getVolume: getSystemVolume,
-    setVolume: setSystemVolume,
+    getVolume: process.platform === 'darwin' ? getSystemVolume : getVideoVolume,
+    setVolume: process.platform === 'darwin' ? setSystemVolume : setVideoVolume,
   }).catch((err) => console.error('Presenter server failed to start:', err));
 }
 
@@ -179,6 +199,7 @@ export function stopPresentation(): void {
   if (timerTick) clearInterval(timerTick);
   timerTick = null;
   stopNativePresenter();
+  stopLanPresenter();
   stopPresenterServer();
   state = initialPresenterState();
   for (const w of BrowserWindow.getAllWindows()) {
@@ -199,6 +220,12 @@ function applyAndRelay(action: PresenterAction, exclude: { wc?: Electron.WebCont
   }
   broadcastToClients(action, exclude.clientId);
   broadcastNativePresenter(action, exclude.nativeOrigin);
+  broadcastLanPresenter(action, exclude.nativeOrigin);
+  if (action.type === 'setTotal' && process.platform !== 'darwin') {
+    // The audience can finish loading after pairing. Prime its player with the
+    // latest session volume rather than silently restoring YouTube's default.
+    applyAndRelay({ type: 'videoVolume', volume: videoVolume }, {});
+  }
   if (action.type === 'timerToggle' || action.type === 'timerReset') {
     const sync: PresenterAction = { type: 'timerSync', timerSeconds: state.timerSeconds, timerRunning: state.timerRunning };
     for (const w of [audienceWindow, presenterWindow]) if (w && !w.isDestroyed()) w.webContents.send('presenter:control:event', sync);
@@ -221,10 +248,10 @@ export function getPresenterRuntimeState(): PresenterRuntimeState {
 }
 
 /** Server info + a QR data URL for the presenter window's "scan to connect" panel. */
-export async function getServerInfoWithQr(): Promise<(PresenterServerInfo & { qr: string; native?: { url: string; qr: string; name: string } }) | null> {
+export async function getServerInfoWithQr(): Promise<(PresenterServerInfo & { qr: string; native?: { url: string; qr: string; name: string; transport?: 'lan' } }) | null> {
   const info = getPresenterServerInfo();
   if (!info) return null;
   const qr = await QRCode.toDataURL(info.url, { width: 320, margin: 2 });
-  const native = getNativePresenterInfo();
+  const native = process.platform === 'darwin' ? getNativePresenterInfo() : getLanPresenterInfo();
   return { ...info, qr, ...(native ? { native: { ...native, qr: await QRCode.toDataURL(native.url, { width: 320, margin: 2 }) } } : {}) };
 }

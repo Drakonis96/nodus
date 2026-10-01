@@ -8258,4 +8258,6 @@ export const JA: Record<string, string> = {
   "App iPhone–iPad": "iPhone–iPadアプリ",
   "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Nodus Presenterでスキャンしてください。Macとモバイル端末のWi-Fiをオンに保ってください。会場のルーターは不要です。",
   "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "ネイティブ接続は利用できません。macOSとローカルネットワークの許可が必要です。",
+  "Escanea desde Nodus Presenter. Conecta el ordenador y el móvil a la misma red local.": "Nodus Presenter で読み取ってください。コンピューターとスマートフォンを同じローカルネットワークに接続してください。",
+  "El enlace de la app no está disponible. Comprueba la conexión de red e inicia de nuevo la presentación.": "アプリへの接続を利用できません。ネットワーク接続を確認し、プレゼンテーションを再開してください。",
 };

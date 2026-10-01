@@ -7903,4 +7903,6 @@ export const ZH_TW: Record<string, string> = {
   "App iPhone–iPad": "iPhone–iPad App",
   "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "使用 Nodus Presenter 掃描。請保持 Mac 和行動裝置的 Wi-Fi 開啟；無需場地路由器。",
   "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "原生連線無法使用。需要 macOS 和區域網路權限。",
+  "Escanea desde Nodus Presenter. Conecta el ordenador y el móvil a la misma red local.": "使用 Nodus Presenter 掃描。請將電腦和手機連線至同一個區域網路。",
+  "El enlace de la app no está disponible. Comprueba la conexión de red e inicia de nuevo la presentación.": "App 連線無法使用。請檢查網路連線並重新開始簡報。",
 };

@@ -40,7 +40,7 @@ function PresenterViewApp() {
   const timerRunning = ui.timerRunning;
   const [clock, setClock] = useState(() => '');
   const [qrOpen, setQrOpen] = useState(false);
-  const [qrInfo, setQrInfo] = useState<{ url: string; pin: string; qr: string; native?: { url: string; qr: string; name: string } } | null>(null);
+  const [qrInfo, setQrInfo] = useState<{ url: string; pin: string; qr: string; native?: { url: string; qr: string; name: string; transport?: 'lan' } } | null>(null);
   const [qrMode, setQrMode] = useState<'web' | 'native'>('web');
   const [volume, setVolume] = useState(50);
   const [volumeOpen, setVolumeOpen] = useState(false);
@@ -425,8 +425,10 @@ function PresenterViewApp() {
                 </div>
                 {qrMode === 'native' ? (qrInfo.native ? <>
                   <img src={qrInfo.native.qr} alt="QR" width={240} height={240} className="mx-auto my-3 rounded-lg bg-white p-2" />
-                  <p className="text-xs text-neutral-400">{t('Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.')}</p>
-                </> : <p className="my-6 text-sm text-neutral-400">{t('El enlace nativo no está disponible. Requiere macOS y permiso de red local.')}</p>) : <>
+                  <p className="text-xs text-neutral-400">{qrInfo.native.transport === 'lan'
+                    ? t('Escanea desde Nodus Presenter. Conecta el ordenador y el móvil a la misma red local.')
+                    : t('Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.')}</p>
+                </> : <p className="my-6 text-sm text-neutral-400">{t('El enlace de la app no está disponible. Comprueba la conexión de red e inicia de nuevo la presentación.')}</p>) : <>
                 <img src={qrInfo.qr} alt="QR" width={240} height={240} className="mx-auto my-3 rounded-lg bg-white p-2" />
                 <p className="break-all text-xs text-neutral-400">{qrInfo.url}</p>
                 <p className="mt-1 text-sm">
