@@ -51,8 +51,14 @@ const protectedText = (text: string) => hasUnsegmentedText(text) || CAPTION.test
 // Small type and a short line alone do not distinguish a quote or verse from a
 // drawing. Retain phrases of ordinary words; isolated labels and chemical symbols
 // can still be identified from the surrounding scheme layout.
-const ordinaryProse = (text: string) => (text.match(/[\p{L}\p{M}]+/gu) ?? [])
-  .filter((word) => /\p{Ll}{2,}/u.test(word)).length >= 2;
+const ordinaryProse = (text: string) => {
+  const words = text.match(/[\p{L}\p{M}]+/gu) ?? [];
+  return words.filter((word) => /\p{Ll}{2,}/u.test(word)).length >= 2
+    // The structure-token grammar can also spell arbitrary all-caps headings.
+    // Preserve alphabetic phrases of long words, but retain numeric reagent steps
+    // such as "1) LDA, THF, HMPA" and rows of short element symbols as candidates.
+    || (/^[\p{L}\p{M}\s.,:;!?'"“”‘’–—-]+$/u.test(text) && words.filter((word) => /^\p{Lu}{3,}$/u.test(word)).length >= 2);
+};
 
 function size(item: LayoutItem): number {
   return Math.round(Math.abs(Number(item.transform[3])) || Number(item.height) || 0);

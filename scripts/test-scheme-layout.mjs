@@ -167,3 +167,14 @@ test('short ordinary phrases and verse in small type are not a run of scheme lab
   const result = await extractPage(items);
   assert.equal(result.declutteredText, text.join('\n'));
 });
+
+test('all-caps headings are not mistaken for chemical structure tokens at any font size', async () => {
+  for (const size of [8, 10, 14]) {
+    for (const title of ['THIS IS A SHORT TITLE', 'THIS IS A SHORT TITLE.', 'THIS IS A SHORT TITLE:']) {
+      const items = [...page, item(title, 111, 720, size, 300)];
+      assert.equal(pageSchemeLayout(items, 10).scheme.at(-1), false);
+      const result = await extractPage(items);
+      assert.ok(result.declutteredText.includes(title));
+    }
+  }
+});
