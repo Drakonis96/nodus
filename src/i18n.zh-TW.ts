@@ -7874,4 +7874,9 @@ export const ZH_TW: Record<string, string> = {
   "Sent": "已傳送",
   ...CONCILIUM_TRANSLATIONS['zh-TW'],
   ...DRIFT_TRANSLATIONS['zh-TW'],
+  "Conexión móvil": "行動連線",
+  "Navegador web": "網頁瀏覽器",
+  "App iPhone–iPad": "iPhone–iPad App",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "使用 Nodus Presenter 掃描。請保持 Mac 和行動裝置的 Wi-Fi 開啟；無需場地路由器。",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "原生連線無法使用。需要 macOS 和區域網路權限。",
 };

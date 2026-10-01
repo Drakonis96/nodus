@@ -8231,4 +8231,9 @@ export const KO: Record<string, string> = {
   "Sent": "전송됨",
   ...CONCILIUM_TRANSLATIONS['ko'],
   ...DRIFT_TRANSLATIONS['ko'],
+  "Conexión móvil": "모바일 연결",
+  "Navegador web": "웹 브라우저",
+  "App iPhone–iPad": "iPhone–iPad 앱",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Nodus Presenter로 스캔하세요. Mac과 모바일 기기의 Wi-Fi를 켜 두세요. 현장 라우터는 필요하지 않습니다.",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "네이티브 연결을 사용할 수 없습니다. macOS와 로컬 네트워크 권한이 필요합니다.",
 };

@@ -8811,4 +8811,9 @@ export const PT: Record<string, string> = {
   "Sent": "Enviado",
   ...CONCILIUM_TRANSLATIONS['pt'],
   ...DRIFT_TRANSLATIONS['pt'],
+  "Conexión móvil": "Ligação móvel",
+  "Navegador web": "Navegador web",
+  "App iPhone–iPad": "App iPhone–iPad",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Leia com Nodus Presenter. Mantenha o Wi-Fi ligado no Mac e no dispositivo móvel; não precisa do router da sala.",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "A ligação nativa não está disponível. Requer macOS e permissão de rede local.",
 };

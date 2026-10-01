@@ -8860,4 +8860,9 @@ export const FR: Record<string, string> = {
   "Sent": "Envoyé",
   ...CONCILIUM_TRANSLATIONS['fr'],
   ...DRIFT_TRANSLATIONS['fr'],
+  "Conexión móvil": "Connexion mobile",
+  "Navegador web": "Navigateur web",
+  "App iPhone–iPad": "App iPhone–iPad",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Scannez avec Nodus Presenter. Gardez le Wi-Fi activé sur le Mac et le mobile ; le routeur de la salle est inutile.",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "La connexion native est indisponible. Elle nécessite macOS et une autorisation réseau local.",
 };

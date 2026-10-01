@@ -8231,4 +8231,9 @@ export const JA: Record<string, string> = {
   "Sent": "送信済み",
   ...CONCILIUM_TRANSLATIONS['ja'],
   ...DRIFT_TRANSLATIONS['ja'],
+  "Conexión móvil": "モバイル接続",
+  "Navegador web": "Webブラウザ",
+  "App iPhone–iPad": "iPhone–iPadアプリ",
+  "Escanea desde Nodus Presenter. Mantén Wi-Fi encendido en el Mac y el móvil; no necesitas el router de la sala.": "Nodus Presenterでスキャンしてください。Macとモバイル端末のWi-Fiをオンに保ってください。会場のルーターは不要です。",
+  "El enlace nativo no está disponible. Requiere macOS y permiso de red local.": "ネイティブ接続は利用できません。macOSとローカルネットワークの許可が必要です。",
 };
