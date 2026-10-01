@@ -5,7 +5,7 @@
 // @shared/presenterState). Self-contained imperative DOM (no framework) so it can
 // live over a React-managed canvas without fighting reconciliation.
 import type { ToolData, ToolName, ToolSizes } from '@shared/presenterState';
-import { DEFAULT_TOOL_SIZES } from '@shared/presenterState';
+import { DEFAULT_TOOL_COLOR, DEFAULT_TOOL_SIZES } from '@shared/presenterState';
 
 export class ToolOverlayController {
   private readonly root: HTMLDivElement;
@@ -66,6 +66,14 @@ export class ToolOverlayController {
 
     this.root.append(this.flashlight, this.drawCanvas, this.pointer, this.zoom);
     stage.appendChild(this.root);
+    this.setColor(DEFAULT_TOOL_COLOR);
+  }
+
+  setColor(color: string): void {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    const rgb = [1, 3, 5].map(start => parseInt(color.slice(start, start + 2), 16)).join(',');
+    this.pointer.style.background = `rgba(${rgb},0.9)`;
+    this.pointer.style.boxShadow = `0 0 12px 3px rgba(${rgb},0.7)`;
   }
 
   setActiveTool(tool: ToolName | null): void {

@@ -115,6 +115,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
       if (ctl && live) {
         if (action.type === 'setTool') ctl.setActiveTool(action.tool);
         else if (action.type === 'setToolSize') ctl.setSize(action.tool, action.size);
+        else if (action.type === 'setToolColor') ctl.setColor(action.color);
         else if (action.type === 'setZoomFactor') ctl.setZoomFactor(action.factor);
         else if (action.type === 'toolData') ctl.applyToolData(action.data);
         else if (action.type === 'clearDraw') ctl.clearDraw();
@@ -191,6 +192,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
     }
     if (previewWrapRef.current) {
       toolCtlRef.current = new ToolOverlayController(previewWrapRef.current, () => previewCanvasRef.current);
+      toolCtlRef.current.setColor(stateRef.current.toolColor);
       toolCtlRef.current.setActiveTool(stateRef.current.toolMode);
     }
     renderDisplayed(displayedRef.current); // paint the current slide onto the fresh canvas
@@ -422,7 +424,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
               <canvas ref={previewCanvasRef} className="block max-w-none" />
             </div>
             {ui.blackScreen && !localPreview && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black text-xs text-neutral-600">{t('Pantalla en negro')}</div>
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-xs text-neutral-600">{t('Pantalla en negro')}</div>
             )}
             {/* Touch surface (tools / swipe / pinch). touch-action:none keeps the browser
                 from scrolling/refreshing so the tool tracks the finger 1:1. */}
@@ -524,7 +526,7 @@ function RemoteApp({ pin, onInvalidPin }: { pin: string; onInvalidPin: () => voi
           <div className="flex items-center gap-2 border-t border-white/10 p-2" style={{ paddingBottom: 'calc(0.5rem + env(safe-area-inset-bottom))' }}>
             <button
               type="button"
-              onClick={() => emit({ type: 'blackScreen' })}
+              onClick={() => emit({ type: 'blackScreen', enabled: !ui.blackScreen })}
               title={t('Pantalla en negro')}
               className={`rounded-lg p-2.5 ${ui.blackScreen ? 'bg-amber-500/25 text-amber-300' : 'bg-white/5 hover:bg-white/10'}`}
             >

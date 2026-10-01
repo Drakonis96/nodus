@@ -242,7 +242,7 @@ function AudienceApp() {
       {/* Auto-hiding toolbar */}
       <div
         className={`fixed bottom-4 left-1/2 z-30 -translate-x-1/2 transition-opacity ${
-          barVisible || ui.toolMode ? 'opacity-100' : 'pointer-events-none opacity-0'
+          !ui.blackScreen && (barVisible || ui.toolMode) ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onMouseEnter={revealBar}
       >

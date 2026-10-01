@@ -338,7 +338,7 @@ function PresenterViewApp() {
             onMouseDown={tools.onMouseDown}
             onMouseMove={tools.onMouseMove}
             onMouseUp={tools.onMouseUp}
-            className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black p-3"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-black p-3"
           >
             <div
               ref={currentWrapRef}
@@ -347,6 +347,7 @@ function PresenterViewApp() {
             >
               <canvas ref={currentCanvasRef} className="block max-w-none" />
             </div>
+            {ui.blackScreen && <div className="absolute inset-0 z-10 flex items-center justify-center bg-black text-xs text-neutral-500">{t('Pantalla en negro')}</div>}
           </div>
           <div className="flex justify-center border-t border-white/10 bg-neutral-950 p-2">
             <PresenterToolbar
