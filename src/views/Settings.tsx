@@ -118,7 +118,7 @@ const GRAPH_HEALTH_KEYWORDS = 'salud grafo integridad comprobar reparar ideas te
 
 const SETTINGS_TABS: { id: SettingsTabId; label: string; icon: string; keywords: string }[] = [
   { id: 'providers', label: 'Proveedores', icon: 'key', keywords: 'api key keys claves proveedores provider providers modelos favoritos default openai anthropic deepseek gemini google openrouter xiaomi lm studio ollama vault boveda' },
-  { id: 'models', label: 'Modelos IA', icon: 'wand', keywords: 'model model id embedding embeddings extraccion sintesis tutor resumen fusion razonamiento openrouter unpaywall contexto concurrencia' },
+  { id: 'models', label: 'Modelos IA', icon: 'wand', keywords: 'model model id embedding embeddings extraccion sintesis tutor resumen fusion razonamiento openrouter unpaywall contexto concurrencia quimica chemistry stock mcule proveedores comprar' },
   { id: 'library', label: 'Biblioteca', icon: 'book', keywords: 'zotero sincronizacion tag lectura automatizacion cola analisis resumen relaciones' },
   { id: 'extraction', label: 'Texto y OCR', icon: 'search', keywords: 'pdf texto fulltext zotero ocr tesseract paginas idiomas' },
   { id: 'interface', label: 'Interfaz', icon: 'palette', keywords: 'idioma tema claro oscuro animaciones barra lateral menu navegacion accesibilidad contraste escala fuente lectura enfoque' },
@@ -989,7 +989,7 @@ export function Settings({
     visibleSettingsSection('integrations', 'Nodus para Zotero', 'zotero plugin sidebar chat servidor puerto token pagina citas conexiones'),
     visibleSettingsSection('integrations', 'Nodus Research Connector', 'chrome navegador browser extension conector captura metadatos colecciones etiquetas pdf doi isbn'),
     visibleSettingsSection('data', 'Backup / copia de seguridad', 'datos demo exportar importar copia backup cifrada contraseña'),
-    visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen'),
+    visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen quimica chemistry stock mcule proveedores comprar'),
     visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas esquemas figuras'),
     activeVault?.type === 'academic' && visibleSettingsSection('data', 'Salud del grafo', GRAPH_HEALTH_KEYWORDS),
     visibleSettingsSection('data', 'Zona de peligro', 'reinicializar grafo borrar ideas temas conexiones autores huecos'),
@@ -3206,7 +3206,7 @@ export function Settings({
           </Section>
       )}
 
-      {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen') && (<>
+      {visibleSettingsSection('models', 'Modelos de IA', 'basico avanzado modelo general extraccion sintesis tutor resumen fusion embeddings transcripcion voz imagen quimica chemistry stock mcule proveedores comprar') && (<>
           <Section title={t('Selección de modelos')}>
             <p className="mb-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
               {t('Solo puede haber un modo de configuración activo. Cambiar de modo modifica qué selección de modelos utiliza Nodus, no solo la vista de este formulario.')}
@@ -3458,6 +3458,18 @@ export function Settings({
           <LocalImageModelSettings settings={settings} patch={patch} />
           <ImageGenerationSettings settings={settings} onChange={onChange} />
           <AudioGenerationSettings settings={settings} onChange={onChange} />
+          <Section title={t('Química (Chemistry Studio)')}>
+            <Row
+              label={t('Usar listas de stock comerciales')}
+              hint={t('La búsqueda de rutas se detiene en los precursores que tus listas de proveedores tienen en stock, y el informe indica qué materiales de partida, o el propio objetivo, se pueden comprar. Desactívalo para planificar rutas sin tener en cuenta lo que se vende. Solo actúa si has importado alguna lista.')}
+            >
+              <input
+                type="checkbox"
+                checked={settings.chemistryUseStockLists !== false}
+                onChange={(e) => patch({ chemistryUseStockLists: e.target.checked })}
+              />
+            </Row>
+          </Section>
       </>)}
 
       {visibleSettingsSection('extraction', 'Extracción de texto PDFs grandes', 'pdf texto zotero ocr tesseract paginas idiomas') && (

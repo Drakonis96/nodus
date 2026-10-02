@@ -22,6 +22,7 @@ export const SYNTHESIS_EVIDENCE_SYSTEM_RULE = [
   'Prefer a disconnection that is recorded or that a textbook passage supports when it fits the requested starting materials; otherwise use your own knowledge. When you rely on a passage, cite it with its `nodus://passage/…` link.',
   'Passage text has had reaction schemes (marked [scheme]) and literature references (marked [ref]) cut out; a passage marked `scanned` was read from a scanned book by OCR and may contain recognition errors in names and formulas.',
   'When present, `textbook_preparations` lists reactions read from the scheme drawings in the user\'s own textbooks that make the target or one of its precursors, each structure checked against its name, and `disconnections` proposed by reaction templates extracted from those schemes ("worked example": a real compound in the book; "general scheme": drawn with R groups); cite the book and page given when you rely on one.',
+  'When present, `target_availability` says the target itself is on the user\'s vendor stock lists (or in another stereo or isotope form): say so at the start of the answer, then give the route if one was asked for.',
   'When present, `candidate_routes` are complete routes the application searched backwards from the target over the recorded reactions and reaction templates (each step marked recorded or template, with its source); they are machine-searched candidates to check and use if sound — chemistry, selectivity and the requested starting materials — not answers to copy.',
 ].join(' ');
 
@@ -404,6 +405,8 @@ export interface SynthesisEvidence {
   /** Complete routes found by the route search over the ORD and textbook indexes (absent when
    *  the package has no route search or nothing complete was found in time). */
   candidateRoutes?: CandidateRoute[];
+  /** The target itself is on the user's stock lists (absent when it is not, or stock is off). */
+  targetAvailability?: string;
 }
 
 /** A route the application's search found, compact for the payload: steps in synthesis order. */
@@ -468,9 +471,10 @@ export function candidateRoutes(
 
 /** The payload value, or null when there is nothing to add. */
 export function synthesisEvidencePayload(evidence: SynthesisEvidence | null): Record<string, unknown> | null {
-  if (!evidence || (!evidence.disconnections.length && !evidence.passages.length && !evidence.textbookPreparations?.length && !evidence.candidateRoutes?.length)) return null;
+  if (!evidence || (!evidence.disconnections.length && !evidence.passages.length && !evidence.textbookPreparations?.length && !evidence.candidateRoutes?.length && !evidence.targetAvailability)) return null;
   return {
     target: evidence.target,
+    ...(evidence.targetAvailability ? { target_availability: evidence.targetAvailability } : {}),
     ...(evidence.startingMaterials.length ? { starting_materials: evidence.startingMaterials } : {}),
     ...(evidence.disconnections.length ? {
       ord_disconnections: evidence.disconnections.map((brief) => ({
@@ -503,6 +507,53 @@ export function routeStartingMaterials(labels: Array<Array<{ role: string; bypro
     for (const label of step) if (label.role === 'product') made.add(label.smiles);
   }
   return [...out.values()];
+}
+
+/** The route's target: the last step's organic product (not a byproduct), or null. */
+export function routeTargetSmiles(labels: Array<Array<{ role: string; byproduct: boolean; name: string; smiles: string }>>): { name: string; smiles: string } | null {
+  const last = labels[labels.length - 1] ?? [];
+  const product = last.find((label) => label.role === 'product' && !label.byproduct && hasCarbon(label.smiles));
+  return product ? { name: product.name || product.smiles, smiles: product.smiles } : null;
+}
+
+/** What the stock lists say about one compound: in stock, the same compound in another stereo or
+ *  isotope form (InChIKey connectivity block), or orderable (make-on-demand). */
+export interface CompoundAvailability {
+  inStock: string[];
+  sameCompoundOtherForm: string[];
+  orderable: string[];
+  orderableOtherForm: string[];
+}
+
+/** The availability of one molecule from a check-stock reply. */
+export function compoundAvailability(
+  smiles: string,
+  data: { stock?: Record<string, string[]>; orderable?: Record<string, string[]>; sameSkeleton?: Record<string, string[]>; sameSkeletonOrderable?: Record<string, string[]> },
+): CompoundAvailability {
+  return {
+    inStock: data.stock?.[smiles] ?? [],
+    sameCompoundOtherForm: data.sameSkeleton?.[smiles] ?? [],
+    orderable: data.orderable?.[smiles] ?? [],
+    orderableOtherForm: data.sameSkeletonOrderable?.[smiles] ?? [],
+  };
+}
+
+/** One plain sentence when the target itself can be bought, or ''. */
+export function formatTargetAvailability(name: string, availability: CompoundAvailability): string {
+  const vendors = (list: string[]) => list.map((vendor) => vendor.replace(/-full$/, '')).join(', ');
+  if (availability.inStock.length) {
+    return `The target itself (${name}) is commercially available (${vendors(availability.inStock)}, in stock) — a route may be unnecessary.`;
+  }
+  if (availability.sameCompoundOtherForm.length) {
+    return `The target (${name}) is commercially available in another stereo or isotope form, or with stereochemistry unspecified (${vendors(availability.sameCompoundOtherForm)}, in stock) — check whether that form serves before making it.`;
+  }
+  if (availability.orderable.length) {
+    return `The target itself (${name}) can be ordered (${vendors(availability.orderable)}, make-on-demand).`;
+  }
+  if (availability.orderableOtherForm.length) {
+    return `The target (${name}) can be ordered in another stereo or isotope form (${vendors(availability.orderableOtherForm)}, make-on-demand).`;
+  }
+  return '';
 }
 
 /** One line under the route report: which starting materials the user's stock lists hold

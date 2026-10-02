@@ -2,9 +2,11 @@ import type { ModelRef } from '@shared/types';
 import { findRequestedTarget } from '@shared/moleculeInspection';
 import {
   candidateRoutes,
+  compoundAvailability,
   disconnectionClasses,
   findStartingSmiles,
   findTargetName,
+  formatTargetAvailability,
   isIndexLikePassage,
   isSynthesisEvidenceWork,
   normalizeDisconnections,
@@ -33,6 +35,7 @@ import { chemistryRunner } from './moleculeInspection';
 const CHEMISTRY_CAPABILITY = 'nodus:chemistry';
 const DISCONNECT_TOOL = 'propose-disconnections';
 const ROUTE_SEARCH_TOOL = 'search-routes';
+const STOCK_TOOL = 'check-stock';
 /** The route search's time budget: it returns the complete routes it has found by then. */
 const ROUTE_SEARCH_SECONDS = 60;
 /** Proposals kept per molecule, and passages kept in all. */
@@ -175,6 +178,26 @@ async function searchedRoutes(target: string, starting: string[], options: Evide
   }
 }
 
+/** One sentence when the target itself is on the user's stock lists (exactly, or in another
+ *  stereo/isotope form), so the model can say a route may be unnecessary. Undefined without stock
+ *  lists, with stock switched off, or on any failure. */
+async function targetAvailability(target: string, name: string, options: EvidenceOptions): Promise<string | undefined> {
+  const stockDir = chemistryStockDirectory();
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  if (!stockDir || !provider?.tools.some((tool) => tool.id === STOCK_TOOL)) return undefined;
+  const { runner, dispose } = chemistryRunner(options);
+  try {
+    const result = await runner.invoke({ provider, toolId: STOCK_TOOL, input: { stockDir, molecules: [target] } });
+    const data = (result.artifacts ?? []).find((entry) => entry.artifactType === 'stock-availability')?.data as Parameters<typeof compoundAvailability>[1] | undefined;
+    return (data && formatTargetAvailability(name, compoundAvailability(target, data))) || undefined;
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    return undefined;
+  } finally {
+    await dispose();
+  }
+}
+
 /** The works whose passages count as route evidence: synthetic-chemistry texts and works filed
  *  under a chemistry collection. */
 export function synthesisEvidenceWorkIds(): string[] {
@@ -273,6 +296,8 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   // The route search runs beside the rest of the evidence (it has its own time budget).
   const routes = searchedRoutes(target, startingMaterials, options);
   routes.catch(() => undefined); // awaited below; a cancelled request must not leave it unhandled
+  const availability = targetAvailability(target, findTargetName(question) || target, options);
+  availability.catch(() => undefined);
   const disconnections = await ordDisconnections(target, startingMaterials, options);
   let passages: EvidencePassage[] = [];
   try {
@@ -286,8 +311,10 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   }
   const preparations = await textbookSchemePreparations(target, disconnections, startingMaterials, options);
   const candidates = await routes;
+  const available = await availability;
   return {
     target, startingMaterials, disconnections, passages,
+    ...(available ? { targetAvailability: available } : {}),
     ...(preparations.length ? { textbookPreparations: preparations } : {}),
     ...(candidates.length ? { candidateRoutes: candidates } : {}),
   };

@@ -44,7 +44,7 @@ import {
   type StepSupport,
   type UnresolvedName,
 } from '@shared/moleculeInspection';
-import { findStartingSmiles, formatStartingMaterialStock, relevantExcerpt, routeStartingMaterials, textbookQueryForClass } from '@shared/synthesisEvidence';
+import { compoundAvailability, findStartingSmiles, formatStartingMaterialStock, formatTargetAvailability, relevantExcerpt, routeStartingMaterials, routeTargetSmiles, textbookQueryForClass } from '@shared/synthesisEvidence';
 import { chemistryStockDirectory } from './chemistryStock';
 import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
 import { formatTextbookPrecedents, TEXTBOOK_ID } from '@shared/textbookSchemes';
@@ -798,16 +798,23 @@ async function drawRouteSteps(
 
 const STOCK_TOOL = 'check-stock';
 
-/** The stock line for a route's starting materials, or '' without stock lists or the tool. */
+/** The stock lines for a route: whether the target itself can be bought, then its starting
+ *  materials; '' without stock lists, with stock switched off, or without the tool. */
 async function startingMaterialStockLine(runner: Runner, labels: RouteSpeciesLabel[][]): Promise<string> {
   const stockDir = chemistryStockDirectory();
   const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
   if (!stockDir || !provider?.tools.some((tool) => tool.id === STOCK_TOOL)) return '';
   const starting = routeStartingMaterials(labels);
-  if (!starting.length) return '';
-  const result = await runner.invoke({ provider, toolId: STOCK_TOOL, input: { stockDir, molecules: starting.map((entry) => entry.smiles).slice(0, 64) } });
-  const data = (result.artifacts ?? []).find((entry) => entry.artifactType === 'stock-availability')?.data as { stock?: Record<string, string[]>; lists?: string[]; orderable?: Record<string, string[]>; orderLists?: string[] } | undefined;
-  return data ? formatStartingMaterialStock(starting, data.stock ?? {}, data.lists ?? [], data.orderable ?? {}, data.orderLists ?? []) : '';
+  const target = routeTargetSmiles(labels);
+  const molecules = [...new Set([...(target ? [target.smiles] : []), ...starting.map((entry) => entry.smiles)])].slice(0, 64);
+  if (!molecules.length) return '';
+  const result = await runner.invoke({ provider, toolId: STOCK_TOOL, input: { stockDir, molecules } });
+  const data = (result.artifacts ?? []).find((entry) => entry.artifactType === 'stock-availability')?.data as
+    ({ stock?: Record<string, string[]>; lists?: string[]; orderable?: Record<string, string[]>; orderLists?: string[] } & Parameters<typeof compoundAvailability>[1]) | undefined;
+  if (!data) return '';
+  const targetLine = target ? formatTargetAvailability(target.name, compoundAvailability(target.smiles, data)) : '';
+  const startingLine = starting.length ? formatStartingMaterialStock(starting, data.stock ?? {}, data.lists ?? [], data.orderable ?? {}, data.orderLists ?? []) : '';
+  return [targetLine && `**Target:** ${targetLine}`, startingLine].filter(Boolean).join('\n\n');
 }
 
 /** The post-answer route check, then one drawing per verified step. Neither rewrites the
