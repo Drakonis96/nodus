@@ -2,6 +2,74 @@
   "version": 1,
   "notices": [
     {
+      "id": "2026-10-02-workspace-redesign-survey",
+      "date": "2026-10-02",
+      "severity": "info",
+      "url": "https://docs.google.com/forms/d/e/1FAIpQLSfuoi5sKXI5hYcge6m1YKyLNS4v-6fVt4hlStGJls3Y8OaAqw/viewform?usp=header",
+      "copy": {
+        "es": {
+          "title": "Ayúdanos a rediseñar Nodus Workspace (editor de escritura)",
+          "body": "Empezamos con un gran cambio: Workspace tendrá un nuevo nombre, una interfaz completamente rediseñada y más funciones. Queremos replantear cómo escribes, organizas notas e ideas, conectas fuentes y trabajas con tu investigación en Nodus, con un mayor énfasis en ayudarte a desarrollar y redactar tus notas o artículos. Antes de reconstruirlo, nos gustaría saber qué esperas de este espacio, qué limitaciones encuentras y qué funciones lo harían realmente útil para tu forma de trabajar.",
+          "linkLabel": "Responder la encuesta"
+        },
+        "en": {
+          "title": "Help us redesign Nodus Workspace (writing editor)",
+          "body": "We’re starting with a major change: the Workspace will get a new name, a completely redesigned interface, and a broader set of features.\nThe aim is to rethink how you write, organize notes and ideas, connect sources, and work with your research inside Nodus, with a stronger focus on helping you develop and write your notes or papers. Before we rebuild it, we’d like to know what you expect from this space, what currently feels limiting, and which features would make it genuinely useful for your workflow.",
+          "linkLabel": "Take the survey"
+        },
+        "fr": {
+          "title": "Aidez-nous à repenser Nodus Workspace (éditeur de rédaction)",
+          "body": "Un grand changement se prépare : Workspace aura un nouveau nom, une interface entièrement repensée et plus de fonctions. Nous voulons revoir la façon dont vous écrivez, organisez notes et idées, reliez vos sources et travaillez sur vos recherches dans Nodus, en vous aidant davantage à développer et rédiger vos notes ou articles. Avant de le reconstruire, nous aimerions savoir ce que vous attendez de cet espace, ce qui vous limite et quelles fonctions le rendraient vraiment utile à votre façon de travailler.",
+          "linkLabel": "Répondre à l’enquête"
+        },
+        "de": {
+          "title": "Hilf uns, Nodus Workspace neu zu gestalten (Schreibeditor)",
+          "body": "Eine große Änderung steht an: Workspace bekommt einen neuen Namen, eine völlig neue Oberfläche und mehr Funktionen. Wir wollen neu denken, wie du in Nodus schreibst, Notizen und Ideen ordnest, Quellen verknüpfst und mit deiner Forschung arbeitest. Dabei möchten wir dich stärker beim Entwickeln und Schreiben deiner Notizen oder Arbeiten unterstützen. Vor dem Umbau möchten wir wissen, was du von diesem Bereich erwartest, was dich derzeit einschränkt und welche Funktionen ihn für deine Arbeit wirklich nützlich machen würden.",
+          "linkLabel": "An der Umfrage teilnehmen"
+        },
+        "pt": {
+          "title": "Ajuda-nos a redesenhar o Nodus Workspace (editor de escrita)",
+          "body": "Começamos com uma grande mudança: o Workspace terá um novo nome, uma interface totalmente redesenhada e mais funcionalidades. Queremos repensar como escreves, organizas notas e ideias, ligas fontes e trabalhas na tua investigação no Nodus, com maior foco em ajudar-te a desenvolver e redigir as tuas notas ou artigos. Antes de o reconstruirmos, gostaríamos de saber o que esperas deste espaço, o que te limita atualmente e que funcionalidades o tornariam realmente útil para a tua forma de trabalhar.",
+          "linkLabel": "Responder ao inquérito"
+        },
+        "pt-BR": {
+          "title": "Ajude-nos a redesenhar o Nodus Workspace (editor de escrita)",
+          "body": "Começamos com uma grande mudança: o Workspace terá um novo nome, uma interface totalmente redesenhada e mais recursos. Queremos repensar como você escreve, organiza notas e ideias, conecta fontes e trabalha com sua pesquisa no Nodus, com maior foco em ajudar você a desenvolver e redigir suas notas ou artigos. Antes de reconstruí-lo, gostaríamos de saber o que você espera deste espaço, o que limita seu trabalho hoje e quais recursos o tornariam realmente útil para sua forma de trabalhar.",
+          "linkLabel": "Responder à pesquisa"
+        },
+        "it": {
+          "title": "Aiutaci a riprogettare Nodus Workspace (editor di scrittura)",
+          "body": "Iniziamo con un grande cambiamento: Workspace avrà un nuovo nome, un’interfaccia completamente riprogettata e più funzioni. Vogliamo ripensare come scrivi, organizzi note e idee, colleghi fonti e lavori alla tua ricerca in Nodus, aiutandoti di più a sviluppare e scrivere le tue note o i tuoi articoli. Prima di ricostruirlo, vorremmo sapere cosa ti aspetti da questo spazio, cosa ti limita oggi e quali funzioni lo renderebbero davvero utile per il tuo modo di lavorare.",
+          "linkLabel": "Rispondi al sondaggio"
+        },
+        "tr": {
+          "title": "Nodus Workspace’i yeniden tasarlamamıza yardımcı olun (yazı editörü)",
+          "body": "Büyük bir değişiklikle başlıyoruz: Workspace yeni bir ada, tamamen yenilenmiş bir arayüze ve daha fazla özelliğe kavuşacak. Nodus’ta nasıl yazdığınızı, not ve fikirlerinizi düzenlediğinizi, kaynakları ilişkilendirdiğinizi ve araştırmanızla çalıştığınızı yeniden düşünmek; not veya makalelerinizi geliştirip yazmanıza daha çok destek olmak istiyoruz. Yeniden oluşturmadan önce bu alandan ne beklediğinizi, şu anda sizi nelerin sınırladığını ve hangi özelliklerin onu iş akışınız için gerçekten yararlı kılacağını öğrenmek istiyoruz.",
+          "linkLabel": "Ankete katılın"
+        },
+        "zh-CN": {
+          "title": "帮助我们重新设计 Nodus Workspace（写作编辑器）",
+          "body": "我们将从一项重大改变开始：Workspace 将采用新名称、全新设计的界面和更丰富的功能。我们希望重新思考你如何在 Nodus 中写作、整理笔记与想法、关联来源并开展研究，更着重于帮助你完善和撰写笔记或论文。在重新构建之前，我们想了解你对这个空间的期待、目前有哪些限制，以及哪些功能能让它真正融入你的工作流程。",
+          "linkLabel": "填写问卷"
+        },
+        "zh-TW": {
+          "title": "幫助我們重新設計 Nodus Workspace（寫作編輯器）",
+          "body": "我們將從一項重大改變開始：Workspace 將採用新名稱、全新設計的介面和更豐富的功能。我們希望重新思考你如何在 Nodus 中寫作、整理筆記與想法、連結來源並進行研究，更著重於幫助你完善和撰寫筆記或論文。在重新建構之前，我們想了解你對這個空間的期待、目前有哪些限制，以及哪些功能能讓它真正融入你的工作流程。",
+          "linkLabel": "填寫問卷"
+        },
+        "ja": {
+          "title": "Nodus Workspace（執筆エディター）の再設計にご協力ください",
+          "body": "大きな変更に着手します。Workspace は名称を変更し、インターフェースを全面的に再設計して、機能を拡充します。Nodus での執筆、ノートやアイデアの整理、資料の関連付け、研究の進め方を見直し、ノートや論文の内容を練り、書き上げる作業をより重点的に支援することが目標です。再構築する前に、このスペースに何を期待するか、現在どこに制約を感じているか、どのような機能があれば皆さんの作業に本当に役立つかを教えてください。",
+          "linkLabel": "アンケートに回答する"
+        },
+        "ko": {
+          "title": "Nodus Workspace(글쓰기 편집기) 재설계에 의견을 주세요",
+          "body": "큰 변화부터 시작합니다. Workspace는 새로운 이름, 완전히 새로 설계된 인터페이스, 더 다양한 기능을 갖추게 됩니다. Nodus에서 글을 쓰고, 노트와 아이디어를 정리하고, 자료를 연결하고, 연구를 진행하는 방식을 다시 생각하며, 특히 노트나 논문의 내용을 발전시키고 작성하는 데 더 집중해 도움을 드리고자 합니다. 새롭게 구축하기 전에 이 공간에 무엇을 기대하는지, 현재 어떤 점이 제약으로 느껴지는지, 어떤 기능이 여러분의 작업 흐름에 실질적인 도움이 될지 알고 싶습니다.",
+          "linkLabel": "설문조사에 참여하기"
+        }
+      }
+    },
+    {
       "id": "2026-09-local-models-nvidia-gpus",
       "date": "2026-09-16",
       "severity": "warning",
