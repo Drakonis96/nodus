@@ -127,11 +127,16 @@ export interface TextbookTemplateSource {
   reagents?: string | null;
   status?: string;
   generic?: boolean;
+  /** 'crop' | 'page' for a PDF page, 'image' for an EPUB image (no page link). */
+  kind?: string;
+  /** Link to the book's text at that page, filled in by the host when it has one. */
+  link?: string | null;
 }
 
 /** "*Clayden*, p. 508 · conditions: H2/Pd, HOAc · general scheme" (or "worked example"). */
 export function formatTemplateCitation(source: TextbookTemplateSource): string {
-  const parts = [`*${source.book}*, p. ${source.page}`];
+  const location = `*${source.book}*, p. ${source.page}`;
+  const parts = [source.link ? `[${location}](${source.link})` : location];
   const conditions = clip(source.reagents, MAX_CONDITIONS);
   if (conditions) parts.push(`conditions: ${conditions}`);
   parts.push(source.generic ? 'general scheme' : 'worked example');

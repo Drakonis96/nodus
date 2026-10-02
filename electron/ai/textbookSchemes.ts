@@ -113,11 +113,13 @@ export function textbookTemplateCitations(templates: string[], dir = textbookSch
   const ordered = [...all.filter((source) => !source.generic), ...all.filter((source) => source.generic)];
   const seen = new Set<string>();
   const out: TextbookTemplateSource[] = [];
+  const works = new Map<string, string | null>();
   for (const source of ordered) {
     const key = `${source.book}#${source.page}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(source);
+    const link = source.nodusId ? pageLink({ nodusId: source.nodusId, page: source.page, kind: source.kind } as TextbookSchemeRecord, works) : null;
+    out.push({ ...source, link });
     if (out.length >= max) break;
   }
   return out;

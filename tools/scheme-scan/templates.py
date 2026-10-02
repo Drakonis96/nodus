@@ -48,11 +48,11 @@ def export():
     RDLogger.DisableLog('rdApp.*')
     os.makedirs(WORK, exist_ok=True)
     con = scan.connect()
-    rows = con.execute("""SELECT x.item_id, x.n, x.source, x.status, x.reactants, x.products, x.reagents, x.checks, b.title, b.nodus_id, i.page
+    rows = con.execute("""SELECT x.item_id, x.n, x.source, x.status, x.reactants, x.products, x.reagents, x.checks, b.title, b.nodus_id, i.page, i.kind
       FROM records x JOIN items i ON i.id = x.item_id JOIN books b ON b.book_key = i.book_key
       WHERE x.status IN ('generic', 'confirmed', 'repaired')""").fetchall()  # 'retro' records are excluded
     seen, out = set(), []
-    for item_id, n, source, status, reactants, products, reagents, checks, title, nodus_id, page in rows:
+    for item_id, n, source, status, reactants, products, reagents, checks, title, nodus_id, page, kind in rows:
         fix = {c['smiles']: c['suggested'] for c in json.loads(checks) if c.get('suggested')}
         sides = []
         for side in (reactants, products):
@@ -72,7 +72,7 @@ def export():
             continue
         seen.add(rxn)
         out.append({'id': f'{item_id}:{n}:{source}', 'rxn': rxn, 'generic': generic, 'genericReactants': r if generic else None,
-                    'genericProducts': p if generic else None, 'book': title, 'nodusId': nodus_id, 'page': page,
+                    'genericProducts': p if generic else None, 'book': title, 'nodusId': nodus_id, 'page': page, 'kind': kind,
                     'reagents': reagents if isinstance(reagents, str) else None, 'status': status})
     with open(TO_MAP, 'w') as fh:
         for row in out:
@@ -194,7 +194,7 @@ def extract():
         entry['count'] += 1
         entry['generic'] += row['generic']
         if len(entry['sources']) < 5:
-            entry['sources'].append({k: row[k] for k in ('book', 'nodusId', 'page', 'reagents', 'status')} | {'generic': row['generic']})
+            entry['sources'].append({k: row.get(k) for k in ('book', 'nodusId', 'page', 'kind', 'reagents', 'status')} | {'generic': row['generic']})
     with open(OUT, 'w') as fh:
         json.dump(templates, fh)
     print(f'{len(templates)} distinct templates from {stats} -> {OUT}')

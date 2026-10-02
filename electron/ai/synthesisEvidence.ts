@@ -118,7 +118,7 @@ async function textbookSchemePreparations(target: string, disconnections: Target
   const molecules = [...new Set([target, ...secondLevelTargets(disconnections, starting, 5)])].slice(0, 6);
   const { runner, dispose } = chemistryRunner(options);
   try {
-    const result = await runner.invoke({ provider, toolId: DISCONNECT_TOOL, input: { indexDir, targets: molecules, limit: 3 } });
+    const result = await runner.invoke({ provider, toolId: DISCONNECT_TOOL, input: { indexDir, targets: molecules, limit: 6 } });
     const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-disconnections');
     return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir), (templates) => textbookTemplateCitations(templates, indexDir)) : [];
   } catch (error) {
