@@ -1,0 +1,11 @@
+# Pinned deps for the offline ORD reaction-index builder.
+# Python 3.12. Install with: uv pip install -r requirements.txt
+ord-schema==0.8.3
+rdkit==2026.3.6
+rdchiral==1.1.0
+drfp==0.3.7
+hnswlib==0.8.0
+faiss-cpu==1.15.1
+zstandard==0.25.0
+numpy==2.5.3
+huggingface_hub==0.36.0

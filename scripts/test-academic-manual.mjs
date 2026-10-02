@@ -21,7 +21,7 @@ if (!process.argv.includes('--run')) {
     await build({ entryPoints: [entry], outfile: path.join(dir, 'bundle.cjs'), bundle: true, platform: 'node', format: 'cjs', packages: 'external', alias: { electron: electronStub, '@shared': path.join(root, 'shared') }, plugins: [{ name: 'isolated-ai', setup(b) {
       b.onResolve({ filter: /\/aiClient$/ }, () => ({ path: 'ai', namespace: 'stub' }));
       b.onResolve({ filter: /\/nodusLocalAi$/ }, () => ({ path: 'local', namespace: 'stub' }));
-      b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'ai' ? stub : 'export async function downloadNodusLocalModel() {} export function listNodusLocalChatModels(){return []} export function listNodusLocalEmbeddingModels(){return []}', loader: 'ts' }));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, args => ({ contents: args.path === 'ai' ? stub : 'export async function downloadNodusLocalModel() {} export function listNodusLocalChatModels(){return []} export function listNodusLocalEmbeddingModels(){return []} export async function llamaServerPath(){return null} export async function freePort(){return 0}', loader: 'ts' }));
     }}] });
     execFileSync(require('electron'), [import.meta.filename, '--run', path.join(dir, 'bundle.cjs')], { cwd: root, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', NODUS_TEST_USERDATA: path.join(dir, 'profile'), NODE_PATH: path.join(root, 'node_modules') }, stdio: 'inherit' });
   } finally { rmSync(dir, { recursive: true, force: true }); }

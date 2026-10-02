@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(path.join(os.tmpdir(), 'molecule-inspection-'));
 await build({ entryPoints: ['shared/moleculeInspection.ts'], outfile: path.join(dir, 'inspection.mjs'), bundle: true, platform: 'node', format: 'esm' });
-const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification, routeReportsForHistory, classifyCoProducts, smilesHasCarbon, routeStepFailure, routeFixPromptForHistory, formatRouteCheckUnavailable } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+const { findSmilesCandidates, findAnswerSpecies, normalizeMoleculeDossier, formatMoleculeDossier, formatStructureAudit, MOLECULE_DOSSIER_SYSTEM_RULE, findStepConditions, declaresRacemic, stepDeclaresRacemic, normalizeRouteAudit, formatRouteAudit, ROUTE_CONTINUITY_SYSTEM_RULE, findRequestedTarget, requestedTargetFor, ROUTE_FIX_PROMPT_LEAD, parseRouteReview, buildRouteReviewRequest, ROUTE_REVIEW_SYSTEM, clampReviewDetail, findStepProse, routeLabelNames, countRouteSteps, findStepNamedSpecies, buildRouteSteps, annotateSpeciesSmiles, formatNameCorrectionNote, formatAuthorStructureNote, formatNamedRouteFixPrompts, formatMissingSpeciesPrompt, isRouteFixPrompt, parseNameFeedback, ROUTE_NAME_FEEDBACK_SYSTEM, formatUnresolvedNameClarification, routeReportsForHistory, classifyCoProducts, smilesHasCarbon, routeStepFailure, routeFixPromptForHistory, formatRouteCheckUnavailable, normalizeReactionPrecedent, formatReactionPrecedents, buildPrecedentQueries, similarityBand, precedentDrawingFor } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
 await build({ entryPoints: ['shared/chatSkills.ts'], outfile: path.join(dir, 'chatSkills.mjs'), bundle: true, platform: 'node', format: 'esm' });
 const { splitChatVisuals } = await import(pathToFileURL(path.join(dir, 'chatSkills.mjs')));
 await build({ entryPoints: ['shared/synthesisPrompt.ts'], outfile: path.join(dir, 'synthesisPrompt.mjs'), bundle: true, platform: 'node', format: 'esm' });
@@ -182,8 +182,8 @@ test('a route audit is normalized defensively and formatted deterministically', 
   assert.match(text, /- Step 1 FAIL — NOT balanced \(H: reactants 6, products 4\)\. C2H6O → C2H4O/);
   assert.match(text, /- Step 2 OK — balanced\./);
   assert.match(text, /- Step 1 → 2 OK — carried C2H4O/);
-  assert.match(text, /\*\*Route not verified\*\* — 1 of 2 step\(s\) do not pass \(step 1\)\./);
-  assert.match(text, /Not verified: Step 1 is not balanced/);
+  assert.match(text, /\*\*Route check failed\*\* — 1 of 2 step\(s\) do not pass \(step 1\)\./);
+  assert.match(text, /Check failed: Step 1 is not balanced/);
 });
 
 test('a route review blocks the verdict and is shown as a model finding', () => {
@@ -193,15 +193,15 @@ test('a route review blocks the verdict and is shown as a model finding', () => 
   });
   assert.ok(audit);
   const clean = formatRouteAudit(audit);
-  assert.match(clean, /\*\*Route verified\*\*/);
+  assert.match(clean, /\*\*Route checked: balanced and connected\*\*/);
   assert.doesNotMatch(clean, /Route review/);
   const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"the Products line names a different compound than the target."}]}');
   assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'blocking', detail: 'the Products line names a different compound than the target.' }] });
   const blockedText = formatRouteAudit(audit, [], review);
-  assert.match(blockedText, /\*\*Route not verified\*\* — a route review raised 1 problem\(s\)\./);
+  assert.match(blockedText, /\*\*Route check failed\*\* — a route review raised 1 problem\(s\)\./);
   assert.match(blockedText, /### Route review \(model\)/);
   assert.match(blockedText, /- Step 1: the Products line names a different compound than the target\./);
-  assert.match(blockedText, /Not verified: The route review raised 1 problem\(s\)\./);
+  assert.match(blockedText, /Check failed: The route review raised 1 problem\(s\)\./);
 });
 
 test('an advisory review finding is shown but never blocks the route', () => {
@@ -212,12 +212,12 @@ test('an advisory review finding is shown but never blocks the route', () => {
   const review = parseRouteReview('{"status":"problems","problems":[{"step":1,"detail":"I doubt acid X can give the named product."}]}');
   assert.deepEqual(review, { status: 'problems', problems: [{ step: 1, severity: 'advisory', detail: 'I doubt acid X can give the named product.' }] });
   const text = formatRouteAudit(audit, [], review);
-  assert.match(text, /\*\*Route verified\*\*/);
-  assert.doesNotMatch(text, /Route not verified/);
+  assert.match(text, /\*\*Route checked: balanced and connected\*\*/);
+  assert.doesNotMatch(text, /Route check failed/);
   assert.match(text, /### Route review \(model, advisory\)/);
   assert.match(text, /I doubt acid X can give the named product\./);
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"advisory","detail":"x"}]}')), /\*\*Route verified\*\*/);
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"x"}]}')), /\*\*Route not verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"advisory","detail":"x"}]}')), /\*\*Route checked: balanced and connected\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"problems","problems":[{"step":1,"severity":"blocking","detail":"x"}]}')), /\*\*Route check failed\*\*/);
 });
 
 test('an unreadable review is not a problem and never blocks', () => {
@@ -227,9 +227,9 @@ test('an unreadable review is not a problem and never blocks', () => {
   assert.deepEqual(parseRouteReview('here it is: {"status":"ok"}'), { status: 'ok', problems: [] });
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.ok(audit);
-  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
   // A review of `ok` does not block either.
-  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route verified\*\*/);
+  assert.match(formatRouteAudit(audit, [], parseRouteReview('{"status":"ok"}')), /\*\*Route checked: balanced and connected\*\*/);
 });
 
 test('a review finding is kept whole or cut on a word boundary, never mid-word', () => {
@@ -256,6 +256,11 @@ test('the route review is told not to re-check balance and to allow one-pot casc
   assert.doesNotMatch(ROUTE_REVIEW_SYSTEM, /it has passed/, 'the review is not told a failed route passed');
   assert.match(ROUTE_REVIEW_SYSTEM, /Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem/);
   assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade/);
+  // A free amine vs its hydrochloride is a protonation-state choice: the review flipped between
+  // the two across corrections and blocked each time. It is advisory; a folded workup still blocks.
+  assert.match(ROUTE_REVIEW_SYSTEM, /a free amine or its hydrochloride, an acid or its carboxylate — is the author's choice/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /never report both forms in turn/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /a step that folds a separate workup into a different transformation/, 'the Kolbe–Schmitt workup rule still blocks');
   // The checker owns balance; the reviewer still owns the plan problem it can see.
   assert.match(ROUTE_REVIEW_SYSTEM, /regiochemistry/);
 });
@@ -369,9 +374,9 @@ test('the verified verdict only claims a formed target when one was checked', ()
     continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [],
     target: { input: 'CCO', canonicalSmiles: 'CCO', formula: 'C2H6O', formedAt: 0, reason: 'formed' },
   });
-  assert.match(formatRouteAudit(withTarget), /\*\*Route verified\*\* — every equation balances and every intermediate is carried over, and the target is formed\./);
+  assert.match(formatRouteAudit(withTarget), /\*\*Route checked: balanced and connected\*\* — every equation balances and every intermediate is carried over, and the target is formed\./);
   const withoutTarget = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
-  assert.match(formatRouteAudit(withoutTarget), /\*\*Route verified\*\* — every equation balances and every intermediate is carried over\./);
+  assert.match(formatRouteAudit(withoutTarget), /\*\*Route checked: balanced and connected\*\* — every equation balances and every intermediate is carried over\./);
   assert.doesNotMatch(formatRouteAudit(withoutTarget), /and the target is formed/);
 });
 
@@ -393,7 +398,7 @@ test('the route report shows the solved coefficients and flags a large balance',
   const text = formatRouteAudit(audit);
   assert.match(text, /8 C6H8O7/);
   assert.match(text, /9 C5H6O5 \+ 5 H2O \+ 3 CO2/);
-  assert.match(text, /balances only with large coefficients \(up to 9\)/);
+  assert.match(text, /carbon compounds balance only with large coefficients \(up to 9\)/);
   // An ordinary 1:1 balance shows the species without coefficients and no note.
   const small = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.doesNotMatch(formatRouteAudit(small), /large coefficients/);
@@ -479,7 +484,7 @@ test('a step that cannot be assembled is FAIL and named in the verdict', () => {
     links: [],
   });
   const text = formatRouteAudit(audit);
-  assert.match(text, /\*\*Route not verified\*\* — [^.]*cannot be assembled from a single substrate molecule \(step 1\)/);
+  assert.match(text, /\*\*Route check failed\*\* — [^.]*cannot be assembled from a single substrate molecule \(step 1\)/);
   assert.match(text, /- Step 1 FAIL — balanced\. .*need 9 substrate molecules/);
   // The large-coefficient note is redundant once the assembly reason is shown.
   assert.doesNotMatch(text, /large coefficients/);
@@ -662,6 +667,30 @@ test('reaction lines are derived from resolved species, never the model', () => 
   // A step with no resolvable reactant cannot form an equation; it stays as an empty line so the
   // steps after it keep their numbers.
   assert.deepEqual(buildRouteSteps([[{ role: 'product', byproduct: false, name: 'x', status: 'unresolved' }]]), ['']);
+});
+
+test('precedent queries leave byproducts out, as the Open Reaction Database records the main product', () => {
+  const labels = [
+    [
+      { role: 'reactant', byproduct: false, name: 'salicylic acid', smiles: 'O=C(O)c1ccccc1O' },
+      { role: 'reactant', byproduct: false, name: 'acetic anhydride', smiles: 'CC(=O)OC(C)=O' },
+      { role: 'agent', byproduct: false, name: 'sulfuric acid', smiles: 'OS(=O)(=O)O' },
+      { role: 'product', byproduct: false, name: 'aspirin', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+      { role: 'product', byproduct: true, name: 'acetic acid', smiles: 'CC(=O)O' },
+    ],
+    // Every product marked a byproduct: keep them rather than lose the step.
+    [
+      { role: 'reactant', byproduct: false, name: 'a', smiles: 'CCO' },
+      { role: 'product', byproduct: true, name: 'b', smiles: 'CC=O' },
+    ],
+  ];
+  assert.deepEqual(buildPrecedentQueries(labels), [
+    { step: 0, query: 'O=C(O)c1ccccc1O.CC(=O)OC(C)=O>OS(=O)(=O)O>CC(=O)Oc1ccccc1C(=O)O' },
+    { step: 1, query: 'CCO>>CC=O' },
+  ]);
+  // An unusable step is left out without renumbering the steps after it.
+  const gap = [[{ role: 'product', byproduct: false, name: 'x', smiles: 'C' }], labels[1]];
+  assert.deepEqual(buildPrecedentQueries(gap), [{ step: 1, query: 'CCO>>CC=O' }]);
 });
 
 test('an ion shared by two salts is written once per side so the balance is unique', () => {
@@ -992,8 +1021,8 @@ test('history drops the review and known reactions of superseded answers, and re
 test('the interim report says checks passed, not verified, while the review runs', () => {
   const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
   assert.match(formatRouteAudit(audit, [], null, true), /\*\*Route checks passed\*\*.*The model review is still running\./);
-  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route verified/);
-  assert.match(formatRouteAudit(audit, [], null), /\*\*Route verified\*\*/);
+  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route checked: balanced/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
   assert.match(formatRouteCheckUnavailable('worker crashed'), /Route check unavailable: worker crashed\. The route above has not been checked\./);
 });
 
@@ -1039,4 +1068,462 @@ test('correction drawing plans preserve backslashes in stereochemical SMILES', (
   const prompt = fixPayload(formatMissingSpeciesPrompt(target)).prompt;
   const json = prompt.match(/chemistry-plan with (\{.*\}), copying/)[1];
   assert.equal(JSON.parse(json).species[0].input.value, target);
+});
+
+const ORD_A = 'ord-72c311ce8dea41689de4d74d72468e40';
+const ORD_B = 'ord-67c6c6df753946089bb72c3d48ece67a';
+
+test('reaction precedent is normalized defensively', () => {
+  const precedent = normalizeReactionPrecedent({
+    reactions: [
+      { input: 'a>>b', key: 'k', count: 3, samples: [ORD_A, 'not-an-id', ORD_B], reaction: 'CC(=O)OC(C)=O.O=C(O)c1ccccc1O>>CC(=O)Oc1ccccc1C(=O)O' },
+      { input: '', count: 1 }, 'junk',
+      { input: 'c>>d', count: 1, form: 'rm -rf', reaction: 'rm -rf / >> x' },
+    ],
+    products: [{ input: 'b', count: 5, keys: ['k1', 'k2'] }],
+    similar: [{ input: 'a>>b', neighbors: [
+      { key: 'k1', distance: 4, count: 2, similarity: 0.82, reaction: 'CO>>C=O', svg: '<svg xmlns="http://www.w3.org/2000/svg"/>' },
+      { count: 1 },
+      { key: 'k2', distance: 9, count: 1, similarity: 7 },
+    ] }],
+  });
+  assert.ok(precedent);
+  assert.equal(precedent.reactions.length, 2, 'an empty input and a non-object are dropped');
+  assert.deepEqual(precedent.reactions[0].samples, [ORD_A, ORD_B], 'only Open Reaction Database ids survive');
+  assert.equal(precedent.reactions[0].reaction, 'CC(=O)OC(C)=O.O=C(O)c1ccccc1O>>CC(=O)Oc1ccccc1C(=O)O');
+  assert.equal(precedent.reactions[1].form, undefined, 'an unknown form is dropped');
+  assert.equal(precedent.reactions[1].reaction, undefined, 'a reaction that is not SMILES is dropped');
+  assert.equal(precedent.products[0].count, 5);
+  assert.equal(precedent.similar[0].neighbors.length, 2, 'a neighbor without a key is dropped');
+  assert.equal(precedent.similar[0].neighbors[0].similarity, 0.82);
+  assert.equal(precedent.similar[0].neighbors[1].similarity, undefined, 'a similarity outside 0..1 is dropped');
+  assert.ok(precedent.similar[0].neighbors[0].svg.startsWith('<svg'), 'a drawing is kept with its reaction');
+  const oddSvg = normalizeReactionPrecedent({ similar: [{ input: 'a>>b', neighbors: [
+    { key: 'k', distance: 1, count: 1, reaction: 'CO>>C=O', svg: '<script>alert(1)</script>' },
+    { key: 'k', distance: 1, count: 1, svg: '<svg/>' },
+  ] }] });
+  assert.equal(oddSvg.similar[0].neighbors[0].svg, undefined, 'a drawing that is not an svg is dropped');
+  assert.equal(oddSvg.similar[0].neighbors[1].svg, undefined, 'nor is a drawing without the reaction it shows');
+
+  assert.equal(normalizeReactionPrecedent({}), null, 'an empty payload is not a precedent');
+  assert.equal(normalizeReactionPrecedent({ reactions: [] }), null, 'nor is a payload with nothing usable');
+});
+
+test('similarity reads as a plain-language band', () => {
+  assert.equal(similarityBand(1), 'same bond changes, on different molecules');
+  assert.equal(similarityBand(0.998), 'same transformation, different substrate');
+  assert.equal(similarityBand(0.7), 'same transformation, different substrate');
+  assert.equal(similarityBand(0.69), 'shares some of the bond changes');
+  assert.equal(similarityBand(0.4), 'shares some of the bond changes');
+  assert.equal(similarityBand(0.39), 'loosely related');
+});
+
+test('only a step without an exact match gets its closest known reaction drawn', () => {
+  const drawn = { key: 'b', distance: 4, count: 1, reaction: 'CO>>C=O', svg: '<svg/>' };
+  const near = { input: 'x', neighbors: [{ key: 'a', distance: 3, count: 1, reaction: 'CC>>C=C' }, drawn] };
+  assert.equal(precedentDrawingFor({ input: 'x', count: 2, reaction: 'CCO>>CC=O' }, near), null, 'an exact match is the step itself');
+  assert.equal(precedentDrawingFor({ input: 'x', count: 0 }, near), drawn, 'the neighbour the package drew');
+  assert.equal(precedentDrawingFor({ input: 'x', count: 0 }, undefined), null);
+});
+
+test('the precedent section is titled by route step, names the target and explains similarity', () => {
+  const labels = [
+    [
+      { role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' },
+      { role: 'reactant', byproduct: false, name: 'carbon dioxide', smiles: 'O=C=O' },
+      { role: 'product', byproduct: false, name: '2-hydroxybenzoic acid', smiles: 'O=C(O)c1ccccc1O' },
+    ],
+    [
+      { role: 'reactant', byproduct: false, name: '2-hydroxybenzoic acid', smiles: 'O=C(O)c1ccccc1O' },
+      { role: 'reactant', byproduct: false, name: 'acetic anhydride', smiles: 'CC(=O)OC(C)=O' },
+      { role: 'agent', byproduct: false, name: 'sulfuric acid', smiles: 'OS(=O)(=O)O' },
+      { role: 'product', byproduct: false, name: '2-acetoxybenzoic acid', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+      { role: 'product', byproduct: true, name: 'acetic acid', smiles: 'CC(=O)O' },
+    ],
+    [
+      { role: 'reactant', byproduct: false, name: '2-acetoxybenzoic acid', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+      { role: 'product', byproduct: false, name: '2-acetoxybenzoic acid', smiles: 'CC(=O)Oc1ccccc1C(=O)O' },
+    ],
+  ];
+  const queries = buildPrecedentQueries(labels);
+  const precedent = normalizeReactionPrecedent({
+    reactions: [
+      { input: queries[0].query, count: 0 },
+      { input: queries[1].query, count: 4, samples: [ORD_A, ORD_B], reaction: 'CC(=O)OC(C)=O.O=C(O)c1ccccc1O>>CC(=O)Oc1ccccc1C(=O)O' },
+      { input: queries[2].query, count: 0, unchanged: true },
+    ],
+    products: [{ input: 'CC(=O)Oc1ccccc1C(=O)O', count: 23 }],
+    similar: [
+      { input: queries[0].query, neighbors: [{ key: 'n', distance: 12, count: 1, similarity: 0.625, reaction: 'CO>>C=O' }] },
+      { input: queries[1].query, neighbors: [{ key: 'm', distance: 0, count: 4, similarity: 1 }] },
+      { input: queries[2].query, neighbors: [], unchanged: true },
+    ],
+  });
+  const text = formatReactionPrecedents(precedent, {
+    queries, labels,
+    target: { smiles: 'CC(=O)Oc1ccccc1C(=O)O', name: '2-acetoxybenzoic acid' },
+    drawings: new Map([[0, '<drawing of step 1 neighbour>']]),
+  });
+  assert.match(text, /Target: \*\*2-acetoxybenzoic acid\*\* — `CC\(=O\)Oc1ccccc1C\(=O\)O` · 23 recorded route\(s\) to it in this local snapshot\./);
+  assert.match(text, /\*\*Step 1\*\* — phenol \+ carbon dioxide → 2-hydroxybenzoic acid\n`Oc1ccccc1\.O=C=O>>O=C\(O\)c1ccccc1O`/);
+  assert.match(text, /Not recorded in this snapshot\. Closest recorded reaction: 63% similar — shares some of the bond changes\./);
+  assert.match(text, /\n\*\*Step 2\*\* — 2-hydroxybenzoic acid \+ acetic anhydride → 2-acetoxybenzoic acid \(sulfuric acid\)\n/, 'agents shown, the acetic acid byproduct left out');
+  assert.match(text, new RegExp(`✔ Exact match — 4 recorded precedent\\(s\\): \`${ORD_A}\`, \`${ORD_B}\`\\.`));
+  assert.match(text, /_The closest known reaction, as recorded in the database \(species as listed, not a balanced equation\):_\n\n<drawing of step 1 neighbour>/);
+  assert.match(text, /\*\*Step 3\*\* — [^\n]*\n`[^`]+`\n- Changes no structure \(a purification or salt step\), so it is not looked up\./);
+  assert.match(text, /_Similarity compares which bonds and groups change in a reaction/);
+
+  // Without a context the steps are numbered in query order and nothing is named.
+  const bare = formatReactionPrecedents(normalizeReactionPrecedent({ reactions: [{ input: 'CCO>>CC=O', count: 2 }] }));
+  assert.match(bare, /\*\*Step 1\*\*\n`CCO>>CC=O`\n- ✔ Exact match — 2 recorded precedent\(s\)\./);
+  assert.ok(!bare.includes('_Similarity compares'), 'no footnote when no similarity is shown');
+});
+
+test('replayed history keeps the app route reports for the latest answer only', () => {
+  const answer = [
+    '## Route', 'Step 1 prose.', '',
+    '### Structure check (RDKit)', '', 'Every SMILES below was parsed.', '',
+    '### Route check (RDKit)', '', '- Step 1 FAIL — not balanced', '',
+    '### Route drawings (RDKit)', '', '**Step 1**', '', 'Not drawn:', '- Step 2 — not balanced', '',
+    '### Known reactions (Open Reaction Database)', '', '- ✔ Exact match', '',
+    'Name corrections: salicylic acid → 2-hydroxybenzoic acid',
+  ].join('\n');
+  const latest = routeReportsForHistory(answer, true);
+  assert.match(latest, /### Route check/, 'the latest route report is kept');
+  assert.match(latest, /### Structure check/);
+  assert.doesNotMatch(latest, /Route drawings|\*\*Step 1\*\*|Not drawn/, 'drawing leftovers are never replayed');
+  assert.match(latest, /### Known reactions/);
+  assert.match(latest, /Name corrections: salicylic acid/, 'the app note after the reports survives');
+  const earlier = routeReportsForHistory(answer, false);
+  assert.doesNotMatch(earlier, /Route check|Structure check|FAIL/, 'a superseded report is not re-sent');
+  assert.match(earlier, /Step 1 prose\./, 'the model\'s own prose is kept');
+  assert.match(earlier, /Name corrections:/);
+});
+
+test('carbon is found only where the SMILES has a carbon atom', () => {
+  for (const smiles of ['C', 'c1ccccc1', '[C@@H](O)F', '[cH]1ccccc1', 'O=C=O', '[13CH4]']) assert.ok(smilesHasCarbon(smiles), smiles);
+  for (const smiles of ['[Na+].[Cl-]', 'O', 'Cl', '[Ca+2]', '[Cs+]', 'O=S(=O)(O)O', '[Co]', 'Br', '[Na+].[OH-]']) assert.ok(!smilesHasCarbon(smiles), smiles);
+});
+
+test('an inorganic co-product listed as a Product becomes a byproduct, and the equation is unchanged', () => {
+  // The fix-turn step the model wrote: NaCl beside salicylic acid under Products.
+  const step = [
+    { role: 'reactant', byproduct: false, name: 'sodium phenoxide', smiles: '[Na+].[O-]c1ccccc1' },
+    { role: 'reactant', byproduct: false, name: 'carbon dioxide', smiles: 'O=C=O' },
+    { role: 'reactant', byproduct: false, name: 'hydrogen chloride', smiles: 'Cl' },
+    { role: 'product', byproduct: false, name: 'salicylic acid', smiles: 'O=C(O)c1ccccc1O' },
+    { role: 'product', byproduct: false, name: 'sodium chloride', smiles: '[Cl-].[Na+]' },
+    { role: 'agent', byproduct: false, name: 'water', smiles: 'O' },
+  ];
+  const classified = classifyCoProducts(step);
+  assert.equal(classified.find((entry) => entry.name === 'sodium chloride').byproduct, true, 'NaCl is a byproduct');
+  assert.equal(classified.find((entry) => entry.name === 'salicylic acid').byproduct, false, 'the organic product stays the product');
+  assert.equal(classified.find((entry) => entry.name === 'water').byproduct, false, 'an agent is untouched');
+  // Balancing reads roles only: the equation handed to the checker is byte-identical.
+  assert.deepEqual(buildRouteSteps([classified]), buildRouteSteps([step]));
+  // The looked-up reaction drops it with the other byproducts.
+  assert.equal(buildPrecedentQueries([classified])[0].query, '[Na+].[O-]c1ccccc1.O=C=O.Cl>O>O=C(O)c1ccccc1O');
+  // A step whose only product is inorganic keeps it: there is nothing else to call the product.
+  const inorganic = [{ role: 'reactant', byproduct: false, name: 'x', smiles: 'CCO' }, { role: 'product', byproduct: false, name: 'water', smiles: 'O' }];
+  assert.equal(classifyCoProducts(inorganic)[1].byproduct, false);
+});
+
+test('a checker message reaches the correction prompt whole', () => {
+  const message = 'The declared species cannot be balanced: "Na", "OH", "H2O" take(s) no part (coefficient 0), so the equation balances only if those molecules are removed. Delete the molecule the step neither consumes nor produces — water and a solvent are the usual ones.';
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['x'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: [message], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  assert.equal(audit.steps[0].differences[0], message, 'no truncation at 200 characters');
+  const labels = [[{ role: 'reactant', byproduct: false, name: 'phenol', smiles: 'Oc1ccccc1' }, { role: 'product', byproduct: false, name: 'salicylic acid', smiles: 'O=C(O)c1ccccc1O' }]];
+  const chip = routeFixChips(formatNamedRouteFixPrompts(labels, audit)).find((entry) => entry.label === 'Fix step 1');
+  assert.ok(chip.prompt.includes('water and a solvent are the usual ones.'), 'the instruction at the end survives');
+});
+
+test('the route review blocks a workup folded into another transformation', () => {
+  assert.match(ROUTE_REVIEW_SYSTEM, /folds a separate workup into a different transformation/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /Kolbe–Schmitt carboxylation and the acidification/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /one-pot cascade such as the Robinson tropinone synthesis is one step/, 'true cascades stay allowed');
+});
+
+test('the first request draws the target from its SMILES when the request gives one', () => {
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /If my request gives the\s+target's SMILES, use it \(kind "smiles"\)/);
+  assert.ok(SYNTHESIS_TEMPLATE_ADDENDUM.includes('"input":{"kind":"smiles","value":"EXACT TARGET SMILES FROM MY REQUEST"}'));
+});
+
+test('an unbuildable step keeps every later step on its own number', () => {
+  const species = (reactant, product) => [
+    { role: 'reactant', byproduct: false, name: reactant, smiles: reactant },
+    { role: 'product', byproduct: false, name: product, smiles: product },
+  ];
+  const resolved = [species('CCO', 'CC=O'), [{ role: 'product', byproduct: false, name: 'unknown', status: 'unresolved' }], species('CC=O', 'CC(=O)O')];
+  const steps = buildRouteSteps(resolved);
+  assert.equal(steps.length, 3, 'one line per step');
+  assert.equal(steps[1], '', 'the unbuilt step is an empty line');
+  assert.equal(steps[2], 'CC=O>>CC(=O)O', 'step 3 is still at index 2');
+});
+
+test('the report, the drawings and the corrections share one step verdict', () => {
+  const assembled = { index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [], assemblyProblem: 'the equation can only balance by taking more product molecules' };
+  assert.equal(routeStepFailure(assembled), assembled.assemblyProblem, 'an assembly problem fails the step (so it is not drawn)');
+  assert.equal(routeStepFailure(passingStep(0, 'a>>b')), null);
+  assert.match(routeStepFailure({ ...passingStep(0, 'a>>b'), ok: false, error: 'This step could not be built' }), /could not be built/);
+});
+
+test('the shared rules keep a workup as its own step, as the review requires', () => {
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /A workup — an acidification, basification or quench .* is always its own step/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /except in the single structure fallback below and the one target chemistry-plan/);
+  assert.match(ROUTE_CONTINUITY_SYSTEM_RULE, /In a route, do not write a reaction SMILES/, 'single-reaction drawings stay allowed');
+});
+
+test('history drops the review and known reactions of superseded answers, and repeated correction rules', () => {
+  const answer = ['## Route', 'prose', '', '### Route check (RDKit)', '- Step 1 OK', '', '### Route review (model)', '- Step 1: folded workup', '', 'Not verified: The route review raised 1 problem(s).', '', '### Known reactions (Open Reaction Database)', '- ✔ Exact match'].join('\n');
+  const earlier = routeReportsForHistory(answer, false);
+  assert.doesNotMatch(earlier, /Route review|folded workup|Not verified|Known reactions/);
+  const latest = routeReportsForHistory(answer, true);
+  assert.match(latest, /Route review/);
+  assert.match(latest, /Known reactions/);
+  const correction = 'Correction needed for step 2 of the synthesis route above.\n\nStep 2 was rejected: x\n\nWhat may change: only step 2.\nRules for every step:\n- rule one\n- rule two';
+  const replayed = routeFixPromptForHistory(correction);
+  assert.match(replayed, /Step 2 was rejected: x/);
+  assert.match(replayed, /What may change: only step 2\./);
+  assert.doesNotMatch(replayed, /rule one/);
+  assert.equal(routeFixPromptForHistory('Why is step 2 slow?'), 'Why is step 2 slow?', 'an ordinary message is untouched');
+});
+
+test('the interim report says checks passed, not verified, while the review runs', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [passingStep(0, 'a>>b')], links: [] });
+  assert.match(formatRouteAudit(audit, [], null, true), /\*\*Route checks passed\*\*.*The model review is still running\./);
+  assert.doesNotMatch(formatRouteAudit(audit, [], null, true), /Route checked: balanced/);
+  assert.match(formatRouteAudit(audit, [], null), /\*\*Route checked: balanced and connected\*\*/);
+  assert.match(formatRouteCheckUnavailable('worker crashed'), /Route check unavailable: worker crashed\. The route above has not been checked\./);
+});
+
+test('conditions and prose are read inside each step, not by position', () => {
+  const answer = [
+    '## Summary', '', 'Reaction conditions: see each step.', '',
+    '### Step 1 — Oxidation of ethanol', 'Ethanol is oxidised to ethanal.', '',
+    'Reactants: ethanol; oxygen', 'Products: ethanal', 'Byproducts: water', 'Agents: none', '',
+    '### Step 2 — Oxidation of ethanal', 'Ethanal is oxidised further.', 'Reagents and conditions: KMnO4, H2O, 25 °C', '',
+    'Reactants: ethanal; oxygen', 'Products: ethanoic acid', 'Byproducts: none', 'Agents: none',
+  ].join('\n');
+  // Step 1 has no conditions line; the summary line above it must not be taken for step 1, and
+  // step 2's line must stay on step 2.
+  const conditions = findStepConditions(answer, 2);
+  assert.equal(conditions[0], '', 'step 1 has no conditions of its own');
+  assert.match(conditions[1], /KMnO4/, 'step 2 keeps its own conditions');
+  const prose = findStepProse(answer, 2);
+  assert.match(prose[0], /^Step 1 — Oxidation of ethanol — Ethanol is oxidised to ethanal\./);
+  assert.match(prose[1], /^Step 2 — Oxidation of ethanal/);
+});
+
+test('a step carries its reaction class, a textbook passage and the index alternatives', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: '4-nitrobenzoic acid', smiles: 'O=C(O)c1ccc([N+](=O)[O-])cc1' },
+    { role: 'reactant', byproduct: false, name: 'ethanol', smiles: 'CCO' },
+    { role: 'product', byproduct: false, name: 'ethyl 4-nitrobenzoate', smiles: 'CCOC(=O)c1ccc([N+](=O)[O-])cc1' },
+    { role: 'product', byproduct: true, name: 'water', smiles: 'O' },
+  ]];
+  const queries = buildPrecedentQueries(labels);
+  const precedent = normalizeReactionPrecedent({ reactions: [{ input: queries[0].query, count: 0, classes: ['Fischer esterification', 42] }], products: [], similar: [] });
+  assert.deepEqual(precedent.reactions[0].classes, ['Fischer esterification'], 'a non-string class is dropped');
+  const support = new Map([[0, {
+    passage: { title: 'Organic Chemistry 9th Ed', location: 'pp. 954', citation: 'nodus://passage/w1%230', excerpt: 'Mechanism of Fischer esterification…', about: 'Fischer esterification' },
+    alternatives: { product: 'CCOC(=O)c1ccc([N+](=O)[O-])cc1', proposals: [
+      { precursors: 'CCO.O=C(Cl)c1ccc([N+](=O)[O-])cc1', classes: ['acylation of an alcohol or phenol'], recorded: 7 },
+      { precursors: 'CCI.O=C(O)c1ccc([N+](=O)[O-])cc1', classes: [], recorded: 0 },
+    ] },
+  }]]);
+  const text = formatReactionPrecedents(precedent, { queries, labels, support });
+  assert.match(text, /- Reaction class: Fischer esterification\./);
+  assert.match(text, /- Textbook, on Fischer esterification: \[Organic Chemistry 9th Ed, pp\. 954\]\(nodus:\/\/passage\/w1%230\) — “Mechanism of Fischer esterification…”/);
+  assert.match(text, /- Other ways to make `CCOC\(=O\)c1ccc\(\[N\+\]\(=O\)\[O-\]\)cc1` \(Open Reaction Database\): `CCO\.O=C\(Cl\)[^`]+` \(acylation of an alcohol or phenol; recorded 7×\) · `CCI\.[^`]+` \(template only\)\./);
+
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: false, chargeBalanced: true, differences: ['x'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, null, support));
+  assert.match(chips[0].prompt, /Evidence, not an instruction — the Open Reaction Database makes `CCOC\(=O\)[^`]+` from: `CCO\.O=C\(Cl\)[^`]+` \(acylation of an alcohol or phenol; recorded 7×\)[^\n]*Write any species you take from it by name\./);
+  assert.match(chips.find((chip) => chip.label === 'Fix step 1').prompt, /Textbook, on Fischer esterification: Organic Chemistry 9th Ed, pp\. 954 \(nodus:\/\/passage\/w1%230\)\./);
+  // Without support the chips are unchanged.
+  assert.doesNotMatch(routeFixChips(formatNamedRouteFixPrompts(labels, audit))[0].prompt, /Evidence, not an instruction/);
+});
+
+test('the route rules agree with each other and with what the checker does', () => {
+  // Agents are what a step does not consume; the old "never a species that takes no part" said
+  // the opposite of a catalyst's definition.
+  assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /never a species that takes no part|true catalysts or solvents only/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Agents \(catalysts, solvents and other conditions the step does not consume\)/);
+  // Solvent water that is also formed has a home, and salts sharing an ion are named whole.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /goes under Agents as the solvent and under Byproducts as the amount formed, never under Reactants/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Name each salt whole \(sodium sulfate, chromium\(III\) sulfate\) even when two salts share an ion/);
+  assert.doesNotMatch(SYNTHESIS_TEMPLATE_ADDENDUM, /do not repeat an ion that two salts share/);
+  // The checker files an idle reagent under Agents, so only an unformed product is removed.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /A reagent listed under Reactants that takes no part is treated as an Agent by the checker/);
+  // One definition of a folded workup, in the author's rules and the reviewer's, and the
+  // product's isolated form is a naming choice in both.
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /folds a workup when it lists the workup's acid or base together with the transformation's reagents/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /folds a workup only when its species include the workup's acid or base alongside the transformation's reagents/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Which form a product is written in \(an amine or its hydrochloride, an acid or its salt\) is your choice/);
+  // The reviewer does not re-litigate what the checker derived from the structures.
+  assert.match(ROUTE_REVIEW_SYSTEM, /Never dispute what a SMILES denotes \(`Cl` is hydrogen chloride; chloride is `\[Cl-\]`\)/);
+  assert.match(ROUTE_REVIEW_SYSTEM, /tin\(II\) or tin\(IV\) chloride/);
+});
+
+test('a target requested without stereochemistry is racemic by the request', async () => {
+  const { implyRacemicTarget } = await import(pathToFileURL(path.join(dir, 'inspection.mjs')));
+  const product = (smiles, open) => ({ input: smiles, canonicalSmiles: smiles, skeletonSmiles: smiles, formula: '', charge: 0, heavyAtoms: 0, stereocentres: open, unspecifiedStereocentres: open });
+  const step = (index, products) => ({ index, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: products.reduce((s, p) => s + p.unspecifiedStereocentres, 0), reactants: [], agents: [], products });
+  const audit = () => normalizeRouteAudit({ continuous: true, blocked: ['Step 2 leaves 1 stereocentre(s) or double bond(s) unspecified.'], links: [], target: { input: 'CCC(C)C(=O)O', canonicalSmiles: 'CCC(C)C(=O)O', formula: 'C5H10O2', formedAt: 1, reason: 'formed' },
+    steps: [step(0, [product('CCC(C)(C(=O)O)C(=O)O', 0)]), step(1, [product('CCC(C)C(=O)O', 1), product('O=C=O', 0)])] });
+  // Decarboxylation to 2-methylbutanoic acid, requested as CCC(C)C(=O)O: no stereo asked for.
+  const excused = implyRacemicTarget(audit(), 'CCC(C)C(=O)O');
+  assert.equal(excused.steps[1].racemic, true);
+  assert.equal(routeStepFailure(excused.steps[1]), null);
+  assert.deepEqual(excused.blocked, [], 'the checker sentence about the excused step is dropped');
+  // A target requested with stereo is still held to it.
+  assert.notEqual(implyRacemicTarget(audit(), 'CC[C@H](C)C(=O)O').steps[1].racemic, true);
+  // An intermediate with an open centre is not excused by the target rule.
+  const intermediate = normalizeRouteAudit({ continuous: true, blocked: [], links: [], target: { input: 'CCC(C)C(=O)O', canonicalSmiles: 'CCC(C)C(=O)O', formula: '', formedAt: 1, reason: 'formed' },
+    steps: [step(0, [product('CC(O)CC', 1)])] });
+  assert.notEqual(implyRacemicTarget(intermediate, 'CCC(C)C(=O)O').steps[0].racemic, true);
+});
+
+test('a racemic outcome is declared per step, and "achiral" is not a declaration', () => {
+  assert.equal(declaresRacemic('The decarboxylation gives racemic 2-methylbutanoic acid.'), true);
+  assert.equal(declaresRacemic('Its stereochemistry is not controlled.'), true);
+  assert.equal(declaresRacemic('Benzocaine is achiral, so no descriptors are needed.'), false, 'an achiral product has nothing to excuse');
+});
+
+test('a fix chip names the species that did not resolve, not only the balance it broke', () => {
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'diethyl malonate', smiles: 'CCOC(=O)CC(=O)OCC' },
+    { role: 'reactant', byproduct: false, name: 'sodium ethoxide', smiles: 'CC[O-].[Na+]' },
+    { role: 'product', byproduct: true, name: 'ethanol', smiles: 'CCO' },
+  ]];
+  const audit = normalizeRouteAudit({ continuous: false, blocked: ['Step 1 is not balanced.'], steps: [{ index: 0, reaction: 'a>>b', ok: false, balanced: false, chargeBalanced: true, differences: ['C: reactants 9, products 2'], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const unresolved = [{ step: 1, role: 'product', byproduct: false, name: 'sodium diethyl malonate enolate' }];
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, null, undefined, unresolved));
+  const backwards = chips.find(chip => chip.label === 'Fix from the target backwards');
+  assert.match(backwards.prompt, /“sodium diethyl malonate enolate” \(Product\) could not be resolved to a structure, so the checker built this step without it/);
+  assert.match(chips.find(chip => chip.label === 'Fix step 1').prompt, /could not be resolved/);
+  // Without unresolved names the chips are unchanged.
+  assert.doesNotMatch(routeFixChips(formatNamedRouteFixPrompts(labels, audit))[0].prompt, /could not be resolved/);
+});
+
+test('an unresolved species in a step that otherwise passes still gets a fix chip', () => {
+  const labels = [[{ role: 'product', byproduct: false, name: 'x', smiles: 'C' }]];
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], steps: [{ index: 0, reaction: 'a>>b', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }], links: [] });
+  const chips = routeFixChips(formatNamedRouteFixPrompts(labels, audit, null, undefined, [{ step: 1, role: 'reactant', byproduct: false, name: 'the enolate' }]));
+  assert.ok(chips.length);
+  assert.match(chips[0].prompt, /- Step 1: a species did not resolve to a structure\n  - “the enolate” \(Reactant\)/);
+});
+
+test('a salt is shown whole with its count, and water at 7 in a dichromate oxidation is not called suspicious', () => {
+  const sp = (input, formula, coefficient) => ({ input, canonicalSmiles: input, skeletonSmiles: input, formula, charge: 0, heavyAtoms: 1, stereocentres: 0, unspecifiedStereocentres: 0, coefficient });
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+    reactants: [sp('OC1CCCCC1', 'C6H12O', 3), sp('[Na+]', 'Na', 2), sp('[O-][Cr](=O)(=O)O[Cr](=O)(=O)[O-]', 'Cr2O7', 1), sp('OS(=O)(=O)O', 'H2O4S', 4)],
+    agents: [],
+    products: [sp('O=C1CCCCC1', 'C6H10O', 3), sp('[O-]S(=O)(=O)[O-]', 'O4S', 4), sp('[Cr+3]', 'Cr', 2), sp('[Na+]', 'Na', 2), sp('O', 'H2O', 7)] }] });
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'cyclohexanol', smiles: 'OC1CCCCC1' },
+    { role: 'reactant', byproduct: false, name: 'sodium dichromate', smiles: '[Na+].[Na+].[O-][Cr](=O)(=O)O[Cr](=O)(=O)[O-]' },
+    { role: 'reactant', byproduct: false, name: 'sulfuric acid', smiles: 'OS(=O)(=O)O' },
+    { role: 'product', byproduct: false, name: 'cyclohexanone', smiles: 'O=C1CCCCC1' },
+    { role: 'product', byproduct: true, name: 'chromium(III) sulfate', smiles: '[Cr+3].[Cr+3].[O-]S(=O)(=O)[O-].[O-]S(=O)(=O)[O-].[O-]S(=O)(=O)[O-]' },
+    { role: 'product', byproduct: true, name: 'sodium sulfate', smiles: '[Na+].[Na+].[O-]S(=O)(=O)[O-]' },
+    { role: 'product', byproduct: true, name: 'water', smiles: 'O' },
+  ]];
+  const line = formatRouteAudit(audit, labels).split('\n').find((entry) => entry.startsWith('- Step 1'));
+  assert.equal(line, '- Step 1 OK — balanced. 3 cyclohexanol (C6H12O) + 4 sulfuric acid (H2O4S) + sodium dichromate (Cr2Na2O7) → 3 cyclohexanone (C6H10O) + 7 water (H2O) + chromium(III) sulfate (Cr2O12S3) + sodium sulfate (Na2O4S)');
+  // A disodium salt whose sodium was sent once is shown with both sodiums, not "Na".
+  const disodium = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+    reactants: [sp('CC(C(=O)[O-])C(=O)[O-]', 'C4H4O4', 1), sp('[Na+]', 'Na', 2), sp('Cl', 'HCl', 2)], agents: [],
+    products: [sp('CC(C(=O)O)C(=O)O', 'C4H6O4', 1), sp('[Na+]', 'Na', 2), sp('[Cl-]', 'Cl', 2)] }] });
+  const disodiumLabels = [[
+    { role: 'reactant', byproduct: false, name: 'disodium 2-methylpropanedioate', smiles: '[Na+].[Na+].CC(C(=O)[O-])C(=O)[O-]' },
+    { role: 'reactant', byproduct: false, name: 'hydrogen chloride', smiles: 'Cl' },
+    { role: 'product', byproduct: false, name: '2-methylpropanedioic acid', smiles: 'CC(C(=O)O)C(=O)O' },
+    { role: 'product', byproduct: true, name: 'sodium chloride', smiles: '[Na+].[Cl-]' },
+  ]];
+  assert.match(formatRouteAudit(disodium, disodiumLabels), /2 hydrogen chloride \(HCl\) \+ disodium 2-methylpropanedioate \(C4H4Na2O4\) → 2-methylpropanedioic acid \(C4H6O4\) \+ 2 sodium chloride \(ClNa\)/);
+});
+
+test('a spectator ion the solver left at 1:1 still lets the salts show whole (caprolactam, Suite 2b)', () => {
+  const sp = (input, formula, coefficient) => ({ input, canonicalSmiles: input, skeletonSmiles: input, formula, charge: 0, heavyAtoms: 1, stereocentres: 0, unspecifiedStereocentres: 0, coefficient });
+  const dichromate = '[O]=[Cr](=[O])([O-])[O][Cr](=[O])(=[O])[O-]';
+  const sulfate = 'O=S(=O)([O-])[O-]';
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0,
+    reactants: [sp('OC1CCCCC1', 'C6H12O', 3), sp('[Na+]', 'Na', 1), sp(dichromate, 'Cr2O7', 1), sp('O=S(=O)(O)O', 'H2O4S', 4)], agents: [],
+    products: [sp('O=C1CCCCC1', 'C6H10O', 3), sp(sulfate, 'O4S', 4), sp('[Cr+3]', 'Cr', 2), sp('[Na+]', 'Na', 1), sp('O', 'H2O', 7)] }] });
+  const labels = [[
+    { role: 'reactant', byproduct: false, name: 'cyclohexanol', smiles: 'OC1CCCCC1' },
+    { role: 'reactant', byproduct: false, name: 'sodium dichromate', smiles: `[Na+].[Na+].${dichromate}` },
+    { role: 'reactant', byproduct: false, name: 'sulfuric acid', smiles: 'O=S(=O)(O)O' },
+    { role: 'product', byproduct: false, name: 'cyclohexanone', smiles: 'O=C1CCCCC1' },
+    { role: 'product', byproduct: true, name: 'chromium(III) sulfate', smiles: `${sulfate}.${sulfate}.${sulfate}.[Cr+3].[Cr+3]` },
+    { role: 'product', byproduct: true, name: 'sodium sulfate', smiles: `${sulfate}.[Na+].[Na+]` },
+    { role: 'product', byproduct: true, name: 'water', smiles: 'O' },
+  ]];
+  const line = formatRouteAudit(audit, labels).split('\n').find((entry) => entry.startsWith('- Step 1'));
+  assert.match(line, /3 cyclohexanol \(C6H12O\) \+ 4 sulfuric acid \(H2O4S\) \+ sodium dichromate \(Cr2Na2O7\) → 3 cyclohexanone \(C6H10O\) \+ 7 water \(H2O\) \+ chromium\(III\) sulfate \(Cr2O12S3\) \+ sodium sulfate \(Na2O4S\)$/);
+});
+
+
+test('a stereo declaration counts wherever it sits in the step, and a bold lead-in keeps its prose (Sonnet 5.5, hard suite)', () => {
+  const lead = 'Treat the triketone with pyrrolidine in methanol at room temperature. The methyl ketone enolate attacks one ring carbonyl and closes the second six-membered ring. The step is an isomerization with no gain or loss of atoms. It creates two stereocentres, the carbon bearing the OH and the methyl-bearing quaternary carbon. No chiral catalyst is used, so the stereochemistry of this step is not controlled and the ketol is racemic.';
+  const answer = [
+    '# Wieland–Miescher ketone', '',
+    '**Step 1: Michael addition.** Heat the dione with but-3-en-2-one in water.', '',
+    'Reactants: 2-methylcyclohexane-1,3-dione; but-3-en-2-one', 'Products: 2-methyl-2-(3-oxobutyl)cyclohexane-1,3-dione', '',
+    `**Step 2: intramolecular aldol addition.** ${lead}`, '',
+    'Reactants: 2-methyl-2-(3-oxobutyl)cyclohexane-1,3-dione', 'Products: 4a-hydroxy-8a-methyloctahydronaphthalene-1,6(2H,5H)-dione', '',
+  ].join('\n');
+  assert.ok(lead.indexOf('racemic') > 360, 'the declaration sits past the reviewer\'s 360-character prose');
+  assert.deepEqual(stepDeclaresRacemic(answer, 2), [false, true]);
+  const prose = findStepProse(answer, 2);
+  assert.match(prose[1], /^Step 2: intramolecular aldol addition\. — Treat the triketone with pyrrolidine/);
+  // "of this step" no longer hides the phrase; a species name never counts as a declaration.
+  assert.equal(declaresRacemic('The stereochemistry of this step is not controlled.'), true);
+  assert.deepEqual(stepDeclaresRacemic('**Step 1: x.** Heat it.\n\nProducts: rac-2-methylbutanoic acid (racemic)\n', 1), [false]);
+});
+
+test('an unspecified-stereo failure names the product that carries the open centres', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 2,
+    reactants: [], agents: [], products: [{ input: 'p', canonicalSmiles: 'CC12CCC(=O)CC1(O)CCCC2=O', skeletonSmiles: 'p', formula: 'C11H16O3', charge: 0, heavyAtoms: 14, stereocentres: 0, unspecifiedStereocentres: 2, name: '4a-hydroxy-8a-methyloctahydronaphthalene-1,6(2H,5H)-dione' }] }] });
+  assert.match(routeStepFailure(audit.steps[0]), /2 unspecified stereocentre\(s\) or double bond\(s\) in “4a-hydroxy-8a-methyloctahydronaphthalene-1,6\(2H,5H\)-dione” \(2\) — name the stereoisomer formed .* in this step's own paragraph/);
+});
+
+test('steps written as a numbered list are found, and a numbered list inside one step is not (Opus 4.8, camphor)', () => {
+  const answer = [
+    'Camphor from α-pinene in three steps.', '',
+    '1. **Acid-catalysed rearrangement.** α-Pinene is treated with acetic acid and catalytic sulfuric acid. A Wagner–Meerwein shift gives the bornyl cation. The stereochemistry of this step is not controlled: the acetate is racemic.', '',
+    'Reactants: 2,6,6-trimethylbicyclo[3.1.1]hept-2-ene; acetic acid', 'Products: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-yl acetate', '',
+    '2. **Ester hydrolysis.** The acetate is hydrolysed. Conditions:', '   1. reflux 2 h', '   2. cool', 'The alcohol is racemic.', '',
+    'Reactants: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-yl acetate; water', 'Products: 1,7,7-trimethylbicyclo[2.2.1]heptan-2-ol', '',
+  ].join('\n');
+  assert.deepEqual(stepDeclaresRacemic(answer, 2), [true, true]);
+  assert.match(findStepProse(answer, 2)[0], /^Acid-catalysed rearrangement\. — α-Pinene is treated/);
+  assert.match(findStepProse(answer, 2)[1], /^Ester hydrolysis\. — The acetate is hydrolysed/);
+  // Without labelled species under the items, a numbered list is not taken for the route.
+  assert.deepEqual(stepDeclaresRacemic('1. First, it is racemic.\n2. Second.\n', 2), [false, false]);
+});
+
+test('a route request asks for backwards, one-step planning without hand-balancing or mechanisms, before the format', () => {
+  const method = SYNTHESIS_TEMPLATE_ADDENDUM.indexOf('How to plan the route:');
+  const format = SYNTHESIS_TEMPLATE_ADDENDUM.indexOf('Output format — follow exactly.');
+  assert.ok(method >= 0 && format > method, 'the method comes first, the output format after it');
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Work backwards from the target, one step at a time/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Once a step is written, do not revisit or re-derive it/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Do not count atoms, track hydrogens or balance equations in your reasoning/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Do not work out reaction mechanisms/);
+  assert.match(SYNTHESIS_TEMPLATE_ADDENDUM, /Present the finished route in forward order, step 1 first/);
+  // The addendum is still recognised as already applied, so it is never appended twice.
+  assert.equal(looksLikeSynthesisRequest(`Propose a synthesis of benzocaine.\n${SYNTHESIS_TEMPLATE_ADDENDUM}`), false);
+});
+
+test('open stereocentres that cannot reach the target pass, and say so', () => {
+  const audit = normalizeRouteAudit({ continuous: true, blocked: [], links: [], steps: [{ index: 0, reaction: 'x', ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 2, stereoNotRequired: true,
+    reactants: [], agents: [], products: [{ input: 'd', canonicalSmiles: 'CN1C2CCC1C(C(=O)O)C(=O)C2C(=O)O', skeletonSmiles: 'd', formula: 'C10H13NO5', charge: 0, heavyAtoms: 16, stereocentres: 0, unspecifiedStereocentres: 2 }] }] });
+  assert.equal(audit.steps[0].stereoNotRequired, true);
+  assert.equal(routeStepFailure(audit.steps[0]), null);
+  assert.match(formatRouteAudit(audit), /- Step 1 OK — balanced, 2 open stereocentre\(s\) not required \(lost before the target\)/);
+  // Without the flag the same step still fails.
+  const strict = normalizeRouteAudit({ ...audit, steps: [{ ...audit.steps[0], stereoNotRequired: false }] });
+  assert.match(routeStepFailure(strict.steps[0]) ?? '', /2 unspecified stereocentre/);
 });

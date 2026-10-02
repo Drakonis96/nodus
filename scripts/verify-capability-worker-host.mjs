@@ -42,6 +42,12 @@ function makeGlb(json) {
 
 try {
   const verdict = path.join(temporary, 'verdict.txt');
+  const coldPlugin = path.join(temporary, 'cold-plugin.cjs');
+  const coldInvoked = path.join(temporary, 'cold-invoked.txt');
+  fs.writeFileSync(coldPlugin, `module.exports = async () => {
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    return { invoke: async () => { require('node:fs').writeFileSync(${JSON.stringify(coldInvoked)}, 'invoked'); return {}; } };
+  };`);
   const bootstrap = path.join(temporary, 'bootstrap.cjs');
   await build({
     entryPoints: [path.join(root, 'electron/capabilities/workerBootstrap.ts')],
@@ -276,6 +282,22 @@ try {
       await assert.rejects(pending, error => error.name === 'AbortError');
       await cancelled.stop();
 
+      stage = 'cancellation before the worker handshake';
+      const cold = new CapabilityWorkerHandle({ ...runtimeFor(), entryPath: ${JSON.stringify(coldPlugin)} }, {
+        services: async () => { throw new Error('cold fixture has no host calls'); }, bootstrapPath: ${JSON.stringify(bootstrap)},
+      });
+      const coldAbort = new AbortController();
+      const coldPending = cold.call('invoke', { invocationId: 'cold', toolId: 'echo', input: {}, locale: 'en' }, { signal: coldAbort.signal });
+      coldAbort.abort();
+      let coldTimer;
+      try {
+        await assert.rejects(Promise.race([coldPending, new Promise((_, reject) => {
+          coldTimer = setTimeout(() => reject(new Error('cancel waited for the cold worker handshake')), 1000);
+        })]), error => error.name === 'AbortError');
+      } finally { clearTimeout(coldTimer); await cold.stop(); }
+      assert.equal(cold.alive, false);
+      assert.equal(fs.existsSync(${JSON.stringify(coldInvoked)}), false, 'a cancelled startup never invokes the tool');
+
       // A crashed worker rejects what was in flight rather than leaving it unresolved.
       stage = 'crash';
       const crashing = handleFor();
@@ -369,7 +391,7 @@ try {
   const electron = createRequire(import.meta.url)('electron');
   await promisify(execFile)(electron, [outfile], { env: { ...process.env, ELECTRON_DISABLE_SECURITY_WARNINGS: '1' } });
   if (fs.readFileSync(verdict, 'utf8') !== 'pass') throw new Error('The capability worker host verification did not report a pass.');
-  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, 3D validation and storage, maps permissions/budget, host-service cancellation, deadline, crash recovery, migration ladder.');
+  console.log('CAPABILITY WORKER HOST PASS: handshake, host-call gating, storage quota, network allowlist, secret isolation, 3D validation and storage, maps permissions/budget, host-service and cold-start cancellation, deadline, crash recovery, migration ladder.');
 } finally {
   fs.rmSync(temporary, { recursive: true, force: true });
 }

@@ -17,8 +17,16 @@ await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')
       '../capabilities/registry': `export const capabilityRegistry=()=>({providers:new Map([['nodus:chemistry',{id:'nodus:chemistry',tools:[{id:'verify-route',inputSchema:{properties:{labels:{}}}}]}]])}); export const pinCapabilitiesForTurn=()=>[];`,
       '../capabilities/runner': `export function createTrustedCapabilityRunner(){throw Error('test must supply a runner')}`,
       './aiClient': `export function completeText(){throw Error('test must not call a model')}`,
+      // The reaction index and the route evidence are optional; with no index they add nothing.
+      '../reactionIndex': `export const reactionIndexService=()=>({localDirectory:async()=>null})`,
+      './synthesisEvidence': `export async function invokeDisconnections(){return null} export function synthesisEvidenceWorkIds(){return []} export async function textbookPassages(){return []}`,
+      './chemistryStock': `export const chemistryStockDirectory=()=>null`,
+      // No textbook-scheme index built: the route report has no textbook section.
+      './textbookSchemes': `export const textbookSchemeDirectory=()=>null; export const textbookCitations=()=>[]`,
     };
-    api.onResolve({ filter: /^(\.\/aiClient|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    // Only the electron modules' imports are mocked: a shared module's own `./textbookSchemes` is the
+    // real shared file, not electron/ai/textbookSchemes.
+    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\/textbookSchemes|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => (args.importer.includes(`${path.sep}electron${path.sep}`) ? { path: args.path, namespace: 'mock' } : undefined));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
   } }],
 });
@@ -39,7 +47,7 @@ test('an installed 2.5.6-style checker cannot attach shifted labels or correctio
   const answer = await appendRouteReportAndDrawings('Route prose', '', { runner: runnerFor(old) }, { steps, labels });
   assert.match(answer, /Route check unavailable:.*omitted or renumbered/);
   assert.match(answer, /Update Chemistry Studio/);
-  assert.doesNotMatch(answer, /Route verified|nodus-route-fix|### Route drawings/);
+  assert.doesNotMatch(answer, /Route checked: balanced|nodus-route-fix|### Route drawings/);
 });
 
 test('a checker that keeps the count but renumbers steps is also refused', async () => {

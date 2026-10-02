@@ -73,8 +73,14 @@ export function registerNotebookRun(id: string, controller: AbortController): ()
 }
 
 const pinnedScope = Symbol('backendResearchScope');
-type ScopedRequest = ResearchChatRequest & { [pinnedScope]?: ResolvedResearchScope };
+const pinnedSourceRestriction = Symbol('backendResearchSourceRestriction');
+type ScopedRequest = ResearchChatRequest & { [pinnedScope]?: ResolvedResearchScope; [pinnedSourceRestriction]?: boolean };
 export function requestNotebookScope(input: ResearchChatRequest): ResolvedResearchScope | null { return (input as ScopedRequest)[pinnedScope] ?? null; }
+/** Academic authorization pins the entire library through sourceFilter too. Remember whether
+ * the user narrowed it, so an invoked skill may use its own sources on a whole-library turn. */
+export function hasResearchSourceRestriction(input: ResearchChatRequest): boolean {
+  return (input as ScopedRequest)[pinnedSourceRestriction] ?? (!!requestNotebookScope(input)?.notebookId || input.selection.sourceFilter?.enabled === true);
+}
 export function resolveAcademicResearchScope(filter?: ResearchChatRequest['selection']['sourceFilter'], attachments?: Pick<ResearchChatRequest, 'conversationId' | 'attachmentIds'>): ResolvedResearchScope {
   if (attachments?.attachmentIds !== undefined && (!Array.isArray(attachments.attachmentIds) || attachments.attachmentIds.length > 20)) throw new Error('Invalid research attachments');
   const vault = getActiveVault();
@@ -103,7 +109,7 @@ export function authorizeNotebookRequest(input: ResearchChatRequest): ScopedRequ
   if (notebook && !prior && notebookPreparationStatus(scope.documents.map(document => document.id), getResearchPreparationInventory().documents, embeddingsExpected()).pending > 0) throw new Error('research_notebook_indexing');
   if (notebook && input.conversationId) notebooks.associateNotebookConversation(notebook.id, input.conversationId);
   // The conversation's own system prompt and effort apply, chosen in the chat like any other.
-  return { ...input, [pinnedScope]: scope, attachmentIds: input.selection.notebookId ? [] : input.attachmentIds,
+  return { ...input, [pinnedScope]: scope, [pinnedSourceRestriction]: hasResearchSourceRestriction(input) || !!input.selection.notebookId, attachmentIds: input.selection.notebookId ? [] : input.attachmentIds,
     messages: authorizedNotebookHistory(input, scope),
     // Limits a notebook or the user chose are pinned; without them the chat's agent sets its own.
     selection: { ...input.selection, documents: false, passages: true, retrieval: notebook?.settings || input.selection.retrieval ? validateRetrievalSettings(notebook?.settings ?? input.selection.retrieval!) : undefined,

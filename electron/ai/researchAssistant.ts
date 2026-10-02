@@ -8,11 +8,11 @@ import { resolveResearchSourceScope, type ResearchSourceScope } from './research
 import { researchGenerationOptions } from './researchGenerationOptions';
 import { skillHasCapability, type ChatSkill } from '@shared/chatSkills';
 import { buildChatSkillsPrompt, chatProseForHistory, chatSkillsOutputContract, chatVisualTitleSummary, splitChatVisuals, transformChatProse } from '@shared/chatSkills';
-import { enabledChatSkills, invokedChatSkills } from '../chatSkills';
+import { capabilityChatSkills, enabledChatSkills, invokedChatSkills } from '../chatSkills';
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
-import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
+import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, hasResearchSourceRestriction, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
 import { researchModelContextWindow } from './aiClient';
 import { researchAnswerTokens } from '@shared/researchRetrievalBudget';
 import { researchContextLayers } from '@shared/researchContextLayers';
@@ -22,6 +22,10 @@ import { planResearchTurn, literalResearchTurnPlan } from './researchTurnPlanner
 import { inspectResearchMolecules, appendStructureAudit, appendRouteReportAndDrawings, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
 import { countRouteSteps, findStepNamedSpecies, formatAuthorStructureNote, formatMissingSpeciesPrompt, formatNameCorrectionNote, formatRouteCheckUnavailable, isRouteFixPrompt, MOLECULE_DOSSIER_SYSTEM_RULE, ROUTE_CONTINUITY_SYSTEM_RULE, requestedTargetFor, routeFixPromptForHistory, routeReportsForHistory } from '@shared/moleculeInspection';
 import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/synthesisPrompt';
+import { reviseRouteWithEvidence, revisionUserMessage, routeEvidencePassEnabled } from './routeEvidencePass';
+import { SYNTHESIS_EVIDENCE_KEY, SYNTHESIS_EVIDENCE_SYSTEM_RULE, synthesisEvidencePayload, synthesisRetrievalQuery } from '@shared/synthesisEvidence';
+import { gatherSynthesisEvidence } from './synthesisEvidence';
+import { chemistryEvidenceScope } from './chemistryEvidenceScope';
 import type {
   Author,
   ChatMessageRecord,
@@ -216,9 +220,23 @@ function skillExecution(request: ResearchChatRequest) {
   const lastRequest = [...userMessages].reverse().find(message => !isRouteFixPrompt(message));
   // Skills invoked with @ apply to this turn in every vault, academic included.
   const standing = getActiveVault().type === 'academic' ? [] : enabledChatSkills('assistant');
-  const invoked = invokedChatSkills(request.skillIds).filter(skill => !standing.some(item => item.id === skill.id));
-  return { skills: [...standing, ...invoked], question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+  // A route-fix chip is Chemistry Studio's own output, so its turn gets Chemistry Studio back:
+  // the @ that started the route is not stored with the conversation.
+  const fixSkills = isRouteFixPrompt(userMessages.at(-1) ?? '') ? capabilityChatSkills('nodus:chemistry') : [];
+  const invoked = [...invokedChatSkills(request.skillIds), ...fixSkills]
+    .filter((skill, index, all) => !standing.some(item => item.id === skill.id) && all.findIndex(item => item.id === skill.id) === index);
+  return { skills: [...standing, ...invoked], evidenceScope: chemistryEvidenceScope(request), question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
+}
+
+/** Route quality option A: a new route's first draft is revised once against per-step ORD,
+ *  textbook and web evidence before the checks run. Off unless its switch is on. */
+async function withRouteEvidence(answer: string, execution: ReturnType<typeof skillExecution>, opts: Parameters<typeof completeText>[0], local: boolean, sourceContext: string, signal?: AbortSignal): Promise<string> {
+  const question = execution.question ?? '';
+  const chemistry = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
+  if (!routeEvidencePassEnabled() || !chemistry || isRouteFixPrompt(question) || !looksLikeSynthesisRequest(question)) return answer;
+  return reviseRouteWithEvidence(answer, { model: execution.model, evidenceScope: execution.evidenceScope, target: execution.target, question: execution.request ?? question, signal, locale: getSettings().promptLanguage ?? 'en' },
+    async brief => finalizeAnswer(await completeTextStream({ ...opts, user: revisionUserMessage(opts.user, answer, brief) }, () => {}, execution.model, signal), local, sourceContext));
 }
 
 /** Runs the reply through its Skills, then appends the RDKit checks: the structure check on
@@ -242,7 +260,7 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
   // step drawings) take seconds more and repaint the answer when they finish.
   if (onDeterministic && skilled !== answer) onDeterministic(skilled);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const base = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
+  const base = { model: execution.model, evidenceScope: execution.evidenceScope, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
   // One capability runner for the whole phase: the resolve pass warms the worker's reference
   // cache and the route audit reuses it, so a route opens one worker, not three.
   const session = chemistryEnabled ? chemistryRunner(base) : null;
@@ -267,7 +285,7 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
     // The structure check reads the model's own text: the resolved answer carries the app's
     // derived SMILES beside every name, which the route check already covers.
     const withStructures = await appendStructureAudit(resolved.answer, skilled, options);
-    const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels });
+    const routed = await appendRouteReportAndDrawings(withStructures, resolved.answer, { ...options, target: execution.target }, { steps: resolved.steps, labels: resolved.labels, unresolved: resolved.unresolved ?? [] });
     const correctionNote = formatNameCorrectionNote(resolved.corrections);
     const structureNote = formatAuthorStructureNote(resolved.authorStructures);
     const notes = [correctionNote, structureNote].filter(Boolean).join('\n\n');
@@ -302,7 +320,7 @@ async function answerResearchChatTurn(request: ResearchChatRequest, signal: Abor
     signal.throwIfAborted();
     answer = finalizeAnswer(await withResearchAttachmentFallback(attachments, opts, options => completeText(options, request.model)), local, user);
     validateNotebookRequest(request);
-    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: rememberNotebookTurn(request, await finalizeWithAudit(answer, execution)), stats };
+    if (!citationRequired || attachments.text || extractCitationRefs(answer).length > 0 || splitChatVisuals(answer).some(part => part.kind !== 'markdown')) return { answer: rememberNotebookTurn(request, await finalizeWithAudit(await withRouteEvidence(answer, execution, opts, local, user, signal), execution)), stats };
   }
   throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
 }
@@ -387,6 +405,7 @@ async function streamResearchChatTurn(
   if (citationRequired && !attachments.text && extractCitationRefs(answer).length === 0 && !splitChatVisuals(answer).some(part => part.kind !== 'markdown')) {
     throw new Error('El modelo no devolvió ninguna cita verificable del contexto tras tres intentos idénticos.');
   }
+  if (!council?.member) answer = await withRouteEvidence(answer, execution, opts, local, sourceContext, signal);
   // Interim repaints carry the whole answer, so they replace the streamed text rather than append.
   const repaint = (text: string) => onDelta(text, 'replace');
   return { answer: council?.member ? answer : rememberNotebookTurn(request, await (execution.skills.length ? researchActivityStep('tools', 'execute', () => finalizeWithAudit(answer, execution, signal, repaint)) : finalizeWithAudit(answer, execution, signal, repaint))), stats };
@@ -543,6 +562,7 @@ const WEB_DISABLED_INSTRUCTION = 'The user asked for an internet search, but web
 const NO_SOURCES_INSTRUCTION = 'The user switched off every source in this chat: no ideas, documents or web pages were consulted. Answer from general knowledge, say so plainly at the start of the answer in the answer language, and cite nothing. ';
 
 async function buildResearchChatPrompt(request: ResearchChatRequest, skills = enabledChatSkills('assistant'), council?: { member?: boolean; assessments?: ConciliumResult; corpus?: { context: SectionPayload; stats: ResearchContextStats }; windowCap?: number }, signal?: AbortSignal): Promise<PromptBuild> {
+  signal?.throwIfAborted();
   // Resolve the effective model up front so a local target can size the whole payload
   // (context + history + output) to its real, small window instead of overflowing.
   const model = resolveModelRef(request.model);
@@ -554,6 +574,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
 
   const turns = request.messages.filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim());
+  // The retrieval anchor belongs to the full authorized history, before the model-window trim.
+  const originalRequest = [...turns].reverse().find(message => message.role === 'user' && !isRouteFixPrompt(message.content))?.content;
   const latestAnswer = turns.map((m) => m.role).lastIndexOf('assistant');
   const latestQuestion = turns.map((m) => m.role).lastIndexOf('user');
   let messages = turns
@@ -582,7 +604,19 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
   const chemistryEnabled = skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage });
+  const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage, signal });
+  // A new route request (not a correction): it also gets the synthesis template.
+  const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question);
+  // A route request or a route correction is about making one molecule: its corpus context is
+  // retrieved for that chemistry (the target and the reaction classes in play) and leaves out the
+  // library-wide research gaps and contradictions, which are about the literature.
+  const chemistryRoute = chemistryEnabled && !genealogy && (routeRequest || isRouteFixPrompt(question));
+  // The ORD disconnections and textbook passages are gathered for the route's original request,
+  // on the first answer and again on each correction, so a fix weighs the same evidence.
+  const routeQuestion = originalRequest ?? question;
+  const gathered = chemistryRoute && !council?.member ? await gatherSynthesisEvidence(routeQuestion, { model, locale: promptLanguage, signal, evidenceScope: chemistryEvidenceScope(request) }) : null;
+  const routeEvidence = synthesisEvidencePayload(gathered);
+  const retrievalQuestion = chemistryRoute ? synthesisRetrievalQuery(routeQuestion, gathered) : question;
   const assessments = council?.assessments ? conciliumAssessments(council.assessments, window == null ? 12_000 : Math.max(256, Math.floor(window * LOCAL_CHARS_PER_TOKEN * 0.2 / council.assessments.members.length))) : undefined;
   const system = withResearchSystemPrompt([
     council?.member ? 'You are an independent Concilium council member. Assess the user question carefully and provide a concise, evidence-based answer with key reasons, uncertainties and verifiable citations. No skills or tools are available to you. Return prose only, with no skill directives or executable artifacts.' : '',
@@ -593,8 +627,9 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     chemistryEnabled ? ROUTE_CONTINUITY_SYSTEM_RULE : '',
     // A correction carries the same rules itself, with its own edit policy; the first-request
     // contract is not added on top, so the rules are sent once.
-    chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question) ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
-    !genealogy && request.selection.sourceFilter?.enabled === true
+    routeRequest ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
+    routeEvidence ? SYNTHESIS_EVIDENCE_SYSTEM_RULE : '',
+    !genealogy && hasResearchSourceRestriction(request)
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
   ].filter(Boolean).join('\n\n'), request.systemPromptId, { surface: 'research', conversationId: request.conversationId });
 
@@ -609,7 +644,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     const promptChars = Math.max(0, window - maxTokens - margin) * LOCAL_CHARS_PER_TOKEN;
     // Reserve what system + history + the JSON wrapper already consume; the rest is the
     // corpus context's budget. Never below the floor — the shrinker then guarantees fit.
-    const reserved = system.length + JSON.stringify(messages).length + (assessments?.length ?? 0) + (moleculeDossiers.length ? JSON.stringify(moleculeDossiers).length : 0) + 400;
+    const reserved = system.length + JSON.stringify(messages).length + (assessments?.length ?? 0) + (moleculeDossiers.length ? JSON.stringify(moleculeDossiers).length : 0) + (routeEvidence ? JSON.stringify(routeEvidence).length : 0) + 400;
     contextBudget = Math.max(LOCAL_MIN_CONTEXT_CHARS, Math.floor(promptChars - reserved));
   }
 
@@ -645,7 +680,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     if (window) run.budget.constrainToWindow(window, Math.max(Math.ceil(window * 0.75),
       new TextEncoder().encode(system + JSON.stringify(messages)).length + maxTokens + 4096));
     const depth = webDepth(retrieval);
-    run.web = new ResearchWebGrant(request.webSearch ?? getSettings().researchWebSearch ?? 'auto', depth, question, signal, request.model,
+    run.web = new ResearchWebGrant(request.webSearch ?? getSettings().researchWebSearch ?? 'auto', depth, retrievalQuestion, signal, request.model,
       Math.min(WEB_RESEARCH_LIMITS[depth].evidenceBytes, Math.max(0, Math.floor(contextBudget / 3))));
     // The chat is an agent: it plans the turn from the conversation, keeps what earlier
     // answers cited and looks in the catalogue before it lets the answer be written.
@@ -653,7 +688,10 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     const plan = consulted ? await planResearchTurn(messages, request.model, signal) : literalResearchTurnPlan(question);
     run.agent = { plan, question, compact, minSources: ['definition', 'comparison', 'survey'].includes(plan.kind) ? 3 : 2 };
     if (run.layers.documents) run.seedPriorEvidence(messages.slice(0, -1));
-    await run.investigate(plan.goal, request.model);
+    // A synthesis-route turn searches for the target and its reaction classes: the request
+    // itself is mostly output rules, and a planned goal drawn from it retrieved passages on
+    // formatting rather than chemistry.
+    await run.investigate(chemistryRoute ? retrievalQuestion : plan.goal, request.model);
     await run.web.afterLibrary({ evidence: run.evidence.size, matched: run.matchedDocuments.size, supervised: run.supervised,
       titles: run.scope.documents.filter(document => run.matchedDocuments.has(document.id)).map(document => document.title) });
     const webPassages = run.web.contextPassages();
@@ -666,8 +704,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       obras: nothingConsulted ? [] : snapshot.works,
       ideas_generadas: request.selection.ideas ? snapshot.ideas.map(idea => ({ ...idea, citation: `nodus://idea/${encodeURIComponent(idea.id)}` })) : [],
       temas_principales: request.selection.themes ? snapshot.themes : [],
-      contradicciones: request.selection.contradictions ? snapshot.contradictions : [],
-      huecos: request.selection.gaps ? snapshot.gaps.map(gap => ({ ...gap, citation: `nodus://gap/${encodeURIComponent(gap.id)}` })) : [],
+      contradicciones: request.selection.contradictions && !chemistryRoute ? snapshot.contradictions : [],
+      huecos: request.selection.gaps && !chemistryRoute ? snapshot.gaps.map(gap => ({ ...gap, citation: `nodus://gap/${encodeURIComponent(gap.id)}` })) : [],
       pasajes_relevantes: snapshot.passages,
       ...(webPassages.length ? { pasajes_web: webPassages } : {}),
       ...(run.web.enabled ? {} : run.web.explicit ? { web_search: 'disabled_by_user' } : {}),
@@ -678,7 +716,12 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       documents: snapshot.works.length, summaries: 0, passages: snapshot.passages.length, contextChars: JSON.stringify(context).length, truncated: run.budget.partial, researchTraversal: compactResearchTraversal(run.coverage()),
       ...(run.web.used || (run.web.explicit && !run.web.enabled) ? { webSearch: run.web.stats(), webSources: run.web.sources() } : {}) };
   } else {
-    ({ context, stats } = await buildResearchContext(request.selection, question, contextBudget, promptLanguage));
+    // A route request's corpus context is retrieved for its chemistry, and the corpus-level
+    // contradictions and research gaps (about the literature, not about making a molecule) are
+    // left out so the budget goes to ideas and passages.
+    ({ context, stats } = chemistryRoute
+      ? await buildResearchContext({ ...request.selection, contradictions: false, gaps: false }, question, contextBudget, promptLanguage, { retrievalQuery: retrievalQuestion })
+      : await buildResearchContext(request.selection, question, contextBudget, promptLanguage));
     const layers = researchContextLayers(request.selection);
     if (!layers.ideas && !layers.documents) context = { ...context, research_scope: { instruction: NO_SOURCES_INSTRUCTION } };
   }
@@ -692,6 +735,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
       conversacion: messages,
       ...(assessments ? { council_assessments: assessments } : {}),
       ...(moleculeDossiers.length ? { estructura_objetivo_verificada: moleculeDossiers } : {}),
+      ...(routeEvidence ? { [SYNTHESIS_EVIDENCE_KEY]: routeEvidence } : {}),
       ...(citationContract ? { contrato_de_salida_obligatorio: citationContract } : {}),
       application_output_contract: council?.member ? undefined : chatSkillsOutputContract(skills),
     },
@@ -879,7 +923,10 @@ export async function buildResearchContext(
   selection: ResearchContextSelection,
   question = '',
   maxContextChars = MAX_TOTAL_CONTEXT_CHARS,
-  language: PromptLanguage = getSettings().promptLanguage ?? 'es'
+  language: PromptLanguage = getSettings().promptLanguage ?? 'es',
+  /** A route request retrieves with a query focused on its chemistry (the verbatim prompt is
+   *  mostly output-format rules). */
+  route?: { retrievalQuery: string },
 ): Promise<BuildResult> {
   const prompt = researchAssistantPromptPack(language);
   const context: SectionPayload = {
@@ -890,7 +937,7 @@ export async function buildResearchContext(
   const linkedWorkIds = new Set<string>();
   let truncated = false;
 
-  const scope = await buildRelevanceScope(selection, question);
+  const scope = await buildRelevanceScope(selection, route?.retrievalQuery || question);
   if (scope.sourceScope) context.source_filter = { active: true, matched_works: scope.sourceScope.workIds.size, instruction: "Use only evidence from these works. If it is insufficient, say so; do not fill gaps from other sources or prior conversations." };
 
   if (selection.ideas) {
