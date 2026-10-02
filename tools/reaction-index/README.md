@@ -16,6 +16,13 @@ doi:10.1021/jacs.1c09820). The index (≈2 GB) and the data (≈1.2 GB) are not 
     ./fetch-ord.sh ord-data                       # the pinned snapshot from Hugging Face
     .venv/bin/python build_index.py --root ord-data --out index-v3
 
+    .venv/bin/python conditions.py --index index-v3 --root ord-data   # ~2 min
+
+`conditions.py` adds `conditions.tsv.zst`: for every ORD id the index cites as a sample, the
+reagents, catalysts and solvents (USPTO inputs that give no atom to a product count as reagents),
+temperature, time, atmosphere, yield and reference (DOI, or the patent for USPTO data). The worker
+attaches them to precedents so a step can be cited with what it was run with.
+
 Extraction checkpoints are content-addressed (file SHA-256 + row group), so a rebuild re-extracts
 only new data. `progress.py` / `reaction_progress.py` report a running build.
 
@@ -28,7 +35,8 @@ only new data. `progress.py` / `reaction_progress.py` report a running build.
 `--check` compares the latest Hugging Face revision's parquet files (LFS SHA-256) with the local
 copy, and notes when ORD's GitHub `main` (what the website shows) has data newer than the Hugging
 Face copy. `--apply` downloads only new and changed files, rebuilds into a clone of the current
-index (reusing every checkpoint), checks the new manifest and swaps it in, keeping `<index>.prev`.
+index (reusing every checkpoint), rebuilds the conditions table, checks the new manifest and swaps
+it in, keeping `<index>.prev`.
 `--apply --force` rebuilds even when nothing changed (after an extractor change).
 Paths: `--index` / `NODUS_REACTION_INDEX_DIR`, `--data` / `ORD_DATA_DIR`.
 

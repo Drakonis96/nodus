@@ -14,7 +14,9 @@ How an update runs (only what changed is fetched and re-extracted):
   2. New and changed files are downloaded into ord-data; removed ones are moved aside.
   3. The index is rebuilt into a clone of the current one (APFS clone, instant). The builder's
      checkpoints are content-addressed (file SHA-256 + row group), so only new row groups are
-     extracted; the merge and the DRFP/faiss step (~12 min) run over everything.
+     extracted; the merge and the DRFP/faiss step (~12 min) run over everything. conditions.py then
+     rebuilds conditions.tsv.zst (reagents, solvents, temperature, yield, reference of the cited
+     reactions; ~2 min, also checkpointed).
   4. The new manifest is checked (revision, key counts), then the clone replaces the index and
      the old one is kept as <index>.prev for a rollback (update_ord.py --rollback).
 """
@@ -132,6 +134,13 @@ def apply(args, p):
         cmd += ['--workers', str(args.workers)]
     print('building:', ' '.join(cmd), flush=True)
     started = time.time()
+    subprocess.run(cmd, check=True)
+    # The builder rewrites manifest.json; the conditions of the reactions the new index cites are
+    # rebuilt after it (checkpoints cloned with the index, so only new row groups are read).
+    cmd = [sys.executable, os.path.join(HERE, 'conditions.py'), '--index', staged, '--root', os.path.abspath(args.data)]
+    if args.workers:
+        cmd += ['--workers', str(args.workers)]
+    print('conditions:', ' '.join(cmd), flush=True)
     subprocess.run(cmd, check=True)
 
     new = json.load(open(os.path.join(staged, 'manifest.json')))
