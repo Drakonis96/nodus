@@ -210,3 +210,65 @@ test('a textbook index that fails never blocks the request', async () => {
     globalThis.__textbook = undefined;
   }
 });
+
+test('route search: candidate routes over the ORD and textbook indexes, cited by ORD id, book page or template source', async () => {
+  const TB = `tb-${'c'.repeat(32)}`;
+  const ORD = `ord-${'d'.repeat(32)}`;
+  const T1 = '[N;H0;D3;+0:1]-[c:2]>>Cl-[c:2].[NH;D2;+0:1]';
+  globalThis.__textbook = {
+    dir: '/schemes',
+    cite: (ids) => ids.filter((id) => id === TB).map((id) => ({ id, book: 'Synthetic Textbook A', page: 921, kind: 'crop', reagents: 'H2, PtO2, EtOH', yield: '85%', status: 'confirmed', link: null })),
+    citeTemplates: (templates) => (templates.includes(T1) ? [{ book: 'Synthetic Textbook B', page: 12, reagents: 'conc. H2SO4', generic: true }] : []),
+  };
+  const route = { target: 'CCOC(=O)c1ccc(N)cc1', expanded: 4, timedOut: false, routes: [
+    { cost: 2, steps: [
+      { product: 'CCOC(=O)c1ccc([N+](=O)[O-])cc1', precursors: ['CCO', 'O=C(O)c1ccc([N+](=O)[O-])cc1'], kind: 'template', index: 'textbook', recorded: 0, samples: [], templates: [T1] },
+      { product: 'CCOC(=O)c1ccc(N)cc1', precursors: ['CCOC(=O)c1ccc([N+](=O)[O-])cc1'], kind: 'recorded', index: 'textbook', recorded: 2, samples: [TB, `tb-${'e'.repeat(32)}`] },
+    ], startingMaterials: [{ smiles: 'CCO', given: false, inStock: true }, { smiles: 'O=C(O)c1ccc([N+](=O)[O-])cc1', given: false, inStock: false }] },
+    { cost: 1, steps: [{ product: 'CCOC(=O)c1ccc(N)cc1', precursors: ['CCO', 'Nc1ccc(C(=O)O)cc1'], kind: 'recorded', index: 'ord', recorded: 1, samples: [ORD, 'not-an-id'] }],
+      startingMaterials: [{ smiles: 'Cc1ccc([N+](=O)[O-])cc1', given: true, inStock: true }] },
+    { cost: 9, steps: Array.from({ length: 7 }, () => ({ product: 'CCO', precursors: ['C'], kind: 'template', index: 'ord' })), startingMaterials: [] },
+  ] };
+  const requests = [];
+  const tools = { tools: [{ id: 'propose-disconnections' }, { id: 'search-routes' }] };
+  try {
+    const evidence = await scenario({
+      provider: tools, indexDir: '/idx',
+      invoke: async (request) => {
+        requests.push(request);
+        if (request.toolId === 'search-routes') return { artifacts: [{ artifactType: 'candidate-routes', data: route }] };
+        return { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [] } }] };
+      },
+    });
+    const search = requests.find((request) => request.toolId === 'search-routes');
+    assert.deepEqual(search.input, { indexDirs: ['/idx', '/schemes'], target: 'CCOC(=O)c1ccc(N)cc1', maxSteps: 5, budgetSeconds: 60, startingMaterials: ['Cc1ccc([N+](=O)[O-])cc1'] });
+    const payload = synthesisEvidencePayload(evidence);
+    assert.equal(payload.candidate_routes.length, 2, 'a route longer than six steps is left out');
+    assert.deepEqual(payload.candidate_routes[0], {
+      steps: [
+        { reaction: 'CCO.O=C(O)c1ccc([N+](=O)[O-])cc1>>CCOC(=O)c1ccc([N+](=O)[O-])cc1', basis: 'template', source: 'textbook', citations: ['*Synthetic Textbook B*, p. 12 · conditions: conc. H2SO4 · general scheme'] },
+        { reaction: 'CCOC(=O)c1ccc([N+](=O)[O-])cc1>>CCOC(=O)c1ccc(N)cc1', basis: 'recorded', source: 'textbook', recorded: 2, citations: ['*Synthetic Textbook A*, p. 921 · conditions: H2, PtO2, EtOH · yield 85%'] },
+      ],
+      starting_materials: [{ smiles: 'CCO', status: 'in stock' }, { smiles: 'O=C(O)c1ccc([N+](=O)[O-])cc1', status: 'to source' }],
+    });
+    assert.deepEqual(payload.candidate_routes[1].steps[0].citations, [ORD], 'ORD steps cite their ORD ids only');
+    assert.deepEqual(payload.candidate_routes[1].starting_materials, [{ smiles: 'Cc1ccc([N+](=O)[O-])cc1', status: 'given' }]);
+    assert.ok(!JSON.stringify(payload.candidate_routes).includes('>>Cl-[c'), 'template SMARTS never reach the model');
+  } finally {
+    globalThis.__textbook = undefined;
+  }
+});
+
+test('a route search that fails or times out never blocks the request', async () => {
+  const tools = { tools: [{ id: 'propose-disconnections' }, { id: 'search-routes' }] };
+  const evidence = await scenario({
+    provider: tools, indexDir: '/idx',
+    invoke: async (request) => {
+      if (request.toolId === 'search-routes') throw new Error('timed out');
+      return { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [] } }] };
+    },
+  });
+  assert.ok(evidence.passages.length > 0);
+  assert.equal(evidence.candidateRoutes, undefined);
+  assert.ok(!('candidate_routes' in synthesisEvidencePayload(evidence)));
+});

@@ -22,6 +22,7 @@ export const SYNTHESIS_EVIDENCE_SYSTEM_RULE = [
   'Prefer a disconnection that is recorded or that a textbook passage supports when it fits the requested starting materials; otherwise use your own knowledge. When you rely on a passage, cite it with its `nodus://passage/…` link.',
   'Passage text has had reaction schemes (marked [scheme]) and literature references (marked [ref]) cut out; a passage marked `scanned` was read from a scanned book by OCR and may contain recognition errors in names and formulas.',
   'When present, `textbook_preparations` lists reactions read from the scheme drawings in the user\'s own textbooks that make the target or one of its precursors, each structure checked against its name, and `disconnections` proposed by reaction templates extracted from those schemes ("worked example": a real compound in the book; "general scheme": drawn with R groups); cite the book and page given when you rely on one.',
+  'When present, `candidate_routes` are complete routes the application searched backwards from the target over the recorded reactions and reaction templates (each step marked recorded or template, with its source); they are machine-searched candidates to check and use if sound — chemistry, selectivity and the requested starting materials — not answers to copy.',
 ].join(' ');
 
 /** Titles of works that teach synthetic organic chemistry. */
@@ -400,11 +401,74 @@ export interface SynthesisEvidence {
   /** Reactions read from the scheme drawings in the user's textbooks that make the target or a
    *  precursor, cited by book and page (absent without a textbook-scheme index). */
   textbookPreparations?: TextbookPreparation[];
+  /** Complete routes found by the route search over the ORD and textbook indexes (absent when
+   *  the package has no route search or nothing complete was found in time). */
+  candidateRoutes?: CandidateRoute[];
+}
+
+/** A route the application's search found, compact for the payload: steps in synthesis order. */
+export interface CandidateRoute {
+  steps: Array<{ reaction: string; basis: 'recorded' | 'template'; source: string; recorded?: number; citations?: string[] }>;
+  starting_materials: Array<{ smiles: string; status: 'given' | 'in stock' | 'to source' }>;
+}
+
+const CANDIDATE_ROUTES = 3;
+const CANDIDATE_STEPS = 6;
+const STEP_CITATIONS = 2;
+const ORD_SAMPLE = /^ord-[0-9a-f]{32}$/;
+const TEXTBOOK_SAMPLE = /^tb-[0-9a-f]{32}$/;
+
+/** Reads `candidate-routes` data (the worker's route search): each route's steps in synthesis
+ *  order with their basis and source, cited by ORD ids, textbook records (`citeTextbook`: record ids
+ *  to formatted citations) or, for a textbook template step, the schemes its templates came from
+ *  (`citeTemplates`); and its starting materials, marked given, in stock or still to source. */
+export function candidateRoutes(
+  data: unknown,
+  citeTextbook?: (ids: string[]) => string[],
+  citeTemplates?: (templates: string[]) => string[],
+): CandidateRoute[] {
+  const routes = (data as { routes?: unknown })?.routes;
+  if (!Array.isArray(routes)) return [];
+  const out: CandidateRoute[] = [];
+  for (const raw of routes) {
+    const route = raw as { steps?: unknown; startingMaterials?: unknown } | null;
+    const steps: CandidateRoute['steps'] = [];
+    for (const item of Array.isArray(route?.steps) ? route.steps : []) {
+      const step = item as { product?: unknown; precursors?: unknown; kind?: unknown; index?: unknown; recorded?: unknown; samples?: unknown; templates?: unknown };
+      const precursors = Array.isArray(step.precursors) ? step.precursors.filter((p): p is string => typeof p === 'string' && !!p) : [];
+      if (typeof step.product !== 'string' || !step.product || !precursors.length) continue;
+      const source = step.index === 'textbook' ? 'textbook' : step.index === 'ord' ? 'ORD' : typeof step.index === 'string' ? step.index : 'index';
+      const basis = step.kind === 'recorded' ? 'recorded' : 'template';
+      const samples = Array.isArray(step.samples) ? step.samples.filter((id): id is string => typeof id === 'string') : [];
+      const templates = Array.isArray(step.templates) ? step.templates.filter((t): t is string => typeof t === 'string' && t.includes('>>')) : [];
+      let citations: string[] = [];
+      if (basis === 'recorded' && source === 'ORD') citations = samples.filter((id) => ORD_SAMPLE.test(id)).slice(0, STEP_CITATIONS);
+      else if (basis === 'recorded' && source === 'textbook' && citeTextbook) citations = citeTextbook(samples.filter((id) => TEXTBOOK_SAMPLE.test(id))).slice(0, STEP_CITATIONS);
+      else if (basis === 'template' && source === 'textbook' && citeTemplates && templates.length) citations = citeTemplates(templates).slice(0, STEP_CITATIONS);
+      steps.push({
+        reaction: `${precursors.join('.')}>>${step.product}`.slice(0, 600),
+        basis,
+        source,
+        ...(basis === 'recorded' && typeof step.recorded === 'number' && step.recorded > 0 ? { recorded: step.recorded } : {}),
+        ...(citations.length ? { citations } : {}),
+      });
+    }
+    if (!steps.length || steps.length > CANDIDATE_STEPS) continue;
+    const starting = (Array.isArray(route?.startingMaterials) ? route.startingMaterials : []).flatMap((item) => {
+      const value = item as { smiles?: unknown; given?: unknown; inStock?: unknown };
+      if (typeof value.smiles !== 'string' || !value.smiles) return [];
+      const status: CandidateRoute['starting_materials'][number]['status'] = value.given === true ? 'given' : value.inStock === true ? 'in stock' : 'to source';
+      return [{ smiles: value.smiles.slice(0, 400), status }];
+    });
+    out.push({ steps, starting_materials: starting });
+    if (out.length >= CANDIDATE_ROUTES) break;
+  }
+  return out;
 }
 
 /** The payload value, or null when there is nothing to add. */
 export function synthesisEvidencePayload(evidence: SynthesisEvidence | null): Record<string, unknown> | null {
-  if (!evidence || (!evidence.disconnections.length && !evidence.passages.length && !evidence.textbookPreparations?.length)) return null;
+  if (!evidence || (!evidence.disconnections.length && !evidence.passages.length && !evidence.textbookPreparations?.length && !evidence.candidateRoutes?.length)) return null;
   return {
     target: evidence.target,
     ...(evidence.startingMaterials.length ? { starting_materials: evidence.startingMaterials } : {}),
@@ -417,6 +481,7 @@ export function synthesisEvidencePayload(evidence: SynthesisEvidence | null): Re
     } : {}),
     ...(evidence.passages.length ? { textbook_passages: evidence.passages } : {}),
     ...(evidence.textbookPreparations?.length ? { textbook_preparations: evidence.textbookPreparations } : {}),
+    ...(evidence.candidateRoutes?.length ? { candidate_routes: evidence.candidateRoutes } : {}),
   };
 }
 

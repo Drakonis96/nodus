@@ -1,6 +1,7 @@
 import type { ModelRef } from '@shared/types';
 import { findRequestedTarget } from '@shared/moleculeInspection';
 import {
+  candidateRoutes,
   disconnectionClasses,
   findStartingSmiles,
   findTargetName,
@@ -11,6 +12,7 @@ import {
   passageFitsQuery,
   secondLevelTargets,
   synthesisEvidenceQueries,
+  type CandidateRoute,
   type EvidencePassage,
   type SynthesisEvidence,
   type TargetDisconnections,
@@ -23,13 +25,16 @@ import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '
 import { reactionIndexService } from '../reactionIndex';
 import { chemistryStockDirectory } from './chemistryStock';
 import { textbookCitations, textbookSchemeDirectory, textbookTemplateCitations } from './textbookSchemes';
-import { textbookPreparations, type TextbookPreparation } from '@shared/textbookSchemes';
+import { formatTemplateCitation, formatTextbookCitation, textbookPreparations, type TextbookPreparation } from '@shared/textbookSchemes';
 import { rerank, rerankerAvailable } from './localReranker';
 import { embed } from './aiClient';
 import { chemistryRunner } from './moleculeInspection';
 
 const CHEMISTRY_CAPABILITY = 'nodus:chemistry';
 const DISCONNECT_TOOL = 'propose-disconnections';
+const ROUTE_SEARCH_TOOL = 'search-routes';
+/** The route search's time budget: it returns the complete routes it has found by then. */
+const ROUTE_SEARCH_SECONDS = 60;
 /** Proposals kept per molecule, and passages kept in all. */
 const PROPOSALS_PER_TARGET = 6;
 const MAX_PASSAGES = 8;
@@ -124,6 +129,46 @@ async function textbookSchemePreparations(target: string, disconnections: Target
   } catch (error) {
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] textbook schemes unavailable:', error instanceof Error ? error.message : String(error));
+    return [];
+  } finally {
+    await dispose();
+  }
+}
+
+/** Complete routes from the package's route search over the ORD and textbook indexes, stopping
+ *  at the user's stock lists and starting materials, cited like the other evidence. Best-effort:
+ *  an older package without the tool, no index, a timeout or a failure returns []. */
+async function searchedRoutes(target: string, starting: string[], options: EvidenceOptions): Promise<CandidateRoute[]> {
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  if (!provider || !provider.tools.some((tool) => tool.id === ROUTE_SEARCH_TOOL)) return [];
+  const textbookDir = textbookSchemeDirectory();
+  const indexDirs = [await reactionIndexService().localDirectory(), textbookDir].filter((dir): dir is string => !!dir);
+  if (!indexDirs.length) return [];
+  const stockDir = chemistryStockDirectory();
+  const { runner, dispose } = chemistryRunner(options);
+  try {
+    const result = await runner.invoke({
+      provider,
+      toolId: ROUTE_SEARCH_TOOL,
+      input: {
+        indexDirs,
+        target,
+        maxSteps: starting.length ? 5 : 4,
+        budgetSeconds: ROUTE_SEARCH_SECONDS,
+        ...(starting.length ? { startingMaterials: starting.slice(0, 16) } : {}),
+        ...(stockDir ? { stockDir } : {}),
+      },
+    });
+    const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'candidate-routes');
+    if (!artifact) return [];
+    return candidateRoutes(
+      artifact.data,
+      textbookDir ? (ids) => textbookCitations(ids, textbookDir).map(formatTextbookCitation) : undefined,
+      textbookDir ? (templates) => textbookTemplateCitations(templates, textbookDir).map(formatTemplateCitation) : undefined,
+    );
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    console.warn('[synthesisEvidence] route search unavailable:', error instanceof Error ? error.message : String(error));
     return [];
   } finally {
     await dispose();
@@ -225,6 +270,9 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   const target = findRequestedTarget(question);
   if (!target) return null;
   const startingMaterials = findStartingSmiles(question, target);
+  // The route search runs beside the rest of the evidence (it has its own time budget).
+  const routes = searchedRoutes(target, startingMaterials, options);
+  routes.catch(() => undefined); // awaited below; a cancelled request must not leave it unhandled
   const disconnections = await ordDisconnections(target, startingMaterials, options);
   let passages: EvidencePassage[] = [];
   try {
@@ -237,5 +285,10 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
     console.warn('[synthesisEvidence] textbook passages unavailable:', error instanceof Error ? error.message : String(error));
   }
   const preparations = await textbookSchemePreparations(target, disconnections, startingMaterials, options);
-  return { target, startingMaterials, disconnections, passages, ...(preparations.length ? { textbookPreparations: preparations } : {}) };
+  const candidates = await routes;
+  return {
+    target, startingMaterials, disconnections, passages,
+    ...(preparations.length ? { textbookPreparations: preparations } : {}),
+    ...(candidates.length ? { candidateRoutes: candidates } : {}),
+  };
 }
