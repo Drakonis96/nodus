@@ -111,7 +111,24 @@ export class CapabilityWorkerHandle {
 
   private async attempt<T>(method: WorkerMethod, payload: unknown, options: { timeoutMs?: number; signal?: AbortSignal }): Promise<T> {
     options.signal?.throwIfAborted();
-    await this.start();
+    const ready = this.start();
+    const signal = options.signal;
+    let abortStart: (() => void) | undefined;
+    try {
+      if (!signal) await ready;
+      else await Promise.race([ready, new Promise<never>((_resolve, reject) => {
+        abortStart = () => {
+          this.cancel();
+          reject(new DOMException('The capability startup was cancelled.', 'AbortError'));
+        };
+        signal.addEventListener('abort', abortStart, { once: true });
+        if (signal.aborted) abortStart();
+      })]);
+    } finally {
+      if (abortStart) signal?.removeEventListener('abort', abortStart);
+    }
+    // Abort can arrive with the ready frame, before the call listener has been installed.
+    signal?.throwIfAborted();
     const timeoutMs = Math.min(Math.max(options.timeoutMs ?? LIMITS.toolTimeoutMsMax, LIMITS.toolTimeoutMsMin), LIMITS.toolTimeoutMsMax);
     const callId = `c${this.nextCallId++}`;
     return new Promise<T>((resolve, reject) => {

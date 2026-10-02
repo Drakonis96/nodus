@@ -12,7 +12,7 @@ import { capabilityChatSkills, enabledChatSkills, invokedChatSkills } from '../c
 import { chatAssetOwner, chatAssetVersion } from '../chatAssets';
 import { getConversation } from '../db/chatRepo';
 import { executeChatSkills } from './chatSkillExecution';
-import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
+import { authorizeNotebookRequest, validateNotebookRequest, requestNotebookScope, hasResearchSourceRestriction, rememberNotebookTurn, registerNotebookRun } from './researchNotebookService';
 import { researchModelContextWindow } from './aiClient';
 import { researchAnswerTokens } from '@shared/researchRetrievalBudget';
 import { researchContextLayers } from '@shared/researchContextLayers';
@@ -25,6 +25,7 @@ import { SYNTHESIS_TEMPLATE_ADDENDUM, looksLikeSynthesisRequest } from '@shared/
 import { reviseRouteWithEvidence, revisionUserMessage, routeEvidencePassEnabled } from './routeEvidencePass';
 import { SYNTHESIS_EVIDENCE_KEY, SYNTHESIS_EVIDENCE_SYSTEM_RULE, synthesisEvidencePayload, synthesisRetrievalQuery } from '@shared/synthesisEvidence';
 import { gatherSynthesisEvidence } from './synthesisEvidence';
+import { chemistryEvidenceScope } from './chemistryEvidenceScope';
 import type {
   Author,
   ChatMessageRecord,
@@ -224,7 +225,7 @@ function skillExecution(request: ResearchChatRequest) {
   const fixSkills = isRouteFixPrompt(userMessages.at(-1) ?? '') ? capabilityChatSkills('nodus:chemistry') : [];
   const invoked = [...invokedChatSkills(request.skillIds), ...fixSkills]
     .filter((skill, index, all) => !standing.some(item => item.id === skill.id) && all.findIndex(item => item.id === skill.id) === index);
-  return { skills: [...standing, ...invoked], question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
+  return { skills: [...standing, ...invoked], evidenceScope: chemistryEvidenceScope(request), question: userMessages.at(-1), request: lastRequest ?? userMessages.at(-1), target: requestedTargetFor(userMessages), model: request.model, owner, version: owner ? chatAssetVersion(owner) : 0,
     isCurrent: () => getActiveVault().id === vaultId && (!request.conversationId || !!getConversation(request.conversationId)) };
 }
 
@@ -234,7 +235,7 @@ async function withRouteEvidence(answer: string, execution: ReturnType<typeof sk
   const question = execution.question ?? '';
   const chemistry = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
   if (!routeEvidencePassEnabled() || !chemistry || isRouteFixPrompt(question) || !looksLikeSynthesisRequest(question)) return answer;
-  return reviseRouteWithEvidence(answer, { model: execution.model, target: execution.target, question: execution.request ?? question, signal, locale: getSettings().promptLanguage ?? 'en' },
+  return reviseRouteWithEvidence(answer, { model: execution.model, evidenceScope: execution.evidenceScope, target: execution.target, question: execution.request ?? question, signal, locale: getSettings().promptLanguage ?? 'en' },
     async brief => finalizeAnswer(await completeTextStream({ ...opts, user: revisionUserMessage(opts.user, answer, brief) }, () => {}, execution.model, signal), local, sourceContext));
 }
 
@@ -259,7 +260,7 @@ async function auditAnswer(answer: string, execution: ReturnType<typeof skillExe
   // step drawings) take seconds more and repaint the answer when they finish.
   if (onDeterministic && skilled !== answer) onDeterministic(skilled);
   const chemistryEnabled = execution.skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const base = { model: execution.model, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
+  const base = { model: execution.model, evidenceScope: execution.evidenceScope, locale: getSettings().promptLanguage ?? 'en', enabled: chemistryEnabled, owner: execution.owner, signal, question: execution.request ?? execution.question, ...(onDeterministic ? { onDeterministic } : {}) };
   // One capability runner for the whole phase: the resolve pass warms the worker's reference
   // cache and the route audit reuses it, so a route opens one worker, not three.
   const session = chemistryEnabled ? chemistryRunner(base) : null;
@@ -561,6 +562,7 @@ const WEB_DISABLED_INSTRUCTION = 'The user asked for an internet search, but web
 const NO_SOURCES_INSTRUCTION = 'The user switched off every source in this chat: no ideas, documents or web pages were consulted. Answer from general knowledge, say so plainly at the start of the answer in the answer language, and cite nothing. ';
 
 async function buildResearchChatPrompt(request: ResearchChatRequest, skills = enabledChatSkills('assistant'), council?: { member?: boolean; assessments?: ConciliumResult; corpus?: { context: SectionPayload; stats: ResearchContextStats }; windowCap?: number }, signal?: AbortSignal): Promise<PromptBuild> {
+  signal?.throwIfAborted();
   // Resolve the effective model up front so a local target can size the whole payload
   // (context + history + output) to its real, small window instead of overflowing.
   const model = resolveModelRef(request.model);
@@ -572,6 +574,8 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   const compact = window != null && window <= LOCAL_COMPACT_WINDOW;
 
   const turns = request.messages.filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content.trim());
+  // The retrieval anchor belongs to the full authorized history, before the model-window trim.
+  const originalRequest = [...turns].reverse().find(message => message.role === 'user' && !isRouteFixPrompt(message.content))?.content;
   const latestAnswer = turns.map((m) => m.role).lastIndexOf('assistant');
   const latestQuestion = turns.map((m) => m.role).lastIndexOf('user');
   let messages = turns
@@ -600,19 +604,19 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
   // ontology (people, kinship, events, documents, evidence), not the idea graph.
   const genealogy = getActiveVault().type === 'genealogy';
   const chemistryEnabled = skills.some(skill => (skill.capabilities ?? []).includes('nodus:chemistry'));
-  const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage });
+  const moleculeDossiers = genealogy || !chemistryEnabled ? [] : await inspectResearchMolecules(question, { model, locale: promptLanguage, signal });
   // A new route request (not a correction): it also gets the synthesis template.
   const routeRequest = chemistryEnabled && !genealogy && !isRouteFixPrompt(question) && looksLikeSynthesisRequest(question);
   // A route request or a route correction is about making one molecule: its corpus context is
   // retrieved for that chemistry (the target and the reaction classes in play) and leaves out the
   // library-wide research gaps and contradictions, which are about the literature.
   const chemistryRoute = chemistryEnabled && !genealogy && (routeRequest || isRouteFixPrompt(question));
-  const originalRequest = [...messages].reverse().find(message => message.role === 'user' && !isRouteFixPrompt(message.content))?.content ?? question;
   // The ORD disconnections and textbook passages are gathered for the route's original request,
   // on the first answer and again on each correction, so a fix weighs the same evidence.
-  const gathered = chemistryRoute && !council?.member ? await gatherSynthesisEvidence(originalRequest, { model, locale: promptLanguage }) : null;
+  const routeQuestion = originalRequest ?? question;
+  const gathered = chemistryRoute && !council?.member ? await gatherSynthesisEvidence(routeQuestion, { model, locale: promptLanguage, signal, evidenceScope: chemistryEvidenceScope(request) }) : null;
   const routeEvidence = synthesisEvidencePayload(gathered);
-  const retrievalQuestion = chemistryRoute ? synthesisRetrievalQuery(originalRequest, gathered) : question;
+  const retrievalQuestion = chemistryRoute ? synthesisRetrievalQuery(routeQuestion, gathered) : question;
   const assessments = council?.assessments ? conciliumAssessments(council.assessments, window == null ? 12_000 : Math.max(256, Math.floor(window * LOCAL_CHARS_PER_TOKEN * 0.2 / council.assessments.members.length))) : undefined;
   const system = withResearchSystemPrompt([
     council?.member ? 'You are an independent Concilium council member. Assess the user question carefully and provide a concise, evidence-based answer with key reasons, uncertainties and verifiable citations. No skills or tools are available to you. Return prose only, with no skill directives or executable artifacts.' : '',
@@ -625,7 +629,7 @@ async function buildResearchChatPrompt(request: ResearchChatRequest, skills = en
     // contract is not added on top, so the rules are sent once.
     routeRequest ? SYNTHESIS_TEMPLATE_ADDENDUM : '',
     routeEvidence ? SYNTHESIS_EVIDENCE_SYSTEM_RULE : '',
-    !genealogy && request.selection.sourceFilter?.enabled === true
+    !genealogy && hasResearchSourceRestriction(request)
       ? 'Source restriction: use only the supplied context from the selected works. Do not supplement it with other corpus sources or general knowledge. If the selected sources are insufficient, state that explicitly. Continue answering in the configured language.' : '',
   ].filter(Boolean).join('\n\n'), request.systemPromptId, { surface: 'research', conversationId: request.conversationId });
 

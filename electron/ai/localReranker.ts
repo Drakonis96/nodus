@@ -2,6 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
+import { setTimeout as delay } from 'node:timers/promises';
 import { freePort, llamaServerPath } from './nodusLocalAi';
 
 /**
@@ -29,7 +30,7 @@ const IDLE_MS = 5 * 60_000;
 const START_TIMEOUT_MS = 60_000;
 
 let server: { child: ChildProcess; url: string; idle: NodeJS.Timeout | null } | null = null;
-let starting: Promise<string | null> | null = null;
+let starting: { promise: Promise<string | null>; controller: AbortController; users: number } | null = null;
 
 export function rerankerModelPath(): string {
   return path.join(app.getPath('userData'), 'local-ai', 'models', RERANKER_MODEL.id, RERANKER_MODEL.file);
@@ -52,6 +53,7 @@ function touch(): void {
 }
 
 export function stopReranker(): void {
+  starting?.controller.abort();
   const current = server;
   server = null;
   if (!current) return;
@@ -59,45 +61,78 @@ export function stopReranker(): void {
   current.child.kill('SIGTERM');
 }
 
-async function ensureServer(): Promise<string | null> {
-  if (server && server.child.exitCode == null) { touch(); return server.url; }
-  if (starting) return starting;
-  starting = (async () => {
-    const executable = await llamaServerPath();
-    if (!executable || !rerankerAvailable()) return null;
-    const port = await freePort();
-    const child = spawn(executable, [
-      '--model', rerankerModelPath(), '--host', '127.0.0.1', '--port', String(port), '--reranking',
-      '--ctx-size', '16384', '--parallel', '4', '--batch-size', '4096', '--ubatch-size', '4096',
-      ...(process.platform === 'darwin' ? ['--n-gpu-layers', '999'] : ['--fit', 'on']),
-      '--no-webui',
-    ], { stdio: 'ignore' });
-    const url = `http://127.0.0.1:${port}`;
-    const deadline = Date.now() + START_TIMEOUT_MS;
+async function startServer(signal: AbortSignal): Promise<string | null> {
+  const executable = await llamaServerPath();
+  signal.throwIfAborted();
+  if (!executable || !rerankerAvailable()) return null;
+  const port = await freePort();
+  signal.throwIfAborted();
+  const child = spawn(executable, [
+    '--model', rerankerModelPath(), '--host', '127.0.0.1', '--port', String(port), '--reranking',
+    '--ctx-size', '16384', '--parallel', '4', '--batch-size', '4096', '--ubatch-size', '4096',
+    ...(process.platform === 'darwin' ? ['--n-gpu-layers', '999'] : ['--fit', 'on']),
+    '--no-webui',
+  ], { stdio: 'ignore' });
+  const url = `http://127.0.0.1:${port}`;
+  const deadline = Date.now() + START_TIMEOUT_MS;
+  try {
     while (Date.now() < deadline && child.exitCode == null) {
+      signal.throwIfAborted();
       try {
-        if ((await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) })).ok) {
+        if ((await fetch(`${url}/health`, { signal: AbortSignal.any([signal, AbortSignal.timeout(2000)]) })).ok) {
+          signal.throwIfAborted();
           server = { child, url, idle: null };
           child.once('exit', () => { if (server?.child === child) server = null; });
           touch();
           return url;
         }
-      } catch { /* not listening yet */ }
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      } catch (error) {
+        if (signal.aborted) throw error;
+        /* not listening yet */
+      }
+      await delay(250, undefined, { signal });
     }
-    child.kill('SIGKILL');
     console.warn('[reranker] the local reranker did not start; textbook evidence keeps its fused order');
     return null;
-  })().finally(() => { starting = null; });
-  return starting;
+  } finally {
+    if (server?.child !== child) child.kill('SIGKILL');
+  }
+}
+
+async function ensureServer(signal?: AbortSignal): Promise<string | null> {
+  signal?.throwIfAborted();
+  if (server && server.child.exitCode == null) { touch(); return server.url; }
+  if (!starting || starting.controller.signal.aborted) {
+    const pending = { promise: Promise.resolve<string | null>(null), controller: new AbortController(), users: 0 };
+    pending.promise = startServer(pending.controller.signal).finally(() => { if (starting === pending) starting = null; });
+    starting = pending;
+  }
+  const pending = starting;
+  pending.users++;
+  let abort: (() => void) | undefined;
+  try {
+    if (!signal) return await pending.promise;
+    return await Promise.race([pending.promise, new Promise<never>((_resolve, reject) => {
+      abort = () => reject(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+    })]);
+  } finally {
+    if (abort) signal?.removeEventListener('abort', abort);
+    pending.users--;
+    // Cancelling one caller does not kill a startup another live search still needs.
+    if (!pending.users && starting === pending) pending.controller.abort();
+  }
 }
 
 /** Relevance scores for `documents` against `query`, in input order; null when the reranker is
  *  not installed or fails (the caller keeps its own order). */
 export async function rerank(query: string, documents: string[], signal?: AbortSignal): Promise<number[] | null> {
+  signal?.throwIfAborted();
   if (!documents.length || !rerankerAvailable()) return null;
   try {
-    const url = await ensureServer();
+    const url = await ensureServer(signal);
+    signal?.throwIfAborted();
     if (!url) return null;
     const response = await fetch(`${url}/v1/rerank`, {
       method: 'POST',

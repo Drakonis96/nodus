@@ -50,6 +50,7 @@ import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
 import { formatTextbookPrecedents, TEXTBOOK_ID } from '@shared/textbookSchemes';
 import { compatibilityFixLines, formatCompatibility, normalizeCompatibility, type StepCompatibility } from '@shared/stepCompatibility';
 import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
+import type { ChemistryEvidenceScope } from './chemistryEvidenceScope';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
 import { reactionIndexService } from '../reactionIndex';
@@ -72,6 +73,7 @@ const MAX_ROUTE_DRAWINGS = 16;
 const MAX_PRECEDENT_DRAWINGS = 8;
 
 interface InspectOptions {
+  evidenceScope?: ChemistryEvidenceScope;
   model?: ModelRef | null;
   locale?: string;
   signal?: AbortSignal;
@@ -244,9 +246,12 @@ async function invokeRoute(runner: Runner, provider: CapabilityProvider, steps: 
  *  the package exposes the tool and the index has been downloaded and verified. Best-effort:
  *  an absent index, an older package or a tool failure all return null and change nothing. */
 export async function lookupReactionPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<{ precedent: ReactionPrecedent; provider: CapabilityProvider } | null> {
+  options.signal?.throwIfAborted();
+  if (options.evidenceScope?.external === false) return null;
   const provider = knownReactionsProvider();
   if (!provider) return null;
   const indexDir = await reactionIndexService().localDirectory();
+  options.signal?.throwIfAborted();
   if (!indexDir) return null;
   try {
     const result = await runner.invoke({
@@ -271,7 +276,8 @@ export async function lookupReactionPrecedent(runner: Runner, steps: string[], o
  *  when it has been built. Best-effort like the ORD lookup: null on any absence or failure. */
 export async function lookupTextbookPrecedent(runner: Runner, steps: string[], options: InspectOptions): Promise<ReactionPrecedent | null> {
   const provider = knownReactionsProvider();
-  const indexDir = provider ? textbookSchemeDirectory() : null;
+  options.signal?.throwIfAborted();
+  const indexDir = provider ? textbookSchemeDirectory(options.evidenceScope) : null;
   if (!provider || !indexDir) return null;
   try {
     const result = await runner.invoke({
@@ -681,7 +687,7 @@ async function buildStepSupport(
   const passagesPromise = (async () => {
     if (!byClass.size) return;
     const names = [...byClass.keys()];
-    const found = await textbookPassages(names.map((name) => textbookQueryForClass(name)!), synthesisEvidenceWorkIds(), options.signal, 1);
+    const found = await textbookPassages(names.map((name) => textbookQueryForClass(name)!), synthesisEvidenceWorkIds(options.evidenceScope), options.signal, 1);
     for (const passage of found) {
       const name = names.find((item) => textbookQueryForClass(item) === passage.retrievedFor);
       if (!name) continue;
@@ -702,7 +708,7 @@ async function buildStepSupport(
     }
     if (!products.size) return;
     const starting = findStartingSmiles(options.question ?? '', options.target);
-    const briefs = await invokeDisconnections(runner, [...new Set(products.values())], starting, 4);
+    const briefs = await invokeDisconnections(runner, [...new Set(products.values())], starting, 4, options);
     if (!briefs) return;
     for (const [step, product] of products) {
       const brief = briefs.find((item) => item.input === product);
@@ -824,7 +830,8 @@ const COMPATIBILITY_TOOL = 'check-compatibility';
  *  labels, its reagents from the step's conditions line and its named agents. Empty when the
  *  package has no such tool; textbook examples of protecting groups when the textbook index is
  *  there. */
-async function checkStepCompatibility(runner: Runner, labels: RouteSpeciesLabel[][], conditions: string[]): Promise<StepCompatibility[]> {
+async function checkStepCompatibility(runner: Runner, labels: RouteSpeciesLabel[][], conditions: string[], options: InspectOptions): Promise<StepCompatibility[]> {
+  options.signal?.throwIfAborted();
   const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
   if (!provider?.tools.some((tool) => tool.id === COMPATIBILITY_TOOL)) return [];
   const steps = labels.map((entries, index) => {
@@ -835,7 +842,7 @@ async function checkStepCompatibility(runner: Runner, labels: RouteSpeciesLabel[
     return { reactants: smiles('reactant', true), products: smiles('product', false), reagents: [conditions[index] ?? '', ...agents].filter(Boolean).join('; ').slice(0, 2000) };
   });
   if (!steps.some((step) => step.reactants.length && step.products.length && step.reagents)) return [];
-  const textbookDir = textbookSchemeDirectory();
+  const textbookDir = textbookSchemeDirectory(options.evidenceScope);
   const result = await runner.invoke({ provider, toolId: COMPATIBILITY_TOOL, input: { steps: steps.slice(0, 24), ...(textbookDir ? { textbookDir } : {}) } });
   const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'step-compatibility');
   return artifact ? normalizeCompatibility(artifact.data) : [];
@@ -849,6 +856,7 @@ export async function appendRouteReportAndDrawings(
   options: InspectOptions = {},
   overrides: { steps?: string[]; labels?: RouteSpeciesLabel[][]; unresolved?: UnresolvedName[] } = {},
 ): Promise<string> {
+  options.signal?.throwIfAborted();
   if (options.enabled === false || !routeVerificationAvailable()) return finalAnswer;
   // The names-first path derives the equations from the resolved names and passes them in.
   const steps = overrides.steps ?? [];
@@ -897,12 +905,12 @@ export async function appendRouteReportAndDrawings(
     const textbookSection = lookupTextbookPrecedent(runner, queries.map((query) => query.query), options).then((precedent) => {
       if (!precedent) return '';
       const target = options.target ? { smiles: options.target, name: targetName(labels, audit, options.target) } : null;
-      return formatTextbookPrecedents(precedent, (ids) => textbookCitations(ids), { queries, target });
+      return formatTextbookPrecedents(precedent, (ids) => textbookCitations(ids, undefined, options.evidenceScope), { queries, target });
     }).catch(() => '');
     // Groups a step's reagents would attack (an ester through LiAlH4, a free OH beside a Grignard).
-    const compatibilityPromise = checkStepCompatibility(runner, labels, conditions).catch(() => [] as StepCompatibility[]);
+    const compatibilityPromise = checkStepCompatibility(runner, labels, conditions, options).catch(() => [] as StepCompatibility[]);
     // Which starting materials the user's vendor stock lists hold (no lists: nothing is said).
-    const stockPromise = startingMaterialStockLine(runner, labels).catch(() => '');
+    const stockPromise = options.evidenceScope?.external === false ? Promise.resolve('') : startingMaterialStockLine(runner, labels).catch(() => '');
     const review = await reviewPromise;
     const report = formatRouteAudit(audit, labels, review);
     const precedentText = await precedentSection;
@@ -913,7 +921,7 @@ export async function appendRouteReportAndDrawings(
       const clashes = compatibilityFixLines(step);
       if (clashes.length) support.set(step.step - 1, { ...(support.get(step.step - 1) ?? {}), compatibility: clashes });
     }
-    const compatibilityText = formatCompatibility(compatibility, (ids) => textbookCitations(ids));
+    const compatibilityText = formatCompatibility(compatibility, (ids) => textbookCitations(ids, undefined, options.evidenceScope));
     // A refusal the checker can name and the app cannot fix is offered back to the model as one
     // click: names and roles only — the model never authored the derived SMILES. The index's
     // alternatives and a textbook passage ride along as evidence.

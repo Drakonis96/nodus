@@ -5,6 +5,16 @@ import { relevantExcerpt, textbookQueryForClass } from '@shared/synthesisEvidenc
 import { lookupReactionPrecedent, resolveNamedRoute, chemistryRunner } from './moleculeInspection';
 import { synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { searchSearxng } from '../websearch/searxngService';
+import type { ChemistryEvidenceScope } from './chemistryEvidenceScope';
+
+interface RouteEvidenceOptions {
+  model?: ModelRef | null;
+  target?: string | null;
+  question?: string;
+  signal?: AbortSignal;
+  locale?: string;
+  evidenceScope?: ChemistryEvidenceScope;
+}
 
 /** Per-step evidence pass (route quality, option A): after the first draft of a new route,
  *  look up each step in the Open Reaction Database index, the textbooks and the web, and give
@@ -29,12 +39,14 @@ async function webFor(reaction: string, signal?: AbortSignal): Promise<StepEvide
       title: result.title, url: result.url, snippet: (result.content ?? '').replace(/\s+/g, ' ').slice(0, SNIPPET_CHARS),
     }));
   } catch (error) {
+    if (signal?.aborted) throw error;
     console.warn('[route-evidence] web search unavailable:', error instanceof Error ? error.message : String(error));
     return undefined;
   }
 }
 
-export async function gatherRouteEvidence(draft: string, options: { model?: ModelRef | null; target?: string | null; question?: string; signal?: AbortSignal; locale?: string }): Promise<StepEvidence[]> {
+export async function gatherRouteEvidence(draft: string, options: RouteEvidenceOptions): Promise<StepEvidence[]> {
+  options.signal?.throwIfAborted();
   const started = Date.now();
   const { runner, dispose } = chemistryRunner(options);
   try {
@@ -55,18 +67,22 @@ export async function gatherRouteEvidence(draft: string, options: { model?: Mode
     const textbook = (async () => {
       if (!byClass.size) return;
       const classNames = [...byClass.keys()];
-      const passages = await textbookPassages(classNames.map((name) => textbookQueryForClass(name)!), synthesisEvidenceWorkIds(), options.signal, 1);
+      const passages = await textbookPassages(classNames.map((name) => textbookQueryForClass(name)!), synthesisEvidenceWorkIds(options.evidenceScope), options.signal, 1);
       for (const passage of passages) {
         const name = classNames.find((entry) => textbookQueryForClass(entry) === passage.retrievedFor);
         if (!name) continue;
         const excerpt = relevantExcerpt(name, passage.text, EXCERPT_CHARS);
         for (const step of byClass.get(name) ?? []) evidence[step].textbook = { title: passage.work.title, location: passage.location ?? '', about: name, excerpt };
       }
-    })().catch((error) => console.warn('[route-evidence] textbook lookup failed:', error instanceof Error ? error.message : String(error)));
+    })().catch((error) => {
+      if (options.signal?.aborted) throw error;
+      console.warn('[route-evidence] textbook lookup failed:', error instanceof Error ? error.message : String(error));
+    });
     // The web is asked about the steps with the least support first.
     const webSteps = [...evidence].sort((a, b) => (a.ord?.recorded ?? 0) - (b.ord?.recorded ?? 0)).slice(0, WEB_STEPS);
-    const web = Promise.all(webSteps.map(async (item) => { item.web = await webFor(item.reaction, options.signal); }));
+    const web = options.evidenceScope?.web === false ? Promise.resolve([]) : Promise.all(webSteps.map(async (item) => { item.web = await webFor(item.reaction, options.signal); }));
     await Promise.all([textbook, web]);
+    options.signal?.throwIfAborted();
     console.log(`[route-evidence] ${evidence.length} steps: ord ${evidence.filter((item) => item.ord).length}, textbook ${evidence.filter((item) => item.textbook).length}, web ${evidence.filter((item) => item.web?.length).length} (${Date.now() - started} ms)`);
     return evidence;
   } finally {
@@ -78,7 +94,7 @@ export async function gatherRouteEvidence(draft: string, options: { model?: Mode
  *  nothing was found or the revision is not a route (so the pass can never lose an answer). */
 export async function reviseRouteWithEvidence(
   draft: string,
-  options: { model?: ModelRef | null; target?: string | null; question?: string; signal?: AbortSignal; locale?: string },
+  options: RouteEvidenceOptions,
   complete: (user: string) => Promise<string>,
 ): Promise<string> {
   try {

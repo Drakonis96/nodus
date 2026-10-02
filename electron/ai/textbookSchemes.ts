@@ -3,6 +3,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { TEXTBOOK_ID, textbookCitation, type TextbookCitation, type TextbookSchemeRecord, type TextbookTemplateSource } from '@shared/textbookSchemes';
 import { getDb } from '../db/database';
+import type { ChemistryEvidenceScope } from './chemistryEvidenceScope';
 
 /**
  * The textbook-scheme reaction index: reactions transcribed from the scheme drawings in the user's
@@ -17,17 +18,38 @@ const SOURCE = 'nodus.textbook-schemes';
 const REQUIRED = ['manifest.json', 'records.json', 'exact.tsv.zst', 'products.tsv.zst', 'reaction-smiles.tsv.zst',
   'molecules.tsv.zst', 'reactions.faiss.zst', 'reaction-keys.txt.zst'];
 
-export function textbookSchemeDirectory(): string | null {
+export function textbookSchemeDirectory(scope?: ChemistryEvidenceScope): string | null {
+  if (scope?.workIds?.size === 0) return null;
   const dir = process.env.NODUS_SCHEME_INDEX_DIR
     ? path.resolve(process.env.NODUS_SCHEME_INDEX_DIR)
     : path.join(app.getPath('userData'), 'chemistry-schemes', 'index');
   try {
     if (!REQUIRED.every((name) => fs.statSync(path.join(dir, name)).isFile())) return null;
     const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')) as { source?: string };
-    return manifest.source === SOURCE ? dir : null;
+    return manifest.source === SOURCE && (!scope || indexWithinScope(dir, scope)) ? dir : null;
   } catch {
     return null;
   }
+}
+
+/** The package searches an entire index, including its templates. Filtering its citations
+ * afterwards cannot undo an excluded book's influence on a proposed route. Until the package
+ * can filter before search, only indexes entirely attributable to permitted works may run. */
+function indexWithinScope(dir: string, scope: ChemistryEvidenceScope): boolean {
+  const allowed = new Set((getDb().prepare('SELECT nodus_id, zotero_key FROM works WHERE archived = 0').all() as Array<{ nodus_id: string; zotero_key: string | null }>)
+    .filter(work => !scope.workIds || scope.workIds.has(work.nodus_id))
+    .flatMap(work => [work.nodus_id, ...(work.zotero_key ? [work.zotero_key] : [])]));
+  const permitted = (source: { nodusId?: string }) => !!source.nodusId && allowed.has(source.nodusId);
+  // Check the raw files too: parsers used for display skip malformed entries, while an index
+  // can still contain the reactions/templates behind them.
+  const raw = JSON.parse(fs.readFileSync(path.join(dir, 'records.json'), 'utf8')) as Record<string, TextbookSchemeRecord>;
+  if (!Object.keys(raw).length || !Object.values(raw).every(source => source && permitted(source))) return false;
+  const hasTemplates = ['templates.tsv.zst', 'retro-templates.tsv.zst'].some(file => fs.existsSync(path.join(dir, file)));
+  if (hasTemplates || fs.existsSync(path.join(dir, 'template-sources.json'))) {
+    const templates = JSON.parse(fs.readFileSync(path.join(dir, 'template-sources.json'), 'utf8')) as Record<string, { sources?: Array<{ nodusId?: string }> }>;
+    if (!Object.values(templates).every(entry => Array.isArray(entry?.sources) && entry.sources.length > 0 && entry.sources.every(source => source && permitted(source)))) return false;
+  }
+  return true;
 }
 
 let cached: { file: string; mtimeMs: number; records: Map<string, TextbookSchemeRecord> } | null = null;
@@ -65,10 +87,11 @@ function pageLink(record: TextbookSchemeRecord, works: Map<string, string | null
 }
 
 /** Citations for record ids, in the order given; unknown ids are skipped. */
-export function textbookCitations(ids: string[], dir = textbookSchemeDirectory()): TextbookCitation[] {
+export function textbookCitations(ids: string[], dir = textbookSchemeDirectory(), scope?: ChemistryEvidenceScope): TextbookCitation[] {
   if (!dir || !ids.length) return [];
   let map: Map<string, TextbookSchemeRecord>;
   try {
+    if (scope && !indexWithinScope(dir, scope)) return [];
     map = records(dir);
   } catch {
     return [];
@@ -101,10 +124,11 @@ function templateSources(dir: string): Map<string, TextbookTemplateSource[]> {
 
 /** The schemes behind retro templates, in the templates' order, at most `max` distinct pages;
  *  worked examples (real molecules) before general schemes (R groups). */
-export function textbookTemplateCitations(templates: string[], dir = textbookSchemeDirectory(), max = 2): TextbookTemplateSource[] {
+export function textbookTemplateCitations(templates: string[], dir = textbookSchemeDirectory(), max = 2, scope?: ChemistryEvidenceScope): TextbookTemplateSource[] {
   if (!dir || !templates.length) return [];
   let map: Map<string, TextbookTemplateSource[]>;
   try {
+    if (scope && !indexWithinScope(dir, scope)) return [];
     map = templateSources(dir);
   } catch {
     return [];

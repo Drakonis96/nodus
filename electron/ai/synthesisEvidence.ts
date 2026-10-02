@@ -31,6 +31,7 @@ import { formatTemplateCitation, formatTextbookCitation, textbookPreparations, t
 import { rerank, rerankerAvailable } from './localReranker';
 import { embed } from './aiClient';
 import { chemistryRunner } from './moleculeInspection';
+import type { ChemistryEvidenceScope } from './chemistryEvidenceScope';
 
 const CHEMISTRY_CAPABILITY = 'nodus:chemistry';
 const DISCONNECT_TOOL = 'propose-disconnections';
@@ -50,6 +51,7 @@ const RERANK_LANE = 20;
 const RERANK_POOL = 30;
 
 interface EvidenceOptions {
+  evidenceScope?: ChemistryEvidenceScope;
   model?: ModelRef | null;
   locale?: string;
   signal?: AbortSignal;
@@ -73,10 +75,13 @@ function stockInput(): { stockDir?: string } {
 
 /** One `propose-disconnections` call on an open runner. Null when the package has no such tool or
  *  the index is not downloaded; throws on a tool failure. */
-export async function invokeDisconnections(runner: Runner, targets: string[], starting: string[], limit = PROPOSALS_PER_TARGET): Promise<TargetDisconnections[] | null> {
+export async function invokeDisconnections(runner: Runner, targets: string[], starting: string[], limit = PROPOSALS_PER_TARGET, options: EvidenceOptions = {}): Promise<TargetDisconnections[] | null> {
+  options.signal?.throwIfAborted();
+  if (options.evidenceScope?.external === false) return null;
   const provider = disconnectProvider();
   if (!provider || !targets.length) return null;
   const indexDir = await reactionIndexService().localDirectory();
+  options.signal?.throwIfAborted();
   if (!indexDir) return null;
   const result = await runner.invoke({
     provider,
@@ -93,17 +98,17 @@ export async function invokeDisconnections(runner: Runner, targets: string[], st
  *  Best-effort: an older package, an index without the retro tables or a tool failure returns
  *  what was found so far. */
 async function ordDisconnections(target: string, starting: string[], options: EvidenceOptions): Promise<TargetDisconnections[]> {
-  if (!disconnectProvider()) return [];
+  if (options.evidenceScope?.external === false || !disconnectProvider()) return [];
   const { runner, dispose } = chemistryRunner(options);
   const briefs: TargetDisconnections[] = [];
   try {
-    let level = (await invokeDisconnections(runner, [target], starting)) ?? [];
+    let level = (await invokeDisconnections(runner, [target], starting, PROPOSALS_PER_TARGET, options)) ?? [];
     briefs.push(...level);
     for (let depth = 2; depth <= (starting.length ? 3 : 2) && level.length; depth += 1) {
       options.signal?.throwIfAborted();
       const next = secondLevelTargets(level, starting, 3).filter((molecule) => !briefs.some((brief) => brief.input === molecule || brief.target === molecule));
       if (!next.length) break;
-      level = ((await invokeDisconnections(runner, next, starting)) ?? []).map((brief) => ({ ...brief, proposals: brief.proposals.slice(0, 3) }));
+      level = ((await invokeDisconnections(runner, next, starting, PROPOSALS_PER_TARGET, options)) ?? []).map((brief) => ({ ...brief, proposals: brief.proposals.slice(0, 3) }));
       briefs.push(...level);
     }
   } catch (error) {
@@ -121,14 +126,14 @@ async function ordDisconnections(target: string, starting: string[], options: Ev
  *  tool failure returns []. */
 async function textbookSchemePreparations(target: string, disconnections: TargetDisconnections[], starting: string[], options: EvidenceOptions): Promise<TextbookPreparation[]> {
   const provider = disconnectProvider();
-  const indexDir = provider ? textbookSchemeDirectory() : null;
+  const indexDir = provider ? textbookSchemeDirectory(options.evidenceScope) : null;
   if (!provider || !indexDir) return [];
   const molecules = [...new Set([target, ...secondLevelTargets(disconnections, starting, 5)])].slice(0, 6);
   const { runner, dispose } = chemistryRunner(options);
   try {
     const result = await runner.invoke({ provider, toolId: DISCONNECT_TOOL, input: { indexDir, targets: molecules, limit: 6 } });
     const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-disconnections');
-    return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir), (templates) => textbookTemplateCitations(templates, indexDir)) : [];
+    return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir, options.evidenceScope), (templates) => textbookTemplateCitations(templates, indexDir, 2, options.evidenceScope)) : [];
   } catch (error) {
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] textbook schemes unavailable:', error instanceof Error ? error.message : String(error));
@@ -144,10 +149,12 @@ async function textbookSchemePreparations(target: string, disconnections: Target
 async function searchedRoutes(target: string, starting: string[], options: EvidenceOptions): Promise<CandidateRoute[]> {
   const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
   if (!provider || !provider.tools.some((tool) => tool.id === ROUTE_SEARCH_TOOL)) return [];
-  const textbookDir = textbookSchemeDirectory();
-  const indexDirs = [await reactionIndexService().localDirectory(), textbookDir].filter((dir): dir is string => !!dir);
+  const textbookDir = textbookSchemeDirectory(options.evidenceScope);
+  const ordDir = options.evidenceScope?.external === false ? null : await reactionIndexService().localDirectory();
+  options.signal?.throwIfAborted();
+  const indexDirs = [ordDir, textbookDir].filter((dir): dir is string => !!dir);
   if (!indexDirs.length) return [];
-  const stockDir = chemistryStockDirectory();
+  const stockDir = options.evidenceScope?.external === false ? null : chemistryStockDirectory();
   const { runner, dispose } = chemistryRunner(options);
   try {
     const result = await runner.invoke({
@@ -166,8 +173,8 @@ async function searchedRoutes(target: string, starting: string[], options: Evide
     if (!artifact) return [];
     return candidateRoutes(
       artifact.data,
-      textbookDir ? (ids) => textbookCitations(ids, textbookDir).map(formatTextbookCitation) : undefined,
-      textbookDir ? (templates) => textbookTemplateCitations(templates, textbookDir).map(formatTemplateCitation) : undefined,
+      textbookDir ? (ids) => textbookCitations(ids, textbookDir, options.evidenceScope).map(formatTextbookCitation) : undefined,
+      textbookDir ? (templates) => textbookTemplateCitations(templates, textbookDir, 2, options.evidenceScope).map(formatTemplateCitation) : undefined,
     );
   } catch (error) {
     if (options.signal?.aborted) throw error;
@@ -182,6 +189,7 @@ async function searchedRoutes(target: string, starting: string[], options: Evide
  *  stereo/isotope form), so the model can say a route may be unnecessary. Undefined without stock
  *  lists, with stock switched off, or on any failure. */
 async function targetAvailability(target: string, name: string, options: EvidenceOptions): Promise<string | undefined> {
+  if (options.evidenceScope?.external === false) return undefined;
   const stockDir = chemistryStockDirectory();
   const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
   if (!stockDir || !provider?.tools.some((tool) => tool.id === STOCK_TOOL)) return undefined;
@@ -200,7 +208,8 @@ async function targetAvailability(target: string, name: string, options: Evidenc
 
 /** The works whose passages count as route evidence: synthetic-chemistry texts and works filed
  *  under a chemistry collection. */
-export function synthesisEvidenceWorkIds(): string[] {
+export function synthesisEvidenceWorkIds(scope?: ChemistryEvidenceScope): string[] {
+  if (scope?.workIds?.size === 0) return [];
   const rows = getDb().prepare(
     `SELECT w.nodus_id, w.title,
             (SELECT group_concat(c.name, char(31)) FROM work_collections wc JOIN collections c ON c.collection_key = wc.collection_key
@@ -209,7 +218,7 @@ export function synthesisEvidenceWorkIds(): string[] {
       WHERE w.archived = 0 AND EXISTS (SELECT 1 FROM passages p WHERE p.nodus_id = w.nodus_id)`
   ).all() as Array<{ nodus_id: string; title: string | null; collections: string | null }>;
   return rows
-    .filter((row) => isSynthesisEvidenceWork(row.title ?? '', row.collections ? row.collections.split('\u001f') : []))
+    .filter((row) => (!scope?.workIds || scope.workIds.has(row.nodus_id)) && isSynthesisEvidenceWork(row.title ?? '', row.collections ? row.collections.split('\u001f') : []))
     .map((row) => row.nodus_id);
 }
 
@@ -234,6 +243,7 @@ function scannedWorkLookup(): (nodusId: string) => boolean {
 /** Passages for each query from the scoped works: the lexical lane (named reactions, reagent
  *  names) and the dense lane, fused by reciprocal rank, a few per query. */
 export async function textbookPassages(queries: string[], workIds: string[], signal?: AbortSignal, perQuery = PASSAGES_PER_QUERY): Promise<EvidencePassage[]> {
+  signal?.throwIfAborted();
   if (!queries.length || !workIds.length) return [];
   const chosen = new Map<string, EvidencePassage>();
   const scannedWork = scannedWorkLookup();
@@ -246,9 +256,13 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
     const lanes: SimilarPassage[][] = [];
     try { lanes.push(lexicalPassageSearch(query, laneSize, { nodusIds: workIds })); } catch { /* FTS is optional */ }
     try {
-      const vector = await embed(query);
+      const vector = await embed(query, signal);
+      signal?.throwIfAborted();
       if (vector) lanes.push(findSimilarPassages(vector, PASSAGE_SIMILARITY, laneSize, { nodusIds: workIds }));
-    } catch { /* no embedding provider: the lexical lane alone */ }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      /* no embedding provider: the lexical lane alone */
+    }
     const scores = new Map<string, { score: number; hit: SimilarPassage }>();
     for (const lane of lanes) {
       lane.forEach((hit, rank) => {
@@ -290,6 +304,7 @@ export async function textbookPassages(queries: string[], workIds: string[], sig
  *  target and textbook passages for the target and the reaction classes those disconnections
  *  name. Null when the request names no target SMILES. */
 export async function gatherSynthesisEvidence(question: string, options: EvidenceOptions = {}): Promise<SynthesisEvidence | null> {
+  options.signal?.throwIfAborted();
   const target = findRequestedTarget(question);
   if (!target) return null;
   const startingMaterials = findStartingSmiles(question, target);
@@ -304,7 +319,7 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
     // The methods the request's own starting materials imply come first: ORD need not propose them.
     const classes = [...new Set([...requestMethodClasses(question), ...disconnectionClasses(disconnections, 6)])];
     const queries = synthesisEvidenceQueries(findTargetName(question), classes);
-    passages = await textbookPassages(queries, synthesisEvidenceWorkIds(), options.signal);
+    passages = await textbookPassages(queries, synthesisEvidenceWorkIds(options.evidenceScope), options.signal);
   } catch (error) {
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] textbook passages unavailable:', error instanceof Error ? error.message : String(error));
@@ -312,6 +327,7 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   const preparations = await textbookSchemePreparations(target, disconnections, startingMaterials, options);
   const candidates = await routes;
   const available = await availability;
+  options.signal?.throwIfAborted();
   // One line per request, so a run's log shows which evidence reached the model.
   console.info(`[synthesisEvidence] target ${target} · ORD disconnections ${disconnections.reduce((n, d) => n + d.proposals.length, 0)} · passages ${passages.length} · textbook preparations ${preparations.length} · candidate routes ${candidates.length} · target purchasable ${available ? 'yes' : 'no/unknown'} · stock ${chemistryStockDirectory() ? 'on' : 'off'}`);
   return {
