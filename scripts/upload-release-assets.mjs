@@ -13,7 +13,7 @@ const expectedByPlatform = {
   'mac-arm64': ['Nodus-mac-arm64.dmg', 'Nodus-mac-arm64.zip'],
   'mac-x64': ['Nodus-mac-x64.dmg', 'Nodus-mac-x64.zip'],
   win: ['Nodus-win-x64.exe'],
-  linux: ['Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm'],
+  linux: ['Nodus-linux-amd64.deb', 'Nodus-x86_64.AppImage', 'Nodus-x86_64.AppImage.zsync', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm'],
 };
 
 // Only files under this prefix belong to this runner. Without it a macOS runner
@@ -56,10 +56,18 @@ export function selectReleaseAssets(platform, channel, entries) {
 
   const prefix = prefixByPlatform[platform];
   const selected = entries
-    .filter((filename) => filename.startsWith(prefix) || (publishesManifest(platform) && filename === manifest))
+    .filter((filename) => filename.startsWith(prefix) || expected.includes(filename) || (publishesManifest(platform) && filename === manifest))
     .sort();
   if (selected.length === 0) throw new Error(`No ${platform} release assets found`);
   return selected;
+}
+
+export function releaseAssetUploadBatches(platform, assets) {
+  // The catalogue prefers the most recently uploaded build when names differ
+  // only by "linux". Upload the compatibility alias before the canonical file.
+  return platform === 'linux'
+    ? [assets.filter((file) => path.basename(file) === 'Nodus-linux-x86_64.AppImage'), assets.filter((file) => path.basename(file) !== 'Nodus-linux-x86_64.AppImage')]
+    : [assets];
 }
 
 export function uploadReleaseAssets({ platform, channel, tag, repository }) {
@@ -69,12 +77,9 @@ export function uploadReleaseAssets({ platform, channel, tag, repository }) {
   const assets = selectReleaseAssets(platform, channel, entries)
     .map((filename) => path.join(releaseDir, filename));
 
-  execFileSync('gh', [
-    'release', 'upload', tag,
-    ...assets,
-    '--repo', repository,
-    '--clobber',
-  ], { cwd: repoRoot, stdio: 'inherit' });
+  for (const batch of releaseAssetUploadBatches(platform, assets)) {
+    execFileSync('gh', ['release', 'upload', tag, ...batch, '--repo', repository, '--clobber'], { cwd: repoRoot, stdio: 'inherit' });
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
