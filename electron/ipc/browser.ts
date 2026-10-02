@@ -504,10 +504,17 @@ export function registerBrowserIpc({ h, getWindow }: IpcContext): void {
     return resolved;
   });
 
-  h('browser:setViewport', async (event, raw: unknown) => {
-    assertUiSender(event, getWindow);
-    const viewport = sanitizeViewport(raw);
-    if (viewport) setViewport(viewport);
+  ipcMain.on('browser:setViewportSync', (event, raw: unknown) => {
+    try {
+      assertUiSender(event, getWindow);
+      const viewport = sanitizeViewport(raw);
+      if (viewport) setViewport(viewport);
+    } catch {
+      // Reject untrusted requests without crashing the main process.
+    } finally {
+      // Always release sendSync, including invalid or untrusted requests.
+      event.returnValue = null;
+    }
   });
 
   /**

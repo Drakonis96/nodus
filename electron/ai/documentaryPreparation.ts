@@ -853,7 +853,7 @@ export async function retrieveSharedDocumentaryEvidence(scope: ResolvedResearchS
       finish(message.error ? new Error(message.error) : null, message);
     });
     worker.once('error', error => finish(error));
-    worker.once('exit', () => { if (!settled) finish(new Error('documentary_retrieval_worker_stopped')); });
+    worker.once('exit', (code: number | null) => { if (!settled) { console.warn(`[documentary] retrieval worker exited with code ${code} before replying`); finish(new Error('documentary_retrieval_worker_stopped')); } });
     worker.postMessage({ filename: documentaryStore().db.name, query, lexicalKeys: keys, vectorKeys, vector, settings, threshold, read, activity: researchActivityEnabled() });
   });
   const latest = researchCorpusInventory().documents;

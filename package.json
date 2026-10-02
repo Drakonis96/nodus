@@ -447,6 +447,9 @@
       "category": "Office",
       "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
     },
+    "appImage": {
+      "artifactName": "Nodus-${arch}.${ext}"
+    },
     "artifactName": "Nodus-${os}-${arch}.${ext}"
   }
 }

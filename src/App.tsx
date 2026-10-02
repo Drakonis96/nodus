@@ -475,6 +475,7 @@ export function App() {
   const beginSidebarResize = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.currentTarget.focus();
     event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
     const startX = event.clientX;
     const startWidth = sidebarWidth;
     document.body.classList.add('is-resizing-sidebar');
