@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { Icon } from '../components/ui';
 import { t, tx } from '../i18n';
@@ -9,6 +9,7 @@ import type {
   BrowserRestartResult,
   BrowserState,
   BrowserTabState,
+  BrowserViewport,
   PendingBrowserAuth,
   PendingBrowserPermission,
 } from '@shared/browser';
@@ -39,6 +40,7 @@ import connectorIcon from '../../browser-extension/icons/icon.svg';
  */
 export function NodusBrowserView() {
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const publishedViewportRef = useRef<BrowserViewport | null>(null);
   const [state, setState] = useState<BrowserState>({ tabs: [], activeTabId: null });
   const [omnibox, setOmnibox] = useState('');
   const [omniboxFocused, setOmniboxFocused] = useState(false);
@@ -230,35 +232,35 @@ export function NodusBrowserView() {
     const element = viewportRef.current;
     if (!element) return;
     const rect = element.getBoundingClientRect();
-    void window.nodus.setBrowserViewport({
+    const next = {
       x: rect.left,
       y: rect.top,
       width: rect.width,
       height: rect.height,
-    });
+    };
+    const previous = publishedViewportRef.current;
+    if (previous && previous.x === next.x && previous.y === next.y
+      && previous.width === next.width && previous.height === next.height) return;
+    publishedViewportRef.current = next;
+    void window.nodus.setBrowserViewport(next);
   }, []);
 
-  useEffect(() => {
+  // Parent commits include sidebar width/collapse changes. Publish their new
+  // geometry before paint, including moves that do not resize the viewport.
+  useLayoutEffect(() => { publishViewport(); });
+
+  useLayoutEffect(() => {
     publishViewport();
     const element = viewportRef.current;
     if (!element) return;
-    // rAF-coalesced: a drag-resize fires these dozens of times per second, and
-    // forwarding each one is how a browser section starts dropping frames.
-    let frame = 0;
-    const schedule = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        publishViewport();
-      });
-    };
-    const observer = new ResizeObserver(schedule);
+    // ResizeObserver already batches layout changes before paint. Scheduling
+    // another rAF here left the native page at its old bounds for a full frame.
+    const observer = new ResizeObserver(publishViewport);
     observer.observe(element);
-    window.addEventListener('resize', schedule);
+    window.addEventListener('resize', publishViewport);
     return () => {
-      if (frame) cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener('resize', schedule);
+      window.removeEventListener('resize', publishViewport);
     };
   }, [publishViewport]);
 
@@ -633,8 +635,8 @@ export function NodusBrowserView() {
         />
       )}
 
-      {/* The page goes here. This div is deliberately empty and never painted
-          into: the main process positions the native view over its rectangle. */}
+      {/* Main positions the native page here. While app overlays are open, the
+          overlay guard keeps a frozen image inside this same rectangle. */}
       <div ref={viewportRef} data-browser-viewport className="relative min-h-0 flex-1">
         {active?.kind === 'bookmarks' && (
           <NodusBookmarksPage

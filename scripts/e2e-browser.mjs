@@ -324,10 +324,16 @@ try {
     localStorage.setItem('nodus.tutorialVideosAnnouncementSeen.2026-07', '1');
     localStorage.setItem('nodus.pdfPresenterTutorialSeen.e2js_u-05OA', '1');
     localStorage.setItem('nodus.toolkitBetaGuideSeen.2.4.0', '1');
+    localStorage.setItem('nodus.libraryTutorialSeen.v1', '1');
     await window.nodus.updateSettings({
       onboardingComplete: true,
       tourComplete: true,
       advancedTourComplete: true,
+    });
+    // This isolated profile tests Browser behavior, not corpus preparation.
+    // Its welcome dialog can otherwise arrive after startup and block dragging.
+    await window.nodus.setResearchPreparationPolicy({
+      welcomeVersion: 1, decision: 'declined', futureAdditions: false,
     });
   }, require(path.join(repoRoot, 'package.json')).version);
   await page.reload();
@@ -438,6 +444,52 @@ try {
         await window.nodus.setBrowserViewport({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
       });
     }
+  });
+
+  await check('sidebar resizing commits native page bounds before the next frame', async () => {
+    const handle = page.getByTestId('sidebar-resize-handle');
+    const viewport = page.locator('[data-browser-viewport]');
+    const assertBounds = async () => {
+      const rect = await viewport.evaluate((element) => new Promise((resolve) => {
+        requestAnimationFrame(() => {
+          const rect = element.getBoundingClientRect();
+          resolve({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+        });
+      }));
+      const native = await app.evaluate(({ BrowserWindow }) => {
+        const win = BrowserWindow.getAllWindows()[0];
+        const view = win.contentView.children.find((child) => 'webContents' in child);
+        return { bounds: view?.getBounds(), zoom: win.webContents.getZoomFactor() };
+      });
+      const left = Math.round(rect.x * native.zoom);
+      const top = Math.round(rect.y * native.zoom);
+      assert.deepEqual(native.bounds, {
+        x: left, y: top,
+        width: Math.round((rect.x + rect.width) * native.zoom) - left,
+        height: Math.round((rect.y + rect.height) * native.zoom) - top,
+      });
+      return rect;
+    };
+    const initial = await assertBounds();
+    const box = await handle.boundingBox();
+    const x = box.x + 6; // Start on the sidebar side of the native page boundary.
+    const y = box.y + 100;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    try {
+      for (const offset of [24, 56, 90, 48, 0]) {
+        await page.mouse.move(x + offset, y);
+        const rect = await assertBounds();
+        assert.ok(Math.abs(rect.x - initial.x - offset) < 2,
+          'pointer capture must keep the drag active as it crosses the native page');
+      }
+    } finally { await page.mouse.up(); }
+    await handle.focus();
+    await handle.press('ArrowRight');
+    const widened = await assertBounds();
+    assert.ok(widened.x > initial.x, 'keyboard resizing must also update native bounds');
+    await handle.press('ArrowLeft');
+    await assertBounds();
   });
 
   await check('a tab opens and loads a real page', async () => {
@@ -924,9 +976,11 @@ try {
     await modal.getByRole('button', { name: 'Abrir en Nodus', exact: true }).click();
     await modal.waitFor({ state: 'detached' });
     await page.getByTestId('browser-toolbar').waitFor({ state: 'detached' });
-    // A snapshot plus source URL can open the Library's source chooser. Close
-    // that child overlay before returning through the sidebar.
-    await page.keyboard.press('Escape');
+    // The reader loads asynchronously. Wait for its format chooser before
+    // closing it, or an early Escape misses the dialog and blocks the sidebar.
+    const formatDialog = page.getByTestId('library-reader-format-dialog');
+    await formatDialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await formatDialog.waitFor({ state: 'detached' });
     await page.locator('[data-tour="nav-browser"]').click();
     await page.locator('[data-browser-viewport]').waitFor({ state: 'visible' });
     assert.equal(archives.parentId, research.id, 'the selected destination must be a nested Nodus collection');
@@ -1005,7 +1059,7 @@ try {
     assert.equal(restored, true, 'closing Notifications must restore the native page');
   });
 
-  await check('global vault overlays stay above Browser pages', async () => {
+  await check('global vault overlays preserve the page behind the menu and child dialogs', async () => {
     const callsBefore = await app.evaluate(() => globalThis.__nodusBrowserVisibilityCalls?.length ?? 0);
     await page.locator('[data-vault-trigger]').first().click();
     const vaultPanel = page.locator('[data-browser-native-overlay="true"]');
@@ -1019,12 +1073,20 @@ try {
       if (!hidden) await new Promise((resolve) => setTimeout(resolve, 25));
     }
     assert.equal(hidden, true, 'the anchored vault switcher must hide the native page');
+    const snapshot = page.getByTestId('browser-native-overlay-snapshot');
+    await snapshot.waitFor({ state: 'visible' });
+    assert.match(await snapshot.getAttribute('src'), /^data:image\/png;base64,/);
+    assert.equal(await snapshot.evaluate((image) => image.complete && image.naturalWidth > 0), true);
+    assert.deepEqual(await snapshot.boundingBox(), await page.locator('[data-browser-viewport]').boundingBox(),
+      'the page snapshot must occupy the browser viewport');
 
     await vaultPanel.getByTitle(/Añadir bóveda|Add vault/).click();
     const addVaultDialog = page.getByRole('dialog', { name: /Añadir bóveda|Add vault/ });
     await addVaultDialog.waitFor({ state: 'visible' });
     assert.equal(await vaultPanel.isVisible(), true, 'the parent switcher must remain behind the creation dialog');
+    assert.equal(await snapshot.isVisible(), true);
     await addVaultDialog.getByRole('button', { name: /Cancelar|Cancel/, exact: true }).click();
+    assert.equal(await snapshot.isVisible(), true, 'closing the child dialog must retain the page behind the menu');
     await vaultPanel.getByTitle(/Cerrar|Close/).click();
     await vaultPanel.waitFor({ state: 'detached' });
 
@@ -1035,6 +1097,7 @@ try {
       if (!restored) await new Promise((resolve) => setTimeout(resolve, 25));
     }
     assert.equal(restored, true, 'closing the last trusted overlay must restore the native page');
+    await snapshot.waitFor({ state: 'detached' });
   });
 
   await check('leaving and returning to Browser preserves the active tab', async () => {
