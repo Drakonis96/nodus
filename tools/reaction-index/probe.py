@@ -2,7 +2,7 @@ import sys, time, glob, os
 from collections import Counter
 from ord_schema.datasets import load_dataset
 
-BIG = '/Users/avijit/Code/NodusResearch/ord-data/data/11/ord_dataset-1158e351757f315b93cbcbe7bc55f38e.parquet'
+BIG = os.path.join(os.environ.get('ORD_DATA_DIR', 'ord-data'), 'data', '11', 'ord_dataset-1158e351757f315b93cbcbe7bc55f38e.parquet')
 N_GROUPS = int(sys.argv[1]) if len(sys.argv) > 1 else 10  # ~1000 reactions per row group
 
 view = load_dataset(BIG)

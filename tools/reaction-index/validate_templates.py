@@ -8,7 +8,7 @@ import glob, os, sys, time
 from ord_schema.datasets import load_dataset
 from template_fast import extract_template, round_trip_ok, apply_retro
 
-BIG = sorted(glob.glob('/Users/avijit/Code/NodusResearch/ord-data/data/*/*.parquet'),
+BIG = sorted(glob.glob(os.path.join(os.environ.get('ORD_DATA_DIR', 'ord-data'), 'data', '*', '*.parquet')),
              key=os.path.getsize, reverse=True)[0]
 
 

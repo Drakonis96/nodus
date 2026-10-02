@@ -1,7 +1,8 @@
 """Multi-step: does the hybrid search complete a route from the case's starting materials, and how
 many of the reference steps does its best route contain?"""
+import os
 import json, sys, time
-sys.path.insert(0, '/Users/avijit/Code/NodusResearch/marketplace/plugins/chemistry-studio/python')
+sys.path.insert(0, os.environ.get('CHEMISTRY_STUDIO_PYTHON', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'nodus-research-skill-marketplace', 'plugins', 'chemistry-studio', 'python')))
 import reactions_worker as W
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')

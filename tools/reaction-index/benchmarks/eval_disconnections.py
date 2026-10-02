@@ -4,8 +4,9 @@ For every reference step, the lookup for the step's product should propose a pre
 contains the expected organic precursors (inorganic reagents ignored), and/or the product should
 have a recorded ORD reaction using them. Run: .venv/bin/python benchmarks/eval_disconnections.py
 """
+import os
 import json, sys, time
-sys.path.insert(0, '/Users/avijit/Code/NodusResearch/marketplace/plugins/chemistry-studio/python')
+sys.path.insert(0, os.environ.get('CHEMISTRY_STUDIO_PYTHON', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'nodus-research-skill-marketplace', 'plugins', 'chemistry-studio', 'python')))
 import reactions_worker as W
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')

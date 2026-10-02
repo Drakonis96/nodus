@@ -1,6 +1,6 @@
 """Recall vs template-set size: load templates.tsv at lower cutoffs (no rebuild) and re-run the benchmark."""
 import json, sys, time, subprocess
-sys.path.insert(0, '/Users/avijit/Code/NodusResearch/marketplace/plugins/chemistry-studio/python')
+sys.path.insert(0, os.environ.get('CHEMISTRY_STUDIO_PYTHON', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'nodus-research-skill-marketplace', 'plugins', 'chemistry-studio', 'python')))
 import reactions_worker as W
 from rdkit import Chem, RDLogger
 RDLogger.DisableLog('rdApp.*')

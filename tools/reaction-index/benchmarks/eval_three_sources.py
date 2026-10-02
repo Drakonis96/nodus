@@ -7,8 +7,9 @@ runs a dense lane): one of the top-2 passages for the step's class query, from t
 contains every root of that query. Run from ord-index/:
   .venv/bin/python benchmarks/eval_three_sources.py <nodus.sqlite copy>
 """
+import os
 import json, re, sqlite3, sys
-sys.path.insert(0, '/Users/avijit/Code/NodusResearch/marketplace/plugins/chemistry-studio/python')
+sys.path.insert(0, os.environ.get('CHEMISTRY_STUDIO_PYTHON', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'nodus-research-skill-marketplace', 'plugins', 'chemistry-studio', 'python')))
 import reactions_worker as W
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')

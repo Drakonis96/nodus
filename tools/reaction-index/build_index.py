@@ -307,7 +307,7 @@ def list_tasks(root, files, limit):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--root', default='/Users/avijit/Code/NodusResearch/ord-data')
+    ap.add_argument('--root', default=os.environ.get('ORD_DATA_DIR', 'ord-data'))
     ap.add_argument('--out', required=True)
     ap.add_argument('--files', nargs='*')
     ap.add_argument('--workers', type=int, default=max(1, (os.cpu_count() or 4) - 2),

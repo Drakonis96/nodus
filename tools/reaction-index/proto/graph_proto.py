@@ -1,7 +1,8 @@
 """Prototype: ORD as a bipartite molecule<->reaction graph in CSR arrays, and a backward
 search from a target to given starting materials over recorded reactions only."""
+import os
 import io, sys, time, json, collections, numpy as np, zstandard as z
-sys.path.insert(0, '/Users/avijit/Code/NodusResearch/marketplace/plugins/chemistry-studio/python')
+sys.path.insert(0, os.environ.get('CHEMISTRY_STUDIO_PYTHON', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..', 'nodus-research-skill-marketplace', 'plugins', 'chemistry-studio', 'python')))
 import reactions_worker as W
 from rdkit import Chem, RDLogger
 RDLogger.DisableLog('rdApp.*')

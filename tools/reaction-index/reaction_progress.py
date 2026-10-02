@@ -31,7 +31,7 @@ def row_counts(root):
 
 def main():
     out = sys.argv[1]
-    root = sys.argv[sys.argv.index('--root') + 1] if '--root' in sys.argv else '/Users/avijit/Code/NodusResearch/ord-data'
+    root = sys.argv[sys.argv.index('--root') + 1] if '--root' in sys.argv else os.environ.get('ORD_DATA_DIR', 'ord-data')
     counts = row_counts(root)
     finished = [name[:-5] for name in os.listdir(os.path.join(out, 'parts')) if name.endswith('.json')]
     done = sum(counts.get(name, 0) for name in finished)

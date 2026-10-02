@@ -10,8 +10,8 @@ left off and nothing already read is sent to the vision model again.
   scan.py status                             counts, tokens, spend
 
 Database: <userData>/chemistry-schemes/scan.sqlite (SCHEME_SCAN_DB overrides). Progress for the
-side panel: CLAUDE-PROGRESS.json when SCHEME_SCAN_PROGRESS points at it. The Gemini key is read
-from ~/.config/nodus-harness/keys.json ("gemini").
+side panel: a JSON progress file when SCHEME_SCAN_PROGRESS points at it. The Gemini key comes from
+GEMINI_API_KEY (or GEMINI_KEYS_FILE, a JSON file with a "gemini" entry).
 
 Detection reuses the declutter layout classifier (blocks.mjs → electron/extraction/schemeLayout.ts):
 scheme text items are clustered, clusters sharing a vertical band are merged into one scheme row,
@@ -66,6 +66,16 @@ CREATE TABLE IF NOT EXISTS names(name TEXT PRIMARY KEY, smiles TEXT, source TEXT
 CREATE TABLE IF NOT EXISTS records(item_id INTEGER, n INTEGER, reactants TEXT, reagents TEXT, products TEXT, yield TEXT, molecules TEXT,
   status TEXT, checks TEXT, PRIMARY KEY(item_id, n));
 """
+
+
+def gemini_key():
+    """GEMINI_API_KEY, or the "gemini" entry of GEMINI_KEYS_FILE (a JSON file of API keys)."""
+    if os.environ.get('GEMINI_API_KEY'):
+        return os.environ['GEMINI_API_KEY']
+    path = os.environ.get('GEMINI_KEYS_FILE')
+    if path and os.path.exists(path):
+        return json.load(open(path))['gemini']
+    raise SystemExit('Set GEMINI_API_KEY (or GEMINI_KEYS_FILE) to read schemes with Gemini.')
 
 
 def connect():
@@ -352,7 +362,7 @@ def spent(con):
 
 def read(books=None, cap=100.0, workers=6):
     con = connect()
-    key = json.load(open(os.path.expanduser('~/.config/nodus-harness/keys.json')))['gemini']
+    key = gemini_key()
     where = ' AND i.book_key IN (SELECT book_key FROM books WHERE nodus_id IN (%s))' % ','.join('?' * len(books)) if books else ''
     pending = con.execute(f"""SELECT i.* FROM items i LEFT JOIN readings r ON r.item_id=i.id AND r.model=? AND r.prompt_version=? AND r.error IS NULL
       WHERE r.item_id IS NULL{where} ORDER BY (SELECT rowid FROM books b WHERE b.book_key=i.book_key), i.page, i.ordinal""", (MODEL, PROMPT_VERSION, *(books or []))).fetchall()
@@ -395,7 +405,7 @@ def recheck(model, thinking, tag, limit=None, cap=50.0, workers=8, total_cap=185
     `thinking` and store it under prompt_version `tag` (the first reading is kept). Spend counts only
     this tag's tokens against `cap`."""
     con = connect()
-    key = json.load(open(os.path.expanduser('~/.config/nodus-harness/keys.json')))['gemini']
+    key = gemini_key()
     rows = con.execute(f"""SELECT DISTINCT i.* FROM items i {'' if every else "JOIN records x ON x.item_id=i.id AND x.status='flagged' AND x.source='v2'"}
       WHERE NOT EXISTS (SELECT 1 FROM readings r WHERE r.item_id=i.id AND r.model=? AND r.prompt_version=? AND r.error IS NULL)
       {' AND i.book_key IN (SELECT book_key FROM books WHERE nodus_id IN (%s))' % ','.join('?' * len(books)) if books else ''}
