@@ -312,6 +312,8 @@ export async function gatherSynthesisEvidence(question: string, options: Evidenc
   const preparations = await textbookSchemePreparations(target, disconnections, startingMaterials, options);
   const candidates = await routes;
   const available = await availability;
+  // One line per request, so a run's log shows which evidence reached the model.
+  console.info(`[synthesisEvidence] target ${target} · ORD disconnections ${disconnections.reduce((n, d) => n + d.proposals.length, 0)} · passages ${passages.length} · textbook preparations ${preparations.length} · candidate routes ${candidates.length} · target purchasable ${available ? 'yes' : 'no/unknown'} · stock ${chemistryStockDirectory() ? 'on' : 'off'}`);
   return {
     target, startingMaterials, disconnections, passages,
     ...(available ? { targetAvailability: available } : {}),
