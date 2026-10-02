@@ -11,6 +11,7 @@
  */
 
 import type { TextbookPreparation } from './textbookSchemes';
+import { conditionsPlainText, normalizeReactionConditions } from './reactionConditions';
 
 /** The payload key the evidence travels under, next to `estructura_objetivo_verificada`. */
 export const SYNTHESIS_EVIDENCE_KEY = 'evidencia_para_la_ruta';
@@ -93,6 +94,8 @@ export interface DisconnectionProposal {
    *  documents its templates (the textbook-scheme index) can cite their sources. Not sent to the
    *  model. */
   templates?: string[];
+  /** For a recorded disconnection, what its most recorded sample was run with (one plain line). */
+  conditions?: string;
 }
 
 export interface TargetDisconnections {
@@ -100,7 +103,9 @@ export interface TargetDisconnections {
   input: string;
   target: string;
   /** ORD reactions that make this molecule, most recorded first. */
-  recordedRoutes: Array<{ precursors: string; count: number }>;
+  /** `conditions`: what the most recorded sample was run with, one plain line (absent without an
+   *  index conditions table). */
+  recordedRoutes: Array<{ precursors: string; count: number; conditions?: string }>;
   proposals: DisconnectionProposal[];
 }
 
@@ -109,6 +114,14 @@ function stockVendors(inStock: unknown): string[] {
   const lists = Object.values((inStock ?? {}) as Record<string, unknown>).map((vendors) => (Array.isArray(vendors) ? vendors.filter((v): v is string => typeof v === 'string') : []));
   if (!lists.length) return [];
   return lists.reduce((common, vendors) => common.filter((vendor) => vendors.includes(vendor)));
+}
+
+const ORD_ID = /^ord-[0-9a-f]{32}$/;
+
+/** The first well-formed recorded conditions as one plain line, for the model's payload. */
+function firstConditions(value: unknown): string | undefined {
+  const [first] = normalizeReactionConditions(value, ORD_ID);
+  return first ? conditionsPlainText(first) || undefined : undefined;
 }
 
 const asNumber = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
@@ -130,7 +143,8 @@ export function normalizeDisconnections(data: unknown, perTarget = 6): TargetDis
       const smiles = asString((reaction as Record<string, unknown>)?.reaction);
       const precursors = smiles.split('>>')[0];
       if (!precursors || recordedRoutes.some((route) => route.precursors === precursors)) continue;
-      recordedRoutes.push({ precursors, count: asNumber((reaction as Record<string, unknown>).count) });
+      const conditions = firstConditions((reaction as Record<string, unknown>).conditions);
+      recordedRoutes.push({ precursors, count: asNumber((reaction as Record<string, unknown>).count), ...(conditions ? { conditions } : {}) });
       if (recordedRoutes.length >= 3) break;
     }
     const proposals: DisconnectionProposal[] = [];
@@ -145,6 +159,7 @@ export function normalizeDisconnections(data: unknown, perTarget = 6): TargetDis
         available: proposal.available === true,
         ...(typeof proposal.fromStarts === 'boolean' ? { fromStarts: proposal.fromStarts } : {}),
         ...(proposal.purchasable === true ? { purchasable: true, vendors: stockVendors(proposal.inStock) } : {}),
+        ...(firstConditions(proposal.conditions) ? { conditions: firstConditions(proposal.conditions) } : {}),
         ...(Array.isArray(proposal.templates) && proposal.templates.length
           ? { templates: proposal.templates.filter((smarts): smarts is string => typeof smarts === 'string').slice(0, 3) } : {}),
       });

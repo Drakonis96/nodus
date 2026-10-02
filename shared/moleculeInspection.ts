@@ -7,6 +7,7 @@
 
 import { correctionTargetPlanRule, ROUTE_LABEL_LINES, ROUTE_SPECIES_RULES } from './routeRules';
 import { similarityBand } from './reactionSimilarity';
+import { conditionsText, normalizeReactionConditions, type ReactionConditions } from './reactionConditions';
 
 export { similarityBand };
 
@@ -160,6 +161,8 @@ export interface ReactionPrecedentEntry {
   reaction?: string;
   /** For a reaction, the reaction classes the package reads from its group changes. */
   classes?: string[];
+  /** For a matched reaction, what up to two of its recorded samples were run with. */
+  conditions?: ReactionConditions[];
 }
 
 export interface ReactionPrecedentNeighbor {
@@ -171,6 +174,9 @@ export interface ReactionPrecedentNeighbor {
   reaction?: string;
   /** The package's drawing of the reaction exactly as recorded (unbalanced). */
   svg?: string;
+  /** For the closest reaction of an unmatched step: its recorded sample ids and their conditions. */
+  samples?: string[];
+  conditions?: ReactionConditions[];
 }
 
 export interface ReactionPrecedentSimilar {
@@ -1328,10 +1334,16 @@ function normalizePrecedentEntry(entry: unknown, idPattern: RegExp = ORD_ID): Re
     ...(samples.length ? { samples } : {}),
     ...(reaction ? { reaction } : {}),
     ...(Array.isArray(value.classes) ? { classes: stringArray(value.classes).map((name) => name.slice(0, 120)).slice(0, 3) } : {}),
+    ...withConditions(value.conditions, idPattern),
   };
 }
 
-function normalizePrecedentNeighbor(item: unknown): ReactionPrecedentNeighbor | null {
+function withConditions(value: unknown, idPattern: RegExp): { conditions?: ReactionConditions[] } {
+  const conditions = normalizeReactionConditions(value, idPattern);
+  return conditions.length ? { conditions } : {};
+}
+
+function normalizePrecedentNeighbor(item: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedentNeighbor | null {
   const neighbor = asRecord(item);
   if (!neighbor || typeof neighbor.key !== 'string') return null;
   const similarity = typeof neighbor.similarity === 'number' && neighbor.similarity >= 0 && neighbor.similarity <= 1 ? neighbor.similarity : undefined;
@@ -1344,6 +1356,8 @@ function normalizePrecedentNeighbor(item: unknown): ReactionPrecedentNeighbor | 
     ...(similarity !== undefined ? { similarity } : {}),
     ...(reaction ? { reaction } : {}),
     ...(svg && reaction ? { svg } : {}),
+    ...(Array.isArray(neighbor.samples) ? { samples: stringArray(neighbor.samples).filter((id) => idPattern.test(id)).slice(0, 3) } : {}),
+    ...withConditions(neighbor.conditions, idPattern),
   };
 }
 
@@ -1360,7 +1374,7 @@ export function normalizeReactionPrecedent(data: unknown, idPattern: RegExp = OR
     const record = asRecord(entry);
     if (!record || typeof record.input !== 'string') return null;
     const neighbors = (Array.isArray(record.neighbors) ? record.neighbors : [])
-      .map(normalizePrecedentNeighbor).filter((item): item is ReactionPrecedentNeighbor => item !== null).slice(0, 8);
+      .map((item) => normalizePrecedentNeighbor(item, idPattern)).filter((item): item is ReactionPrecedentNeighbor => item !== null).slice(0, 8);
     return { input: record.input.slice(0, 4000), neighbors, ...(record.unchanged === true ? { unchanged: true } : {}) };
   }).filter((entry): entry is ReactionPrecedentSimilar => entry !== null).slice(0, 16);
   if (!reactions.length && !products.length && !similar.length) return null;
@@ -1385,6 +1399,18 @@ function stepTitle(step: RouteSpeciesLabel[] | undefined): string {
   const agents = names('agent');
   if (!reactants.length || !products.length) return '';
   return `${reactants.join(' + ')} → ${products.join(' + ')}${agents.length ? ` (${agents.join(', ')})` : ''}`;
+}
+
+/** "  - Run with: Pd-C, ethanol · 8 h · yield 92% · US05320776 (`ord-…`)", one line per recorded sample. */
+function conditionLines(conditions: ReactionConditions[] | undefined, lead: string): string[] {
+  // Two samples of one patent often record the same run: one line for it.
+  const seen = new Set<string>();
+  return (conditions ?? []).flatMap((item) => {
+    const text = conditionsText(item);
+    if (!text || seen.has(text)) return [];
+    seen.add(text);
+    return [`  - ${lead}: ${text} (\`${item.id}\`)`];
+  });
 }
 
 const SIMILARITY_FOOTNOTE = '_Similarity compares which bonds and groups change in a reaction (its DRFP fingerprint, Tanimoto). 100% means the same changes, not necessarily the same molecules. It is not a confidence score: a low figure for a textbook reaction usually means this snapshot records it with different reagents or in one pot. A step not recorded here is not thereby new._';
@@ -1414,6 +1440,7 @@ export function formatReactionPrecedents(precedent: ReactionPrecedent, context?:
       const notes = (entry.form ?? '').split('+').map((part) => PRECEDENT_FORM_NOTE[part]).filter(Boolean);
       const ids = entry.samples?.length ? `: ${entry.samples.map((id) => `\`${id}\``).join(', ')}` : '';
       lines.push(`- ✔ Exact match — ${entry.count} recorded precedent(s)${notes.length ? ` (${notes.join(', ')})` : ''}${ids}.`);
+      lines.push(...conditionLines(entry.conditions, 'Run with'));
     } else {
       const item = similarByInput.get(entry.input);
       const closest = item?.neighbors[0];
@@ -1422,6 +1449,7 @@ export function formatReactionPrecedents(precedent: ReactionPrecedent, context?:
       } else if (closest.similarity !== undefined) {
         usedSimilarity = true;
         lines.push(`- Not recorded in this snapshot. Closest recorded reaction: ${Math.round(closest.similarity * 100)}% similar — ${similarityBand(closest.similarity)}.`);
+        lines.push(...conditionLines(closest.conditions, 'The closest reaction was run with'));
       } else {
         lines.push(`- Not recorded in this snapshot. Closest recorded reaction is ${closest.distance} fingerprint bit(s) away.`);
       }
