@@ -12,8 +12,8 @@
 // connected the template to the names the rest of the project depends on, so the
 // break was invisible until the release ran.
 //
-// This file is that connection. The displayed product name is free to change;
-// these filenames are not.
+// This file is that connection. AppImage now omits "linux" in its canonical
+// name, with an identical legacy alias preserving existing download links.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -24,6 +24,7 @@ import { INSTALLER_KEYS } from './github-release-downloads.mjs';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (relative) => readFileSync(path.join(repoRoot, relative), 'utf8');
 const pkg = JSON.parse(read('package.json'));
+const templateFor = (target) => target.ext === 'AppImage' ? pkg.build.appImage.artifactName : pkg.build.artifactName;
 
 /** What electron-builder would name each artifact, from the real template. */
 function artifactName(template, { os, arch, ext }) {
@@ -43,7 +44,7 @@ const PUBLISHED = [
   { os: 'mac', arch: 'x64', ext: 'zip', name: 'Nodus-mac-x64.zip' },
   { os: 'win', arch: 'x64', ext: 'exe', name: 'Nodus-win-x64.exe' },
   { os: 'linux', arch: 'amd64', ext: 'deb', name: 'Nodus-linux-amd64.deb' },
-  { os: 'linux', arch: 'x86_64', ext: 'AppImage', name: 'Nodus-linux-x86_64.AppImage' },
+  { os: 'linux', arch: 'x86_64', ext: 'AppImage', name: 'Nodus-x86_64.AppImage' },
   { os: 'linux', arch: 'x86_64', ext: 'rpm', name: 'Nodus-linux-x86_64.rpm' },
 ];
 
@@ -58,7 +59,7 @@ test('THE REGRESSION: the artifact template does not interpolate the product nam
 
 test('every artifact electron-builder builds is named exactly what is published', () => {
   for (const target of PUBLISHED) {
-    assert.equal(artifactName(pkg.build.artifactName, target), target.name);
+    assert.equal(artifactName(templateFor(target), target), target.name);
   }
 });
 
@@ -67,7 +68,7 @@ test('renaming the product cannot move a single download URL', () => {
   // called something else entirely and check the filenames do not budge.
   const rebranded = { ...pkg, build: { ...pkg.build, productName: 'Something Else Entirely' } };
   for (const target of PUBLISHED) {
-    const name = rebranded.build.artifactName
+    const name = (target.ext === 'AppImage' ? rebranded.build.appImage.artifactName : rebranded.build.artifactName)
       .replaceAll('${os}', target.os).replaceAll('${arch}', target.arch).replaceAll('${ext}', target.ext);
     assert.equal(name, target.name);
   }
@@ -77,7 +78,7 @@ test('no artifact filename contains a space', () => {
   // A space becomes %20 in a download URL and breaks hand-written links and
   // shell one-liners alike. "Nodus Research-linux-amd64.deb" was exactly this.
   for (const target of PUBLISHED) {
-    assert.doesNotMatch(artifactName(pkg.build.artifactName, target), /\s/, target.name);
+    assert.doesNotMatch(artifactName(templateFor(target), target), /\s/, target.name);
   }
 });
 
@@ -96,7 +97,7 @@ test('the uploader expects the names the builder produces', () => {
 
 test('the release workflow verifies the same names before publishing', () => {
   const workflow = read('.github/workflows/release-build.yml');
-  for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
+  for (const name of PUBLISHED.filter((target) => target.ext !== 'zip').map((target) => target.name)) {
     assert.ok(workflow.includes(name), `the release workflow must verify ${name}`);
   }
 });

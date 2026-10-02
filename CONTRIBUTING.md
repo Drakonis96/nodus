@@ -107,6 +107,10 @@ also be run manually by supplying the exact tag. The channel/version validator
 stops a stable tag from entering Beta or a beta tag from entering Stable before
 any native build begins.
 
+Linux AppImages support both the built-in Electron updater and external
+AppImageUpdate tools. See [AppImage update compatibility](docs/appimage-updates.md)
+for the finalization sequence, preserved download aliases and Linux checks.
+
 Desktop updates download automatically, but installation and restart require
 the explicit **Install and restart** action on every supported platform. An
 ordinary app quit never installs a pending update. The downloaded update remains

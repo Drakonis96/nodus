@@ -292,6 +292,15 @@ jobs:
         if: runner.os == 'Linux'
         run: node scripts/verify-linux-glibc.mjs release/linux-unpacked
 
+      - name: Add and verify AppImageUpdate metadata
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y zsync
+          node scripts/finalize-linux-appimage.mjs release
+          test "$(release/Nodus-x86_64.AppImage --appimage-updateinformation)" = "$(node --input-type=module -e 'import { updateInformation } from "./scripts/finalize-linux-appimage.mjs"; console.log(updateInformation(process.env.NODUS_RELEASE_CHANNEL))')"
+          cmp release/Nodus-x86_64.AppImage release/Nodus-linux-x86_64.AppImage
+
       - name: Remove temporary macOS credentials
         if: always() && startsWith(matrix.os, 'macos')
         shell: bash
@@ -466,6 +475,8 @@ jobs:
             Nodus-mac-x64.dmg
             Nodus-win-x64.exe
             Nodus-linux-amd64.deb
+            Nodus-x86_64.AppImage
+            Nodus-x86_64.AppImage.zsync
             Nodus-linux-x86_64.AppImage
             Nodus-linux-x86_64.rpm
           )
