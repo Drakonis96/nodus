@@ -69,8 +69,12 @@ export const browserApi = {
   },
   submitBrowserOmnibox: (input: string): Promise<BrowserOmniboxResult> =>
     ipcRenderer.invoke('browser:submitOmnibox', input),
-  setBrowserViewport: (viewport: BrowserViewport): Promise<void> =>
-    ipcRenderer.invoke('browser:setViewport', viewport).then(() => undefined),
+  setBrowserViewport: (viewport: BrowserViewport): Promise<void> => {
+    // Layout and native bounds must commit together. An async invoke lets the
+    // page cover the sidebar until main processes the next IPC round trip.
+    ipcRenderer.sendSync('browser:setViewportSync', viewport);
+    return Promise.resolve();
+  },
   browserFindInPage: (text: string, options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }): Promise<void> =>
     ipcRenderer.invoke('browser:findInPage', text, options ?? {}).then(() => undefined),
   browserStopFindInPage: (action?: 'clearSelection' | 'keepSelection' | 'activateSelection'): Promise<void> =>
