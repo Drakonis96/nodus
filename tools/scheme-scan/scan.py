@@ -20,7 +20,7 @@ labels). A page whose raster images cover ≥ 15% of it (a scanned or image-base
 whole instead. Records keep page, box and their order on the page (top to bottom), which matches
 the order of the [scheme] markers in the decluttered text of that page.
 """
-import base64, concurrent.futures as cf, datetime, hashlib, json, os, sqlite3, subprocess, sys, threading, time, urllib.parse
+import base64, concurrent.futures as cf, datetime, hashlib, json, os, re, sqlite3, subprocess, sys, threading, time, urllib.parse
 import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,6 +47,14 @@ For a structure you cannot read reliably, write "UNREADABLE" rather than guessin
 Skip transition-state drawings, mechanisms (curved arrows) and equilibria between resonance forms: they are not synthetic steps. If there is no synthetic reaction arrow, return an empty list.
 
 Reply with JSON only: {"reactions": [{"reactants": [...], "reagents": "...", "products": [...], "yield": null, "molecules": [], "confidence": "high"}]}"""
+
+# v3: v2 plus the arrow type. Retrosynthesis books (Warren) draw target => precursors with an open
+# double arrow; read as forward reactions those records are reversed.
+PROMPT_V3 = PROMPT.replace('- confidence: "high"', '- arrow: "forward" for a reaction arrow (starting materials -> product), "retrosynthetic" for a retrosynthesis arrow (an open double-line arrow, target => precursors or synthons, often labelled with the bond disconnected, "FGI" or similar). Always list the molecules as drawn: reactants = left of the arrow, products = right.\n- confidence: "high"').replace(
+    '"molecules": [], "confidence": "high"}]}', '"molecules": [], "arrow": "forward", "confidence": "high"}]}')
+PROMPTS = {'v2': PROMPT, 'v2-med': PROMPT, 'v2-high': PROMPT, 'v2-pro': PROMPT, 'v3': PROMPT_V3}
+# Labels that mark a retrosynthesis arrow where a reaction arrow would carry reagents.
+RETRO_LABEL = re.compile(r'(⇒|=>|\bFG[IA]\b|disconnect|synthon|^\s*C\s*[-–—]\s*(?:C|N|O|S|X|Hal|Br|Cl|I|Si|P)\b)', re.I | re.M)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS books(book_key TEXT PRIMARY KEY, nodus_id TEXT, title TEXT, path TEXT, pages INTEGER, body REAL, detected_at TEXT);
@@ -316,8 +324,8 @@ def parse_reply(text):
     return reactions
 
 
-def gemini(image_b64, key, model=None, thinking='low'):
-    body = {'contents': [{'parts': [{'inline_data': {'mime_type': 'image/png', 'data': image_b64}}, {'text': PROMPT}]}],
+def gemini(image_b64, key, model=None, thinking='low', prompt=None):
+    body = {'contents': [{'parts': [{'inline_data': {'mime_type': 'image/png', 'data': image_b64}}, {'text': prompt or PROMPT}]}],
             'generationConfig': {'temperature': 0, 'responseMimeType': 'application/json', 'maxOutputTokens': 32000, 'thinkingConfig': {'thinkingLevel': thinking}}}
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{model or MODEL}:generateContent?key={key}'
     for attempt in range(6):
@@ -382,15 +390,15 @@ def read(books=None, cap=100.0, workers=6):
     print(f'done; ${cost:.2f} spent; {left} schemes left', flush=True)
 
 
-def recheck(model, thinking, tag, limit=None, cap=50.0, workers=8, total_cap=185.0, books=None):
+def recheck(model, thinking, tag, limit=None, cap=50.0, workers=8, total_cap=185.0, books=None, every=False):
     """Second opinion on crops whose first reading has a flagged record: read again with `model` at
     `thinking` and store it under prompt_version `tag` (the first reading is kept). Spend counts only
     this tag's tokens against `cap`."""
     con = connect()
     key = json.load(open(os.path.expanduser('~/.config/nodus-harness/keys.json')))['gemini']
-    rows = con.execute(f"""SELECT DISTINCT i.* FROM items i JOIN records x ON x.item_id=i.id AND x.status='flagged'
+    rows = con.execute(f"""SELECT DISTINCT i.* FROM items i {'' if every else "JOIN records x ON x.item_id=i.id AND x.status='flagged' AND x.source='v2'"}
       WHERE NOT EXISTS (SELECT 1 FROM readings r WHERE r.item_id=i.id AND r.model=? AND r.prompt_version=? AND r.error IS NULL)
-      AND x.source='v2'{' AND i.book_key IN (SELECT book_key FROM books WHERE nodus_id IN (%s))' % ','.join('?' * len(books)) if books else ''}
+      {' AND i.book_key IN (SELECT book_key FROM books WHERE nodus_id IN (%s))' % ','.join('?' * len(books)) if books else ''}
       ORDER BY (SELECT rowid FROM books b WHERE b.book_key=i.book_key), i.page, i.ordinal""", (model, tag, *(books or []))).fetchall()
     if limit:
         import random
@@ -405,7 +413,7 @@ def recheck(model, thinking, tag, limit=None, cap=50.0, workers=8, total_cap=185
         if stop.is_set():
             return
         try:
-            reactions, tin, tout = gemini(render(item), key, model, thinking)
+            reactions, tin, tout = gemini(render(item), key, model, thinking, PROMPTS.get(tag, PROMPT))
             row = (item[0], model, tag, json.dumps({'reactions': reactions}), tin, tout, None, datetime.datetime.now().isoformat())
         except Exception as error:
             row = (item[0], model, tag, None, 0, 0, str(error)[:300], datetime.datetime.now().isoformat())
@@ -489,13 +497,17 @@ def check(redo=False):
         con.execute('DELETE FROM records'); con.commit()
     # Crops without records, plus crops with a second-opinion reading (re-merged every run; cheap, names are cached).
     item_ids = [r[0] for r in con.execute("""SELECT DISTINCT r.item_id FROM readings r WHERE r.error IS NULL AND r.model=? AND
-      ((r.prompt_version=? AND NOT EXISTS (SELECT 1 FROM records x WHERE x.item_id=r.item_id)) OR r.prompt_version=?)""", (MODEL, PROMPT_VERSION, SECOND_OPINION))]
+      ((r.prompt_version IN (?, 'v3') AND NOT EXISTS (SELECT 1 FROM records x WHERE x.item_id=r.item_id AND x.source=r.prompt_version))
+       OR r.prompt_version=?)""", (MODEL, PROMPT_VERSION, SECOND_OPINION))]
     as_list = lambda v: v if isinstance(v, list) else [v] if v else []  # a reply occasionally gives one string
     parsed = []
     for item_id in item_ids:
         versions = []
-        for version, payload in con.execute("SELECT prompt_version, json FROM readings WHERE item_id=? AND model=? AND error IS NULL AND prompt_version IN (?,?) ORDER BY prompt_version='v2' DESC",
-                                            (item_id, MODEL, PROMPT_VERSION, SECOND_OPINION)):
+        # The primary reading is v3 where one exists (it says which arrows are retrosynthetic), else v2.
+        found = dict(con.execute("SELECT prompt_version, json FROM readings WHERE item_id=? AND model=? AND error IS NULL AND prompt_version IN (?,?,'v3')",
+                                 (item_id, MODEL, PROMPT_VERSION, SECOND_OPINION)).fetchall())
+        primary = 'v3' if 'v3' in found else PROMPT_VERSION
+        for version, payload in [(v, found[v]) for v in (primary, SECOND_OPINION) if v in found]:
             reactions = [x for x in json.loads(payload)['reactions'] if isinstance(x, dict)]
             for x in reactions:
                 x['reactants'], x['products'] = as_list(x.get('reactants')), as_list(x.get('products'))
@@ -547,6 +559,10 @@ def check(redo=False):
         # nothing else is wrong. The original SMILES stay in reactants/products; checks[].suggested has the fix.
         repairable = conflict and all(c.get('suggested') for c in checks if c['result'] in ('conflict', 'invalid'))
         status = ('repaired' if repairable and readable else 'flagged') if conflict or not readable else 'generic' if generic else 'confirmed' if confirmed else 'unchecked'
+        # A retrosynthesis arrow (target => precursors) is not a forward reaction: kept, never indexed.
+        arrow = x.get('arrow') if isinstance(x.get('arrow'), str) else ''
+        if arrow.lower().startswith('retro') or (isinstance(x.get('reagents'), str) and RETRO_LABEL.search(x['reagents'])):
+            status = 'retro'
         return status, checks
 
     def products_key(x):
@@ -562,11 +578,11 @@ def check(redo=False):
             for x in reactions:
                 status, checks = grade(x)
                 key = products_key(x)
-                if version == PROMPT_VERSION:
+                if version != SECOND_OPINION:
                     rows.append([x, status, checks, version, key]); continue
                 if status not in verified:
                     continue
-                same = [r for r in rows if key and r[4] == key and r[3] == PROMPT_VERSION]
+                same = [r for r in rows if key and r[4] == key and r[3] != SECOND_OPINION]
                 if any(r[1] in verified for r in same):
                     continue
                 for r in same:
@@ -610,7 +626,7 @@ if __name__ == '__main__':
     elif args[0] == 'recheck':
         recheck(opt('--model', 'gemini-flash-latest'), opt('--thinking', 'high'), opt('--tag'), int(opt('--limit')) if opt('--limit') else None,
                 float(opt('--cap', '50')), int(opt('--workers', '8')), float(opt('--total-cap', '185')),
-                opt('--books').split(',') if opt('--books') else None)
+                opt('--books').split(',') if opt('--books') else None, '--every' in args)
     elif args[0] == 'check':
         check(redo='--redo' in args)
     elif args[0] == 'status':

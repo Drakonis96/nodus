@@ -133,8 +133,15 @@ def main():
 
     out = lambda name: os.path.join(args.out, name)
     write_zst_blocked(out('exact.tsv.zst'), [f'{k}\t{exact[k]}\t{",".join(exact_samples[k])}' for k in sorted(exact)])
-    write_zst(out('templates.tsv.zst'), '')
-    write_zst(out('retro-templates.tsv.zst'), '')
+    # Retro templates (templates.py): one row per template, most supported first; their book/page
+    # sources go to template-sources.json for citation.
+    templates_path = os.path.join(os.path.dirname(scan.DB), 'templates', 'templates.json')
+    templates = json.load(open(templates_path)) if os.path.exists(templates_path) else {}
+    ranked = sorted(templates.items(), key=lambda kv: (-kv[1]['count'], kv[0]))
+    write_zst(out('templates.tsv.zst'), '\n'.join(f'{t["count"]}\t{t["count"]}\t0\t\t{smarts}' for smarts, t in ranked))
+    write_zst(out('retro-templates.tsv.zst'), '\n'.join(f'{t["count"]}\t{t["count"]}\t{smarts}' for smarts, t in ranked))
+    with open(out('template-sources.json'), 'w') as fh:
+        json.dump({smarts: {'count': t['count'], 'generic': t['generic'], 'sources': t['sources']} for smarts, t in ranked}, fh)
     write_zst(out('products.tsv.zst'), '\n'.join(f'{k}\t{products[k]["n"]}\t{",".join(products[k]["k"])}' for k in sorted(products)))
     write_zst_blocked(out('reaction-smiles.tsv.zst'), [f'{k}\t{reaction_meta[k][0]}' for k in sorted(reaction_meta)])
     as_reactant, as_product, makes = Counter(), Counter(), defaultdict(list)
@@ -175,14 +182,14 @@ def main():
 
     names = ['exact.tsv.zst', 'exact.tsv.zst.blocks', 'templates.tsv.zst', 'retro-templates.tsv.zst', 'products.tsv.zst',
              'reaction-smiles.tsv.zst', 'reaction-smiles.tsv.zst.blocks', 'molecules.tsv.zst', 'molecules.tsv.zst.blocks',
-             'reactions.faiss.zst', 'reaction-keys.txt.zst', 'records.json']
+             'reactions.faiss.zst', 'reaction-keys.txt.zst', 'records.json', 'template-sources.json']
     manifest = {
         'format': 'nodus.reaction-index', 'version': 4, 'source': 'nodus.textbook-schemes',
         'licence': 'derived from the user\'s own library; not for redistribution',
         'citation': None, 'idPrefix': 'tb-',
         'fingerprint': {'kind': 'drfp', 'bits': ord_builder.DRFP_BITS, 'space': 'hamming', 'index': 'flat',
                         'vectors': len(keys), 'emptyExcluded': len(items) - len(keys)},
-        'records': len(records), 'exactKeys': len(exact), 'products': len(products), 'skipped': dict(skipped),
+        'records': len(records), 'retroTemplates': len(templates), 'exactKeys': len(exact), 'products': len(products), 'skipped': dict(skipped),
         'books': sorted({r['book'] for r in records.values()}),
         'files': {n: {'bytes': os.path.getsize(out(n)), 'sha256': digest(out(n))} for n in names},
         'builtAt': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
