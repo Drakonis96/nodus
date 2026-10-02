@@ -216,6 +216,8 @@ export interface PrecedentContext {
 export interface StepSupport {
   passage?: { title: string; location: string | null; citation: string; excerpt: string; about: string; scanned?: boolean };
   alternatives?: { product: string; proposals: Array<{ precursors: string; classes: string[]; recorded: number }> };
+  /** High-severity functional-group clashes the compatibility check found in the step. */
+  compatibility?: string[];
 }
 
 const ALTERNATIVES_SHOWN = 3;
@@ -1980,6 +1982,7 @@ function fixEvidence(support: StepSupport | undefined, indent: string): string {
   const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
   if (alternatives.length) lines.push(`${indent}Evidence, not an instruction — the Open Reaction Database makes \`${support!.alternatives!.product}\` from: ${alternatives.map(alternativeLine).join(' · ')}. Write any species you take from it by name.`);
   if (support?.passage) lines.push(`${indent}Textbook, on ${support.passage.about}: ${support.passage.title}${support.passage.location ? `, ${support.passage.location}` : ''} (${support.passage.citation}).`);
+  for (const clash of support?.compatibility ?? []) lines.push(`${indent}Compatibility check (evidence, not an instruction): ${clash}.`);
   return lines.length ? `\n${lines.join('\n')}` : '';
 }
 

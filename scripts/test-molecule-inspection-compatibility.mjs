@@ -24,7 +24,9 @@ await build({ entryPoints: [path.join(root, 'electron/ai/moleculeInspection.ts')
       // No textbook-scheme index built: the route report has no textbook section.
       './textbookSchemes': `export const textbookSchemeDirectory=()=>null; export const textbookCitations=()=>[]`,
     };
-    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\/textbookSchemes|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => ({ path: args.path, namespace: 'mock' }));
+    // Only the electron modules' imports are mocked: a shared module's own `./textbookSchemes` is the
+    // real shared file, not electron/ai/textbookSchemes.
+    api.onResolve({ filter: /^(\.\/aiClient|\.\/synthesisEvidence|\.\/chemistryStock|\.\/textbookSchemes|\.\.\/reactionIndex|\.\.\/capabilities\/(registry|runner))$/ }, args => (args.importer.includes(`${path.sep}electron${path.sep}`) ? { path: args.path, namespace: 'mock' } : undefined));
     api.onLoad({ filter: /.*/, namespace: 'mock' }, args => ({ contents: mocks[args.path] }));
   } }],
 });

@@ -48,6 +48,7 @@ import { compoundAvailability, findStartingSmiles, formatStartingMaterialStock, 
 import { chemistryStockDirectory } from './chemistryStock';
 import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
 import { formatTextbookPrecedents, TEXTBOOK_ID } from '@shared/textbookSchemes';
+import { compatibilityFixLines, formatCompatibility, normalizeCompatibility, type StepCompatibility } from '@shared/stepCompatibility';
 import { invokeDisconnections, synthesisEvidenceWorkIds, textbookPassages } from './synthesisEvidence';
 import { capabilityRegistry, pinCapabilitiesForTurn, type CapabilityProvider } from '../capabilities/registry';
 import { createTrustedCapabilityRunner } from '../capabilities/runner';
@@ -817,6 +818,29 @@ async function startingMaterialStockLine(runner: Runner, labels: RouteSpeciesLab
   return [targetLine && `**Target:** ${targetLine}`, startingLine].filter(Boolean).join('\n\n');
 }
 
+const COMPATIBILITY_TOOL = 'check-compatibility';
+
+/** Functional-group compatibility of each step: its reactants and products from the resolved
+ *  labels, its reagents from the step's conditions line and its named agents. Empty when the
+ *  package has no such tool; textbook examples of protecting groups when the textbook index is
+ *  there. */
+async function checkStepCompatibility(runner: Runner, labels: RouteSpeciesLabel[][], conditions: string[]): Promise<StepCompatibility[]> {
+  const provider = capabilityRegistry().providers.get(CHEMISTRY_CAPABILITY);
+  if (!provider?.tools.some((tool) => tool.id === COMPATIBILITY_TOOL)) return [];
+  const steps = labels.map((entries, index) => {
+    const smiles = (role: RouteSpeciesLabel['role'], keepByproducts: boolean) => entries
+      .filter((entry) => entry.role === role && (keepByproducts || !entry.byproduct) && entry.smiles)
+      .map((entry) => entry.smiles).slice(0, 12);
+    const agents = entries.filter((entry) => entry.role === 'agent' && entry.name).map((entry) => entry.name);
+    return { reactants: smiles('reactant', true), products: smiles('product', false), reagents: [conditions[index] ?? '', ...agents].filter(Boolean).join('; ').slice(0, 2000) };
+  });
+  if (!steps.some((step) => step.reactants.length && step.products.length && step.reagents)) return [];
+  const textbookDir = textbookSchemeDirectory();
+  const result = await runner.invoke({ provider, toolId: COMPATIBILITY_TOOL, input: { steps: steps.slice(0, 24), ...(textbookDir ? { textbookDir } : {}) } });
+  const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'step-compatibility');
+  return artifact ? normalizeCompatibility(artifact.data) : [];
+}
+
 /** The post-answer route check, then one drawing per verified step. Neither rewrites the
  *  answer nor asks the model again; a step the checker refused is reported, not drawn. */
 export async function appendRouteReportAndDrawings(
@@ -875,12 +899,21 @@ export async function appendRouteReportAndDrawings(
       const target = options.target ? { smiles: options.target, name: targetName(labels, audit, options.target) } : null;
       return formatTextbookPrecedents(precedent, (ids) => textbookCitations(ids), { queries, target });
     }).catch(() => '');
+    // Groups a step's reagents would attack (an ester through LiAlH4, a free OH beside a Grignard).
+    const compatibilityPromise = checkStepCompatibility(runner, labels, conditions).catch(() => [] as StepCompatibility[]);
     // Which starting materials the user's vendor stock lists hold (no lists: nothing is said).
     const stockPromise = startingMaterialStockLine(runner, labels).catch(() => '');
     const review = await reviewPromise;
     const report = formatRouteAudit(audit, labels, review);
     const precedentText = await precedentSection;
     const support = await supportPromise;
+    // A step's high-severity clashes ride along in its fix prompt, as evidence.
+    const compatibility = await compatibilityPromise;
+    for (const step of compatibility) {
+      const clashes = compatibilityFixLines(step);
+      if (clashes.length) support.set(step.step - 1, { ...(support.get(step.step - 1) ?? {}), compatibility: clashes });
+    }
+    const compatibilityText = formatCompatibility(compatibility, (ids) => textbookCitations(ids));
     // A refusal the checker can name and the app cannot fix is offered back to the model as one
     // click: names and roles only — the model never authored the derived SMILES. The index's
     // alternatives and a textbook passage ride along as evidence.
@@ -888,7 +921,7 @@ export async function appendRouteReportAndDrawings(
     const sources = await evidenceSources(modelAnswer, steps.length, precedentPromise, queries, support);
     const stockLine = await stockPromise;
     const textbookText = await textbookSection;
-    return `${finalAnswer.trimEnd()}\n\n${report}\n${stockLine ? `${stockLine}\n\n` : ''}${drawings}${precedentText}${textbookText}${sources}${fix ? `\n${fix}\n` : ''}`;
+    return `${finalAnswer.trimEnd()}\n\n${report}\n${stockLine ? `${stockLine}\n\n` : ''}${drawings}${precedentText}${textbookText}${compatibilityText}${sources}${fix ? `\n${fix}\n` : ''}`;
   } catch (error) {
     if (options.signal?.aborted) return finalAnswer;
     return `${finalAnswer.trimEnd()}\n\n${formatRouteCheckUnavailable(error instanceof Error ? error.message : 'the route check failed')}\n`;
