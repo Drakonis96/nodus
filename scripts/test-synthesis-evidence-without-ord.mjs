@@ -28,7 +28,7 @@ const STUBS = {
   // No stock lists imported: disconnections are requested without a stock directory.
   './chemistryStock': `export const chemistryStockDirectory = () => null; export const chemistryStockLists = () => [];`,
   // No textbook-scheme index unless a scenario sets one.
-  './textbookSchemes': `export const textbookSchemeDirectory = () => globalThis.__textbook?.dir ?? null; export const textbookCitations = (ids) => (globalThis.__textbook?.cite ?? (() => []))(ids);`,
+  './textbookSchemes': `export const textbookSchemeDirectory = () => globalThis.__textbook?.dir ?? null; export const textbookCitations = (ids) => (globalThis.__textbook?.cite ?? (() => []))(ids); export const textbookTemplateCitations = (templates) => (globalThis.__textbook?.citeTemplates ?? (() => []))(templates);`,
   // No local reranker installed: the fused order stands.
   './localReranker': `export const rerankerAvailable = () => false; export const rerank = async () => null;`,
   '../db/database': `export const getDb = () => ({ prepare: () => ({ all: () => [{ nodus_id: 'w1', title: 'Klein Organic Chemistry 3rd Ed', collections: 'Chemistry' }] }) });`,
@@ -161,6 +161,40 @@ test('with a textbook-scheme index, the textbook preparations of the target are 
     assert.equal(prep.reactions[0].citations.length, 1, 'unknown and ORD ids are not cited');
     assert.match(prep.reactions[0].citations[0], /\[\*Klein Organic Chemistry 3rd Ed\*, p\. 862\]\(nodus:\/\/passage\/w1%23862\) · conditions: EtOH, H2SO4, reflux · yield 85%/);
     assert.ok(payload.ord_disconnections, 'the ORD brief is still there');
+  } finally {
+    globalThis.__textbook = undefined;
+  }
+});
+
+test('textbook retro templates: a proposal is cited by the schemes its templates came from; template SMARTS never reach the model', async () => {
+  const T1 = '[N;H0;D3;+0:1]-[c:2]>>Cl-[c:2].[NH;D2;+0:1]';
+  const T2 = '[*:1]-[N;H0;D3;+0:2]>>[*:1]-Br.[NH;D2;+0:2]';
+  globalThis.__textbook = {
+    dir: '/schemes',
+    cite: () => [],
+    citeTemplates: (templates) => templates.flatMap((t) => t === T1
+      ? [{ book: 'Synthetic Textbook A', page: 1115, reagents: 'Pd cat. + ligands', generic: false }]
+      : t === T2 ? [{ book: 'Synthetic Textbook B', page: 42, reagents: 'K2CO3, DMF', generic: true }] : []),
+  };
+  const target = 'CN1CCN(c2ccccc2)CC1';
+  const ordBrief = { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [{ input: target, target, madeBy: null, proposals: [{ precursors: 'CN1CCNCC1.Brc1ccccc1', classes: ['N-arylation'], recorded: 2, available: true, templates: ['[ord-template]>>[x]'] }] }] } }] };
+  const textbook = { artifacts: [{ artifactType: 'reaction-disconnections', data: { disconnections: [{ input: target, target, madeBy: null, proposals: [
+    { precursors: 'CN1CCNCC1.Clc1ccccc1', recorded: 0, templateCount: 5, templates: [T1] },
+    { precursors: 'CN1CCNCC1.Brc1ccccc1', recorded: 0, templateCount: 3, templates: [T2, T1] },
+    { precursors: 'unknown.template', recorded: 0, templates: ['[C:1]>>[C:1]'] },
+    { precursors: 'CN1CCNCC1.Ic1ccccc1', recorded: 0, templates: [T1] },
+  ] }] } }] };
+  try {
+    const evidence = await scenario({ provider: TOOL, indexDir: '/idx', invoke: async ({ input }) => (input.indexDir === '/schemes' ? textbook : ordBrief) });
+    const payload = synthesisEvidencePayload(evidence);
+    const [prep] = payload.textbook_preparations;
+    assert.deepEqual(prep.reactions, []);
+    assert.deepEqual(prep.disconnections, [
+      { precursors: 'CN1CCNCC1.Clc1ccccc1', citations: ['*Synthetic Textbook A*, p. 1115 · conditions: Pd cat. + ligands · worked example'] },
+      { precursors: 'CN1CCNCC1.Brc1ccccc1', citations: ['*Synthetic Textbook B*, p. 42 · conditions: K2CO3, DMF · general scheme', '*Synthetic Textbook A*, p. 1115 · conditions: Pd cat. + ligands · worked example'] },
+    ], 'uncited proposals are skipped; two per molecule');
+    assert.ok(!JSON.stringify(payload).includes('ord-template'), 'ORD template SMARTS are not sent to the model');
+    assert.ok(!JSON.stringify(payload.ord_disconnections).includes('templates'));
   } finally {
     globalThis.__textbook = undefined;
   }

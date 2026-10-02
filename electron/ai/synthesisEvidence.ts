@@ -22,7 +22,7 @@ import { getDb } from '../db/database';
 import { findSimilarPassages, lexicalPassageSearch, type SimilarPassage } from '../db/passagesRepo';
 import { reactionIndexService } from '../reactionIndex';
 import { chemistryStockDirectory } from './chemistryStock';
-import { textbookCitations, textbookSchemeDirectory } from './textbookSchemes';
+import { textbookCitations, textbookSchemeDirectory, textbookTemplateCitations } from './textbookSchemes';
 import { textbookPreparations, type TextbookPreparation } from '@shared/textbookSchemes';
 import { rerank, rerankerAvailable } from './localReranker';
 import { embed } from './aiClient';
@@ -108,7 +108,8 @@ async function ordDisconnections(target: string, starting: string[], options: Ev
 }
 
 /** Reactions in the user's textbook schemes that make the target and its most promising ORD
- *  precursors, with book-and-page citations. Best-effort: no textbook index, an older package or a
+ *  precursors, and one-step disconnections proposed by retro templates extracted from those
+ *  schemes, with book-and-page citations. Best-effort: no textbook index, an older package or a
  *  tool failure returns []. */
 async function textbookSchemePreparations(target: string, disconnections: TargetDisconnections[], starting: string[], options: EvidenceOptions): Promise<TextbookPreparation[]> {
   const provider = disconnectProvider();
@@ -119,7 +120,7 @@ async function textbookSchemePreparations(target: string, disconnections: Target
   try {
     const result = await runner.invoke({ provider, toolId: DISCONNECT_TOOL, input: { indexDir, targets: molecules, limit: 3 } });
     const artifact = (result.artifacts ?? []).find((entry) => entry.artifactType === 'reaction-disconnections');
-    return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir)) : [];
+    return artifact ? textbookPreparations(artifact.data, (ids) => textbookCitations(ids, indexDir), (templates) => textbookTemplateCitations(templates, indexDir)) : [];
   } catch (error) {
     if (options.signal?.aborted) throw error;
     console.warn('[synthesisEvidence] textbook schemes unavailable:', error instanceof Error ? error.message : String(error));

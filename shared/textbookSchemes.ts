@@ -118,30 +118,59 @@ export function formatTextbookPrecedents(
   return `\n${lines.join('\n').trimEnd()}\n`;
 }
 
-/** Textbook reactions that make a molecule, for the pre-answer route evidence. */
+/** Where a textbook retro template came from, as template-sources.json lists it: a scheme the
+ *  template was extracted from. `generic`: the book drew it with R groups (a general scheme). */
+export interface TextbookTemplateSource {
+  book: string;
+  nodusId?: string;
+  page: number;
+  reagents?: string | null;
+  status?: string;
+  generic?: boolean;
+}
+
+/** "*Clayden*, p. 508 · conditions: H2/Pd, HOAc · general scheme" (or "worked example"). */
+export function formatTemplateCitation(source: TextbookTemplateSource): string {
+  const parts = [`*${source.book}*, p. ${source.page}`];
+  const conditions = clip(source.reagents, MAX_CONDITIONS);
+  if (conditions) parts.push(`conditions: ${conditions}`);
+  parts.push(source.generic ? 'general scheme' : 'worked example');
+  return parts.join(' · ');
+}
+
+/** Textbook reactions that make a molecule, for the pre-answer route evidence: recorded ones
+ *  (`reactions`) and one-step disconnections proposed by retro templates extracted from the books'
+ *  schemes (`disconnections`), each with the schemes it came from. */
 export interface TextbookPreparation {
   molecule: string;
   reactions: Array<{ reaction: string; schemes: number; citations: string[] }>;
+  disconnections?: Array<{ precursors: string; citations: string[] }>;
 }
 
 const PREPARATION_MOLECULES = 6;
 const PREPARATION_REACTIONS = 3;
 const PREPARATION_CITATIONS = 2;
+const PREPARATION_DISCONNECTIONS = 2;
 
 /** Reads `reaction-disconnections` data from the textbook index: the recorded reactions that make
- *  each molecule (`madeBy`), each with its record ids resolved to citations. Template proposals are
- *  ignored: the textbook index has no retro templates. */
-export function textbookPreparations(data: unknown, cite: (ids: string[]) => TextbookCitation[]): TextbookPreparation[] {
+ *  each molecule (`madeBy`), each with its record ids resolved to citations, and — when
+ *  `citeTemplates` is given — the template proposals not already recorded, each cited by the schemes
+ *  its templates were extracted from (a proposal whose templates have no known source is left out). */
+export function textbookPreparations(
+  data: unknown,
+  cite: (ids: string[]) => TextbookCitation[],
+  citeTemplates?: (templates: string[]) => TextbookTemplateSource[],
+): TextbookPreparation[] {
   const entries = (data as { disconnections?: unknown })?.disconnections;
   if (!Array.isArray(entries)) return [];
   const out: TextbookPreparation[] = [];
   for (const raw of entries) {
-    const entry = raw as { target?: unknown; madeBy?: { reactions?: unknown } | null } | null;
+    const entry = raw as { target?: unknown; madeBy?: { reactions?: unknown } | null; proposals?: unknown } | null;
     const molecule = typeof entry?.target === 'string' ? entry.target : '';
+    if (!molecule) continue;
     const made = entry?.madeBy?.reactions;
-    if (!molecule || !Array.isArray(made)) continue;
     const reactions: TextbookPreparation['reactions'] = [];
-    for (const item of made) {
+    for (const item of Array.isArray(made) ? made : []) {
       const value = item as { reaction?: unknown; count?: unknown; samples?: unknown };
       if (typeof value.reaction !== 'string' || !value.reaction.includes('>>')) continue;
       const ids = Array.isArray(value.samples) ? value.samples.filter((id): id is string => typeof id === 'string' && TEXTBOOK_ID.test(id)) : [];
@@ -150,7 +179,21 @@ export function textbookPreparations(data: unknown, cite: (ids: string[]) => Tex
       reactions.push({ reaction: value.reaction.slice(0, 600), schemes: typeof value.count === 'number' ? value.count : citations.length, citations });
       if (reactions.length >= PREPARATION_REACTIONS) break;
     }
-    if (reactions.length) out.push({ molecule, reactions });
+    const disconnections: NonNullable<TextbookPreparation['disconnections']> = [];
+    if (citeTemplates) {
+      const recorded = new Set(reactions.map((reaction) => reaction.reaction.split('>>')[0]));
+      for (const item of Array.isArray(entry?.proposals) ? entry.proposals : []) {
+        const value = item as { precursors?: unknown; recorded?: unknown; templates?: unknown };
+        const precursors = typeof value.precursors === 'string' ? value.precursors : '';
+        if (!precursors || recorded.has(precursors) || (typeof value.recorded === 'number' && value.recorded > 0)) continue;
+        const templates = Array.isArray(value.templates) ? value.templates.filter((t): t is string => typeof t === 'string' && t.includes('>>')) : [];
+        const citations = templates.length ? citeTemplates(templates).slice(0, PREPARATION_CITATIONS).map(formatTemplateCitation) : [];
+        if (!citations.length) continue;
+        disconnections.push({ precursors: precursors.slice(0, 600), citations });
+        if (disconnections.length >= PREPARATION_DISCONNECTIONS) break;
+      }
+    }
+    if (reactions.length || disconnections.length) out.push({ molecule, reactions, ...(disconnections.length ? { disconnections } : {}) });
     if (out.length >= PREPARATION_MOLECULES) break;
   }
   return out;

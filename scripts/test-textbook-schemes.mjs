@@ -95,6 +95,18 @@ test('textbook preparations: made-by reactions with resolvable citations only, c
   assert.deepEqual(shared.textbookPreparations({}, cite), []);
 });
 
+test('template citations: worked example or general scheme; recorded and uncited proposals are skipped', () => {
+  assert.equal(shared.formatTemplateCitation({ book: 'Book A', page: 9, reagents: 'H2,\n  Pd/C', generic: false }), '*Book A*, p. 9 · conditions: H2, Pd/C · worked example');
+  assert.equal(shared.formatTemplateCitation({ book: 'Book B', page: 3, generic: true }), '*Book B*, p. 3 · general scheme');
+  const data = { disconnections: [{ input: 'X', target: 'CCO', madeBy: null, proposals: [
+    { precursors: 'CC=O', recorded: 1, templates: ['a>>b'] },
+    { precursors: 'CCBr', recorded: 0, templates: ['a>>b'] },
+  ] }] };
+  const citeTemplates = (templates) => templates.map(() => ({ book: 'Book A', page: 9, reagents: null, generic: false }));
+  assert.deepEqual(shared.textbookPreparations(data, cite, citeTemplates), [{ molecule: 'CCO', reactions: [], disconnections: [{ precursors: 'CCBr', citations: ['*Book A*, p. 9 · worked example'] }] }]);
+  assert.deepEqual(shared.textbookPreparations(data, cite), [], 'without a template resolver, template proposals are ignored');
+});
+
 test('the directory resolver needs a complete textbook-scheme index; citations link to the page passage', async () => {
   const dir = path.join(tmp, 'index');
   await mkdir(dir, { recursive: true });
@@ -133,6 +145,13 @@ test('the directory resolver needs a complete textbook-scheme index; citations l
     assert.equal(b.book, 'Clayden');
     assert.equal(b.link, null, 'a book without text in the library is cited unlinked');
     assert.equal(w.link, null, 'an EPUB image has no page link');
+    assert.deepEqual(electron.textbookTemplateCitations(['t1>>x']), [], 'an index without template-sources.json has no template citations');
+    await writeFile(path.join(dir, 'template-sources.json'), JSON.stringify({
+      't1>>x': { count: 3, generic: 1, sources: [{ book: 'Book G', page: 5, generic: true }, { book: 'Book W', page: 7, generic: false }, { book: 'Book W', page: 7, generic: false }] },
+      't2>>x': { count: 1, generic: 0, sources: [{ book: 'Book V', page: 2, generic: false }, { page: 3 }] },
+    }));
+    assert.deepEqual(electron.textbookTemplateCitations(['t1>>x', 't2>>x']).map((s) => `${s.book} ${s.page}`), ['Book W 7', 'Book V 2'], 'worked examples first, one per page, two at most');
+    assert.deepEqual(electron.textbookTemplateCitations(['t1>>x'], dir, 3).map((s) => `${s.book} ${s.page}`), ['Book W 7', 'Book G 5']);
     globalThis.__textbookDb = { prepare: () => { throw new Error('no database'); } };
     assert.equal(electron.textbookCitations([ID_A])[0].link, null, 'a database failure only drops the link');
   } finally {

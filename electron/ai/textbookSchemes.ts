@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { TEXTBOOK_ID, textbookCitation, type TextbookCitation, type TextbookSchemeRecord } from '@shared/textbookSchemes';
+import { TEXTBOOK_ID, textbookCitation, type TextbookCitation, type TextbookSchemeRecord, type TextbookTemplateSource } from '@shared/textbookSchemes';
 import { getDb } from '../db/database';
 
 /**
@@ -78,4 +78,47 @@ export function textbookCitations(ids: string[], dir = textbookSchemeDirectory()
     const record = map.get(id);
     return record ? [textbookCitation(id, record, pageLink(record, works))] : [];
   });
+}
+
+let cachedTemplates: { file: string; mtimeMs: number; sources: Map<string, TextbookTemplateSource[]> } | null = null;
+
+/** template-sources.json (retro SMARTS -> the schemes it was extracted from), read once per build
+ *  of the index; an index built without templates has none. */
+function templateSources(dir: string): Map<string, TextbookTemplateSource[]> {
+  const file = path.join(dir, 'template-sources.json');
+  const mtimeMs = fs.statSync(file).mtimeMs;
+  if (cachedTemplates?.file === file && cachedTemplates.mtimeMs === mtimeMs) return cachedTemplates.sources;
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, { sources?: unknown }>;
+  const sources = new Map<string, TextbookTemplateSource[]>();
+  for (const [smarts, entry] of Object.entries(raw)) {
+    const list = (Array.isArray(entry?.sources) ? entry.sources : []).filter((source): source is TextbookTemplateSource =>
+      !!source && typeof (source as TextbookTemplateSource).book === 'string' && Number.isInteger((source as TextbookTemplateSource).page));
+    if (list.length) sources.set(smarts, list);
+  }
+  cachedTemplates = { file, mtimeMs, sources };
+  return sources;
+}
+
+/** The schemes behind retro templates, in the templates' order, at most `max` distinct pages;
+ *  worked examples (real molecules) before general schemes (R groups). */
+export function textbookTemplateCitations(templates: string[], dir = textbookSchemeDirectory(), max = 2): TextbookTemplateSource[] {
+  if (!dir || !templates.length) return [];
+  let map: Map<string, TextbookTemplateSource[]>;
+  try {
+    map = templateSources(dir);
+  } catch {
+    return [];
+  }
+  const all = templates.flatMap((smarts) => map.get(smarts) ?? []);
+  const ordered = [...all.filter((source) => !source.generic), ...all.filter((source) => source.generic)];
+  const seen = new Set<string>();
+  const out: TextbookTemplateSource[] = [];
+  for (const source of ordered) {
+    const key = `${source.book}#${source.page}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(source);
+    if (out.length >= max) break;
+  }
+  return out;
 }
