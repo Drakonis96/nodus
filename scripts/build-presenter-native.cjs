@@ -9,7 +9,7 @@ function buildPresenterNative(architecture = process.arch) {
   const dir = path.join(root, 'build/presenter-native');
   const output = path.join(dir, architecture, 'nodus-presenter-native');
   fs.mkdirSync(path.dirname(output), { recursive: true });
-  execFileSync('xcrun', ['swiftc', '-swift-version', '5', '-O', '-target', `${arch}-apple-macosx11.0`, '-framework', 'Network', '-framework', 'PDFKit', '-framework', 'AppKit', ...['Protocol.swift', 'Transport.swift', 'main.swift'].map(f => path.join(dir, f)), '-o', output], { stdio: 'inherit' });
+  execFileSync('xcrun', ['swiftc', '-swift-version', '5', '-O', '-target', `${arch}-apple-macosx11.0`, '-framework', 'Network', '-framework', 'PDFKit', '-framework', 'AppKit', '-framework', 'MultipeerConnectivity', ...['Protocol.swift', 'PeerProtocol.swift', 'Transport.swift', 'MultipeerServer.swift', 'main.swift'].map(f => path.join(dir, f)), '-o', output], { stdio: 'inherit' });
   execFileSync('codesign', ['--force', '--sign', '-', output], { stdio: 'inherit' });
 }
 exports.buildPresenterNative = buildPresenterNative;

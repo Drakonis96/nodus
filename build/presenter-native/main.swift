@@ -13,7 +13,8 @@ func emit(_ message: Message) {
     outputLock.lock(); FileHandle.standardOutput.write(data + Data([10])); outputLock.unlock()
 }
 var listener: NWListener?
-var clients: [UUID: FramedConnection] = [:]
+var peerServer: MultipeerPresenterServer?
+var clients: [UUID: PresenterMessageConnection] = [:]
 var channels: [UUID: String] = [:]
 var identities: [UUID: String] = [:]
 var transfers: [UUID: UUID] = [:]
@@ -108,8 +109,20 @@ func receive(_ message: Message, id: UUID) {
     }
 }
 func configure(_ message: Message) {
-    guard listener == nil, let encoded = message["key"]?.string, let key = Data(base64Encoded: encoded), key.count == 32,
+    guard listener == nil, peerServer == nil, let encoded = message["key"]?.string, let key = Data(base64Encoded: encoded), key.count == 32,
           let service = message["service"]?.string else { return }
+    if message["transport"]?.string == "multipeer" {
+        let server = MultipeerPresenterServer(service: service, key: key, queue: queue)
+        server.onClient = { client in
+            let id = UUID(); clients[id] = client
+            client.onMessage = { receive($0, id: id) }
+            client.onState = { state in if case .cancelled = state { remove(id) } }
+        }
+        server.onUnavailable = { emit(["kind": .string("unavailable")]) }
+        peerServer = server; server.start()
+        emit(["kind": .string("ready"), "transport": .string("multipeer")])
+        return
+    }
     do {
         let parameters = PresenterTLS.parameters(key: key, identity: service)
         if ProcessInfo.processInfo.environment["NODUS_PRESENTER_TEST_LOOPBACK"] == "1" {
@@ -143,7 +156,7 @@ func input(_ message: Message) {
         guard let value = message["message"]?.object else { return }
         if let raw = message["id"]?.string, let id = UUID(uuidString: raw) { clients[id]?.send(value) }
         else { for (id, client) in clients where channels[id] == "control" { client.send(value) } }
-    case "stop": for id in Array(clients.keys) { remove(id) }; listener?.cancel(); exit(0)
+    case "stop": for id in Array(clients.keys) { remove(id) }; listener?.cancel(); peerServer?.stop(); exit(0)
     default: break
     }
 }
@@ -155,4 +168,10 @@ DispatchQueue.global().async {
     }
     exit(0)
 }
-dispatchMain()
+if CommandLine.arguments.contains("--multipeer") {
+    // Multipeer's Bonjour objects require a live Foundation run loop. The
+    // existing Network transport continues to use its original dispatch pump.
+    RunLoop.main.run()
+} else {
+    dispatchMain()
+}

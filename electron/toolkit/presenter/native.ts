@@ -23,6 +23,7 @@ let commands = new CommandWindow();
 let overlay: PresenterAction[] = [];
 let overlaySlide = 0;
 let snapshotDeck: Record<string, unknown> = {};
+let multipeerMode = false;
 function write(value: unknown): void {
   if (helper && !helper.stdin.destroyed) helper.stdin.write(JSON.stringify(value) + '\n');
 }
@@ -41,10 +42,14 @@ export function startNativePresenter(d: Dependencies): void {
   deps = d; commands = new CommandWindow(); overlay = []; overlaySlide = d.getState().currentSlide;
   const service = `nodus-${crypto.randomUUID().toLowerCase()}`, key = crypto.randomBytes(32).toString('base64');
   const name = os.hostname().replace(/\.local$/, '');
+  // Explicit local experiment; existing Mac QR and Network transport stay the default.
+  const multipeer = process.env.NODUS_PRESENTER_TRANSPORT === 'multipeer';
+  multipeerMode = multipeer;
   const url = new URL('nodus-presenter://pair');
-  url.search = new URLSearchParams({ version: '1', service, key, name }).toString();
+  url.search = new URLSearchParams({ version: multipeer ? '3' : '1', service, key, name,
+    ...(multipeer ? { transport: 'multipeer' } : {}) }).toString();
   pairing = { url: url.toString(), name };
-  const child = spawn(binary, [], { stdio: 'pipe', windowsHide: true }); helper = child;
+  const child = spawn(binary, multipeer ? ['--multipeer'] : [], { stdio: 'pipe', windowsHide: true }); helper = child;
   child.stdin.on('error', () => { if (helper === child) stopNativePresenter(); });
   child.stderr.resume(); // No credential-bearing helper output enters application logs.
   let buffer = '';
@@ -61,7 +66,7 @@ export function startNativePresenter(d: Dependencies): void {
   });
   child.on('error', () => { if (helper === child) stopNativePresenter(); });
   child.on('exit', () => { if (helper === child) { helper = null; ready = false; pairing = null; deps = null; } });
-  write({ kind: 'configure', service, key });
+  write({ kind: 'configure', service, key, ...(multipeer ? { transport: 'multipeer' } : {}) });
   const state = d.getState(), deck = readLibrary(d.libraryDir()).presentations.find(p => p.id === state.pdfId);
   if (deck && state.pdfId) {
     const file = pdfPath(d.libraryDir(), state.pdfId);
@@ -101,11 +106,19 @@ export function broadcastNativePresenter(action: PresenterAction, origin?: strin
     if (overlay.length >= 8192) overlay = [];
     overlay.push(action);
   }
-  send({ kind: 'update', state: deps.getState(), action, origin });
+  if (multipeerMode && action.type === 'toolData') {
+    // Positions and stroke points do not change canonical state. Avoid sending
+    // a whole snapshot back to the phone for every movement; this also avoids
+    // a full SwiftUI state publication for every locally painted point.
+    send({ kind: 'tool', action, origin });
+  } else {
+    send({ kind: 'update', state: deps.getState(), action, origin });
+  }
 }
 export function getNativePresenterInfo(): { url: string; name: string } | null { return ready ? pairing : null; }
 export function stopNativePresenter(): void {
   const child = helper;
   if (child) { send({ kind: 'ended' }); write({ kind: 'stop' }); helper = null; child.stdin.end(); const timer = setTimeout(() => child.kill(), 1000); timer.unref(); }
   ready = false; pairing = null; deps = null; overlay = []; snapshotDeck = {};
+  multipeerMode = false;
 }
