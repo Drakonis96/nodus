@@ -114,8 +114,10 @@ for the finalization sequence, preserved download aliases and Linux checks.
 Desktop updates download automatically, but installation and restart require
 the explicit **Install and restart** action on every supported platform. An
 ordinary app quit never installs a pending update. The downloaded update remains
-accessible from the header and Settings after choosing **Later**. On launch, the
-header banner shows the update check, available version, and download progress
+accessible from Settings after choosing **Later**. The banner below the header
+reappears during backup and installation, including when installation starts
+from Settings after postponing the update. On launch, the banner shows the update
+check, available version, and download progress
 without blocking the workspace. It disappears when no update is available; an
 initial check or download error is shown briefly and dismissed after five seconds.
 Subsequent checks and downloads stay silent until an update is ready to install.
