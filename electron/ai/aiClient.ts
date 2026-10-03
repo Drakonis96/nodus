@@ -900,8 +900,8 @@ function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> 
   return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo ?? thinkingCatalogFor(model, openAiCompatBase(model.provider)));
 }
 
-function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort, stripTemperature = false): Record<string, number> {
-  if (stripTemperature || temperatureUnsupported(model)) return {};
+function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort): Record<string, number> {
+  if (temperatureUnsupported(model)) return {};
   if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
   return samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning);
 }

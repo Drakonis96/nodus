@@ -214,7 +214,7 @@ export function thinkingOffReplacement(error: unknown): string | null {
 /** A refused request explicitly says its reasoning opt-out is impossible. */
 export function rejectsThinkingOff(error: unknown): boolean {
   if (![400, 422].includes(statusOf(error) ?? 0)) return false;
-  return rejectsAdaptiveThinking(error) || /(?:thinking|reasoning)\b\s+(?:is\s+)?(?:mandatory|required|always on)|(?:thinking|reasoning)\b[^\n]{0,60}cannot be disabled|(?:cannot|can't)\s+disable\s+(?:thinking|reasoning)\b|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,30}(?:disabled|false|none|off)[^\n]{0,70}(?:not supported|unsupported|not accepted|not allowed|invalid)|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,40}(?:does not support|not supported|unsupported|not allowed)[^\n]{0,30}(?:disabled|false|none|off)\b|(?:none|off)[^\n]{0,40}(?:not supported|unsupported|not allowed)[^\n]{0,40}(?:reasoning|thinking)\b/i.test(messageOf(error));
+  return ADAPTIVE_THINKING_REJECTION.test(messageOf(error)) || /(?:thinking|reasoning)\b\s+(?:is\s+)?(?:mandatory|required|always on)|(?:thinking|reasoning)\b[^\n]{0,60}cannot be disabled|(?:cannot|can't)\s+disable\s+(?:thinking|reasoning)\b|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,30}(?:disabled|false|none|off)[^\n]{0,70}(?:not supported|unsupported|not accepted|not allowed|invalid)|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,40}(?:does not support|not supported|unsupported|not allowed)[^\n]{0,30}(?:disabled|false|none|off)\b|(?:none|off)[^\n]{0,40}(?:not supported|unsupported|not allowed)[^\n]{0,40}(?:reasoning|thinking)\b/i.test(messageOf(error));
 }
 
 /** Some compatible APIs publish the accepted effort values in their refusal. */

@@ -72,6 +72,16 @@ function codexRuntime({ connected = true } = {}) {
   return calls;
 }
 
+const uiFile = path.join(tmp, 'ui.cjs');
+await build({ stdin: { contents: `export { FavoriteModelAvailability } from ${JSON.stringify(path.join(repo, 'src/components/FavoriteModelAvailability.tsx'))};
+  export { ProvidersSettings } from ${JSON.stringify(path.join(repo, 'src/views/ProvidersSettings.tsx'))};`, resolveDir: repo, loader: 'tsx' }, outfile: uiFile,
+  bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', logLevel: 'silent', tsconfig: path.join(repo, 'tsconfig.json'),
+  external: ['react', 'react/jsx-runtime'],
+});
+const { FavoriteModelAvailability, ProvidersSettings } = require(uiFile);
+const React = require('react');
+const act = React.act ?? require('react-dom/test-utils').act;
+
 test('reasoning catalogues preserve mandatory controls and filter impossible off levels', async () => {
   globalThis.__catalogFixture.settings = { customProvider: { baseUrl: 'https://fixture.invalid/v1', models: [] } };
   for (const provider of ['openrouter', 'custom']) {
@@ -89,16 +99,6 @@ test('reasoning catalogues preserve mandatory controls and filter impossible off
     });
   }
 });
-
-const uiFile = path.join(tmp, 'ui.cjs');
-await build({ stdin: { contents: `export { FavoriteModelAvailability } from ${JSON.stringify(path.join(repo, 'src/components/FavoriteModelAvailability.tsx'))};
-  export { ProvidersSettings } from ${JSON.stringify(path.join(repo, 'src/views/ProvidersSettings.tsx'))};`, resolveDir: repo, loader: 'tsx' }, outfile: uiFile,
-  bundle: true, format: 'cjs', platform: 'node', jsx: 'automatic', logLevel: 'silent', tsconfig: path.join(repo, 'tsconfig.json'),
-  external: ['react', 'react/jsx-runtime'],
-});
-const { FavoriteModelAvailability, ProvidersSettings } = require(uiFile);
-const React = require('react');
-const act = React.act ?? require('react-dom/test-utils').act;
 
 
 test('custom catalogue failure stays inconclusive even though inference and manual selection work', async () => {

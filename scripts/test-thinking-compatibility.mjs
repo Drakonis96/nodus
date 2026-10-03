@@ -20,7 +20,7 @@ const base = { model: 'fixture', messages: [{ role: 'user', content: 'Keep this 
 
 test('extracts the replacement from real SDK errors, structured payloads, and serialized errors', () => {
   const actual = Anthropic.APIError.generate(400, envelope, undefined, {});
-  for (const error of [actual, fail(actual.message), { status: 400, error: { message: sonnetMessage } }]) {
+  for (const error of [actual, fail(actual.message), { status: 400, error: { message: sonnetMessage } }, fail(sonnetMessage, 422)]) {
     assert.equal(rejectsThinkingOff(error), true);
     assert.equal(thinkingOffReplacement(error), 'between_tools');
   }
