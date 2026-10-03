@@ -402,7 +402,8 @@
         "NSCalendarsFullAccessUsageDescription": "Nodus necesita acceso completo para crear, actualizar y eliminar las copias de tus eventos en el calendario de Apple que elijas.",
         "NSLocalNetworkUsageDescription": "Nodus enlaza Presenter con tu iPhone o iPad \u00fanicamente mientras presentas.",
         "NSBonjourServices": [
-          "_nodus-presenter._tcp"
+          "_nodus-presenter._tcp",
+          "_nodus-peer._tcp"
         ]
       },
       "target": [
