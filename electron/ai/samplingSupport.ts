@@ -23,27 +23,3 @@ export function temperatureUnsupported(model: ModelRef): boolean {
 export function rememberTemperatureUnsupported(model: ModelRef): void {
   unsupported.add(modelKey(model));
 }
-
-/**
- * Models whose provider answered a 400 rejecting `thinking.type.disabled` and requiring
- * `thinking.type.adaptive`. Newer Claude models (`claude-opus-5-5`) removed thinking-off, so the
- * transport sends adaptive from the start once the model has been learned. Session-scoped, like
- * the temperature memory.
- */
-const adaptiveThinking = new Set<string>();
-/** What such a model takes in place of `disabled` when its rejection named it (`between_tools`
- *  for claude-sonnet-5-5); adaptive otherwise. */
-const thinkingOffType = new Map<string, string>();
-
-export function adaptiveThinkingRequired(model: ModelRef): boolean {
-  return adaptiveThinking.has(modelKey(model));
-}
-
-export function rememberAdaptiveThinking(model: ModelRef, offType?: string | null): void {
-  adaptiveThinking.add(modelKey(model));
-  if (offType) thinkingOffType.set(modelKey(model), offType);
-}
-
-export function thinkingOffTypeFor(model: ModelRef): string {
-  return thinkingOffType.get(modelKey(model)) ?? 'adaptive';
-}

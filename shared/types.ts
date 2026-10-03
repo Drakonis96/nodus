@@ -1734,6 +1734,8 @@ export interface ModelInfo {
   group?: string;
   /** For OpenRouter: true when the model is a reasoning model (slower for scans). */
   reasoning?: boolean;
+  /** The provider explicitly requires reasoning; opt-out values are invalid. */
+  reasoningMandatory?: boolean;
   /** Codex App Server: exact effort choices advertised for this model. */
   supportedReasoningEfforts?: Array<{
     reasoningEffort: CodexReasoningEffort;

@@ -72,6 +72,24 @@ function codexRuntime({ connected = true } = {}) {
   return calls;
 }
 
+test('reasoning catalogues preserve mandatory controls and filter impossible off levels', async () => {
+  globalThis.__catalogFixture.settings = { customProvider: { baseUrl: 'https://fixture.invalid/v1', models: [] } };
+  for (const provider of ['openrouter', 'custom']) {
+    await withPayload({ data: [
+      { id: 'vendor/mandatory', reasoning: { mandatory: true, supported_efforts: ['high', 'medium', 'none'] }, supported_parameters: ['reasoning'] },
+      { id: 'vendor/optional', reasoning: { mandatory: false, supported_efforts: ['high', 'low', 'none'] }, supported_parameters: ['reasoning'] },
+    ] }, async () => {
+      const models = await catalog.listModels(provider, null);
+      const mandatory = models.find(model => model.id === 'vendor/mandatory');
+      const optional = models.find(model => model.id === 'vendor/optional');
+      assert.equal(mandatory.reasoningMandatory, true);
+      assert.deepEqual(new Set(mandatory.researchReasoningLevels), new Set(['high', 'medium']));
+      assert.equal(optional.reasoningMandatory, false);
+      assert.deepEqual(new Set(optional.researchReasoningLevels), new Set(['high', 'low', 'none']));
+    });
+  }
+});
+
 const uiFile = path.join(tmp, 'ui.cjs');
 await build({ stdin: { contents: `export { FavoriteModelAvailability } from ${JSON.stringify(path.join(repo, 'src/components/FavoriteModelAvailability.tsx'))};
   export { ProvidersSettings } from ${JSON.stringify(path.join(repo, 'src/views/ProvidersSettings.tsx'))};`, resolveDir: repo, loader: 'tsx' }, outfile: uiFile,

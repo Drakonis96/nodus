@@ -3,8 +3,9 @@ import { researchReasoningBody, researchOmitsTemperature, type ResearchEffort } 
 import type { ReasoningEffort } from '@shared/types';
 import type { VisionImagePart } from '@shared/imageAnalysis';
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
-import { rejectsTemperatureParameter } from './providerErrors';
-import { rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
+import { rejectsTemperatureParameter, rejectsThinkingOff } from './providerErrors';
+import { temperatureUnsupported } from './samplingSupport';
+import { withThinkingCompatibility } from './thinkingCompatibility';
 
 /**
  * Prefix that marks an output-ceiling cutoff. aiClient re-types errors carrying it as
@@ -31,6 +32,7 @@ export interface OpenCodeGoCompletionOptions {
   temperature?: number;
   maxTokens?: number;
   reasoning?: ReasoningEffort;
+  noRetry?: boolean;
   researchEffort?: ResearchEffort;
   jsonMode?: boolean;
   timeoutMs?: number;
@@ -173,12 +175,6 @@ function reasoningExtras(reasoning: ReasoningEffort | undefined): Record<string,
   return !reasoning || reasoning === 'off' ? {} : { reasoning_effort: reasoning };
 }
 
-/** The same body with the sampling knob removed. */
-function withoutTemperature(body: Record<string, unknown>): Record<string, unknown> {
-  const { temperature: _removed, ...rest } = body;
-  return rest;
-}
-
 /**
  * Send the optional params, and on a 400 retry once without them.
  *
@@ -198,24 +194,29 @@ async function postWithOptionalExtras(
   signal: AbortSignal,
   body: Record<string, unknown>,
   extras: Record<string, unknown>,
-  model: string
+  model: string,
+  noRetry = false,
 ): Promise<Response> {
-  const send = (payload: Record<string, unknown>) =>
-    fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(payload) });
+  const send = (payload: Record<string, unknown>) => withThinkingCompatibility({ provider: 'opencode-go', model }, payload, async request => {
+    const response = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(request) });
+    if (response.status === 400 || response.status === 422) {
+      const raw = await response.clone().text();
+      let payload: unknown = raw;
+      try { payload = JSON.parse(raw); } catch { /* Keep plain provider wording. */ }
+      const error = apiError(response.status, payload);
+      if (rejectsThinkingOff(error) || rejectsTemperatureParameter(error)) {
+        try { await response.body?.cancel(); } catch { /* Already closed. */ }
+        throw error;
+      }
+    }
+    return response;
+  }, { noRetry, signal, isSuccess: response => response.ok });
 
   const merged = { ...body, ...extras };
   const response = await send(merged);
-  if (response.status !== 400) return response;
-  // Read the refusal once: the classifier needs its message, and a replay needs the
-  // offending field gone. A response that is not a temperature rejection is handed back
-  // rebuilt from those same bytes, so the caller still sees the provider's own error.
+  if (response.status !== 400 || noRetry) return response;
+  // Retain the refusal's bytes when there are no optional fields to remove.
   const raw = await response.text().catch(() => '');
-  let payload: unknown = raw;
-  try { payload = JSON.parse(raw); } catch { /* retain readable text */ }
-  if (rejectsTemperatureParameter(apiError(400, payload))) {
-    rememberTemperatureUnsupported({ provider: 'opencode-go', model });
-    return send(withoutTemperature(merged));
-  }
   if (Object.keys(extras).length === 0) {
     return new Response(raw, { status: 400, statusText: response.statusText, headers: response.headers });
   }
@@ -313,6 +314,7 @@ async function completeResponses(options: OpenCodeGoCompletionOptions, url: stri
         : { reasoning: { effort: options.reasoning } }),
     },
     options.model,
+    options.noRetry,
   );
   if (!response.ok) return readError(response);
 
@@ -374,6 +376,7 @@ async function completeOpenAi(options: OpenCodeGoCompletionOptions, url: string,
       ...(options.jsonMode ? { response_format: { type: 'json_object' } } : {}),
     },
     options.model,
+    options.noRetry,
   );
   if (!response.ok) return readError(response);
 
@@ -442,6 +445,7 @@ async function completeAnthropic(options: OpenCodeGoCompletionOptions, url: stri
     },
     {},
     options.model,
+    options.noRetry,
   );
   if (!response.ok) return readError(response);
 

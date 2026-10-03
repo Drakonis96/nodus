@@ -86,8 +86,8 @@ test('the adaptive-thinking predicate keys off the model wording, and only on a 
   assert.equal(rejectsAdaptiveThinking(new Error('"thinking.type.disabled" is not supported')), false);
   // An unrelated 400 must keep its own recovery path.
   assert.equal(rejectsAdaptiveThinking(Object.assign(new Error('`temperature` is deprecated for this model'), { status: 400 })), false);
-  // The opus wording names no replacement type: replay with adaptive.
-  assert.equal(thinkingOffReplacement(disabled), null);
+  // The opus wording names adaptive explicitly.
+  assert.equal(thinkingOffReplacement(disabled), 'adaptive');
 });
 
 test('claude-sonnet-5-5 wording: recognised, and the type it asks for is the one replayed', () => {
@@ -97,6 +97,7 @@ test('claude-sonnet-5-5 wording: recognised, and the type it asks for is the one
     { status: 400 },
   );
   assert.equal(rejectsAdaptiveThinking(sonnet), true);
+  assert.equal(thinkingOffReplacement(sonnet), 'between_tools');
   assert.equal(thinkingOffReplacement({ status: 400, error: { message: 'To turn thinking off on this model, send "thinking": {"type": "between_tools"} instead of {"type": "disabled"}.' } }), 'between_tools');
 });
 
@@ -104,7 +105,7 @@ test('wrapProviderError marks a transient network failure retriable', () => {
   // The heuristic is dead without this call site, and aiClient.ts cannot be imported
   // here (database + native driver), so the wiring is asserted on the source text.
   const source = readFileSync(path.join(repoRoot, 'electron/ai/aiClient.ts'), 'utf8');
-  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields, thinkingOffReplacement \} from '\.\/providerErrors';/);
+  assert.match(source, /import \{ classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields \} from '\.\/providerErrors';/);
   assert.match(
     source,
     /if \(isTransientNetworkFailure\(e\)\) \{\s*return new AiError\(message \|\| 'Error de conexión con el proveedor de IA\.', true, false, 'connection'\);/,

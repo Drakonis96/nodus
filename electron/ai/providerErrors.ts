@@ -141,9 +141,21 @@ function statusOf(error: unknown): number | undefined {
 }
 
 function messageOf(error: unknown): string {
-  const e = error as { error?: { message?: unknown } | null; message?: unknown } | null;
-  const nested = e?.error && typeof e.error === 'object' ? e.error.message : undefined;
-  return String((typeof nested === 'string' ? nested : undefined) ?? e?.message ?? '');
+  const e = error as { error?: { message?: unknown; error?: { message?: unknown } | null } | null; message?: unknown } | null;
+  const nested = e?.error?.error?.message ?? e?.error?.message;
+  if (typeof nested === 'string') return nested;
+  const message = String(e?.message ?? '');
+  // SDK errors can also reach us after their structured payload was discarded.
+  // Decode the JSON envelope rather than matching its escaped quotes.
+  try {
+    const start = message.indexOf('{');
+    if (start >= 0) {
+      const payload = JSON.parse(message.slice(start));
+      if (typeof payload?.error?.message === 'string') return payload.error.message;
+      if (typeof payload?.message === 'string') return payload.message;
+    }
+  } catch { /* Plain provider wording remains useful. */ }
+  return message;
 }
 
 /**
@@ -192,9 +204,25 @@ export function rejectsAdaptiveThinking(error: unknown): boolean {
 
 /** The thinking type a provider says to send instead of `disabled`, when its rejection names one:
  *  `To turn thinking off on this model, send "thinking": {"type": "between_tools"} instead of
- *  {"type": "disabled"}.` (claude-sonnet-5-5). Null when the message only points at adaptive. */
+ *  {"type": "disabled"}.` (claude-sonnet-5-5), or a named adaptive replacement. */
 export function thinkingOffReplacement(error: unknown): string | null {
-  return /send\s+"thinking"\s*:\s*\{\s*"type"\s*:\s*"([a-z_]+)"\s*\}\s*instead\s+of/i.exec(messageOf(error))?.[1] ?? null;
+  const message = messageOf(error);
+  return /send\s+"thinking"\s*:\s*\{\s*"type"\s*:\s*"(between_tools|adaptive|enabled)"\s*\}\s*instead\s+of/i.exec(message)?.[1]
+    ?? /(?:use|send)\s+"?thinking\.type\.(adaptive|between_tools|enabled)"?/i.exec(message)?.[1] ?? null;
+}
+
+/** A refused request explicitly says its reasoning opt-out is impossible. */
+export function rejectsThinkingOff(error: unknown): boolean {
+  if (![400, 422].includes(statusOf(error) ?? 0)) return false;
+  return rejectsAdaptiveThinking(error) || /(?:thinking|reasoning)\b\s+(?:is\s+)?(?:mandatory|required|always on)|(?:thinking|reasoning)\b[^\n]{0,60}cannot be disabled|(?:cannot|can't)\s+disable\s+(?:thinking|reasoning)\b|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,30}(?:disabled|false|none|off)[^\n]{0,70}(?:not supported|unsupported|not accepted|not allowed|invalid)|(?:thinking|reasoning)(?:\.type|\.enabled|_effort)?\b[^\n]{0,40}(?:does not support|not supported|unsupported|not allowed)[^\n]{0,30}(?:disabled|false|none|off)\b|(?:none|off)[^\n]{0,40}(?:not supported|unsupported|not allowed)[^\n]{0,40}(?:reasoning|thinking)\b/i.test(messageOf(error));
+}
+
+/** Some compatible APIs publish the accepted effort values in their refusal. */
+export function thinkingEffortReplacement(error: unknown): string | undefined {
+  const values = /supported (?:values|efforts) (?:are|include)\s*:\s*([^\n]+)/i.exec(messageOf(error))?.[1];
+  if (!values) return undefined;
+  return ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'default'].find(effort =>
+    new RegExp(`(?:^|[\\s'",\\[])${effort}(?=$|[\\s'",.\\]])`, 'i').test(values));
 }
 
 /** The statuses a provider answers with when it refused a request before running it. */
