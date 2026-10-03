@@ -1,6 +1,6 @@
 # Build Nodus Server from THIS checkout instead of pulling a published image.
 #
-# The `ghcr.io/drakonis96/nodus-server` tags are only built from `main`, so a branch under
+# The `ghcr.io/jorgepb96/nodus-server` tags are only built from `main`, so a branch under
 # review has no image to pull. Use this file to run exactly the code you have checked out —
 # for testing a branch, or for an air-gapped install that cannot reach GHCR.
 #
@@ -26,7 +26,7 @@ services:
       NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
       NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
       NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
-      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v5.7.4}
+      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/jorgepb96/nodus/tree/v5.7.4}
       # Optional ceilings. Left unset they default to 8 MiB per image, 2 GiB of images per
       # space, and the snapshot limits documented in the README.
       NODUS_MAX_ASSET_BYTES: ${NODUS_MAX_ASSET_BYTES:-}

@@ -25,7 +25,7 @@ test('About establishes the Nodus Research entity without targeting unrelated na
   assert.equal(project['@id'], 'https://nodusresearch.com/#project');
   assert.equal(project.name, 'Nodus Research');
   assert.deepEqual(project.alternateName, ['nodusresearch.com']);
-  assert.ok(project.sameAs.includes('https://github.com/Drakonis96/nodus'));
+  assert.ok(project.sameAs.includes('https://github.com/jorgepb96/nodus'));
   assert.ok(project.sameAs.includes('https://doi.org/10.5281/zenodo.21515531'));
   assert.ok(graph.some((entry) => entry['@type'] === 'FAQPage'));
 });

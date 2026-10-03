@@ -46,7 +46,7 @@ test('every page mounts the one shared header and marks its own destination', ()
     );
     assert.match(html, new RegExp(`src="${base.replace(/\//g, '\\/').replace(/\./g, '\\.')}site-header\\.js\\?v=[^"]+"`), `${relative} loads the shared header component`);
     assert.doesNotMatch(html, /class="site-nav"|id="site-stars"/, `${relative} has no legacy duplicate header`);
-    assert.doesNotMatch(html, /api\.github\.com\/repos\/Drakonis96\/nodus/, `${relative} delegates header data loading to the component`);
+    assert.doesNotMatch(html, /api\.github\.com\/repos\/jorgepb96\/nodus/, `${relative} delegates header data loading to the component`);
   }
 });
 

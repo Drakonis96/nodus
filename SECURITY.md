@@ -12,7 +12,7 @@ versions may not receive patches.
 
 Before reporting a vulnerability, verify whether it still affects the latest
 release available from the
-[Nodus releases page](https://github.com/Drakonis96/nodus/releases/latest).
+[Nodus releases page](https://github.com/jorgepb96/nodus/releases/latest).
 
 ## Reporting a vulnerability
 
@@ -20,7 +20,7 @@ Do not report security vulnerabilities through a public GitHub issue, the
 desktop app's **Suggest / Report** flow, a pull request, or a discussion.
 
 Use GitHub's
-[private vulnerability reporting form](https://github.com/Drakonis96/nodus/security/advisories/new).
+[private vulnerability reporting form](https://github.com/jorgepb96/nodus/security/advisories/new).
 Include:
 
 - A clear description of the vulnerability and its impact
@@ -47,4 +47,4 @@ backup and synchronization, or bundled document-processing tools.
 
 General bugs, feature requests, and vault proposals belong in the repository's
 public issue templates. Product feedback belongs in the permanent
-[shared feedback thread](https://github.com/Drakonis96/nodus/issues/272).
+[shared feedback thread](https://github.com/jorgepb96/nodus/issues/272).

@@ -9,7 +9,7 @@
 export const NODUS_CLOUDFLARE_PROTOCOL = 3 as const;
 export const NODUS_CLOUDFLARE_SERVICE = 'nodus-cloudflare' as const;
 export const NODUS_CLOUDFLARE_WORKER_VERSION = '1.0.0' as const;
-export const NODUS_CLOUDFLARE_TEMPLATE_URL = 'https://github.com/drakonis96/nodus/tree/main/cloudflare' as const;
+export const NODUS_CLOUDFLARE_TEMPLATE_URL = 'https://github.com/jorgepb96/nodus/tree/main/cloudflare' as const;
 export const NODUS_CLOUDFLARE_DEPLOY_ORIGIN = 'https://deploy.workers.cloudflare.com' as const;
 
 export type NodusServerKind = 'classic' | 'cloudflare';

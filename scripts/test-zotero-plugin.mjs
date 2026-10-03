@@ -1238,7 +1238,7 @@ test('security: Zotero-required update feed is HTTPS while background updates st
   const html = readSource('zotero-plugin/content/sidebar.html');
   assert.equal(
     manifest.applications.zotero.update_url,
-    'https://github.com/Drakonis96/nodus/releases/latest/download/updates.json',
+    'https://github.com/jorgepb96/nodus/releases/latest/download/updates.json',
     'Zotero 9 and 10 reject extensions without applications.zotero.update_url',
   );
   assert.equal(manifest.applications.zotero.strict_min_version, '9.0');

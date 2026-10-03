@@ -43,8 +43,8 @@ async function withFile(buffer, action) {
 }
 
 test('stable excludes prereleases and beta follows newer stable releases too', () => {
-  assert.equal(updateInformation('latest'), `gh-releases-zsync|Drakonis96|nodus|latest|${APPIMAGE_NAME}.zsync`);
-  assert.equal(updateInformation('beta'), `gh-releases-zsync|Drakonis96|nodus|latest-all|${APPIMAGE_NAME}.zsync`);
+  assert.equal(updateInformation('latest'), `gh-releases-zsync|jorgepb96|nodus|latest|${APPIMAGE_NAME}.zsync`);
+  assert.equal(updateInformation('beta'), `gh-releases-zsync|jorgepb96|nodus|latest-all|${APPIMAGE_NAME}.zsync`);
   assert.throws(() => updateInformation('nightly'), /Unsupported release channel/);
 });
 

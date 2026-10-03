@@ -10,8 +10,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
 const tag = `v${pkg.version}`;
-const sourceUrl = `https://github.com/Drakonis96/nodus/tree/${tag}`;
-const archiveUrl = `https://github.com/Drakonis96/nodus/archive/refs/tags/${tag}.tar.gz`;
+const sourceUrl = `https://github.com/jorgepb96/nodus/tree/${tag}`;
+const archiveUrl = `https://github.com/jorgepb96/nodus/archive/refs/tags/${tag}.tar.gz`;
 
 assert.equal(pkg.license, 'AGPL-3.0-only', 'release metadata must identify the project license');
 assert.ok((await readFile(path.join(root, 'SOURCE_CODE.md'), 'utf8')).includes(sourceUrl));

@@ -2189,7 +2189,7 @@ export function ServerSettingsView({
       <div className="ss-actions">
         <a
           className="ss-button secondary"
-          href="https://github.com/Drakonis96/nodus"
+          href="https://github.com/jorgepb96/nodus"
           target="_blank"
           rel="noreferrer"
         >
@@ -2197,7 +2197,7 @@ export function ServerSettingsView({
         </a>
         <a
           className="ss-button secondary"
-          href="https://github.com/Drakonis96/nodus/blob/main/PRIVACY.md"
+          href="https://github.com/jorgepb96/nodus/blob/main/PRIVACY.md"
           target="_blank"
           rel="noreferrer"
         >

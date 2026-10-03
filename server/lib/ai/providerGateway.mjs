@@ -117,7 +117,7 @@ export class ProviderGateway {
     // OpenRouter publishes its catalogue without authentication, matching Desktop.
     if (provider === 'openrouter') {
       return normalizeModelCatalog(provider, await providerFetch(SERVER_AI_PROVIDERS.openrouter.models, {
-        headers: { accept: 'application/json', 'HTTP-Referer': 'https://github.com/Drakonis96/nodus', 'X-Title': 'Nodus' },
+        headers: { accept: 'application/json', 'HTTP-Referer': 'https://github.com/jorgepb96/nodus', 'X-Title': 'Nodus' },
       }, 15_000));
     }
     const result = await this.credentials.withUserCredential(userId, provider, async (credential) => {
@@ -160,7 +160,7 @@ export class ProviderGateway {
       const endpoint = SERVER_AI_PROVIDERS[provider].chat;
       return providerFetch(endpoint, {
         signal,
-        method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://github.com/Drakonis96/nodus', 'X-Title': 'Nodus' } : {}) },
+        method: 'POST', headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://github.com/jorgepb96/nodus', 'X-Title': 'Nodus' } : {}) },
         body: JSON.stringify(provider === 'cohere'
           ? { model: safeModel, messages: safeMessages, max_tokens: Math.max(1, Math.min(32_000, Number(maxTokens) || 2_048)) }
           : { model: safeModel, messages: safeMessages, max_tokens: Math.max(1, Math.min(32_000, Number(maxTokens) || 2_048)) }),
@@ -179,7 +179,7 @@ export class ProviderGateway {
         : SERVER_AI_PROVIDERS[provider].embeddings;
       const headers = provider === 'gemini'
         ? { 'x-goog-api-key': key, 'content-type': 'application/json' }
-        : { authorization: `Bearer ${key}`, 'content-type': 'application/json', ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://github.com/Drakonis96/nodus', 'X-Title': 'Nodus' } : {}) };
+        : { authorization: `Bearer ${key}`, 'content-type': 'application/json', ...(provider === 'openrouter' ? { 'HTTP-Referer': 'https://github.com/jorgepb96/nodus', 'X-Title': 'Nodus' } : {}) };
       const body = provider === 'gemini'
         ? { requests: inputs.map((text) => ({ model: `models/${contract.model}`, content: { parts: [{ text }] }, ...(typeof contract.task === 'string' && contract.task !== 'unknown' ? { taskType: contract.task } : {}), outputDimensionality: contract.dim })) }
         : provider === 'cohere'

@@ -1,6 +1,6 @@
 {
   "commit": "736823e0",
-  "workflow": "https://github.com/Drakonis96/nodus/actions/runs/35862266301",
+  "workflow": "https://github.com/jorgepb96/nodus/actions/runs/35862266301",
   "scope": "native install, same-version reinstall and removal on disposable hosted runners; not a different-version upgrade",
   "reports": [
     {

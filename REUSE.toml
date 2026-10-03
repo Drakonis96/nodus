@@ -1,7 +1,7 @@
 version = 1
 SPDX-PackageName = "Nodus"
 SPDX-PackageSupplier = "Jorge Pérez Burgueño and Nodus contributors"
-SPDX-PackageDownloadLocation = "https://github.com/Drakonis96/nodus"
+SPDX-PackageDownloadLocation = "https://github.com/jorgepb96/nodus"
 
 [[annotations]]
 path = [

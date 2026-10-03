@@ -1,6 +1,6 @@
 // The installer filenames are a PUBLIC CONTRACT, and nothing used to hold them.
 //
-// https://github.com/Drakonis96/nodus/releases/latest/download/Nodus-mac-arm64.dmg
+// https://github.com/jorgepb96/nodus/releases/latest/download/Nodus-mac-arm64.dmg
 // is what the site's download buttons, the README and every electron-updater
 // manifest resolve. Those URLs outlive any one release: an install from a year
 // ago auto-updates through them.
@@ -103,7 +103,7 @@ test('the release workflow verifies the same names before publishing', () => {
 });
 
 test('the download links the public actually clicks resolve to these names', () => {
-  const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
+  const base = 'https://github.com/jorgepb96/nodus/releases/latest/download/';
   const page = read('site/app/index.html');
   for (const name of ['Nodus-mac-arm64.dmg', 'Nodus-mac-x64.dmg', 'Nodus-win-x64.exe', 'Nodus-linux-amd64.deb', 'Nodus-linux-x86_64.AppImage', 'Nodus-linux-x86_64.rpm']) {
     assert.ok(page.includes(`${base}${name}`), `site/app/index.html links ${name}`);
@@ -119,7 +119,7 @@ test('every README download counter reads a count the deploy publishes', () => {
   // site/data/github-release-downloads.json, which scripts/github-release-downloads.mjs
   // writes at deploy time. Rename a key there and the badges silently read
   // "no result" instead of failing, so the two sides are checked against each other.
-  const base = 'https://github.com/Drakonis96/nodus/releases/latest/download/';
+  const base = 'https://github.com/jorgepb96/nodus/releases/latest/download/';
   const readme = read('README.md');
   const rows = readme.split('\n').filter((line) => line.includes(base));
 

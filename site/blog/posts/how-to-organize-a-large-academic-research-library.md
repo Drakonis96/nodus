@@ -67,4 +67,4 @@ Get that right and the library stops being the place your research material is s
 
 [Read how Nodus uses AI with evidence](/ai-research/)
 
-[View Nodus on GitHub](https://github.com/Drakonis96/nodus)
+[View Nodus on GitHub](https://github.com/jorgepb96/nodus)

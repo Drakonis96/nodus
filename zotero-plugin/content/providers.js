@@ -168,7 +168,7 @@
     const headers = { "Content-Type": "application/json" };
     if (opts.key) headers.Authorization = "Bearer " + opts.key;
     if (provider === "openrouter") {
-      headers["HTTP-Referer"] = "https://github.com/Drakonis96/nodus";
+      headers["HTTP-Referer"] = "https://github.com/jorgepb96/nodus";
       headers["X-Title"] = "Nodus for Zotero";
     }
     const res = await fetch(base + "/embeddings", {
@@ -228,7 +228,7 @@
     const url = provider === "deepseek" ? "https://api.deepseek.com/chat/completions" : base + "/chat/completions";
     const headers = { "Content-Type": "application/json" };
     if (key) headers.Authorization = "Bearer " + key;
-    if (provider === "openrouter") { headers["HTTP-Referer"] = "https://github.com/Drakonis96/nodus"; headers["X-Title"] = "Nodus for Zotero"; }
+    if (provider === "openrouter") { headers["HTTP-Referer"] = "https://github.com/jorgepb96/nodus"; headers["X-Title"] = "Nodus for Zotero"; }
     const visualMessages = withOpenAiImages(messages, images);
     const body = { model, stream: true, messages: system ? [{ role: "system", content: system }, ...visualMessages] : visualMessages };
     // Only cap when the user configured a limit: omitting it lets the model use

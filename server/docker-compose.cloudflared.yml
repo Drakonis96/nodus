@@ -3,7 +3,7 @@
 # Two things separate this from docker-compose.yml, and both matter if you already run a
 # Nodus Server on the same host:
 #
-#   1. It BUILDS the image instead of pulling `ghcr.io/drakonis96/nodus-server:main`. Those
+#   1. It BUILDS the image instead of pulling `ghcr.io/jorgepb96/nodus-server:main`. Those
 #      tags are only published from `main`, so a branch under review has no image to pull —
 #      pulling would silently run older code and every /api/v1 route would answer 404.
 #   2. Every name is suffixed and the listener moved off 7443, so a second stack cannot
@@ -36,7 +36,7 @@ services:
       # With the pair, the account is created on first boot and its password is rotated
       # whenever you change the value here.
       NODUS_SETUP_TOKEN: ${NODUS_SETUP_TOKEN:-}
-      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/Drakonis96/nodus/tree/v5.7.4}
+      NODUS_SOURCE_URL: ${NODUS_SOURCE_URL:-https://github.com/jorgepb96/nodus/tree/v5.7.4}
       NODUS_ADMIN_EMAIL: ${NODUS_ADMIN_EMAIL:-}
       NODUS_ADMIN_PASSWORD: ${NODUS_ADMIN_PASSWORD:-}
       # Optional ceilings. Unset they default to 8 MiB per image, 2 GiB of images per

@@ -8,14 +8,14 @@ abstract: >-
 authors:
   - family-names: "Pérez Burgueño"
     given-names: "Jorge"
-    alias: "drakonis96"
+    alias: "jorgepb96"
     orcid: "https://orcid.org/0000-0002-1150-1930"
   - name: "Nodus contributors"
 type: software
 version: "5.7.4"
 date-released: "2026-10-02"
 license: "AGPL-3.0-only"
-repository-code: "https://github.com/Drakonis96/nodus"
+repository-code: "https://github.com/jorgepb96/nodus"
 url: "https://nodusresearch.com/"
 # Zenodo assigns the immutable v5.2.1 DOI after the stable GitHub release is archived.
 # Until then the concept DOI is 10.5281/zenodo.21515531 for Nodus over time.

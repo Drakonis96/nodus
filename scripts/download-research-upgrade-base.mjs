@@ -8,11 +8,11 @@ if (process.env.GITHUB_ACTIONS !== 'true' || process.env.RUNNER_ENVIRONMENT !== 
 const directory = path.resolve('release-base');
 fs.mkdirSync(directory, { recursive: true });
 const name = process.platform === 'darwin' ? `Nodus-mac-${process.arch}.dmg` : process.platform === 'win32' ? 'Nodus-win-x64.exe' : 'Nodus-linux-amd64.deb';
-const response = await fetch('https://api.github.com/repos/Drakonis96/nodus/releases/tags/v5.6.0', { headers: { Accept: 'application/vnd.github+json', ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}) }, signal: AbortSignal.timeout(30000) });
+const response = await fetch('https://api.github.com/repos/jorgepb96/nodus/releases/tags/v5.6.0', { headers: { Accept: 'application/vnd.github+json', ...(process.env.GH_TOKEN ? { Authorization: `Bearer ${process.env.GH_TOKEN}` } : {}) }, signal: AbortSignal.timeout(30000) });
 if (!response.ok) throw new Error(`Release metadata HTTP ${response.status}`);
 const release = await response.json();
 const asset = release.assets.find(item => item.name === name);
-if (!asset || !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? '') || !asset.browser_download_url.startsWith('https://github.com/Drakonis96/nodus/releases/download/v5.6.0/')) throw new Error('Missing hash-verified v5.6.0 artifact');
+if (!asset || !/^sha256:[a-f0-9]{64}$/.test(asset.digest ?? '') || !asset.browser_download_url.startsWith('https://github.com/jorgepb96/nodus/releases/download/v5.6.0/')) throw new Error('Missing hash-verified v5.6.0 artifact');
 const download = await fetch(asset.browser_download_url, { signal: AbortSignal.timeout(600000) });
 if (!download.ok || !download.body) throw new Error(`Artifact HTTP ${download.status}`);
 const hash = createHash('sha256');

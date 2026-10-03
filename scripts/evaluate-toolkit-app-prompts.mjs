@@ -74,7 +74,7 @@ async function runCase({ model, testCase }) {
     const prompt = toolkit.buildToolkitAppPrompt(testCase); const started = performance.now();
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/drakonis96/nodus', 'X-Title': 'Nodus Mini Apps prompt evaluation' },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://github.com/jorgepb96/nodus', 'X-Title': 'Nodus Mini Apps prompt evaluation' },
       body: JSON.stringify({ model: model.id, messages: [{ role: 'system', content: prompt.system }, { role: 'user', content: prompt.user }], temperature: 0.2, max_tokens: 16_000, reasoning: { enabled: false }, ...(model.jsonMode ? { response_format: { type: 'json_object' } } : {}) }),
       signal: AbortSignal.timeout(120_000),
     });

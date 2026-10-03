@@ -11,7 +11,7 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
 test('production and Portainer compose pull the experimental image built from main', () => {
   for (const relative of ['server/docker-compose.yml', 'server/portainer-stack.yml']) {
     const source = read(relative);
-    assert.match(source, /image:\s+ghcr\.io\/drakonis96\/nodus-server:main/);
+    assert.match(source, /image:\s+ghcr\.io\/jorgepb96\/nodus-server:main/);
     assert.match(source, /pull_policy:\s+always/);
     assert.doesNotMatch(source, /^\s*build:/m);
     assert.match(source, /NODUS_ADMIN_EMAIL/);

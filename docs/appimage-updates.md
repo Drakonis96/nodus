@@ -44,7 +44,7 @@ than appending another one.
 The embedded stable information is:
 
 ```text
-gh-releases-zsync|Drakonis96|nodus|latest|Nodus-x86_64.AppImage.zsync
+gh-releases-zsync|jorgepb96|nodus|latest|Nodus-x86_64.AppImage.zsync
 ```
 
 Beta uses `latest-all`, so external updater users can move from a beta to a

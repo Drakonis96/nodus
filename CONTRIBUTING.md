@@ -23,7 +23,7 @@ Choose the path that best matches your contribution:
 - **Feature request** for a new capability or improvement
 - **New vault type** for a specialized workspace proposal
 - **Product feedback** belongs in the permanent
-  [shared feedback thread](https://github.com/Drakonis96/nodus/issues/272);
+  [shared feedback thread](https://github.com/jorgepb96/nodus/issues/272);
   add a comment there instead of opening a new issue
 
 The desktop app exposes the same four paths under **Suggest / Report**. Bug

@@ -50,4 +50,4 @@ It's still very much under development, and plenty of the workflow could be bett
 
 [See how Nodus works with Zotero](/zotero/)
 
-[View the source code on GitHub](https://github.com/Drakonis96/nodus)
+[View the source code on GitHub](https://github.com/jorgepb96/nodus)

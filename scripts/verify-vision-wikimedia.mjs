@@ -24,7 +24,7 @@ if(!process.versions.electron){
   if(!fs.existsSync(searchFile)) {
    const params=new URLSearchParams({action:'query',format:'json',formatversion:'2',generator:'search',gsrsearch:'daguerreotype filetype:bitmap',gsrnamespace:'6',gsrlimit:'5',prop:'imageinfo',iiprop:'url|mime|extmetadata',iiurlwidth:'600',iiextmetadatafilter:'ImageDescription|Artist|Credit|LicenseShortName|LicenseUrl|UsageTerms'});
    const url='https://commons.wikimedia.org/w/api.php?'+params;
-   const response=await fetch(url,{headers:{'User-Agent':'NodusVisionDemo/1.0 (https://github.com/Drakonis96/nodus)'},signal:AbortSignal.timeout(20000)});
+   const response=await fetch(url,{headers:{'User-Agent':'NodusVisionDemo/1.0 (https://github.com/jorgepb96/nodus)'},signal:AbortSignal.timeout(20000)});
    if(!response.ok)throw new Error('Wikimedia search failed: '+response.status);
    const result=await response.json();
    if(!result.query?.pages?.length)throw new Error('No Wikimedia image candidates.');

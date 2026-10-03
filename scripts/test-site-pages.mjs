@@ -471,7 +471,7 @@ test('the app page documents the current desktop builds and available vaults', (
     'Nodus-linux-amd64.deb',
     'Nodus-linux-x86_64.rpm',
   ]) {
-    assert.match(app, new RegExp(`https://github\\.com/Drakonis96/nodus/releases/latest/download/${asset.replaceAll('.', '\\.')}`), `${asset} uses the stable release URL`);
+    assert.match(app, new RegExp(`https://github\\.com/jorgepb96/nodus/releases/latest/download/${asset.replaceAll('.', '\\.')}`), `${asset} uses the stable release URL`);
   }
   for (const vault of ['Academic', 'Teaching', 'Study', 'Databases', 'Genealogy', 'Worldbuilding', 'Primary Sources', 'Testimony', 'Prosopography']) {
     assert.match(app, new RegExp(`\\b${vault}\\b`), `${vault} is represented on the app page`);
@@ -502,13 +502,13 @@ test('Support Nodus takes the money the app takes, and names people only', () =>
     assert.ok(html.includes(`href="${url}"`), `the page links to ${url}`);
     assert.ok(settings.includes(url), `the desktop app opens the same ${url}`);
   }
-  assert.match(html, /href="https:\/\/github\.com\/sponsors\/drakonis96"/, 'the page links to GitHub Sponsors');
-  assert.match(funding, /^github: drakonis96$/m, 'the sponsor account matches the funding file');
+  assert.match(html, /href="https:\/\/github\.com\/sponsors\/jorgepb96"/, 'the page links to GitHub Sponsors');
+  assert.match(funding, /^github: jorgepb96$/m, 'the sponsor account matches the funding file');
 
   // The owner opens the wall whatever the counts say, and no assistant or
   // platform account is ever presented as one of the people who built Nodus.
   assert.match(script, /const OWNER = OWNER_LOGIN\.toLowerCase\(\)/, 'the owner is named once and compared in one case');
-  assert.match(script, /const OWNER_LOGIN = 'Drakonis96'/, 'the owner login is spelled the way GitHub spells it');
+  assert.match(script, /const OWNER_LOGIN = 'jorgepb96'/, 'the owner login is spelled the way GitHub spells it');
   assert.match(script, /Number\(b\.login\.toLowerCase\(\) === OWNER\)[\s\S]*?Number\(a\.login\.toLowerCase\(\) === OWNER\)/,
     'the owner is ranked ahead of every contribution count');
   const source = script.match(/const NOT_PEOPLE = (\/[^\n]+?\/i);/)?.[1];
@@ -517,7 +517,7 @@ test('Support Nodus takes the money the app takes, and names people only', () =>
   for (const login of ['claude', 'chatgpt', 'github', 'Claude', 'openai', 'copilot']) {
     assert.ok(notPeople.test(login), `${login} is never shown as a contributor`);
   }
-  for (const login of ['Drakonis96', 'oguzkarayemis', 'sbvelinga', 'mbradaschia', 'githubber']) {
+  for (const login of ['jorgepb96', 'oguzkarayemis', 'sbvelinga', 'mbradaschia', 'githubber']) {
     assert.ok(!notPeople.test(login), `${login} is a person and must stay visible`);
   }
   assert.match(script, /if \(!people\.length\) return false/, 'an unknown list is reported, never shown as zero');
@@ -525,7 +525,7 @@ test('Support Nodus takes the money the app takes, and names people only', () =>
   // The issues card is the community's: the owner's own issues and pull requests
   // are excluded by the query itself, so the total and the faces agree on who
   // counts. The contributor wall is the opposite case and still opens with them.
-  assert.match(script, /repo:Drakonis96\/nodus -author:\$\{OWNER_LOGIN\}/,
+  assert.match(script, /repo:jorgepb96\/nodus -author:\$\{OWNER_LOGIN\}/,
     'the issues query leaves the owner out at the source');
   assert.match(script, /ISSUES_CACHE = 'nodus-issues-community'/,
     'the cache key changed with what the card counts');

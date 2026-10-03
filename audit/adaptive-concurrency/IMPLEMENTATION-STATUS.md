@@ -4,7 +4,7 @@ Fecha de corte: 2026-08-30. Este documento separa lo implementado de lo que est�
 certificado. El modo automático es el valor predeterminado; la integración en
 `main` quedó autorizada por el propietario el 30 de agosto de 2026, después de que
 la verificación final terminara sin fallos. La integración se tramita mediante el
-[issue #622](https://github.com/Drakonis96/nodus/issues/622) y CI.
+[issue #622](https://github.com/jorgepb96/nodus/issues/622) y CI.
 
 ## Implementado
 

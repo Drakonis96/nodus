@@ -69,7 +69,7 @@ The workflow `Nodus Server image (experimental)` tests and publishes from `main`
 multi-architecture image in GitHub Container Registry. Create a Stack with `portainer-stack.yml` via
 the web editor. Portainer will always download:
 
-- `ghcr.io/drakonis96/nodus-server:main`
+- `ghcr.io/jorgepb96/nodus-server:main`
 
 The `main` tag moves and is unstable. Each build is also published with a `main-<sha>` tag so you can
 able to set or restore a particular test. Define these variables in the Stack:

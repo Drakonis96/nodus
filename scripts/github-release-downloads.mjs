@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REPOSITORY = 'Drakonis96/nodus';
+const REPOSITORY = 'jorgepb96/nodus';
 const DEFAULT_OUTPUT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../site/data/github-release-downloads.json',
