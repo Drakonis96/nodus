@@ -2,7 +2,7 @@
 // Run only from the trusted default branch via .github/workflows/cla.yml.
 import { readFile } from 'node:fs/promises';
 import {
-  SIGNATURE_BRANCH, agreement, connection, contributors, signaturePath, validateRecord,
+  agreement, compatibleAgreements, connection, contributors, getSignatureRecord,
 } from './cla.mjs';
 
 export const REMINDER_MARKER = '<!-- nodus-cla-reminder -->';
@@ -18,7 +18,8 @@ export function reminderBody(cla, missing, repo, defaultBranch = 'main') {
   return `${REMINDER_MARKER}\nHi ${mentions} — thanks for contributing to Nodus!\n\n`
     + `Before this PR can be merged, all human contributors need to accept the [Nodus Research Contributor License Agreement](${claUrl}). Please read it first, and if you agree, post the following **exact statement as a new comment on this PR**:\n\n`
     + `\`\`\`text\n${cla.statement}\n\`\`\`\n\n`
-    + 'The CLA check will detect your acceptance automatically. You only need to accept this exact CLA version once; the acceptance is reused for later covered contributions while the agreement remains unchanged.';
+    + 'The CLA check will detect your acceptance automatically. You only need to accept this exact CLA version once; the acceptance is reused for later covered contributions while the agreement remains unchanged.'
+    + (compatibleAgreements(cla).length > 1 ? ' Recorded acceptances from before the maintainer username change are also recognized.' : '');
 }
 
 export function acceptedBody() {
@@ -55,22 +56,9 @@ export async function syncClaReminders({ github, context, core, document }) {
 
   const getRecord = async (userId) => {
     if (records.has(userId)) return records.get(userId);
-    try {
-      const { data } = await github.rest.repos.getContent({
-        ...repo, path: signaturePath(cla, userId), ref: SIGNATURE_BRANCH,
-      });
-      const record = validateRecord(
-        JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')),
-        cla,
-        userId,
-      );
-      records.set(userId, record);
-      return record;
-    } catch (error) {
-      if (error.status !== 404) throw error;
-      records.set(userId, null);
-      return null;
-    }
+    const record = await getSignatureRecord(github, repo, cla, userId);
+    records.set(userId, record);
+    return record;
   };
 
   for (const pr of prs) {

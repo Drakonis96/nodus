@@ -21,6 +21,18 @@ username, comment ID/URL/timestamp, originating PR, statement, and full agreemen
 with its SHA-256 digest. Records are created once and never overwritten. Later
 comment deletion or account renaming does not lose recorded acceptance.
 
+The maintainer username/link update in PR #1052 has one explicit compatibility
+exception. The current v1 document (SHA-256
+`28018d5b63a8adcded0dfde9323a88f3c5e8611460b9bc27f3f1c67013e48aca`)
+also recognizes persisted signatures for the original v1 document (SHA-256
+`68b2b9153b43fb63d3f8d7bee0156375d02005d3023dc73822994a0273fdbaf1`).
+Only the GitHub handle and profile/repository links differ. Both the gate and
+reminders validate the original record against the exact document actually
+signed, including its account ID, statement and evidence. Records are neither
+rewritten nor copied to the new digest. New signatures use the current document.
+Any further document edit disables this exception; matching version numbers
+alone never establish compatibility.
+
 The check requires the PR author and every commit author/coauthor linked to a
 human GitHub account to have accepted. A commit email that no GitHub account
 claims cannot post an acceptance comment, so it is not checked individually; the
@@ -108,6 +120,7 @@ Merge queues are not configured or supported by this workflow; add and test
 - Treat a published agreement as immutable. For changed terms, increment its
   version; its content digest also changes, and contributors must accept again.
   Retain all old acceptance records. Even a wording-only change changes the digest.
+  The pinned PR #1052 username/link exception above does not cover future edits.
 - Use **Actions → Contributor License Agreement → Run workflow** to recheck open
   PRs. A missing signature is a normal failing status; an API or storage error
   also fails the workflow and needs investigation.
@@ -117,4 +130,4 @@ Merge queues are not configured or supported by this workflow; add and test
   individually; the signing PR author covers those commits. Associating the email
   with the account makes the author an explicitly checked contributor, who must
   then post the acceptance comment as well.
-- Run `node --test scripts/test-cla.mjs scripts/test-agpl-release.mjs` after changes.
+- Run `node --test scripts/test-cla.mjs scripts/test-cla-reminder.mjs scripts/test-agpl-release.mjs` after changes.
