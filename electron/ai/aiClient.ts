@@ -49,8 +49,8 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
-import { adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
+import { classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields, thinkingOffReplacement } from './providerErrors';
+import { adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported, thinkingOffTypeFor } from './samplingSupport';
 import {
   optionalBodyUnsupported,
   reasoningHintUnsupported,
@@ -905,6 +905,9 @@ function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> 
 function adaptiveThinkingBody(model: ModelRef, opts: CallOpts): Record<string, unknown> {
   const body = researchBody(model, opts);
   if (!('thinking' in body) && !('output_config' in body)) return body;
+  // Thinking off: send what the model's rejection named in place of `disabled` (claude-sonnet-5-5
+  // asks for `between_tools`); a call with thinking on is only moved to adaptive.
+  if ((body.thinking as { type?: string } | undefined)?.type === 'disabled') return { ...body, thinking: { type: thinkingOffTypeFor(model) } };
   return { ...body, thinking: { type: 'adaptive' } };
 }
 
@@ -1350,7 +1353,7 @@ async function rawCompleteTransport(
           res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create());
         } else if (rejectsAdaptiveThinking(e)) {
           // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
-          rememberAdaptiveThinking(model);
+          rememberAdaptiveThinking(model, thinkingOffReplacement(e));
           res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create(true));
         } else throw e;
       }
@@ -2140,7 +2143,7 @@ async function rawCompleteStreamTransport(
           await streamOnce();
         } else if (rejectsAdaptiveThinking(e)) {
           // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
-          rememberAdaptiveThinking(model);
+          rememberAdaptiveThinking(model, thinkingOffReplacement(e));
           await streamOnce(true);
         } else throw e;
       }

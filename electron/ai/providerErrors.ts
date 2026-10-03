@@ -179,13 +179,22 @@ export function rejectsTemperatureParameter(error: unknown): boolean {
  * A 400 that rejects `thinking.type.disabled` and points at the adaptive contract. Newer Claude
  * models (`claude-opus-5-5`) drop the ability to turn thinking off: they answer
  * `"thinking.type.disabled" is not supported for this model. Use "thinking.type.adaptive" and
- * "output_config.effort" to control thinking behavior.` The transport replays the request with
- * adaptive thinking (effort still set) and remembers the model for the session.
+ * "output_config.effort" to control thinking behavior.` (claude-opus-5-5), or `To turn thinking
+ * off on this model, send "thinking": {"type": "between_tools"} instead of {"type": "disabled"}.`
+ * (claude-sonnet-5-5). The transport replays the request with the type the provider names, else
+ * adaptive (effort still set), and remembers the model for the session.
  */
-const ADAPTIVE_THINKING_REJECTION = /thinking\.type\.disabled[^\n]{0,80}(?:not\s+supported|unsupported|not\s+accepted|not\s+allowed|invalid)|thinking\.type\.adaptive/i;
+const ADAPTIVE_THINKING_REJECTION = /thinking\.type\.disabled[^\n]{0,80}(?:not\s+supported|unsupported|not\s+accepted|not\s+allowed|invalid)|thinking\.type\.adaptive|instead\s+of\s+\{\s*\\?"type\\?"\s*:\s*\\?"disabled\\?"\s*\}/i;
 
 export function rejectsAdaptiveThinking(error: unknown): boolean {
   return statusOf(error) === 400 && ADAPTIVE_THINKING_REJECTION.test(messageOf(error));
+}
+
+/** The thinking type a provider says to send instead of `disabled`, when its rejection names one:
+ *  `To turn thinking off on this model, send "thinking": {"type": "between_tools"} instead of
+ *  {"type": "disabled"}.` (claude-sonnet-5-5). Null when the message only points at adaptive. */
+export function thinkingOffReplacement(error: unknown): string | null {
+  return /send\s+"thinking"\s*:\s*\{\s*"type"\s*:\s*"([a-z_]+)"\s*\}\s*instead\s+of/i.exec(messageOf(error))?.[1] ?? null;
 }
 
 /** The statuses a provider answers with when it refused a request before running it. */

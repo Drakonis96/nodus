@@ -31,11 +31,19 @@ export function rememberTemperatureUnsupported(model: ModelRef): void {
  * the temperature memory.
  */
 const adaptiveThinking = new Set<string>();
+/** What such a model takes in place of `disabled` when its rejection named it (`between_tools`
+ *  for claude-sonnet-5-5); adaptive otherwise. */
+const thinkingOffType = new Map<string, string>();
 
 export function adaptiveThinkingRequired(model: ModelRef): boolean {
   return adaptiveThinking.has(modelKey(model));
 }
 
-export function rememberAdaptiveThinking(model: ModelRef): void {
+export function rememberAdaptiveThinking(model: ModelRef, offType?: string | null): void {
   adaptiveThinking.add(modelKey(model));
+  if (offType) thinkingOffType.set(modelKey(model), offType);
+}
+
+export function thinkingOffTypeFor(model: ModelRef): string {
+  return thinkingOffType.get(modelKey(model)) ?? 'adaptive';
 }
