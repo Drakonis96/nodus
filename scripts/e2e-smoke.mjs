@@ -2126,7 +2126,7 @@ try {
     return document?.favorite === true && document.kind === 'manual' && document.color === '#22c55e';
   }));
   console.log('[e2e] study editor metadata controls ok');
-  await clickEditorAction(page.getByRole('button', { name: /Markdown crudo/ }));
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
   await page.getByTestId('study-markdown-editor').fill(editorMarkdown);
   // Exercise the editor's real autosave and poll the persisted state directly;
@@ -2178,7 +2178,7 @@ try {
   await page.getByText('Prompt guardado.', { exact: true }).waitFor();
   await page.getByTestId('study-improve-dialog').getByRole('button', { name: 'Cerrar', exact: true }).click();
 
-  await clickEditorAction(page.getByRole('button', { name: /Markdown crudo/ }));
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
     await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
   await page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
     root.focus();
@@ -2328,7 +2328,9 @@ try {
 
   const splitButton = page.getByRole('button', { name: 'Dividir vista', exact: true });
   await clickEditorAction(splitButton);
+  await openEditorOptions();
   assert.equal(await splitButton.getAttribute('aria-pressed'), 'true', 'the split-view control exposes its active state');
+  await page.keyboard.press('Escape');
   await page.locator('.study-editor-shell .md .katex').first().waitFor({ timeout: 30_000 });
   assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
   console.log('[e2e] study BlockNote editor + metadata + raw Markdown + versioning ok');
@@ -2560,7 +2562,7 @@ try {
   await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
 
   // ── Study narration: selection/cursor modes, formula speech and dictionary ─
-  await clickEditorAction(page.getByRole('button', { name: /Markdown crudo/ }));
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
   const narrationTextarea = page.getByTestId('study-markdown-editor').first();
   await narrationTextarea.evaluate((element) => {
     const text = element.value;

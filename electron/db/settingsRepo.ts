@@ -16,7 +16,7 @@ import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/even
 import { sanitizeCustomThemes } from '@shared/appThemes';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
-import { migrateScriptorSidebar } from '@shared/scriptorNavigation.mjs';
+import { migrateScriptorSidebar } from '../../shared/scriptorNavigation.mjs';
 import { isResearchEffort } from '@shared/researchReasoning';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {

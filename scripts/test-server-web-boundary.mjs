@@ -39,6 +39,11 @@ test('the Server web build is independent and copied by the production image', (
   assert.match(docker, /build:server-web/);
   assert.match(docker, /dist\/web/);
   assert.match(docker, /shared\/serverProfilePreferences\.mjs\s+\/shared\/serverProfilePreferences\.mjs/);
+  // Relative runtime imports must be present at the same /shared location.
+  const preferences = read('shared/serverProfilePreferences.mjs');
+  for (const match of preferences.matchAll(/from ['"]\.\/([^'"]+\.mjs)['"]/g)) {
+    assert.ok(docker.includes(`COPY shared/${match[1]} /shared/${match[1]}`), `missing runtime preference dependency: ${match[1]}`);
+  }
 });
 
 test('the Server web asset handler stops routing after writing its response', () => {

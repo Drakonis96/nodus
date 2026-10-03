@@ -550,12 +550,19 @@ export function StudyEditor({
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (!synonymPanelRef.current?.contains(event.target as Node)) closeSynonymPanel();
     };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeSynonymPanel(); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      // The BlockNote formatting popover consumes Escape before it bubbles.
+      // Dismiss the foreground synonyms panel first, retaining the selection.
+      event.preventDefault();
+      event.stopPropagation();
+      closeSynonymPanel();
+    };
     document.addEventListener('pointerdown', closeOnOutsidePointer);
-    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', closeOnEscape, true);
     return () => {
       document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', closeOnEscape, true);
     };
   }, [synonymPanel?.sessionId]);
 
