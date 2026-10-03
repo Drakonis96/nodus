@@ -1,6 +1,6 @@
 import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, toggleFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
 import { FocusExitDialog, FocusLayoutDialog, type FocusSectionOption } from './components/focus/FocusDialogs';
-import { focusLayoutVisible } from '@shared/studyFocus';
+import { focusDefaultSectionVisible, focusLayoutVisible } from '@shared/studyFocus';
 import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
 import { FocusRail, type FocusRailItem } from './components/focus/FocusRail';
 import { ResearchPreparationWelcome } from './components/ResearchPreparationWelcome';
@@ -75,7 +75,7 @@ import type {
   StudyMaterialNavigationTarget,
   View,
 } from './navigation';
-import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, orderedNav, NAV_ITEMS, NAV_GROUPS } from './navigation';
+import { researchChatView, dedicatedVaultNavIds, groupedNav, navItemLabel, orderedNav, orderSidebarItems, pinnedToolkitSidebarItems, NAV_ITEMS, NAV_GROUPS } from './navigation';
 import type { ResearchConversationNavigationTarget } from './researchNoteProvenance';
 import type { ToolkitPage } from './navigation';
 import { OPEN_LIBRARY_DOCUMENT_EVENT, type OpenLibraryDocumentDetail } from './evidenceJump';
@@ -795,9 +795,7 @@ export function App() {
   const dbSearchItem = NAV_ITEMS.find((n) => n.id === 'dbSearch')!;
   const [paletteOpen, setPaletteOpen] = useState(false);
 
-  // Focus mode swaps the sidebar for the focus rail. It offers the same sections in
-  // the same saved order (plus Biblioteca), so the mode clears the screen without
-  // taking a single study tool away.
+  // Focus mode offers the active vault's sections in their saved order.
   const openStudySection = useCallback((target: View) => {
     setStudyTarget(null);
     if (target !== 'studyLibrary') setStudyMaterialTarget(null);
@@ -805,25 +803,37 @@ export function App() {
     setStudyGraphTarget(null);
     setView(target);
   }, [setView]);
-  // Every section a Study vault has, in the saved order and whatever the sidebar hides:
-  // the focus mode keeps its own choice of what to show (see FocusLayoutDialog).
-  const focusSections = useMemo<Array<FocusSectionOption & { item: (typeof NAV_ITEMS)[number] }>>(() => {
-    if (!isEstudio) return [];
-    const dedicated = dedicatedVaultNavIds(activeVault?.type) ?? [];
-    return orderedNav(settings?.sidebarOrder ?? [])
-      .filter((n) => n.id === 'library' || (dedicated.includes(n.id) && isViewAllowedForVaultType(n.id, activeVault?.type)))
-      .map((n) => ({ key: n.id, label: t(navItemLabel(n, activeVault?.type)), icon: n.icon, item: n }));
-  }, [isEstudio, activeVault?.type, settings?.sidebarOrder, settings?.uiLanguage]);
+  // Focus keeps a separate choice of visible sections for each vault.
+  const focusSections = useMemo<Array<FocusSectionOption & { item?: SidebarNavItem; databaseId?: string; open?: () => void }>>(() => {
+    const dedicated = dedicatedVaultNavIds(activeVault?.type);
+    const items: SidebarNavItem[] = [...orderedNav(settings?.sidebarOrder ?? []), ...pinnedToolkitSidebarItems(settings?.toolkitPinnedPages)];
+    const sections: Array<FocusSectionOption & { item?: SidebarNavItem; databaseId?: string; open?: () => void }> = orderSidebarItems(items, settings?.sidebarOrder ?? [])
+      .filter(n => 'toolkitPage' in n || n.id === 'library' || ((!dedicated || dedicated.includes(n.id)) && isViewAllowedForVaultType(n.id, activeVault?.type)))
+      .map(n => ({ key: n.id, label: 'toolkitPage' in n ? t(n.label) : t(navItemLabel(n, activeVault?.type)), icon: n.icon, item: n,
+        defaultVisible: focusDefaultSectionVisible(activeVault?.type, n.id) }));
+    if (isDatabases) {
+      sections.push({ key: 'database:new', label: t('Nueva base de datos'), icon: 'plus', defaultVisible: true, open: () => void createDatabase() });
+      sections.push(...databases.map(database => ({ key: `database:${database.id}`, label: database.name, icon: 'table', databaseId: database.id, defaultVisible: true })));
+    }
+    return sections;
+  }, [isDatabases, databases, activeVault?.type, settings?.sidebarOrder, settings?.toolkitPinnedPages, settings?.uiLanguage, createDatabase]);
   const focusRailItems = useMemo<FocusRailItem[]>(() => {
-    if (!isEstudio || !focusReduced) return [];
+    if (!focusReduced) return [];
     return focusSections
-      .filter((section) => focusLayoutVisible(focusLayout.layout, `nav:${section.key}`))
-      .map(({ key, label, icon, item }): FocusRailItem => ({
+      .filter(section => focusLayoutVisible(focusLayout.layout, `nav:${section.key}`, section.defaultVisible))
+      .map(({ key, label, icon, item, databaseId, open }): FocusRailItem => ({
         key, label, icon,
-        active: view === item.id && (item.id !== 'toolkit' || toolkitPage === 'home'),
-        open: () => { if (item.id === 'toolkit') setToolkitPage('home'); openStudySection(item.id); },
+        active: databaseId ? view === 'databases' && activeDatabaseId === databaseId : item && ('toolkitPage' in item ? view === 'toolkit' && toolkitPage === item.toolkitPage : view === item.id && (item.id !== 'toolkit' || toolkitPage === 'home')) || false,
+        open: () => {
+          if (open) { open(); return; }
+          if (databaseId) { setActiveDatabaseId(databaseId); setView('databases'); return; }
+          if (!item) return;
+          if ('toolkitPage' in item) { setToolkitPage(item.toolkitPage); setView('toolkit'); return; }
+          if (item.id === 'toolkit') setToolkitPage('home');
+          openStudySection(item.id);
+        },
       }));
-  }, [isEstudio, focusReduced, focusSections, focusLayout, view, toolkitPage, openStudySection]);
+  }, [focusReduced, focusSections, focusLayout, view, toolkitPage, openStudySection, activeDatabaseId, setView]);
   // Leaving the mode lands on the Concentración page, where the paused block is.
   useEffect(() => {
     const show = () => openStudySection('studyFocus');
@@ -927,6 +937,7 @@ export function App() {
 
   useEffect(() => {
     void reloadVaults();
+    return window.nodus?.onVaultChanged(() => { void reloadVaults(); });
   }, [reloadVaults]);
 
   const reloadRecoveryStatus = useCallback(async () => {
@@ -1359,7 +1370,7 @@ export function App() {
         void window.nodus.updateSettings({ appTheme: next }).then(reloadSettings);
       } },
     ];
-    if (isEstudio && focusActions) {
+    if (focusActions) {
       actions.unshift(
         { id: 'act:focus-mode', label: focusReduced ? t('Salir del modo concentración') : t('Entrar en modo concentración'), section: t('Acciones'), icon: 'focus', keywords: 'concentración concentracion focus pomodoro distracciones estudio', run: () => { if (focusReduced) void focusActions.exitFocusMode(); else focusActions.setReduced(true); } },
         { id: 'act:focus-layout', label: t('Personalizar el modo concentración'), section: t('Acciones'), icon: 'eye', keywords: 'concentración concentracion focus personalizar visibles ocultar secciones', run: openFocusLayout },
@@ -1494,6 +1505,7 @@ export function App() {
       className="h-full flex flex-col"
       style={{ '--vault-accent': dockColorForVaultType(activeVault?.type) } as React.CSSProperties}
       data-testid="app-shell"
+      data-vault-type={activeVault?.type}
       data-focus-reduced={focusReduced}
       data-interface-scale={settings.interfaceScale}
       data-high-contrast={settings.highContrast ? 'true' : 'false'}
@@ -1575,7 +1587,7 @@ export function App() {
 
         {/* The focus counter takes the left half of the header (between the logo and the
             centred badge), centred in it; the right rail only ever has the focus icon. */}
-        {isEstudio && <FocusHeader onProgress={() => setView('studyFocus')} />}
+        <FocusHeader onProgress={() => setView('studyFocus')} />
         <div className="flex-1" />
         {/* Right-side action rail: icon-only by default, with native title labels so
             the header stays a stable row of icons. */}
@@ -1676,7 +1688,7 @@ export function App() {
             dataTour="theme-toggle"
             focusKeep={focusKeeps('header:theme')}
           />
-          {isEstudio && focusActions && (
+          {focusActions && (
             // The same panel as the timer chip: the mode toggle and its settings live inside.
             <span className="focus-quick" data-testid="focus-quick-access" data-focus-timer-trigger="">
               <HeaderAction
@@ -1816,7 +1828,7 @@ export function App() {
       <div className="flex-1 flex min-h-0">
         {/* Sidebar (collapsible via the Nodus logo). Home is pinned first,
             Settings last; the rest render grouped (Explorar · Analizar · Escribir). */}
-        {isEstudio && focusReduced && (
+        {focusReduced && (
           <FocusRail
             items={focusRailItems}
             onOpenSubject={openFocusSubject}
@@ -1825,7 +1837,7 @@ export function App() {
             onOpenLibrary={openFocusLibrary}
           />
         )}
-        {!navCollapsed && !(isEstudio && focusReduced) && (
+        {!navCollapsed && !focusReduced && (
           <nav
             data-testid="resizable-sidebar"
             data-sidebar-compact={sidebarCompact ? 'true' : 'false'}
@@ -2131,8 +2143,8 @@ export function App() {
       <BrowserConnectorPairingRequestHost />
 
       {paletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setPaletteOpen(false)} />}
-      {isEstudio && <FocusLayoutDialog sections={focusSections} />}
-      {isEstudio && <FocusExitDialog />}
+      <FocusLayoutDialog sections={focusSections} />
+      <FocusExitDialog />
 
       <Suspense fallback={null}>
       {collectionsOpen && (

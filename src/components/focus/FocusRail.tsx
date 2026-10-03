@@ -1,7 +1,7 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import type { StudyDocument, StudyWorkspace } from '@shared/studyOrg';
 import type { StudyMaterialPreviewKind, StudyMaterialSummary } from '@shared/studyMaterials';
-import { focusLayoutVisible } from '@shared/studyFocus';
+import { focusHasSubjects, focusLayoutVisible } from '@shared/studyFocus';
 import { openFocusLayout, openFocusTimer, useStudyFocus, useStudyFocusLayout } from './StudyFocusContext';
 import { focusClock, focusRemaining, phaseName } from './FocusControls';
 import { STUDY_WORKSPACE_CHANGED, announceStudyWorkspaceChanged } from '../StudySidebar';
@@ -14,11 +14,9 @@ import { errorText, getActiveLang, t, tx } from '../../i18n';
 export interface FocusRailItem { key: string; label: string; icon: string; active: boolean; open: () => void }
 
 /**
- * What the Study vault leaves on screen in focus mode. The ordinary sidebar is
+ * What the active vault leaves on screen in focus mode. The ordinary sidebar is
  * organized for finding things; this rail is organized for working: the block in
- * progress, the materials of the subject being studied, and the study sections the
- * student chose to keep (focus mode settings), so the mode never locks the student
- * out of their own tools.
+ * progress, contextual materials and the sections chosen in focus mode settings.
  */
 export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial, onOpenLibrary }: {
   items: FocusRailItem[];
@@ -37,6 +35,8 @@ export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial
   });
   const state = focus?.snapshot?.state;
   const vaultId = focus?.snapshot?.vaultId;
+  const hasSubjects = focusHasSubjects(focus?.snapshot?.vaultType);
+  const subjectId = state?.subjectVaultId === vaultId ? state?.subjectId ?? null : null;
   return <aside data-testid="focus-rail" className={`focus-rail ${collapsed ? 'is-collapsed' : ''}`} aria-label={t('Modo concentración')}>
     <div className="focus-rail-head">
       <span className="focus-rail-title"><Icon name="focus" size={15} /><span>{t('Concentración')}</span></span>
@@ -51,7 +51,8 @@ export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial
         <span className="focus-rail-label">{state.status === 'ready' ? t('Iniciar un bloque') : state.status === 'paused' ? t('En pausa') : state.status === 'complete' ? t('Completado') : phaseName(state.phase)}</span>
         <strong>{focusClock(focusRemaining(state))}</strong>
       </button>}
-      {vaultId && (show('block:subject') || show('block:shelf')) && <SubjectShelf key={vaultId} showSubject={show('block:subject')} showShelf={show('block:shelf')} subjectId={state?.subjectId ?? null} task={state?.task ?? null} onOpenSubject={onOpenSubject} onOpenDocument={onOpenDocument} onOpenMaterial={onOpenMaterial} onOpenLibrary={onOpenLibrary} />}
+      {hasSubjects && vaultId && (show('block:subject') || show('block:shelf')) && <SubjectShelf key={vaultId} showSubject={show('block:subject')} showShelf={show('block:shelf')} subjectId={subjectId} task={state?.task ?? null} onOpenSubject={onOpenSubject} onOpenDocument={onOpenDocument} onOpenMaterial={onOpenMaterial} onOpenLibrary={onOpenLibrary} />}
+      {!hasSubjects && show('block:subject') && state?.task && <section className="focus-rail-section" aria-label={t('Objetivo del bloque')}><h2 className="focus-rail-heading">{t('Objetivo del bloque')}</h2><p className="focus-rail-task" data-testid="focus-rail-task"><Icon name="target" size={13} /><span>{state.task}</span></p></section>}
       {items.length > 0 && <RailNav items={items} />}
     </div>
     <div className="focus-rail-foot">
@@ -61,8 +62,8 @@ export function FocusRail({ items, onOpenSubject, onOpenDocument, onOpenMaterial
 }
 
 const RailNav = memo(function RailNav({ items }: { items: FocusRailItem[] }) {
-  return <nav className="focus-rail-section" aria-label={t('Secciones de estudio')}>
-    <h2 className="focus-rail-heading">{t('Estudiar')}</h2>
+  return <nav className="focus-rail-section" aria-label={t('Secciones')}>
+    <h2 className="focus-rail-heading">{t('Secciones')}</h2>
     {items.map(item => <button type="button" key={item.key} data-testid={`focus-rail-nav-${item.key}`} className={`focus-rail-link ${item.active ? 'is-active' : ''}`} aria-current={item.active ? 'page' : undefined} onClick={item.open} title={item.label}>
       <Icon name={item.icon} size={15} /><span className="focus-rail-label">{item.label}</span>
     </button>)}
@@ -92,15 +93,18 @@ const SubjectShelf = memo(function SubjectShelf({ showSubject, showShelf, subjec
   const [failed, setFailed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<unknown>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   // A fresh note filed under the block's subject, dated so a week of them stays legible.
   const createNote = async (id: string) => {
     setCreating(true); setCreateError(null);
     try {
       const date = new Date().toLocaleDateString(getActiveLang(), { day: 'numeric', month: 'long' });
       const document = await window.nodus.createStudyDocument({ title: tx('Apuntes · {date}', { date }), placement: { subjectId: id } });
+      if (!mounted.current) return;
       announceStudyWorkspaceChanged();
       onOpenDocument(document.id);
-    } catch (reason) { setCreateError(reason); } finally { setCreating(false); }
+    } catch (reason) { if (mounted.current) setCreateError(reason); } finally { if (mounted.current) setCreating(false); }
   };
   useEffect(() => {
     let alive = true;

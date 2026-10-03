@@ -99,7 +99,6 @@ export const NAV_ITEMS: NavItem[] = [
   // Study mode — scoped to the 'estudio' vault type.
   { id: 'studyCourses', label: 'Cursos y asignaturas', icon: 'graduation', group: 'explore' },
   { id: 'studySchedule', label: 'Horarios', icon: 'clock', group: 'explore' },
-  { id: 'studyFocus', label: 'Concentración', icon: 'focus', group: 'explore' },
   { id: 'studyCalendar', label: 'Calendario', icon: 'calendar', group: 'explore' },
   { id: 'studySearch', label: 'Buscar en el estudio', icon: 'search', group: 'explore' },
   { id: 'studyLibrary', label: 'Materiales de estudio', icon: 'book', group: 'explore' },
@@ -141,6 +140,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'browser', label: 'Nodus Browser', icon: 'globe', group: 'tools' },
   { id: 'radar', label: 'Nodus Radar', icon: 'radar', group: 'tools' },
   { id: 'compass', label: 'Nodus Compass', icon: 'compass', group: 'tools' },
+  { id: 'studyFocus', label: 'Nodus Focus', icon: 'focus', group: 'tools' },
   { id: 'toolkit', label: 'Nodus Tools', icon: 'tools', group: 'tools' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
@@ -150,11 +150,11 @@ export const NAV_ITEMS: NavItem[] = [
  * adding a tool never expands the vault-type allow-lists. 'home' is the catalogue. */
 export type ToolkitPage = 'home' | ToolkitToolPage;
 
-export type ToolkitStandalonePage = Extract<View, 'browser' | 'radar' | 'compass'>;
+export type ToolkitStandalonePage = Extract<View, 'browser' | 'radar' | 'compass' | 'studyFocus'>;
 export type ToolkitCatalogPage = ToolkitToolPage | ToolkitStandalonePage;
 
 export function isToolkitStandalonePage(page: ToolkitCatalogPage): page is ToolkitStandalonePage {
-  return page === 'browser' || page === 'radar' || page === 'compass';
+  return page === 'browser' || page === 'radar' || page === 'compass' || page === 'studyFocus';
 }
 
 export interface ToolkitToolDef {
@@ -172,6 +172,10 @@ export interface ToolkitToolDef {
 
 /** Single source of truth for the toolkit catalogue. */
 export const TOOLKIT_TOOLS = ([
+  {
+    page: 'studyFocus', name: 'Nodus Focus', icon: 'focus', state: 'wip', testid: 'focus',
+    description: 'Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.',
+  },
   {
     page: 'apps',
     name: 'Nodus Apps',
@@ -290,10 +294,22 @@ const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>
     notes: 'Espacio de trabajo',
   },
   docencia: {
+    studyCourses: 'Cursos, asignaturas y grupos',
+    studySearch: 'Buscar',
+    studyLibrary: 'Materiales',
     studyChat: 'Research chat',
     studyIdeas: 'Ideas',
     studyGraph: 'Grafo',
     notes: 'Espacio de trabajo',
+  },
+  primary_sources: {
+    timeline: 'Cronología',
+    relations: 'Relaciones',
+  },
+  worldbuilding: {
+    timeline: 'Cronología',
+    relations: 'Relaciones',
+    tree: 'Familias',
   },
 };
 
@@ -371,7 +387,7 @@ const DEDICATED_VAULT_NAV_IDS: Partial<Record<ReturnType<typeof normalizeVaultTy
 /** Strict top-level navigation allow-list for dedicated vault workspaces. */
 export function dedicatedVaultNavIds(vaultType: unknown): View[] | null {
   const ids = DEDICATED_VAULT_NAV_IDS[normalizeVaultType(vaultType)];
-  return ids ? [...ids] : null;
+  return ids ? [...new Set<View>([...ids, 'studyFocus'])] : null;
 }
 
 /** Put a bounded set of sidebar items in the user's saved relative order. */

@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { buildSync } from 'esbuild';
+import { build, buildSync } from 'esbuild';
 const require = createRequire(import.meta.url);
 if (!process.versions.electron) {
   execFileSync(require('electron'), [process.argv[1]], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', TZ: 'Europe/Madrid' }, stdio: 'inherit' });
@@ -14,6 +14,9 @@ const temp = mkdtempSync(path.join(tmpdir(), 'nodus-focus-test-'));
 try {
   buildSync({ entryPoints: ['electron/study/focusService.ts', 'electron/db/studyFocusSchema.ts', 'shared/studyFocus.ts'], outdir: temp, outbase: '.', bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent' });
   const { FocusService } = require(path.join(temp, 'electron/study/focusService.js'));
+  await build({ entryPoints: ['electron/study/focusStore.ts'], outdir: temp, outbase: '.', bundle: true, platform: 'node', format: 'cjs', logLevel: 'silent',
+    plugins: [{ name: 'native-sqlite', setup(build) { build.onResolve({ filter: /^better-sqlite3$/ }, () => ({ path: require.resolve('better-sqlite3'), external: true })); } }] });
+  const { importLegacyFocus } = require(path.join(temp, 'electron/study/focusStore.js'));
   const { STUDY_FOCUS_SQL, ensureStudyFocusTaskColumn } = require(path.join(temp, 'electron/db/studyFocusSchema.js'));
   const { splitFocusInterval } = require(path.join(temp, 'shared/studyFocus.js'));
   const Database = require('better-sqlite3');
@@ -130,6 +133,74 @@ try {
     f.restart(); const prefs = f.service.snapshot().preferences;
     assert.deepEqual(prefs.layout, { 'nav:studyReview': true, 'nav:browser': false, 'header:theme': false }); assert.equal(prefs.enterOnStart, false);
     f.service.configure({ layout: {} }); f.restart(); assert.deepEqual(f.service.snapshot().preferences.layout, {}); f.db.close();
+  });
+  const study = { id: 'a', name: 'Estudio', type: 'estudio' };
+  const research = { id: 'b', name: 'Investigación', type: 'academic' };
+  check('one running block crosses vaults with exact attribution and its intention intact', () => {
+    const f = fixture(); f.service.setVault(study); f.act('start', null, 'Escribir');
+    const id = f.service.snapshot().sessionId;
+    f.advance(12345); f.service.setVault(research); f.advance(17655);
+    const state = f.service.snapshot();
+    assert.equal(state.status, 'running'); assert.equal(state.sessionId, id); assert.equal(state.elapsedMs, 30000);
+    assert.equal(state.originVaultId, study.id); assert.equal(state.task, 'Escribir'); assert.equal(state.cycleBlocks, 0);
+    const stats = f.service.stats();
+    assert.equal(stats.days.at(-1).milliseconds, 30000);
+    assert.deepEqual(stats.recent[0].vaults.map(v => [v.vaultId, v.milliseconds]), [['a', 12345], ['b', 17655]]);
+    assert.equal(stats.vaults.reduce((sum, v) => sum + v.days.at(-1).milliseconds, 0), 30000);
+    f.db.close();
+  });
+  check('switching paused and break states preserves their phase; completion counted once at destination', () => {
+    const f = fixture(); f.service.configure({ workMinutes: 1, breakMinutes: 1 }); f.service.setVault(study);
+    f.act('start'); f.advance(20000); f.act('pause'); f.service.setVault(research); f.advance(10000);
+    assert.equal(f.service.snapshot().status, 'paused'); assert.equal(f.service.snapshot().elapsedMs, 20000);
+    f.act('resume'); f.advance(40000); f.service.tick();
+    assert.equal(f.service.stats().vaults.find(v => v.vaultId === 'b').days.at(-1).blocks, 1);
+    f.actKeeping('start'); f.advance(10000); f.service.setVault(study); f.advance(50000); f.service.tick();
+    assert.equal(f.service.snapshot().phase, 'break'); assert.equal(f.notices(), 2);
+    assert.equal(f.service.stats().days.at(-1).milliseconds, 60000); f.db.close();
+  });
+  check('layouts remain per vault while timer preferences and manual opt-out are global', () => {
+    const f = fixture(); f.service.setVault(study); f.service.configure({ layout: { 'nav:browser': false }, enterOnStart: false, workMinutes: 40 });
+    f.service.setVault(research); assert.deepEqual(f.service.snapshot().preferences.layout, {});
+    assert.equal(f.service.snapshot().preferences.enterOnStart, false); assert.equal(f.service.snapshot().preferences.workMinutes, 40);
+    f.service.configure({ layout: { 'header:theme': false } }); f.service.setVault(study);
+    assert.deepEqual(f.service.snapshot().preferences.layout, { 'nav:browser': false }); f.db.close();
+  });
+  check('a subject is retained during a cross-vault block and dropped before a new unrelated block', () => {
+    const f = fixture(); f.db.prepare('INSERT INTO study_subjects(id, name) VALUES (?, ?)').run('history', 'Historia');
+    f.service.setVault(study); f.act('start', 'history'); f.advance(1000); f.service.setVault(research);
+    assert.equal(f.service.snapshot().subjectVaultId, 'a'); assert.equal(f.service.snapshot().subjectName, 'Historia');
+    f.act('finish'); f.actKeeping('start'); assert.equal(f.service.snapshot().subjectId, null);
+    f.act('finish'); assert.throws(() => f.act('start', 'history'), /Asignatura no encontrada/); f.db.close();
+  });
+  check('legacy import is idempotent, preserves colliding ids, opt-out, layouts and paused recovery', () => {
+    const sourceA = fixture(undefined, path.join(temp, 'legacy-a.sqlite'));
+    const sourceB = fixture(undefined, path.join(temp, 'legacy-b.sqlite'));
+    sourceA.act('start', null, 'Historial A'); sourceA.advance(12345); sourceA.act('pause');
+    sourceA.service.configure({ enterOnStart: false, workMinutes: 35, layout: { 'nav:browser': false } });
+    sourceB.act('start', null, 'Historial B'); sourceB.advance(6789); sourceB.act('pause');
+    const sharedId = sourceA.service.snapshot().sessionId;
+    sourceB.db.prepare('UPDATE study_focus_sessions SET id = ?').run(sharedId);
+    sourceB.db.prepare('UPDATE study_focus_intervals SET session_id = ?').run(sharedId);
+    const legacyB = sourceB.service.snapshot(); legacyB.sessionId = sharedId;
+    sourceB.db.prepare('UPDATE study_focus_state SET state_json = ? WHERE id = 1').run(JSON.stringify(legacyB));
+    const vaults = [{ ...study, path: sourceA.db.name }, { ...research, path: sourceB.db.name }];
+    const global = fixture(); importLegacyFocus(global.db, vaults, 'a'); importLegacyFocus(global.db, vaults, 'a'); global.restart(); global.service.setVault(study);
+    assert.equal(global.service.snapshot().status, 'paused'); assert.equal(global.service.snapshot().task, 'Historial A');
+    assert.equal(global.service.snapshot().preferences.enterOnStart, false); assert.equal(global.service.snapshot().preferences.workMinutes, 35);
+    assert.deepEqual(global.service.snapshot().preferences.layout, { 'nav:browser': false });
+    assert.equal(global.service.stats().recent.length, 2); assert.equal(global.service.stats().days.at(-1).milliseconds, 19134);
+    assert.equal(sourceA.service.stats().recent.length, 1);
+    global.service.configure({ enterOnStart: true }); importLegacyFocus(global.db, vaults, 'a'); global.restart();
+    assert.equal(global.service.snapshot().preferences.enterOnStart, true);
+    sourceA.db.close(); sourceB.db.close(); global.db.close();
+  });
+  check('a failed vault-context transaction cannot duplicate already committed work', () => {
+    const f = fixture(); f.service.setVault(study); f.act('start'); f.advance(15000);
+    f.db.exec("CREATE TRIGGER reject_vault BEFORE INSERT ON focus_vaults BEGIN SELECT RAISE(ABORT, 'test failure'); END;");
+    assert.throws(() => f.service.setVault(research)); assert.equal(f.service.context.id, 'a');
+    f.db.exec('DROP TRIGGER reject_vault'); f.service.setVault(research); f.advance(1000); f.act('finish');
+    assert.equal(f.service.stats().days.at(-1).milliseconds, 16000); f.db.close();
   });
   console.log(`${cases} focus integration cases passed (real SQLite).`);
 } finally { rmSync(temp, { recursive: true, force: true }); }

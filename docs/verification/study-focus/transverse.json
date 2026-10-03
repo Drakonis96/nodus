@@ -1,0 +1,218 @@
+[
+  {
+    "vaultType": "estudio",
+    "vaultId": "90744d44-3237-499f-ad54-5bade6117b5a",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 20665.59179,
+    "sections": [
+      "studyCourses",
+      "studyCalendar",
+      "studySearch",
+      "studyLibrary",
+      "studyChat",
+      "studyQuestions",
+      "studyDeepResearch",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:studyCourses": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "academic",
+    "vaultId": "ccecff56-db7b-4236-aed6-8c03a96cd3c3",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 24899.982207,
+    "sections": [
+      "search",
+      "library",
+      "graph",
+      "ideas",
+      "researchChat",
+      "research",
+      "deepResearch",
+      "workspace",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:library": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "primary_sources",
+    "vaultId": "f9d2a908-b53b-476a-b283-7b9d227a538d",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 32092.084163999985,
+    "sections": [
+      "search",
+      "library",
+      "persons",
+      "timeline",
+      "relations",
+      "map",
+      "archive",
+      "researchChat",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:archive": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "genealogy",
+    "vaultId": "e3bb11e9-35b5-47e4-a6fd-a8d5030e2ad8",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 38119.46928999999,
+    "sections": [
+      "search",
+      "library",
+      "persons",
+      "timeline",
+      "tree",
+      "relations",
+      "map",
+      "archive",
+      "researchChat",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:persons": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "prosopography",
+    "vaultId": "699b89b7-cc95-4e01-b8d9-b1b1d0aff601",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 42668.52470600001,
+    "sections": [
+      "library",
+      "prosopSearch",
+      "prosopPopulation",
+      "prosopPersons",
+      "prosopSources",
+      "prosopAnalysis",
+      "prosopNetworks",
+      "researchChat",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:prosopPopulation": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "databases",
+    "vaultId": "e7ed191e-e7a6-4279-a5c0-834b91a4e23c",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 51824.16070700002,
+    "sections": [
+      "library",
+      "pages",
+      "dbSearch",
+      "dbAnalysis",
+      "dbChat",
+      "dbDeepResearch",
+      "notes",
+      "browser",
+      "database:new",
+      "database:db_cf5be2f5-12f6-41e5-a2ae-85e8dd840df0"
+    ],
+    "savedLayout": {
+      "nav:pages": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "testimonios",
+    "vaultId": "c2efed3b-7b49-41f5-a0bb-c6750ccc62a2",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 59076.90641500002,
+    "sections": [
+      "search",
+      "library",
+      "researchChat",
+      "testimonyInterviews",
+      "testimonyParticipants",
+      "testimonyContrasts",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:testimonyInterviews": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "worldbuilding",
+    "vaultId": "1e96798f-4568-468a-ace6-a20e426cf115",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 66246.45937300002,
+    "sections": [
+      "library",
+      "timeline",
+      "map",
+      "encyclopedia",
+      "characters",
+      "places",
+      "continuity",
+      "worldChat",
+      "scenes",
+      "manuscript",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:encyclopedia": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  },
+  {
+    "vaultType": "docencia",
+    "vaultId": "ce0cd671-b336-4cc9-b565-b75fd6b21179",
+    "sessionId": "82d43713-c139-4468-8024-cdce9af7de32",
+    "elapsedMs": 71477.42370700002,
+    "sections": [
+      "library",
+      "studyCourses",
+      "studySchedule",
+      "studyCalendar",
+      "studyLibrary",
+      "studyQuestions",
+      "teachingGroups",
+      "teachingExams",
+      "teachingRubrics",
+      "teachingUnits",
+      "notes",
+      "browser"
+    ],
+    "savedLayout": {
+      "nav:studyCourses": false,
+      "nav:browser": false,
+      "header:theme": false,
+      "nav:toolkit": true
+    }
+  }
+]

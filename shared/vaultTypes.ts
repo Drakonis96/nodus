@@ -397,7 +397,6 @@ export const VAULT_TYPE_SCOPED_VIEWS: Record<string, VaultType[]> = {
   // The question bank is shared with teaching (its Evaluación section).
   studyQuestions: ['estudio', 'docencia'],
   studyReview: ['estudio'],
-  studyFocus: ['estudio'],
   studyDeepResearch: ['estudio'],
   // Student rosters, the exam paper builder and rubrics belong to teaching only.
   teachingGroups: ['docencia'],
@@ -472,7 +471,7 @@ export function isViewAllowedForVaultType(viewId: string, type: unknown): boolea
   if (normalizeVaultType(type) === 'prosopography') {
     return [
       'home', 'settings', 'prosopSearch', 'prosopPopulation', 'prosopPersons',
-      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit',
+      'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'library', 'notes', 'browser', 'radar', 'compass', 'toolkit', 'studyFocus',
     ].includes(viewId);
   }
   const allowed = VAULT_TYPE_SCOPED_VIEWS[viewId];

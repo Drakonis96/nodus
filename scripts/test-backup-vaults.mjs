@@ -139,11 +139,18 @@ try {
   switchTo(gene.id);
 
   // Back up the WHOLE app (all vaults) while the genealogy vault is active.
+  const focusRuntime = require(path.join(repoRoot, 'electron/study/focusRuntime.ts'));
+  const focus = focusRuntime.getGlobalFocusService();
+  focus.configure({ enterOnStart: false, layout: { 'nav:browser': false } });
+  focus.act('start', focus.snapshot().revision, null, 'Tiempo que debe sobrevivir');
+  const focusSessionId = focus.snapshot().sessionId;
   const archive = await createBackupArchive({ password: 'clave-larga-de-prueba', appVersion: '9.9.9-test' });
+  assert.equal(focus.snapshot().status, 'running', 'whole-app backup leaves Focus running');
   assert.ok(Buffer.isBuffer(archive) && archive.length > 0, 'archive produced');
   const initialZip = new AdmZip(archive);
   const initialManifest = JSON.parse(initialZip.readAsText('manifest.json'));
   const initialPayload = new AdmZip(decryptBackupPayload(initialZip.getEntry('backup.bin').getData(), 'clave-larga-de-prueba', initialManifest.cipher));
+  assert.ok(initialPayload.getEntry('aux/global/focus.sqlite'), 'the global Focus snapshot travels in the archive');
   assert.equal(initialPayload.getEntries().some((entry) => entry.entryName.includes('recursive-copy.bin')), false, 'pre-v4 recovery packages are not recursively embedded');
 
   // ── Wipe both vaults' data ──────────────────────────────────────────────────
@@ -173,6 +180,11 @@ try {
   // ── Restore the whole app from the single archive ───────────────────────────
   const result = restoreBackupArchive(archive, 'clave-larga-de-prueba');
   assert.equal(result.ok, true, `restore ok: ${result.message}`);
+  const restoredFocus = focusRuntime.getGlobalFocusSnapshot();
+  assert.equal(restoredFocus.state.sessionId, focusSessionId);
+  assert.equal(restoredFocus.state.status, 'paused');
+  assert.equal(restoredFocus.state.preferences.enterOnStart, false);
+  assert.deepEqual(restoredFocus.state.preferences.layout, { 'nav:browser': false });
 
   // Both vaults still exist, and BOTH people are back — proving the backup was
   // integral across vault types, and the active vault was restored to the backup's.

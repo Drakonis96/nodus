@@ -24,8 +24,8 @@ interface FocusContextValue extends FocusActions {
   notice: FocusNotice | null; exitPrompt: boolean;
 }
 /** What the focus mode shows. Changes only when the student edits it, never per tick. */
-export interface FocusLayout { layout: Record<string, boolean>; enterOnStart: boolean; ready: boolean }
-const EMPTY_LAYOUT: FocusLayout = { layout: {}, enterOnStart: true, ready: false };
+export interface FocusLayout { vaultId: string | null; vaultType: string | undefined; layout: Record<string, boolean>; enterOnStart: boolean; ready: boolean }
+const EMPTY_LAYOUT: FocusLayout = { vaultId: null, vaultType: undefined, layout: {}, enterOnStart: true, ready: false };
 const FocusLayoutContext = createContext<FocusLayout>(EMPTY_LAYOUT);
 export const useStudyFocusLayout = () => useContext(FocusLayoutContext);
 // The editor and shell consume only appearance and actions, so the one-second clock
@@ -81,6 +81,7 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
   const fail = useCallback((reason: unknown) => setError(reason ?? null), []);
   const receive = useCallback((next: FocusSnapshot) => {
     if (next.vaultId !== vault.current) return;
+    if (latest.current?.vaultId === next.vaultId && latest.current.state.revision > next.state.revision) return;
     latest.current = next; setSnapshot(next);
   }, []);
   useEffect(() => {
@@ -90,9 +91,11 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
     const open = async (active: { id: string; type: string } | null) => {
       const token = ++generation;
       if (!alive) return;
-      vault.current = active?.type === 'estudio' ? active.id : null;
-      latest.current = null; setSnapshot(null); reduce(false); setNotice(null); setError(null); setExitPrompt(false);
-      void window.nodus.setStudyFocusDistractions(false).catch(fail);
+      vault.current = active?.id ?? null;
+      latest.current = null;
+      setSnapshot(previous => previous && active ? { ...previous, vaultId: active.id, vaultType: active.type,
+        state: { ...previous.state, preferences: { ...previous.state.preferences, layout: {} } } } : previous);
+      setError(null);
       if (vault.current) {
         try { const next = await window.nodus.getStudyFocus(); if (alive && token === generation) receive(next); }
         catch (reason) { if (alive && token === generation) fail(reason); }
@@ -111,7 +114,6 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
     return () => { alive = false; offVault(); offState(); offComplete(); };
   }, [receive, fail]);
   const setReduced = useCallback((value: boolean) => {
-    // Only a Study vault has the mode; elsewhere the request is simply ignored.
     if (!vault.current) return;
     reduce(value);
     void window.nodus.setStudyFocusDistractions(value).catch(reason => { reduce(!value); fail(reason); });
@@ -122,6 +124,7 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
     setError(null);
     try {
       const next = await window.nodus.actStudyFocus(current.vaultId, action, current.state.revision, options.subjectId, options.task);
+      if (current.vaultId !== vault.current) return;
       receive(next); setNotice(null);
       // A work block is what the mode is for, so starting or resuming one turns it on
       // unless the student has unticked "Modo concentración".
@@ -129,7 +132,7 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
       // Ending the session ends the mode with it: back to the normal view.
       if (action === 'finish' && next.state.status === 'ready') setReduced(false);
     }
-    catch (reason) { fail(reason); }
+    catch (reason) { if (current.vaultId === vault.current) fail(reason); }
   }, [receive, fail, setReduced]);
   const exitFocusMode = useCallback(async () => {
     setReduced(false);
@@ -147,14 +150,14 @@ export function StudyFocusProvider({ children }: { children: ReactNode }) {
     if (!current) return;
     setError(null);
     try { receive(await window.nodus.configureStudyFocus(current.vaultId, patch)); }
-    catch (reason) { fail(reason); }
+    catch (reason) { if (current.vaultId === vault.current) fail(reason); }
   }, [receive, fail]);
   const dismissNotice = useCallback(() => setNotice(null), []);
   const actions = useMemo<FocusActions>(() => ({ setReduced, exitFocusMode, resolveExitPrompt, act, configure, dismissNotice }), [setReduced, exitFocusMode, resolveExitPrompt, act, configure, dismissNotice]);
   const value = useMemo<FocusContextValue>(() => ({ ...actions, snapshot, reduced, error, notice, exitPrompt }), [actions, snapshot, reduced, error, notice, exitPrompt]);
   const preferences = snapshot?.state.preferences;
-  const layoutKey = preferences ? JSON.stringify([preferences.layout, preferences.enterOnStart]) : '';
-  const layout = useMemo<FocusLayout>(() => preferences ? { layout: preferences.layout ?? {}, enterOnStart: preferences.enterOnStart !== false, ready: true } : EMPTY_LAYOUT,
+  const layoutKey = preferences ? JSON.stringify([snapshot?.vaultId, snapshot?.vaultType, preferences.layout, preferences.enterOnStart]) : '';
+  const layout = useMemo<FocusLayout>(() => preferences ? { vaultId: snapshot!.vaultId, vaultType: snapshot!.vaultType, layout: preferences.layout ?? {}, enterOnStart: preferences.enterOnStart !== false, ready: true } : EMPTY_LAYOUT,
     // Keyed on the serialized layout so the one-second snapshot does not rebuild it.
     [layoutKey]);
   return <FocusAppearanceContext.Provider value={reduced}><FocusActionsContext.Provider value={actions}><FocusLayoutContext.Provider value={layout}><FocusContext.Provider value={value}>{children}</FocusContext.Provider></FocusLayoutContext.Provider></FocusActionsContext.Provider></FocusAppearanceContext.Provider>;

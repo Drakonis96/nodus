@@ -48,6 +48,14 @@ test('unknown / missing values normalise to academic', () => {
   }
 });
 
+test('Focus is available and visible by default in every selectable vault', () => {
+  for (const { id } of vt.availableVaultTypes()) {
+    assert.equal(vt.isViewAllowedForVaultType('studyFocus', id), true, `${id}: Focus opens`);
+    assert.equal(vt.defaultHiddenViewsForType(id).includes('studyFocus'), false, `${id}: Focus starts visible`);
+  }
+  assert.deepEqual(vt.effectiveSidebarHidden(['studyFocus'], true, 'estudio'), ['studyFocus'], 'manual hiding remains respected');
+});
+
 test('shipped and preview vaults are selectable; announced future vaults remain gated', () => {
   const ids = vt.availableVaultTypes().map((d) => d.id);
   assert.deepEqual(ids, ['academic', 'genealogy', 'prosopography', 'estudio', 'primary_sources', 'databases', 'testimonios', 'worldbuilding', 'docencia']);

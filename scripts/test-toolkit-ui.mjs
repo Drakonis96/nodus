@@ -84,7 +84,7 @@ test('the toolkit shows in every vault type, including databases and study', () 
   const tools = groups.find((g) => g.id === 'tools');
   assert.ok(tools, 'the tools group survives the databases preset');
   // Order is part of the contract: Compass sits directly below Radar.
-  assert.deepEqual(tools.items.map((n) => n.id), ['browser', 'radar', 'compass', 'toolkit']);
+  assert.deepEqual(tools.items.map((n) => n.id), ['browser', 'radar', 'compass', 'studyFocus', 'toolkit']);
 });
 
 test('pinned Toolkit pages become reorderable sidebar shortcuts with their catalogue icons', () => {
@@ -100,7 +100,7 @@ test('pinned Toolkit pages become reorderable sidebar shortcuts with their catal
   const defaultTools = navigation.groupedNav([], [], ['apps', 'ocr']).find((group) => group.id === 'tools');
   assert.deepEqual(
     defaultTools.items.map((item) => item.id),
-    ['browser', 'radar', 'compass', 'toolkit', 'toolkit:apps', 'toolkit:ocr'],
+    ['browser', 'radar', 'compass', 'studyFocus', 'toolkit', 'toolkit:apps', 'toolkit:ocr'],
     'new pins start beside the Nodus Tools catalogue',
   );
 
@@ -111,7 +111,7 @@ test('pinned Toolkit pages become reorderable sidebar shortcuts with their catal
   ).find((group) => group.id === 'tools');
   assert.deepEqual(
     reordered.items.map((item) => item.id),
-    ['browser', 'toolkit:ocr', 'radar', 'toolkit', 'toolkit:apps', 'compass'],
+    ['browser', 'toolkit:ocr', 'radar', 'toolkit', 'toolkit:apps', 'compass', 'studyFocus'],
     'the Settings order applies to parent sections and pinned tools together',
   );
 });
@@ -144,11 +144,11 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   // set of tools from each other.
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => `toolkit-card-${tool.testid}`),
-    ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-drift', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter']
+    ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-drift', 'toolkit-card-focus', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter']
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.map((tool) => tool.name),
-    ['Nodus Apps', 'Nodus Browser', 'Nodus Compass', 'Nodus Convert', 'Nodus Drift', 'Nodus Protect', 'Nodus Radar', 'Nodus Translate', 'OCR Workspace', 'PDF Presenter'],
+    ['Nodus Apps', 'Nodus Browser', 'Nodus Compass', 'Nodus Convert', 'Nodus Drift', 'Nodus Focus', 'Nodus Protect', 'Nodus Radar', 'Nodus Translate', 'OCR Workspace', 'PDF Presenter'],
     'brand names stay untranslated'
   );
   assert.match(view, /name=\{tool\.name\}/, 'the card shows the brand name verbatim, never through t()');
@@ -166,7 +166,7 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['apps', 'browser', 'compass', 'convert', 'drift', 'protect', 'radar', 'translate', 'ocr', 'presenter'],
+    ['apps', 'browser', 'compass', 'convert', 'drift', 'studyFocus', 'protect', 'radar', 'translate', 'ocr', 'presenter'],
     'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);
