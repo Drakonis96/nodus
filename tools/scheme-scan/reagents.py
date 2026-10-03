@@ -111,10 +111,20 @@ def tokens(text):
     """The reagent mentions in a conditions string, cleaned of amounts, conditions and numbering."""
     if not text or _CLASS_LABEL.search(text):
         return []  # an index label ("Enolate alkylation (1.2)"), not conditions
+    text = text.translate(str.maketrans('₀₁₂₃₄₅₆₇₈₉⁺⁻', '0123456789+-'))
     out = []
     # A comma before a digit is a locant ("2,6-lutidine"), not a separator.
     # "/" separates reagents ("Na/NH3", "H2/Pt", "HNO3/H2SO4") except between digits ("1/2").
-    for part in re.split(r',(?!\d)|[;\n]|\bthen\b|\bor\b|(?<!\d)/|/(?!\d)|\s\+\s', text):
+    # Test whole mentions before splitting slashes or stripping decorations: a slash can
+    # be stereochemistry, and a dot can separate the counterions of a literal SMILES.
+    parts = []
+    for mention in re.split(r',(?!\d)|[;\n]|\bthen\b|\bor\b|\s\+\s', text):
+        mention = _NUMBERING.sub('', mention).strip()
+        if literal_smiles(mention):
+            out.append(mention)
+        else:
+            parts.extend(re.split(r'(?<!\d)/|/(?!\d)', mention))
+    for part in parts:
         part = _NUMBERING.sub('', part)
         part = _QUANTITY.sub(' ', part)
         part = _DECOR.sub(' ', part)
@@ -135,7 +145,7 @@ def tokens(text):
 
 def candidates(text):
     """Tokens that need a name lookup: not in the dictionary, not non-participants, not generic."""
-    return [t for t in tokens(text) if t.lower() not in REAGENTS and not _GENERIC.search(t)]
+    return [t for t in tokens(text) if t.lower() not in REAGENTS and not _GENERIC.search(t) and not literal_smiles(t)]
 
 
 def literal_smiles(token):
@@ -167,7 +177,7 @@ def reagent_smiles(text, lookup):
     seen, out = set(), []
     for token in tokens(text):
         key = token.lower()
-        smiles = REAGENTS.get(key) if key in REAGENTS else (None if _GENERIC.search(token) else lookup(token) or literal_smiles(token))
+        smiles = REAGENTS.get(key) if key in REAGENTS else (None if _GENERIC.search(token) else literal_smiles(token) or lookup(token))
         if not smiles:
             continue
         mol = Chem.MolFromSmiles(smiles)
@@ -187,7 +197,7 @@ def review(resolve=True):
     dictionary, run again."""
     import collections, os, sqlite3
     import scan
-    work = os.environ.get('SCHEME_TEMPLATES_WORK') or os.path.join(os.path.dirname(scan.DB), 'templates-reagents')
+    work = work_directory()
     os.makedirs(work, exist_ok=True)
     con = scan.connect()
     texts = [r[0] for r in con.execute("SELECT reagents FROM records WHERE status IN ('generic', 'confirmed', 'repaired')") if isinstance(r[0], str)]
@@ -289,8 +299,12 @@ PROVIDERS = {
     'anthropic': ('claude-haiku-4-5-20251001', (1.0, 5.0), 'anthropic', 'https://api.anthropic.com/v1/messages'),
     # The tie-break, for names the first two disagree on.
     'sonnet': ('claude-sonnet-5-5', (3.0, 15.0), 'anthropic', 'https://api.anthropic.com/v1/messages'),
-    'gemini': (None, None, 'gemini', None),  # model and price from scan.py
 }
+
+
+def work_directory():
+    import scan
+    return os.environ.get('SCHEME_TEMPLATES_WORK') or os.path.join(os.path.dirname(scan.DB), 'templates')
 
 METALS_ALL = {'Li', 'Na', 'K', 'Rb', 'Cs', 'Be', 'Mg', 'Ca', 'Sr', 'Ba', 'Al', 'Ga', 'In', 'Tl', 'Sn', 'Pb', 'Bi', 'Zn',
               'Cd', 'Hg', 'Cu', 'Ag', 'Au', 'Ni', 'Pd', 'Pt', 'Co', 'Rh', 'Ir', 'Fe', 'Ru', 'Os', 'Mn', 'Cr', 'Mo', 'W',
@@ -386,50 +400,70 @@ def _ask(provider, prompt, keys):
     return None
 
 
-def collect(provider, names, example, cache, batch=80, workers=6, lock=None):
+def collect(provider, names, example, cache, batch=80, workers=6, lock=None, cap=None):
     """Ask one provider about every name it has not answered yet, `workers` batches at a time; raw
     answers go to the answers table (one commit per batch, so a stopped run resumes)."""
     import json, threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    keys = json.load(open(os.path.expanduser('~/.config/nodus-harness/keys.json')))
     _, price, _, _ = PROVIDERS[provider]
     lock = lock or threading.Lock()
     with lock:
         done = {n for (n,) in cache.execute('SELECT name FROM answers WHERE provider=?', (provider,))}
     todo = [n for n in names if n not in done]
+    if not todo or cap is not None and cap <= 0:
+        return
+    keys_path = os.environ.get('REAGENT_KEYS_FILE') or os.path.expanduser('~/.config/nodus-harness/keys.json')
+    with open(keys_path) as fh:
+        keys = json.load(fh)
     chunks = [todo[i:i + batch] for i in range(0, len(todo), batch)]
     spent, finished = 0.0, 0
 
     def ask(chunk):
         return chunk, _ask(provider, LLM_PROMPT + '\n'.join(f'{n}\t{example.get(n, "")}' for n in chunk), keys)
 
+    # A capped run sends one batch at a time, stopping before another batch once its
+    # recorded spend reaches the cap. The final batch can exceed the remaining budget.
+    workers = 1 if cap is not None else workers
     with ThreadPoolExecutor(workers) as pool:
-        for future in as_completed([pool.submit(ask, c) for c in chunks]):
-            chunk, reply = future.result()
-            if reply is None:
-                continue  # left unanswered; a later run asks again
-            text, (tin, tout) = reply
-            spent += tin / 1e6 * price[0] + tout / 1e6 * price[1]
-            text = re.sub(r'^```(?:json)?\s*|\s*```\s*$', '', text.strip())
-            try:
-                parsed = json.loads(text)
-            except ValueError:
-                parsed = {}
-            entries = parsed.get('items', []) if isinstance(parsed, dict) else parsed if isinstance(parsed, list) else []
-            answered = {}
-            for entry in entries:
-                name = entry.get('name') if isinstance(entry, dict) else None
-                if name in chunk and name not in answered:
-                    answered[name] = (entry.get('role') or 'other', entry.get('smiles') if entry.get('role') == 'reagent' else None)
-            with lock:
-                for name in chunk:
-                    role, smiles = answered.get(name, ('no answer', None))
-                    cache.execute('INSERT OR REPLACE INTO answers VALUES(?,?,?,?)', (name, provider, role, smiles))
-                cache.commit()
-            finished += 1
-            if finished % 10 == 0 or finished == len(chunks):
-                print(f'  {provider}: {finished}/{len(chunks)} batches · ${spent:.2f}', flush=True)
-    print(f'{provider}: {len(todo)} names asked, ${spent:.2f}', flush=True)
+        for start in range(0, len(chunks), workers):
+            if cap is not None and spent >= cap:
+                break
+            futures = [pool.submit(ask, c) for c in chunks[start:start + workers]]
+            for future in as_completed(futures):
+                chunk, reply = future.result()
+                spent, finished = save_reply(chunk, reply, cache, lock, provider, price, spent, finished, len(chunks))
+    print(f'{provider}: {finished}/{len(chunks)} batches, ${spent:.2f}', flush=True)
+
+
+def save_reply(chunk, reply, cache, lock, provider, price, spent, finished, total):
+    import json
+    if reply is None:
+        return spent, finished
+    text, (tin, tout) = reply
+    spent += tin / 1e6 * price[0] + tout / 1e6 * price[1]
+    text = re.sub(r'^```(?:json)?\s*|\s*```\s*$', '', text.strip())
+    try:
+        parsed = json.loads(text)
+    except ValueError:
+        parsed = {}
+    entries = parsed.get('items', []) if isinstance(parsed, dict) else parsed if isinstance(parsed, list) else []
+    answered = {}
+    if not isinstance(entries, list):
+        entries = []
+    for entry in entries:
+        name = entry.get('name') if isinstance(entry, dict) else None
+        role = entry.get('role') if isinstance(entry, dict) else None
+        if name in chunk and name not in answered and role in ('reagent', 'solvent', 'catalyst', 'generic', 'other'):
+            smiles = entry.get('smiles')
+            answered[name] = (role, smiles if role == 'reagent' and isinstance(smiles, str) else None)
+    with lock:
+        for name, (role, smiles) in answered.items():
+            cache.execute('INSERT OR REPLACE INTO answers VALUES(?,?,?,?)', (name, provider, role, smiles))
+        cache.commit()  # incomplete or malformed replies remain eligible for retry
+    finished += 1
+    if finished % 10 == 0 or finished == total:
+        print(f'  {provider}: {finished}/{total} batches · ${spent:.2f}', flush=True)
+    return spent, finished
 
 
 def decide(cache):
@@ -464,9 +498,6 @@ def decide(cache):
             final, how = next((s for p, s in agreed if p != 'pubchem'), agreed[0][1]), 'agree:' + '+'.join(sorted({p for p, _ in agreed}))
         elif len(ok) == 1 and formula_counts(name) is not None:
             final, how = ok[0][1], f'formula:{ok[0][0]}'
-        elif not_reagent and 'reagent' not in roles:
-            # No model calls it a reagent: a catalyst, solvent, enzyme or word, whatever each labelled it.
-            final, how = None, 'llm:' + collections.Counter(not_reagent).most_common(1)[0][0]
         elif len(not_reagent) >= 2:
             final, how = None, 'llm:' + collections.Counter(not_reagent).most_common(1)[0][0]
         else:
@@ -478,13 +509,15 @@ def decide(cache):
     return tally, review
 
 
-def crosscheck():
+def crosscheck(provider=None, cap=None):
     """Settle every name OPSIN did not: PubChem's answers and the unresolved ones, asked of DeepSeek and
     Claude Haiku, then decided by agreement (decide). Writes review.tsv for what is left."""
     import collections, sqlite3
     import scan
-    work = os.environ.get('SCHEME_TEMPLATES_WORK') or os.path.join(os.path.dirname(scan.DB), 'templates-reagents')
+    work = work_directory()
+    os.makedirs(work, exist_ok=True)
     cache = sqlite3.connect(os.path.join(work, 'reagent-names.sqlite'), check_same_thread=False)
+    cache.execute('CREATE TABLE IF NOT EXISTS names (name TEXT PRIMARY KEY, smiles TEXT, source TEXT)')
     cache.execute('CREATE TABLE IF NOT EXISTS answers (name TEXT, provider TEXT, role TEXT, smiles TEXT, PRIMARY KEY (name, provider))')
     for name, smiles, source in cache.execute("SELECT name, smiles, source FROM names WHERE source IN ('opsin', 'pubchem')").fetchall():
         cache.execute('INSERT OR IGNORE INTO answers VALUES(?,?,?,?)', (name, source, 'reagent', smiles))
@@ -501,12 +534,17 @@ def crosscheck():
     lock = threading.Lock()
     # DeepSeek answers slowly at peak (minutes per request) but takes many at once.
     workers = {'deepseek': 16, 'anthropic': 6}
-    threads = [threading.Thread(target=collect, args=(provider, names, example, cache), kwargs={'lock': lock, 'workers': workers[provider]}) for provider in workers]
-    for t in threads: t.start()
-    for t in threads: t.join()
+    if provider:
+        collect(provider, names, example, cache, lock=lock, cap=cap)
+    else:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(2) as pool:
+            futures = [pool.submit(collect, p, names, example, cache, lock=lock, workers=w) for p, w in workers.items()]
+            for future in futures:
+                future.result()  # propagate provider failures instead of silently deciding from one reply
     tally, review = decide(cache)
     # Tie-break: what the first two could not settle goes to a stronger model, then is decided again.
-    if review:
+    if review and not provider:
         print(f'{len(review)} names unsettled; asking sonnet as the tie-break', flush=True)
         collect('sonnet', [name for name, _ in review], example, cache, lock=lock, workers=4)
         tally, review = decide(cache)
@@ -517,14 +555,28 @@ def crosscheck():
     print(f'decided: {dict(tally)} · review list: {len(review)} names -> {work}/review.tsv', flush=True)
 
 
+def llm_resolve(provider, cap):
+    if cap <= 0:
+        print('LLM budget is zero; no requests sent'); return
+    crosscheck(provider=provider, cap=cap)
+
+
 if __name__ == '__main__':
-    import sys
+    import argparse, sys
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    if sys.argv[1:2] == ['review']:
-        review(resolve='--no-resolve' not in sys.argv)
-    elif sys.argv[1:2] == ['crosscheck']:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest='command', required=True)
+    review_cmd = commands.add_parser('review', help='resolve names with OPSIN/PubChem and report gaps')
+    review_cmd.add_argument('--no-resolve', action='store_true')
+    commands.add_parser('crosscheck', help='optional paid two-model check, with a tie-break')
+    llm_cmd = commands.add_parser('llm', help='optional paid single-provider pass')
+    llm_cmd.add_argument('--provider', choices=sorted(PROVIDERS), default='deepseek')
+    llm_cmd.add_argument('--cap', type=float, default=2.0,
+                         help='stop scheduling batches at this recorded USD spend; the last batch can exceed it')
+    args = parser.parse_args()
+    if args.command == 'review':
+        review(resolve=not args.no_resolve)
+    elif args.command == 'crosscheck':
         crosscheck()
-    elif sys.argv[1:2] == ['llm']:
-        provider = sys.argv[sys.argv.index('--provider') + 1] if '--provider' in sys.argv else 'deepseek'
-        cap = float(sys.argv[sys.argv.index('--cap') + 1]) if '--cap' in sys.argv else 2.0
-        llm_resolve(provider, cap)
+    elif args.command == 'llm':
+        llm_resolve(args.provider, args.cap)
