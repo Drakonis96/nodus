@@ -13,6 +13,7 @@ import { listNodusLocalChatModels, listNodusLocalEmbeddingModels } from './nodus
 import { nodusUserAgent, openCodeGoSessionId } from './clientIdentity';
 import { researchTestProviderBase, researchTestProviderModels } from '../qa/researchProviderProxy';
 import { cachedModelContextWindow as cachedCatalogueWindow, rememberModelContextWindows } from './modelContextCache';
+import { rememberThinkingCatalog } from './thinkingCompatibility';
 
 export { AI_PROVIDERS, PROVIDER_LABELS, LOCAL_PROVIDERS, isLocalProvider } from '@shared/providers';
 export { normalizeCustomBaseUrl, normalizeCustomModels, normalizeCustomProviderConfig } from '@shared/providers';
@@ -375,6 +376,7 @@ export async function listModels(provider: AiProvider, key: string | null, signa
   // Custom discovery can fall back to manual IDs on failure. Only its successful
   // remote catalogue may replace known windows; listCustom records that snapshot.
   if (provider !== 'custom' || testModels) rememberModelContextWindows(provider, models, endpoint);
+  rememberThinkingCatalog(provider, models, openAiCompatBase(provider));
   return models;
 }
 /** Full listing evidence. Manual IDs never prove that a remote catalogue was read. */
@@ -396,6 +398,7 @@ export async function listProviderModelCatalog(provider: AiProvider, key: string
     // Even after a successful read, manual aliases are selections, not listing evidence.
     selectableModels = mergeCustomModels(models);
   }
+  rememberThinkingCatalog(provider, models, openAiCompatBase(provider));
   return { models, selectableModels };
 }
 
@@ -629,6 +632,7 @@ async function listOpenAiStyle(
       capabilities?: { vision?: boolean; reasoning?: boolean };
       supported_parameters?: string[];
       effort?: { supported_levels?: ModelInfo['researchReasoningLevels'] };
+      reasoning?: { mandatory?: boolean; supported_efforts?: ModelInfo['researchReasoningLevels'] };
     }[];
   };
   if (options.fullCatalog) requireCompleteCatalog(data);
@@ -637,7 +641,8 @@ async function listOpenAiStyle(
     name: m.name,
     contextLength: [m.context_window, m.max_context_length, m.context_length, m.max_model_len]
       .find(limit => Number.isSafeInteger(limit) && limit! >= 1024),
-    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.effort?.supported_levels }),
+    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.effort?.supported_levels ?? m.reasoning?.supported_efforts, reasoningMandatory: m.reasoning?.mandatory }),
+    ...(typeof m.reasoning?.mandatory === 'boolean' ? { reasoningMandatory: m.reasoning.mandatory } : {}),
     vision: m.capabilities?.vision,
     reasoning: m.capabilities?.reasoning ?? (m.supported_parameters ?? []).includes('reasoning'),
   }) as ModelInfo);
@@ -689,7 +694,7 @@ async function listOpenRouter(signal?: AbortSignal, fullCatalog = false): Promis
   const res = await fetch('https://openrouter.ai/api/v1/models', signal ? { signal } : undefined);
   if (!res.ok) throw new Error(`OpenRouter /models HTTP ${res.status}`);
   const data = (await res.json()) as {
-    data?: { id: string; name?: string; context_length?: number; top_provider?: { context_length?: number }; reasoning?: { supported_efforts?: ModelInfo['researchReasoningLevels'] }; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
+    data?: { id: string; name?: string; context_length?: number; top_provider?: { context_length?: number }; reasoning?: { mandatory?: boolean; supported_efforts?: ModelInfo['researchReasoningLevels'] }; supported_parameters?: string[]; architecture?: { input_modalities?: string[] } }[];
   };
   if (fullCatalog) requireCompleteCatalog(data);
   const models: ModelInfo[] = catalogRows<NonNullable<typeof data.data>[number]>(data, 'data', fullCatalog).map((m) => ({
@@ -698,7 +703,8 @@ async function listOpenRouter(signal?: AbortSignal, fullCatalog = false): Promis
     group: m.id.includes('/') ? m.id.split('/')[0] : 'other',
     contextLength: Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) < Infinity ? Math.min(m.context_length ?? Infinity, m.top_provider?.context_length ?? Infinity) : undefined,
     // OpenRouter publishes highest first; the slider runs from lowest to highest.
-    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.reasoning?.supported_efforts }).reverse(),
+    researchReasoningLevels: researchAdvertisedEfforts({ id: m.id, researchReasoningLevels: m.reasoning?.supported_efforts, reasoningMandatory: m.reasoning?.mandatory }).reverse(),
+    ...(typeof m.reasoning?.mandatory === 'boolean' ? { reasoningMandatory: m.reasoning.mandatory } : {}),
     // Flag reasoning models so the picker can warn they are slower for scanning.
     reasoning: (m.supported_parameters ?? []).includes('reasoning'),
     // Modalities let us filter the vision-model picker to image-capable models.

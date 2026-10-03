@@ -82,6 +82,24 @@ const { FavoriteModelAvailability, ProvidersSettings } = require(uiFile);
 const React = require('react');
 const act = React.act ?? require('react-dom/test-utils').act;
 
+test('reasoning catalogues preserve mandatory controls and filter impossible off levels', async () => {
+  globalThis.__catalogFixture.settings = { customProvider: { baseUrl: 'https://fixture.invalid/v1', models: [] } };
+  for (const provider of ['openrouter', 'custom']) {
+    await withPayload({ data: [
+      { id: 'vendor/mandatory', reasoning: { mandatory: true, supported_efforts: ['high', 'medium', 'none'] }, supported_parameters: ['reasoning'] },
+      { id: 'vendor/optional', reasoning: { mandatory: false, supported_efforts: ['high', 'low', 'none'] }, supported_parameters: ['reasoning'] },
+    ] }, async () => {
+      const models = await catalog.listModels(provider, null);
+      const mandatory = models.find(model => model.id === 'vendor/mandatory');
+      const optional = models.find(model => model.id === 'vendor/optional');
+      assert.equal(mandatory.reasoningMandatory, true);
+      assert.deepEqual(new Set(mandatory.researchReasoningLevels), new Set(['high', 'medium']));
+      assert.equal(optional.reasoningMandatory, false);
+      assert.deepEqual(new Set(optional.researchReasoningLevels), new Set(['high', 'low', 'none']));
+    });
+  }
+});
+
 
 test('custom catalogue failure stays inconclusive even though inference and manual selection work', async () => {
   const server = createServer((request, response) => {

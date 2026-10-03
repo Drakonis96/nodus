@@ -49,8 +49,9 @@ import {
   deanonymizeDeep,
   findResidualNames,
 } from '@shared/studentPseudonyms';
-import { classifyProviderError, isTransientNetworkFailure, rejectsAdaptiveThinking, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, rejectsTemperatureParameter, shouldRetryWithoutOptionalFields } from './providerErrors';
-import { adaptiveThinkingRequired, rememberAdaptiveThinking, rememberTemperatureUnsupported, temperatureUnsupported } from './samplingSupport';
+import { classifyProviderError, isTransientNetworkFailure, rejectsOptionalBodyWithoutNaming, rejectsOptionalTransportField, shouldRetryWithoutOptionalFields } from './providerErrors';
+import { temperatureUnsupported } from './samplingSupport';
+import { thinkingCatalogFor, withThinkingCompatibility } from './thinkingCompatibility';
 import {
   optionalBodyUnsupported,
   reasoningHintUnsupported,
@@ -896,20 +897,11 @@ function optionalBody(model: ModelRef, jsonMode: boolean, reasoning: ReasoningEf
 }
 
 function researchBody(model: ModelRef, opts: CallOpts): Record<string, unknown> {
-  return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo);
+  return opts.researchEffort === undefined ? {} : researchReasoningBody(model, opts.researchEffort, opts.maxTokens ?? 8000, opts.researchModelInfo ?? thinkingCatalogFor(model, openAiCompatBase(model.provider)));
 }
 
-/** The Anthropic thinking body with `thinking.type` forced to `adaptive`, for a model that
- *  rejects `thinking.type.disabled` (newer Claude). The effort mapping — including off → low —
- *  is kept, so the model still reasons no more than the requested effort asks. */
-function adaptiveThinkingBody(model: ModelRef, opts: CallOpts): Record<string, unknown> {
-  const body = researchBody(model, opts);
-  if (!('thinking' in body) && !('output_config' in body)) return body;
-  return { ...body, thinking: { type: 'adaptive' } };
-}
-
-function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort, stripTemperature = false): Record<string, number> {
-  if (stripTemperature || temperatureUnsupported(model)) return {};
+function requestSamplingBody(model: ModelRef, opts: CallOpts, reasoning: ReasoningEffort): Record<string, number> {
+  if (temperatureUnsupported(model)) return {};
   if (opts.researchEffort !== undefined && researchOmitsTemperature(model, opts.researchEffort, opts.researchModelInfo)) return {};
   return samplingTemperatureBody(model.provider, model.model, opts.temperature ?? 0.15, reasoning);
 }
@@ -1298,6 +1290,7 @@ async function rawCompleteTransport(
         maxTokens: opts.maxTokens,
         reasoning,
         researchEffort: opts.researchEffort,
+        noRetry: opts.noRetry,
         jsonMode,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
@@ -1327,33 +1320,18 @@ async function rawCompleteTransport(
       ...(opts.noRetry ? { maxRetries: 0 } : {}),
       ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
     });
-    const create = (adaptive = false) => client.messages.create({
+    const body = {
       model: model.model,
       max_tokens: opts.maxTokens ?? 8000,
       ...requestSamplingBody(model, opts, reasoning),
-      ...(adaptive || adaptiveThinkingRequired(model) ? adaptiveThinkingBody(model, opts) : researchBody(model, opts)),
+      ...researchBody(model, opts),
       system: opts.system,
-      messages: [
-        { role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user },
-      ],
-    }, { signal: opts.signal });
+      messages: [{ role: 'user', content: opts.images?.length ? (anthropicVisionContent(opts.user, opts.images) as any) : opts.user }],
+    };
     try {
-      let res;
-      try {
-        res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create());
-      } catch (e: any) {
-        if (opts.noRetry) throw e;
-        if (rejectsTemperatureParameter(e)) {
-          // A Claude that deprecates `temperature` answers 400: drop it and remember the model
-          // (the OpenAI-compatible transport does the same), rather than failing the turn.
-          rememberTemperatureUnsupported(model);
-          res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create());
-        } else if (rejectsAdaptiveThinking(e)) {
-          // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
-          rememberAdaptiveThinking(model);
-          res = await scheduleProviderRequest(model, opts, key, 'anthropic', () => create(true));
-        } else throw e;
-      }
+      const res = await withThinkingCompatibility(model, body,
+        request => scheduleProviderRequest(model, opts, key, 'anthropic', () => client.messages.create(request as any, { signal: opts.signal })),
+        { info: opts.researchModelInfo, noRetry: opts.noRetry, signal: opts.signal });
       const block = res.content.find((b: any) => b.type === 'text');
       // A safety refusal returns no text and its own stop reason; without this it read as an
       // empty response. Checked before the text is read so the reason is never lost.
@@ -1466,23 +1444,24 @@ async function rawCompleteTransport(
       observeProviderQuota(model, opts, key, schedulerEndpoint, result.response.headers);
       return result.data;
     });
-  const bodyFor = (stripTemperature: boolean) => ({
+  const baseBody = {
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...requestSamplingBody(model, opts, reasoning),
     ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     messages: [
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  });
-  const baseBody = bodyFor(false);
+  };
   const extras = optionalBody(model, jsonMode, reasoning, opts);
   const compatStarted = Date.now();
   /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
-  const replayBody = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
-    model, opts, key, schedulerEndpoint, () => createCompletion({ ...baseBody, ...body } as any),
-  ), opts.signal, !opts.noRetry);
+  const replayBody = (body: Record<string, unknown>) => withThinkingCompatibility(model, { ...baseBody, ...body },
+    request => withProviderRetries(freeTier, () => scheduleProviderRequest(
+      model, opts, key, schedulerEndpoint, () => createCompletion(request as any),
+    ), opts.signal, !opts.noRetry),
+    { info: opts.researchModelInfo, endpoint: baseURL, noRetry: opts.noRetry, signal: opts.signal });
   try {
     let res;
     try {
@@ -1493,14 +1472,7 @@ async function rawCompleteTransport(
       // `optionalFieldReplays` for the order and `replayRefusedOptionalFields` for how far a
       // custom gateway is allowed to push the request back to the plain OpenAI body.
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
-      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
-        // A reasoning model that deprecates `temperature`: drop it and remember the model so
-        // later calls go straight through. Everything else in the body is kept.
-        rememberTemperatureUnsupported(model);
-        res = await withProviderRetries(freeTier, () => scheduleProviderRequest(
-          model, opts, key, schedulerEndpoint, () => createCompletion({ ...bodyFor(true), ...extras } as any),
-        ), opts.signal, !opts.noRetry);
-      } else if (!opts.noRetry && Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
+      if (!opts.noRetry && Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
         res = await replayRefusedOptionalFields(model, extras, e, sentReasoning, replayBody);
       } else {
         throw e;
@@ -2079,6 +2051,7 @@ async function rawCompleteStreamTransport(
         maxTokens: opts.maxTokens,
         reasoning,
         researchEffort: opts.researchEffort,
+        noRetry: opts.noRetry,
         jsonMode: false,
         timeoutMs: opts.timeoutMs,
         images: opts.images,
@@ -2098,7 +2071,7 @@ async function rawCompleteStreamTransport(
 
   if (model.provider === 'anthropic') {
     const Anthropic = (await import('@anthropic-ai/sdk')).default;
-    const client = new Anthropic({ apiKey: key });
+    const client = new Anthropic({ apiKey: key, ...(opts.noRetry ? { maxRetries: 0 } : {}), ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}) });
     // `message_delta` is the final event and the only one carrying `stop_reason`; the thinking
     // token breakdown rides along with it. Kept outside `streamOnce` so a replay (temperature or
     // thinking recovery) overwrites rather than inherits the previous attempt's outcome.
@@ -2107,16 +2080,17 @@ async function rawCompleteStreamTransport(
     let thinkingTokens: number | undefined;
     let textDeltas = 0;
     let thinkingDeltas = 0;
-    const streamOnce = (adaptive = false) => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
-      const stream = await (client.messages.create as any)({
-        model: model.model,
-        max_tokens: opts.maxTokens ?? 8000,
-        ...requestSamplingBody(model, opts, reasoning),
-        ...(adaptive || adaptiveThinkingRequired(model) ? adaptiveThinkingBody(model, opts) : researchBody(model, opts)),
-        system: opts.system,
-        stream: true,
-        messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
-      }, { signal });
+    const body = {
+      model: model.model,
+      max_tokens: opts.maxTokens ?? 8000,
+      ...requestSamplingBody(model, opts, reasoning),
+      ...researchBody(model, opts),
+      system: opts.system,
+      stream: true,
+      messages: [{ role: 'user', content: opts.images?.length ? anthropicVisionContent(opts.user, opts.images) : opts.user }],
+    };
+    const streamOnce = (request: Record<string, unknown>) => scheduleProviderRequest(model, scheduleOpts, key, 'anthropic', async () => {
+      const stream = await (client.messages.create as any)(request, { signal });
       for await (const event of stream as AsyncIterable<any>) {
         if (event?.type === 'message_delta') {
           if (event.delta?.stop_reason) stopReason = event.delta.stop_reason;
@@ -2129,21 +2103,10 @@ async function rawCompleteStreamTransport(
       }
     });
     try {
-      try {
-        await streamOnce();
-      } catch (e: any) {
-        if (signal?.aborted || opts.noRetry) throw e;
-        if (rejectsTemperatureParameter(e)) {
-          // A Claude that deprecates `temperature` answers 400 before any content streams:
-          // drop it, remember the model, and replay once.
-          rememberTemperatureUnsupported(model);
-          await streamOnce();
-        } else if (rejectsAdaptiveThinking(e)) {
-          // A newer Claude removed thinking-off: replay with adaptive thinking and remember it.
-          rememberAdaptiveThinking(model);
-          await streamOnce(true);
-        } else throw e;
-      }
+      await withThinkingCompatibility(model, body, streamOnce, {
+        info: opts.researchModelInfo, noRetry: opts.noRetry, signal,
+        canReplay: () => textDeltas === 0 && thinkingDeltas === 0,
+      });
     } catch (e: any) {
       // A user-triggered stop surfaces as an abort here — keep the partial answer
       // that already streamed instead of failing the whole turn.
@@ -2195,9 +2158,9 @@ async function rawCompleteStreamTransport(
     maxRetries: 0,
     defaultHeaders: openAiClientHeaders(model),
   });
-  const bodyFor = (stripTemperature: boolean) => ({
+  const baseBody = {
     model: model.model,
-    ...requestSamplingBody(model, opts, reasoning, stripTemperature),
+    ...requestSamplingBody(model, opts, reasoning),
     ...researchBody(model, opts),
     ...completionTokensBody(model.provider, model.model, maxTokens),
     stream: true as const,
@@ -2205,8 +2168,7 @@ async function rawCompleteStreamTransport(
       { role: 'system' as const, content: opts.system },
       { role: 'user' as const, content: opts.images?.length ? (openAiVisionContent(opts.user, opts.images) as any) : opts.user },
     ],
-  });
-  const baseBody = bodyFor(false);
+  };
   // Streaming is plain text (no JSON mode); only reasoning + routing apply.
   const extras = optionalBody(model, false, reasoning, opts);
   const schedulerEndpoint = model.provider === 'nodus' ? 'nodus-local-runtime' : baseURL;
@@ -2265,23 +2227,17 @@ async function rawCompleteStreamTransport(
       : consumeStream(client, body, transportSignal, touch),
   );
   /** One replay, dispatched through the same retry/scheduler seam as the first attempt. */
-  const replayStream = (body: Record<string, unknown>) => withProviderRetries(freeTier, () => scheduleProviderRequest(
-    model, scheduleOpts, key, schedulerEndpoint, () => executeStream({ ...baseBody, ...body } as any),
-  ), signal, !opts.noRetry);
+  const replayStream = (body: Record<string, unknown>) => withThinkingCompatibility(model, { ...baseBody, ...body },
+    request => withProviderRetries(freeTier, () => scheduleProviderRequest(
+      model, scheduleOpts, key, schedulerEndpoint, () => executeStream(request),
+    ), signal, !opts.noRetry),
+    { info: opts.researchModelInfo, endpoint: baseURL, noRetry: opts.noRetry, signal, canReplay: () => streamChunks === 0 });
   try {
     try {
       await replayStream(extras);
     } catch (e: any) {
       const sentReasoning = (extras as any).reasoning_effort !== undefined;
-      if (!opts.noRetry && rejectsTemperatureParameter(e)) {
-        // A reasoning model that deprecates `temperature`: drop it, remember the model, retry
-        // once before any content streamed. Everything else in the body is kept.
-        rememberTemperatureUnsupported(model);
-        await withProviderRetries(freeTier, () => scheduleProviderRequest(
-          model, scheduleOpts, key, schedulerEndpoint,
-          () => executeStream({ ...bodyFor(true), ...extras } as any),
-        ), signal, !opts.noRetry);
-      } else if (Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
+      if (!opts.noRetry && !signal?.aborted && streamChunks === 0 && Object.keys(extras).length > 0 && shouldRetryWithoutOptionalFields(e, { provider: model.provider })) {
         await replayRefusedOptionalFields(model, extras, e, sentReasoning, replayStream);
       } else if (!opts.noRetry && !signal?.aborted && full.length === 0 && isTransientNetworkFailure(e)) {
         // The connection dropped before any answer text (a long reasoning stream lost after

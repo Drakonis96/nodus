@@ -25,7 +25,9 @@ jobs:
       matrix:
         os: [macos-latest, macos-15-intel, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # Intel builds cryptography/OpenSSL from source before the app build and
+    # Electron integration tests; the cold build exceeded the 30-minute budget.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 60 || 30 }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
