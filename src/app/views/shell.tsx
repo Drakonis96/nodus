@@ -8,8 +8,10 @@ const CompassView = lazy(() => import('../../views/CompassView').then((module) =
 const ToolkitView = lazy(() => import('../../views/ToolkitView').then((module) => ({ default: module.ToolkitView })));
 const ResearchAssistantModal = lazy(() => import('../../views/ResearchAssistantModal').then(module => ({ default: module.ResearchAssistantModal })));
 const Settings = lazy(() => import('../../views/Settings').then((module) => ({ default: module.Settings })));
+const StudyFocusView = lazy(() => import('../../views/StudyFocusView').then((module) => ({ default: module.StudyFocusView })));
 
 export const shellViews = {
+  studyFocus: () => <StudyFocusView />,
   researchChat: ({ settings, assistantTarget, researchConversationTarget, openNoteFromSearch, isAcademic, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded isAcademic={isAcademic} initialTarget={assistantTarget} initialConversationTarget={researchConversationTarget} notesDestinationLabel="Nodus Scriptor" onOpenSavedNote={openNoteFromSearch} isGenealogy={isGenealogy} />,
   browser: () => <NodusBrowserView />,
   radar: ({ radarTarget }) => <RadarView target={radarTarget} />,

@@ -1,11 +1,11 @@
 import { useEffect, useId, useState } from 'react';
-import { FOCUS_LAYOUT_BLOCKS, FOCUS_LAYOUT_DEFAULT_VISIBLE, FOCUS_LAYOUT_HEADER, focusLayoutVisible } from '@shared/studyFocus';
+import { FOCUS_LAYOUT_BLOCKS, FOCUS_LAYOUT_DEFAULT_VISIBLE, FOCUS_LAYOUT_HEADER, focusHasSubjects, focusLayoutVisible } from '@shared/studyFocus';
 import { OPEN_FOCUS_LAYOUT_EVENT, useStudyFocus, useStudyFocusActions, useStudyFocusLayout } from './StudyFocusContext';
 import { Icon, ModalBackdrop } from '../ui';
 import { t, tx } from '../../i18n';
 
-/** A study section the focus rail can show, already translated by the shell. */
-export interface FocusSectionOption { key: string; label: string; icon: string }
+/** A section the focus rail can show, already translated by the shell. */
+export interface FocusSectionOption { key: string; label: string; icon: string; defaultVisible: boolean }
 
 const BLOCK_LABEL: Record<(typeof FOCUS_LAYOUT_BLOCKS)[number], () => string> = {
   'block:timer': () => t('Temporizador'),
@@ -43,18 +43,23 @@ export function FocusLayoutDialog({ sections }: { sections: FocusSectionOption[]
     return () => window.removeEventListener(OPEN_FOCUS_LAYOUT_EVENT, show);
   }, []);
   if (!open || !ready || !actions) return null;
-  const ids = [...FOCUS_LAYOUT_BLOCKS, ...sections.map(section => `nav:${section.key}`), ...FOCUS_LAYOUT_HEADER];
-  const visibleCount = ids.filter(id => focusLayoutVisible(layout, id)).length;
+  const hasSubjects = focusHasSubjects(stored.vaultType);
+  const blocks = FOCUS_LAYOUT_BLOCKS.filter(id => hasSubjects || id !== 'block:shelf');
+  const defaults = new Map(sections.map(section => [`nav:${section.key}`, section.defaultVisible]));
+  const defaultVisible = (id: string) => defaults.get(id) ?? FOCUS_LAYOUT_DEFAULT_VISIBLE.has(id);
+  const visible = (id: string) => focusLayoutVisible(layout, id, defaultVisible(id));
+  const ids = [...blocks, ...sections.map(section => `nav:${section.key}`), ...FOCUS_LAYOUT_HEADER];
+  const visibleCount = ids.filter(visible).length;
   // Only departures from the defaults are stored, so a default added later still applies.
   const save = (next: Record<string, boolean>) => {
     const compact: Record<string, boolean> = {};
-    for (const [id, visible] of Object.entries(next)) if (visible !== FOCUS_LAYOUT_DEFAULT_VISIBLE.has(id)) compact[id] = visible;
+    for (const [id, show] of Object.entries(next)) if (show !== defaultVisible(id)) compact[id] = show;
     setDraftLayout(compact);
     void actions.configure({ layout: compact });
   };
   const setVisible = (id: string, visible: boolean) => save({ ...layout, [id]: visible });
   const row = (id: string, label: string, icon: string) => <label key={id} className="focus-layout-option">
-    <input type="checkbox" data-testid={`focus-layout-${id}`} checked={focusLayoutVisible(layout, id)} onChange={event => setVisible(id, event.target.checked)} />
+    <input type="checkbox" data-testid={`focus-layout-${id}`} checked={visible(id)} onChange={event => setVisible(id, event.target.checked)} />
     <Icon name={icon} size={15} /><span>{label}</span>
   </label>;
   return <ModalBackdrop onClose={() => setOpen(false)}>
@@ -62,7 +67,7 @@ export function FocusLayoutDialog({ sections }: { sections: FocusSectionOption[]
       <div className="focus-layout-head">
         <div>
           <h2 id={titleId}><Icon name="focus" size={17} />{t('Personalizar el modo concentración')}</h2>
-          <p>{t('Elige qué ves mientras estudias. Solo cambia el modo concentración: el menú lateral de siempre no se toca.')}</p>
+          <p>{t('Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.')}</p>
         </div>
         <button type="button" className="focus-rail-icon-button" aria-label={t('Cerrar')} title={t('Cerrar')} onClick={() => setOpen(false)}><Icon name="x" size={16} /></button>
       </div>
@@ -72,7 +77,7 @@ export function FocusLayoutDialog({ sections }: { sections: FocusSectionOption[]
           <span>{t('Activar el modo al iniciar un bloque')}<small>{t('Si lo desactivas, puedes entrar cuando quieras desde la cabecera.')}</small></span>
         </label>
         <fieldset><legend>{t('Parte superior del panel')}</legend>
-          {FOCUS_LAYOUT_BLOCKS.map(id => row(id, BLOCK_LABEL[id](), BLOCK_ICON[id]))}
+          {blocks.map(id => row(id, !hasSubjects && id === 'block:subject' ? t('Objetivo del bloque') : BLOCK_LABEL[id](), !hasSubjects && id === 'block:subject' ? 'target' : BLOCK_ICON[id]))}
         </fieldset>
         <fieldset><legend>{t('Secciones')}</legend>
           <div className="focus-layout-grid">{sections.map(section => row(`nav:${section.key}`, section.label, section.icon))}</div>

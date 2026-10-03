@@ -66,7 +66,6 @@ export function FocusHeader({ onProgress }: { onProgress: () => void }) {
     document.addEventListener('keydown', onKey, true); document.addEventListener('pointerdown', outside);
     return () => { document.removeEventListener('keydown', onKey, true); document.removeEventListener('pointerdown', outside); };
   }, [open]);
-  useEffect(() => { setOpen(false); }, [focus?.snapshot?.vaultId]);
   if (!focus) return null;
   const showCounter = Boolean(state && state.status !== 'ready' && !focus.reduced);
   return <>

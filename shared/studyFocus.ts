@@ -20,6 +20,10 @@ export interface FocusState {
   cycleBlocks: number;
   sessionId: string | null;
   subjectId: string | null;
+  /** Subjects belong to their vault, even when a block continues elsewhere. */
+  subjectVaultId: string | null;
+  subjectName: string | null;
+  originVaultId: string | null;
   /** The block's intention ("Repasar el tema 3"); carried into the next block until changed. */
   task: string | null;
   recovered: boolean;
@@ -30,9 +34,14 @@ export interface FocusSession {
   id: string; startedAt: number; endedAt: number | null; milliseconds: number;
   status: 'running' | 'paused' | 'completed' | 'ended'; subjectId: string | null; subjectName: string | null;
   task: string | null;
+  originVaultId: string | null;
+  vaults: FocusVaultTime[];
 }
-export interface FocusStats { days: FocusDay[]; recent: FocusSession[] }
-export interface FocusSnapshot { vaultId: string; state: FocusState }
+export interface FocusVaultTime { vaultId: string; vaultName: string; milliseconds: number }
+export interface FocusVaultStats { vaultId: string; vaultName: string; days: FocusDay[] }
+export interface FocusStats { days: FocusDay[]; recent: FocusSession[]; vaults: FocusVaultStats[] }
+export interface FocusVaultContext { id: string; name: string; type: string }
+export interface FocusSnapshot { vaultId: string; vaultType: string; state: FocusState }
 export type FocusAction = 'start' | 'pause' | 'resume' | 'finish';
 export interface StudyFocusApi {
   getStudyFocus(): Promise<FocusSnapshot>;
@@ -69,11 +78,31 @@ export const FOCUS_LAYOUT_DEFAULT_VISIBLE: ReadonlySet<string> = new Set([
 ]);
 export const FOCUS_LAYOUT_BLOCKS = ['block:timer', 'block:subject', 'block:shelf'] as const;
 export const FOCUS_LAYOUT_HEADER = ['header:media', 'header:commands', 'header:theme', 'header:queue'] as const;
+
+/** A working set for each workspace; every other allowed section stays configurable. */
+export const FOCUS_VAULT_DEFAULT_SECTIONS: Readonly<Record<string, readonly string[]>> = {
+  academic: ['search', 'library', 'graph', 'ideas', 'research', 'researchChat', 'deepResearch', 'workspace', 'browser'],
+  genealogy: ['search', 'library', 'persons', 'tree', 'archive', 'timeline', 'map', 'relations', 'researchChat', 'notes', 'browser'],
+  primary_sources: ['search', 'library', 'archive', 'persons', 'timeline', 'map', 'relations', 'researchChat', 'notes', 'browser'],
+  prosopography: ['library', 'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources', 'prosopAnalysis', 'prosopNetworks', 'researchChat', 'notes', 'browser'],
+  databases: ['library', 'pages', 'dbSearch', 'dbAnalysis', 'dbChat', 'dbDeepResearch', 'notes', 'browser'],
+  testimonios: ['search', 'library', 'testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts', 'researchChat', 'notes', 'browser'],
+  worldbuilding: ['library', 'encyclopedia', 'characters', 'places', 'timeline', 'map', 'worldChat', 'continuity', 'notes', 'scenes', 'manuscript', 'browser'],
+  docencia: ['library', 'studyCourses', 'studySchedule', 'studyCalendar', 'studyLibrary', 'teachingGroups', 'studyQuestions', 'teachingExams', 'teachingRubrics', 'teachingUnits', 'notes', 'browser'],
+  estudio: [...FOCUS_LAYOUT_DEFAULT_VISIBLE].filter(id => id.startsWith('nav:')).map(id => id.slice(4)),
+};
+export function focusDefaultSectionVisible(vaultType: string | undefined, section: string): boolean {
+  if (section.startsWith('database:')) return vaultType === 'databases';
+  return (FOCUS_VAULT_DEFAULT_SECTIONS[vaultType ?? 'academic'] ?? FOCUS_VAULT_DEFAULT_SECTIONS.academic).includes(section);
+}
 const FOCUS_LAYOUT_ID = /^(?:block|nav|header):[A-Za-z0-9:_-]{1,80}$/;
 export const FOCUS_LAYOUT_MAX_ENTRIES = 200;
 
-export function focusLayoutVisible(layout: Record<string, boolean> | undefined, id: string): boolean {
-  return layout?.[id] ?? FOCUS_LAYOUT_DEFAULT_VISIBLE.has(id);
+export function focusLayoutVisible(layout: Record<string, boolean> | undefined, id: string, defaultVisible = FOCUS_LAYOUT_DEFAULT_VISIBLE.has(id)): boolean {
+  return layout?.[id] ?? defaultVisible;
+}
+export function focusHasSubjects(vaultType: string | undefined): boolean {
+  return vaultType === 'estudio' || vaultType === 'docencia';
 }
 /** Keeps only well-formed ids with boolean values; anything else is dropped, not trusted. */
 export function sanitizeFocusLayout(value: unknown): Record<string, boolean> | null {

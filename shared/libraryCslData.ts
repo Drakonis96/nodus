@@ -43,4 +43,3 @@ export function libraryItemCslData(record: LibraryItemRecord): Record<string, un
     ...Object.fromEntries(Object.entries(metadata.extra ?? {}).map(([key, value]) => [key.replace(/^csl:/, ''), value])),
   };
 }
-

@@ -415,11 +415,15 @@ export async function findSimilarIdeasPaged(
   if (limit <= 0 || opts.nodusIds?.length === 0 || opts.ideaIds?.length === 0) return [];
   const config = currentEmbeddingConfig();
   const nodusIds = [...new Set(opts.nodusIds ?? [])];
+  // `+` keeps SQLite on the (global_id, nodus_id) key by global_id only: an idea has one or two
+  // occurrences, each checked against the scope. Without it the planner probes the key once
+  // per scoped work for every idea — with a whole library in scope (14,055 works) that was
+  // ~700M probes and a 16 s scan per research round; now 0.3 s.
   const scoped = nodusIds.length
     ? ` AND EXISTS (
           SELECT 1 FROM idea_occurrences scoped_occurrence
            WHERE scoped_occurrence.global_id = ideas.global_id
-             AND scoped_occurrence.nodus_id IN (${nodusIds.map(() => '?').join(',')})
+             AND +scoped_occurrence.nodus_id IN (${nodusIds.map(() => '?').join(',')})
         )`
     : '';
   const ranked = await scanSimilar<{ global_id: string; rid: number; similarity: number }>({

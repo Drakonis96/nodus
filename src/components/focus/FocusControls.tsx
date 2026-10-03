@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { openFocusLayout, useStudyFocus } from './StudyFocusContext';
-import { FOCUS_TASK_MAX_LENGTH, type FocusPhase, type FocusPreferences, type FocusState } from '@shared/studyFocus';
+import { FOCUS_TASK_MAX_LENGTH, focusHasSubjects, type FocusPhase, type FocusPreferences, type FocusState } from '@shared/studyFocus';
 import type { StudySubject } from '@shared/studyOrg';
 import { STUDY_WORKSPACE_CHANGED } from '../StudySidebar';
 import { Icon } from '../ui';
@@ -26,6 +26,7 @@ export function useFocusSubjects(vaultId: string | undefined) {
   const [subjects, setSubjects] = useState<StudySubject[]>([]);
   useEffect(() => {
     if (!vaultId) { setSubjects([]); return; }
+    setSubjects([]);
     let alive = true;
     const load = () => { void window.nodus.getStudyWorkspace().then(workspace => { if (alive) setSubjects(workspace.subjects.filter(subject => !subject.archivedAt && !subject.deletedAt)); }).catch(() => {}); };
     load();
@@ -38,7 +39,9 @@ export function useFocusSubjects(vaultId: string | undefined) {
 export function FocusControls({ compact = false }: { compact?: boolean }) {
   const focus = useStudyFocus();
   const state = focus?.snapshot?.state;
-  const subjects = useFocusSubjects(focus?.snapshot?.vaultId);
+  const hasSubjects = focusHasSubjects(focus?.snapshot?.vaultType);
+  const subjects = useFocusSubjects(hasSubjects ? focus?.snapshot?.vaultId : undefined);
+  const localSubject = state?.subjectVaultId === focus?.snapshot?.vaultId;
   const ready = state?.status === 'ready';
   const done = state?.status === 'complete';
   // The subject and intention are asked before a work block only; a break keeps them.
@@ -47,10 +50,10 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
   const [task, setTask] = useState('');
   useEffect(() => {
     if (!asksForBlock || !state) return;
-    setSubject(state.subjectId && subjects.some(item => item.id === state.subjectId) ? state.subjectId : '');
+    setSubject(localSubject && state.subjectId && subjects.some(item => item.id === state.subjectId) ? state.subjectId : '');
     setTask(state.task ?? '');
     // Re-seed only when the form appears or the stored choice changes, never while typing.
-  }, [asksForBlock, state?.subjectId, state?.task, subjects, focus?.snapshot?.vaultId]);
+  }, [asksForBlock, state?.subjectId, state?.task, subjects, focus?.snapshot?.vaultId, localSubject]);
   // Optimistic: the box flips on click; the stored preference catches up a moment later.
   const [enterDraft, setEnterDraft] = useState<boolean | null>(null);
   useEffect(() => { setEnterDraft(null); }, [state?.preferences.enterOnStart]);
@@ -59,7 +62,7 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
   const nextBreak = state.cycleBlocks % FOCUS_CYCLE_LENGTH === 0 ? t('Comenzar descanso largo') : t('Comenzar descanso');
   const startLabel = ready ? t('Iniciar bloque') : done && state.phase === 'work' ? nextBreak : t('Comenzar bloque');
   const progress = ready ? 0 : Math.min(100, state.elapsedMs / state.durationMs * 100);
-  const subjectName = subjects.find(item => item.id === state.subjectId)?.name;
+  const subjectName = localSubject ? subjects.find(item => item.id === state.subjectId)?.name : undefined;
   const start = () => void focus.act('start', asksForBlock ? { subjectId: subject || null, task } : undefined);
   // While a block runs the box is the mode itself; otherwise it is the choice for the
   // next start or resume (on by default). Either way the choice is remembered.
@@ -82,8 +85,8 @@ export function FocusControls({ compact = false }: { compact?: boolean }) {
     <p className="focus-muted focus-cycle">{focusBlocksLabel(state.cycleBlocks)} · {tx('Descanso largo cada {n}', { n: FOCUS_CYCLE_LENGTH })}</p>
     {state.status === 'paused' && <p className="focus-muted" role="status">{state.recovered ? t('Sesión recuperada hasta el último punto guardado. Reanuda cuando quieras.') : t('Tu tiempo está guardado. Reanuda cuando quieras.')}</p>}
     {asksForBlock && <div className="focus-block-form">
-      <label className="focus-label">{t('Asignatura')}<select aria-label={t('Asignatura')} className="input w-full" value={subject} onChange={event => setSubject(event.target.value)}><option value="">{t('Sin asignatura')}</option>{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-      <label className="focus-label">{t('Objetivo del bloque (opcional)')}<input aria-label={t('Objetivo del bloque')} className="input w-full" value={task} maxLength={FOCUS_TASK_MAX_LENGTH} placeholder={t('Por ejemplo, repasar el tema 3')} onChange={event => setTask(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); start(); } }} /></label>
+      {hasSubjects && <label className="focus-label">{t('Asignatura')}<select aria-label={t('Asignatura')} className="input w-full" value={subject} onChange={event => setSubject(event.target.value)}><option value="">{t('Sin asignatura')}</option>{subjects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>}
+      <label className="focus-label">{t('Objetivo del bloque (opcional)')}<input aria-label={t('Objetivo del bloque')} className="input w-full" value={task} maxLength={FOCUS_TASK_MAX_LENGTH} placeholder={hasSubjects ? t('Por ejemplo, repasar el tema 3') : t('Por ejemplo, avanzar en mi proyecto')} onChange={event => setTask(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); start(); } }} /></label>
     </div>}
     <div className="focus-actions">
       {(ready || done) && <button className="btn btn-primary" onClick={start}><Icon name="play" size={15} />{startLabel}</button>}

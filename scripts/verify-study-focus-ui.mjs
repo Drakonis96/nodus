@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const userData = await mkdtemp(path.join(os.tmpdir(), 'nodus-focus-ui-'));
 const shots = path.join(root, 'docs/verification/study-focus');
+const focusDb = path.join(userData, 'focus', 'focus.sqlite');
 await mkdir(shots, { recursive: true });
 const env = { ...process.env, NODUS_USERDATA: userData, NODUS_DISABLE_AUTO_UPDATE: '1', NODUS_E2E_UPDATE_STATUS: 'not-available', NODUS_E2E_DISABLE_STUDY_BACKGROUND_AI: '1' };
 delete env.ELECTRON_RUN_AS_NODE;
@@ -101,24 +102,26 @@ try {
   await page.waitForTimeout(500);
   assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.elapsedMs, suspended.state.elapsedMs);
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
-  // Check cross-vault pause and isolation through the real IPC lifecycle.
+  // One session continues through two vaults of the same type.
   const other = await page.evaluate(async () => {
     const { vault } = await window.nodus.createVault({ name: 'Otra bóveda', type: 'estudio' });
     await window.nodus.switchVault(vault.id); return vault;
   });
-  assert.equal((await page.evaluate(() => window.nodus.getStudyFocusStats())).recent.length, 0);
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocusStats())).recent.length, 1);
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.sessionId, running.state.sessionId);
   await page.evaluate(id => window.nodus.switchVault(id), ids.vault.id);
-  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'paused');
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'running');
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'finish', s.state.revision); });
   // Deterministic illustrative data, isolated from the user's vaults.
-  const seedExample = (_electron, { dbPath, modulePath, subjectId }) => {
+  await app.close();
+  const seedExample = (_electron, { dbPath, modulePath, subjectId, vaultId }) => {
     const Database = require(modulePath); const db = new Database(dbPath);
     db.prepare('DELETE FROM study_focus_intervals').run(); db.prepare('DELETE FROM study_focus_sessions').run();
     const today = new Date();
     const dayKey = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
     const insert = (id, date, minutes, status) => {
-      db.prepare('INSERT INTO study_focus_sessions(id, started_at, ended_at, milliseconds, status, subject_id, subject_name, completed_day) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(id, +date, +date + minutes*60000, minutes*60000, status, subjectId, 'Historia contemporánea', status === 'completed' ? dayKey(date) : null);
-      db.prepare('INSERT INTO study_focus_intervals(session_id, started_at, milliseconds, day) VALUES (?, ?, ?, ?)').run(id, +date, minutes*60000, dayKey(date));
+      db.prepare('INSERT INTO study_focus_sessions(id, started_at, ended_at, milliseconds, status, subject_id, subject_name, completed_day, origin_vault_id, completed_vault_id, subject_vault_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, +date, +date + minutes*60000, minutes*60000, status, subjectId, 'Historia contemporánea', status === 'completed' ? dayKey(date) : null, vaultId, status === 'completed' ? vaultId : null, vaultId);
+      db.prepare('INSERT INTO study_focus_intervals(session_id, started_at, milliseconds, day, vault_id) VALUES (?, ?, ?, ?, ?)').run(id, +date, minutes*60000, dayKey(date), vaultId);
     };
     db.transaction(() => {
       for (let i = 83; i >= 1; i--) {
@@ -133,8 +136,8 @@ try {
       db.prepare('UPDATE study_focus_state SET state_json = ? WHERE id = 1').run(JSON.stringify(state));
     })(); db.close();
   };
-  execFileSync(require('electron'), ['-e', `(${seedExample.toString()})(null, ${JSON.stringify({ dbPath: ids.vault.path, modulePath: require.resolve('better-sqlite3'), subjectId: ids.subject.id })})`], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
-  await page.evaluate(async ({ otherId, originalId }) => { await window.nodus.switchVault(otherId); await window.nodus.switchVault(originalId); }, { otherId: other.id, originalId: ids.vault.id });
+  execFileSync(require('electron'), ['-e', `(${seedExample.toString()})(null, ${JSON.stringify({ dbPath: focusDb, vaultId: ids.vault.id, modulePath: require.resolve('better-sqlite3'), subjectId: ids.subject.id })})`], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } });
+  await launch();
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.configureStudyFocus(s.vaultId, { dailyGoalMinutes: 60 }); });
   await page.reload();
   await page.locator('[data-tour="nav-studyFocus"]').click();
@@ -274,7 +277,7 @@ try {
   // Another interface language: the focus surfaces follow it.
   await page.evaluate(() => window.nodus.updateSettings({ uiLanguage: 'en' }));
   await page.reload(); await page.locator('[data-tour="nav-studyFocus"]').click();
-  await view().getByRole('heading', { name: 'Focus', exact: true }).waitFor();
+  await view().getByRole('heading', { name: 'Nodus Focus', exact: true }).waitFor();
   await view().getByRole('button', { name: 'Resume', exact: true }).click();
   await page.getByTestId('focus-rail').waitFor();
   const englishRail = await page.getByTestId('focus-rail').innerText();
@@ -317,17 +320,184 @@ try {
   const accessibility = await page.evaluate(async () => (await window.axe.run('[data-testid="study-focus-view"]')).violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target) })));
   await writeFile(path.join(shots, 'accessibility.json'), JSON.stringify({ light: lightA11y, dark: accessibility }, null, 2));
   assert.deepEqual(accessibility.filter(v => ['critical', 'serious'].includes(v.impact)), []);
+  // Transverse Focus: one UI-started block traverses every supported vault type.
+  await page.setViewportSize({ width: 1440, height: 1060 });
+  await page.evaluate(() => window.nodus.updateSettings({ theme: 'light' }));
+  await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
+  await page.getByTestId('focus-rail').waitFor();
+  const continuous = await page.evaluate(() => window.nodus.getStudyFocus());
+  const matrix = [{ type: 'estudio', id: ids.vault.id }];
+  for (const type of ['academic', 'primary_sources', 'genealogy', 'prosopography', 'databases', 'testimonios', 'worldbuilding', 'docencia']) {
+    const vault = await page.evaluate(async type => (await window.nodus.createVault({ name: `Focus · ${type}`, type })).vault, type);
+    matrix.push({ type, id: vault.id });
+  }
+  let previousElapsed = continuous.state.elapsedMs;
+  const observations = [];
+  const relevant = {
+    estudio: ['studyCourses', 'studyLibrary', 'studyQuestions'], academic: ['library', 'workspace', 'researchChat'],
+    primary_sources: ['archive', 'timeline', 'relations'], genealogy: ['persons', 'tree', 'archive'],
+    prosopography: ['prosopPopulation', 'prosopSources', 'prosopAnalysis'], databases: ['pages', 'dbSearch', 'dbAnalysis'],
+    testimonios: ['testimonyInterviews', 'testimonyParticipants', 'testimonyContrasts'],
+    worldbuilding: ['encyclopedia', 'characters', 'manuscript'], docencia: ['studyCourses', 'teachingExams', 'teachingUnits'],
+  };
+  const customLayout = { 'nav:browser': false, 'header:theme': false, 'nav:toolkit': true };
+  const savedLayouts = new Map();
+  for (const vault of matrix) {
+    const result = await page.evaluate(id => window.nodus.switchVault(id), vault.id);
+    assert.equal(result.ok, true);
+    await page.evaluate(() => window.nodus.updateSettings({ onboardingComplete: true, tourComplete: true, advancedTourComplete: true, studyTourComplete: true, primarySourcesTourComplete: true, genealogyTourComplete: true, databasesTourComplete: true, testimonyTourComplete: true, docenciaTourComplete: true }));
+    await page.waitForFunction(type => document.querySelector('[data-testid="app-shell"]')?.getAttribute('data-vault-type') === type, vault.type);
+    await page.getByTestId('focus-rail').waitFor();
+    if (vault.type !== 'estudio') assert.deepEqual((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout, {}, 'a fresh vault does not inherit the previous vault\'s layout');
+    const normalSettings = await page.evaluate(async () => { const settings = await window.nodus.getSettings(); return [settings.sidebarOrder, settings.sidebarHidden, settings.sidebarCustomized, settings.toolkitPinnedPages]; });
+    await page.getByTestId('focus-rail-settings').click();
+    const options = page.getByTestId('focus-layout-dialog');
+    await options.getByRole('button', { name: 'Restablecer', exact: true }).click();
+    await page.waitForFunction(async () => Object.keys((await window.nodus.getStudyFocus()).state.preferences.layout).length === 0);
+    if (vault.type === 'academic') {
+      await options.getByRole('button', { name: 'Mostrar todo', exact: true }).click();
+      await page.getByTestId('focus-rail-nav-radar').waitFor();
+      await options.getByRole('button', { name: 'Restablecer', exact: true }).click();
+      await page.getByTestId('focus-rail-nav-radar').waitFor({ state: 'detached' });
+    }
+    assert.equal(await options.getByTestId('focus-layout-block:shelf').count(), ['estudio', 'docencia'].includes(vault.type) ? 1 : 0);
+    if (vault.type === 'worldbuilding') assert.equal(await options.getByTestId('focus-layout-nav:tree').locator('..').innerText(), 'Familias');
+    for (const key of relevant[vault.type]) assert.equal(await options.getByTestId(`focus-layout-nav:${key}`).isChecked(), true, `${vault.type}: ${key} enabled by default`);
+    for (const key of ['radar', 'compass', 'toolkit']) assert.equal(await options.getByTestId(`focus-layout-nav:${key}`).isChecked(), false, `${vault.type}: optional tools remain configurable`);
+    await options.getByTestId('focus-layout-done').click();
+    const current = await page.evaluate(() => window.nodus.getStudyFocus());
+    assert.equal(current.state.status, 'running'); assert.equal(current.state.sessionId, continuous.state.sessionId);
+    assert.equal(current.state.phase, continuous.state.phase); assert.equal(current.state.durationMs, continuous.state.durationMs);
+    assert.equal(current.state.task, continuous.state.task); assert.equal(current.state.subjectId, continuous.state.subjectId);
+    assert.equal(current.state.subjectVaultId, continuous.state.subjectVaultId); assert.equal(current.state.cycleBlocks, continuous.state.cycleBlocks);
+    assert.equal(current.state.preferences.dailyGoalMinutes, continuous.state.preferences.dailyGoalMinutes);
+    assert.ok(current.state.elapsedMs >= previousElapsed); previousElapsed = current.state.elapsedMs;
+    assert.equal(await page.getByTestId('resizable-sidebar').count(), 0);
+    if (!['estudio', 'docencia'].includes(vault.type)) assert.equal(await page.getByTestId('focus-rail-subject').count(), 0);
+    if (vault.type === 'docencia') assert.equal(await page.getByTestId('focus-rail-nav-studyCourses').innerText(), 'Cursos, asignaturas y grupos');
+    if (vault.type === 'databases') {
+      await page.getByTestId('focus-rail-nav-database:new').click();
+      await page.waitForFunction(() => document.querySelector('main')?.getAttribute('data-nodi-view') === 'databases');
+      const databases = await page.evaluate(() => window.nodus.listDatabases());
+      assert.equal(databases.length, 1, 'a database can be created without leaving Focus');
+      await page.getByTestId(`focus-rail-nav-database:${databases[0].id}`).waitFor();
+    }
+    await page.getByTestId('focus-quick-access').getByRole('button').click();
+    const popover = page.getByRole('dialog', { name: 'Temporizador de concentración' });
+    await popover.waitFor();
+    await popover.getByRole('button', { name: 'Ver progreso de concentración', exact: false }).click();
+    await view().getByRole('heading', { name: 'Nodus Focus', exact: true }).waitFor();
+    await page.screenshot({ path: path.join(shots, `transverse-${vault.type}-light.png`) });
+    // Every section kept in Focus must be a valid destination of this vault.
+    const keys = await page.getByTestId('focus-rail').locator('[data-testid^="focus-rail-nav-"]').evaluateAll(els => els.map(el => el.dataset.testid.replace('focus-rail-nav-', '')));
+    for (const key of relevant[vault.type]) assert.ok(keys.includes(key));
+    for (const key of ['home', 'settings', 'radar', 'compass', 'toolkit', 'toolkit:drift']) assert.ok(!keys.includes(key), `${vault.type}: defaults concentrate on this workspace`);
+    await page.getByTestId('focus-rail-settings').click();
+    const hiddenSection = relevant[vault.type][0];
+    const savedLayout = { [`nav:${hiddenSection}`]: false, ...customLayout };
+    await options.getByTestId(`focus-layout-nav:${hiddenSection}`).uncheck();
+    await options.getByTestId('focus-layout-nav:browser').uncheck();
+    await options.getByTestId('focus-layout-header:theme').uncheck();
+    await options.getByTestId('focus-layout-nav:toolkit').check();
+    await page.waitForFunction(async expected => {
+      const layout = (await window.nodus.getStudyFocus()).state.preferences.layout;
+      return Object.keys(layout).length === Object.keys(expected).length && Object.entries(expected).every(([id, value]) => layout[id] === value);
+    }, savedLayout);
+    if (vault.type === 'academic') await page.screenshot({ path: path.join(shots, 'transverse-layout-academic.png') });
+    await options.getByTestId('focus-layout-done').click();
+    await page.getByTestId('focus-rail-nav-toolkit').waitFor();
+    assert.equal(await page.getByTestId('focus-rail-nav-browser').count(), 0);
+    assert.equal(await page.locator('[data-tour="theme-toggle"]').isVisible(), false);
+    assert.deepEqual(await page.evaluate(async () => { const settings = await window.nodus.getSettings(); return [settings.sidebarOrder, settings.sidebarHidden, settings.sidebarCustomized, settings.toolkitPinnedPages]; }), normalSettings, 'Focus customisation leaves normal navigation unchanged');
+    savedLayouts.set(vault.id, savedLayout);
+    observations.push({ vaultType: vault.type, vaultId: vault.id, sessionId: current.state.sessionId, elapsedMs: current.state.elapsedMs, sections: keys, savedLayout });
+  }
+  // Round-trip every saved layout; reopening the dialog must reflect the current vault.
+  for (const vault of [...matrix].reverse()) {
+    await page.evaluate(id => window.nodus.switchVault(id), vault.id);
+    await page.getByTestId('focus-rail-nav-toolkit').waitFor();
+    assert.deepEqual((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout, savedLayouts.get(vault.id));
+    assert.equal(await page.getByTestId('focus-rail-nav-browser').count(), 0);
+    await page.getByTestId('focus-rail-settings').click();
+    const options = page.getByTestId('focus-layout-dialog');
+    assert.equal(await options.getByTestId('focus-layout-nav:browser').isChecked(), false);
+    assert.equal(await options.getByTestId('focus-layout-header:theme').isChecked(), false);
+    assert.equal(await options.getByTestId('focus-layout-nav:toolkit').isChecked(), true);
+    assert.equal(await options.getByTestId(`focus-layout-nav:${relevant[vault.type][0]}`).isChecked(), false);
+    await options.getByTestId('focus-layout-done').click();
+  }
+  // An open customisation dialog adapts to a different vault's sections and saved choices.
+  await page.getByTestId('focus-rail-settings').click();
+  await page.evaluate(id => window.nodus.switchVault(id), matrix.find(vault => vault.type === 'databases').id);
+  await page.getByTestId('focus-layout-nav:dbSearch').waitFor();
+  assert.equal(await page.getByTestId('focus-layout-nav:studyCourses').count(), 0);
+  assert.equal(await page.getByTestId('focus-layout-nav:pages').isChecked(), false);
+  await page.getByTestId('focus-layout-done').click();
+  // The timer popover stays open while its vault context changes.
+  await page.getByTestId('focus-quick-access').getByRole('button').click();
+  await page.evaluate(id => window.nodus.switchVault(id), ids.vault.id);
+  await page.getByRole('dialog', { name: 'Temporizador de concentración' }).waitFor();
+  await page.keyboard.press('Escape');
+  const rejected = await page.evaluate(() => window.nodus.switchVault('missing-focus-vault'));
+  assert.equal(rejected.ok, false);
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.sessionId, continuous.state.sessionId);
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'running');
+  await page.getByTestId('focus-rail').waitFor();
+  const transverseStats = await page.evaluate(() => window.nodus.getStudyFocusStats());
+  const partial = transverseStats.recent.find(session => session.id === continuous.state.sessionId);
+  assert.equal(partial.vaults.length, 9);
+  assert.ok(Math.abs(partial.vaults.reduce((sum, vault) => sum + vault.milliseconds, 0) - partial.milliseconds) < 0.01);
+  // Personalisation belongs to the vault ID, even when two vaults have the same type.
+  await page.evaluate(async id => {
+    await window.nodus.switchVault(id);
+    await window.nodus.updateSettings({ onboardingComplete: true, studyTourComplete: true, tourComplete: true, advancedTourComplete: true });
+  }, other.id);
+  await page.getByTestId('focus-rail-nav-browser').waitFor();
+  assert.deepEqual((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout, {});
+  await page.getByTestId('focus-rail-settings').click();
+  await page.getByTestId('focus-layout-block:timer').uncheck();
+  await page.getByTestId('focus-layout-done').click();
+  assert.equal(await page.getByTestId('focus-rail-timer').count(), 0);
+  await page.evaluate(id => window.nodus.switchVault(id), ids.vault.id);
+  await page.getByTestId('focus-rail-nav-toolkit').waitFor();
+  assert.deepEqual((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout, savedLayouts.get(ids.vault.id));
+  await page.getByTestId('focus-rail-timer').waitFor();
+  assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'running');
+  await writeFile(path.join(shots, 'transverse.json'), JSON.stringify(observations, null, 2));
+  // The searchable catalog opens Focus and pinning never creates a duplicate entry.
+  await page.getByTestId('focus-exit').click(); await page.getByTestId('focus-exit-keep').click();
+  await page.locator('[data-tour="nav-toolkit"]').click();
+  await page.getByTestId('toolkit-search').fill('focus');
+  await page.getByTestId('toolkit-card-focus').waitFor();
+  assert.equal(await page.getByTestId('toolkit-card-focus-pin').getAttribute('aria-pressed'), 'true');
+  await page.screenshot({ path: path.join(shots, 'transverse-catalog.png') });
+  await page.getByTestId('toolkit-card-focus-pin').click();
+  await page.locator('[data-tour="nav-studyFocus"]').waitFor({ state: 'detached' });
+  await page.getByTestId('toolkit-card-focus').click();
+  await view().waitFor();
+  await page.locator('[data-tour="nav-toolkit"]').click();
+  await page.getByTestId('toolkit-search').fill('focus');
+  await page.getByTestId('toolkit-card-focus-pin').click();
+  assert.equal(await page.locator('[data-tour="nav-studyFocus"]').count(), 1);
+  await page.getByTestId('toolkit-card-focus').click();
+  await view().getByTestId('focus-mode-toggle').uncheck();
+  await page.evaluate(id => window.nodus.switchVault(id), matrix.find(vault => vault.type === 'academic').id);
+  await view().getByRole('button', { name: 'Reanudar', exact: true }).click();
+  assert.equal(await page.getByTestId('focus-rail').count(), 0, 'manual opt-out follows the user across vaults');
+  await page.evaluate(async id => { const state = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(state.vaultId, 'pause', state.state.revision); await window.nodus.switchVault(id); }, ids.vault.id);
+  await view().getByTestId('focus-mode-toggle').check();
   if (process.platform === 'darwin') {
     await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });
     const closed = page.waitForEvent('close');
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.webContents.getURL().includes('index.html')).close());
     await closed;
-    const readState = `const Database=require(${JSON.stringify(require.resolve('better-sqlite3'))});const db=new Database(${JSON.stringify(ids.vault.path)});console.log(db.prepare('SELECT state_json FROM study_focus_state WHERE id=1').get().state_json);db.close();`;
+    const readState = `const Database=require(${JSON.stringify(require.resolve('better-sqlite3'))});const db=new Database(${JSON.stringify(focusDb)});console.log(db.prepare('SELECT state_json FROM study_focus_state WHERE id=1').get().state_json);db.close();`;
     const stored = JSON.parse(execFileSync(require('electron'), ['-e', readState], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, encoding: 'utf8' }));
     assert.equal(stored.status, 'paused');
     await app.close().catch(() => {});
     await launch();
     assert.equal((await page.evaluate(() => window.nodus.getStudyFocus())).state.status, 'paused');
+    assert.deepEqual((await page.evaluate(() => window.nodus.getStudyFocus())).state.preferences.layout, savedLayouts.get(ids.vault.id), 'vault layout survives closing and reopening the app');
   }
   // Crash after a real checkpoint; recovery never counts the intervening absence.
   await page.evaluate(async () => { const s = await window.nodus.getStudyFocus(); await window.nodus.actStudyFocus(s.vaultId, 'resume', s.state.revision); });

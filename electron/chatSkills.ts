@@ -155,6 +155,13 @@ export function enabledChatSkills(surface: ChatSkillSurface): ChatSkill[] {
   return listChatSkills().filter(skill => skillActive(skill) && runnable(skill)).map(withCapabilityTools);
 }
 
+/** Enabled, runnable skills that provide one capability. A route correction is produced by
+ *  the chemistry skill's own route check, so its turn needs that skill again even where
+ *  standing skills do not apply (academic vaults use only @-invoked skills). */
+export function capabilityChatSkills(capability: string): ChatSkill[] {
+  return listChatSkills().filter(skill => skillActive(skill) && runnable(skill) && (skill.capabilities ?? []).includes(capability)).map(withCapabilityTools);
+}
+
 /** Skills the user named with @ for one message. The per-chat switch does not apply: naming
  * a skill is the request to use it. Unknown ids and unavailable capabilities are dropped. */
 export function invokedChatSkills(ids: unknown): ChatSkill[] {

@@ -309,7 +309,7 @@ async function findFile(directory: string, wanted: string): Promise<string | nul
   return null;
 }
 
-async function llamaServerPath(): Promise<string | null> {
+export async function llamaServerPath(): Promise<string | null> {
   return findFile(runtimeDirectory(), process.platform === 'win32' ? 'llama-server.exe' : 'llama-server');
 }
 
@@ -942,7 +942,7 @@ export function listNodusLocalEmbeddingModels(): ModelInfo[] {
   }));
 }
 
-async function freePort(): Promise<number> {
+export async function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
     server.unref();

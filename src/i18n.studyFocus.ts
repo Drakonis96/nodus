@@ -2,6 +2,7 @@
 // Spanish is the source language and the key; see src/i18n.ts.
 export const STUDY_FOCUS_TRANSLATIONS = {
   "en": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Focus",
     "Ocultar paneles": "Hide panels",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Give a block to what matters. Review your time and your consistency.",
@@ -117,9 +118,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "You have left focus mode and the block is paused. The time you put in is already saved.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "You have left focus mode. The time you put in is already saved.",
     "Dejarla en pausa": "Keep it paused",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Turns on when you resume the block: clears the screen and keeps your materials at hand."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Turns on when you resume the block: clears the screen and keeps your materials at hand.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Focus on your work with a timer and a space that adapts to each vault.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Choose what you see while working in this vault. This only changes focus mode: your usual sidebar stays as it is.",
+    "Por ejemplo, avanzar en mi proyecto": "For example, make progress on my project",
+    "Todas las bóvedas": "All vaults",
+    "Tiempo por bóveda": "Time by vault"
   },
   "fr": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Concentration",
     "Ocultar paneles": "Masquer les panneaux",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Consacrez un bloc à ce qui compte. Consultez votre temps et votre régularité.",
@@ -235,9 +242,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Vous avez quitté le mode concentration et le bloc est en pause. Le temps consacré est déjà enregistré.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Vous avez quitté le mode concentration. Le temps consacré est déjà enregistré.",
     "Dejarla en pausa": "La laisser en pause",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "S’active à la reprise du bloc : dégage l’écran et garde vos supports à portée de main."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "S’active à la reprise du bloc : dégage l’écran et garde vos supports à portée de main.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Concentrez-vous sur votre travail avec un minuteur et un espace adapté à chaque coffre.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Choisissez ce que vous voyez en travaillant dans ce coffre. Seul le mode concentration change : votre barre latérale habituelle reste intacte.",
+    "Por ejemplo, avanzar en mi proyecto": "Par exemple, avancer sur mon projet",
+    "Todas las bóvedas": "Tous les coffres",
+    "Tiempo por bóveda": "Temps par coffre"
   },
   "de": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Fokus",
     "Ocultar paneles": "Bereiche ausblenden",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Widmen Sie einen Block dem, was zählt. Behalten Sie Zeit und Beständigkeit im Blick.",
@@ -353,9 +366,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Sie haben den Fokusmodus verlassen und der Block ist pausiert. Die investierte Zeit ist bereits gespeichert.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Sie haben den Fokusmodus verlassen. Die investierte Zeit ist bereits gespeichert.",
     "Dejarla en pausa": "Pausiert lassen",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Wird beim Fortsetzen des Blocks aktiviert: räumt den Bildschirm auf und hält Ihre Materialien griffbereit."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Wird beim Fortsetzen des Blocks aktiviert: räumt den Bildschirm auf und hält Ihre Materialien griffbereit.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Konzentriere dich mit einem Timer und einem Arbeitsbereich, der sich an jeden Vault anpasst.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Wähle, was du beim Arbeiten in diesem Vault siehst. Nur der Fokusmodus ändert sich: Deine gewohnte Seitenleiste bleibt erhalten.",
+    "Por ejemplo, avanzar en mi proyecto": "Zum Beispiel, an meinem Projekt weiterarbeiten",
+    "Todas las bóvedas": "Alle Vaults",
+    "Tiempo por bóveda": "Zeit pro Vault"
   },
   "pt": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Concentração",
     "Ocultar paneles": "Ocultar painéis",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Dedique um bloco ao que importa. Consulte o seu tempo e a sua constância.",
@@ -471,9 +490,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Saiu do modo de concentração e o bloco está em pausa. O tempo dedicado já está guardado.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Saiu do modo de concentração. O tempo dedicado já está guardado.",
     "Dejarla en pausa": "Deixá-la em pausa",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Ativa-se ao retomar o bloco: liberta o ecrã e mantém os seus materiais à mão."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Ativa-se ao retomar o bloco: liberta o ecrã e mantém os seus materiais à mão.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Concentra-te no trabalho com um temporizador e um espaço que se adapta a cada cofre.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Escolhe o que vês enquanto trabalhas neste cofre. Só muda o modo de concentração: a barra lateral habitual mantém-se.",
+    "Por ejemplo, avanzar en mi proyecto": "Por exemplo, avançar no meu projeto",
+    "Todas las bóvedas": "Todos os cofres",
+    "Tiempo por bóveda": "Tempo por cofre"
   },
   "pt-BR": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Concentração",
     "Ocultar paneles": "Ocultar painéis",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Dedique um bloco ao que importa. Consulte seu tempo e sua constância.",
@@ -589,9 +614,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Você saiu do modo concentração e o bloco está em pausa. O tempo dedicado já está salvo.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Você saiu do modo concentração. O tempo dedicado já está salvo.",
     "Dejarla en pausa": "Deixar em pausa",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "É ativado ao retomar o bloco: libera a tela e mantém seus materiais à mão."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "É ativado ao retomar o bloco: libera a tela e mantém seus materiais à mão.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Concentre-se no trabalho com um temporizador e um espaço que se adapta a cada cofre.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Escolha o que vê enquanto trabalha neste cofre. Só muda o modo de concentração: a barra lateral habitual permanece igual.",
+    "Por ejemplo, avanzar en mi proyecto": "Por exemplo, avançar no meu projeto",
+    "Todas las bóvedas": "Todos os cofres",
+    "Tiempo por bóveda": "Tempo por cofre"
   },
   "it": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Concentrazione",
     "Ocultar paneles": "Nascondi pannelli",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Dedica un blocco a ciò che conta. Consulta il tuo tempo e la tua costanza.",
@@ -707,9 +738,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Sei uscito dalla modalità concentrazione e il blocco è in pausa. Il tempo dedicato è già salvato.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Sei uscito dalla modalità concentrazione. Il tempo dedicato è già salvato.",
     "Dejarla en pausa": "Lasciala in pausa",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Si attiva alla ripresa del blocco: libera lo schermo e tiene a portata di mano i tuoi materiali."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Si attiva alla ripresa del blocco: libera lo schermo e tiene a portata di mano i tuoi materiali.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Concentrati sul lavoro con un timer e uno spazio che si adatta a ogni vault.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Scegli cosa vedere mentre lavori in questo vault. Cambia solo la modalità concentrazione: la barra laterale abituale resta invariata.",
+    "Por ejemplo, avanzar en mi proyecto": "Per esempio, proseguire con il mio progetto",
+    "Todas las bóvedas": "Tutti i vault",
+    "Tiempo por bóveda": "Tempo per vault"
   },
   "tr": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "Odak",
     "Ocultar paneles": "Panelleri gizle",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "Önemli olana bir blok ayırın. Zamanınızı ve sürekliliğinizi görün.",
@@ -825,9 +862,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "Odak modundan çıktınız ve blok duraklatıldı. Ayırdığınız süre zaten kaydedildi.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "Odak modundan çıktınız. Ayırdığınız süre zaten kaydedildi.",
     "Dejarla en pausa": "Duraklatılmış bırak",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Blok devam ettiğinde açılır: ekranı sadeleştirir ve materyallerinizi el altında tutar."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "Blok devam ettiğinde açılır: ekranı sadeleştirir ve materyallerinizi el altında tutar.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "Her kasaya uyum sağlayan bir alan ve zamanlayıcıyla çalışmanıza odaklanın.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "Bu kasada çalışırken ne göreceğinizi seçin. Yalnızca odak modu değişir: normal kenar çubuğunuz aynı kalır.",
+    "Por ejemplo, avanzar en mi proyecto": "Örneğin, projemde ilerlemek",
+    "Todas las bóvedas": "Tüm kasalar",
+    "Tiempo por bóveda": "Kasaya göre süre"
   },
   "zh-CN": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "专注",
     "Ocultar paneles": "隐藏面板",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "把一段时间留给重要的事。查看你的时间投入和坚持。",
@@ -943,9 +986,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "你已退出专注模式，本段已暂停。投入的时间已保存。",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "你已退出专注模式。投入的时间已保存。",
     "Dejarla en pausa": "保持暂停",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "继续专注时自动开启：清理屏幕，让学习资料触手可及。"
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "继续专注时自动开启：清理屏幕，让学习资料触手可及。",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "使用计时器和适应每个资料库的工作空间，专注于你的工作。",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "选择在此资料库工作时显示的内容。只会更改专注模式，常用侧边栏保持不变。",
+    "Por ejemplo, avanzar en mi proyecto": "例如，推进我的项目",
+    "Todas las bóvedas": "所有资料库",
+    "Tiempo por bóveda": "按资料库统计时间"
   },
   "zh-TW": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "專注",
     "Ocultar paneles": "隱藏面板",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "把一段時間留給重要的事。檢視你的時間投入與堅持。",
@@ -1061,9 +1110,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "你已退出專注模式，本段已暫停。投入的時間已儲存。",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "你已退出專注模式。投入的時間已儲存。",
     "Dejarla en pausa": "保持暫停",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "繼續專注時自動開啟：清理畫面，讓學習資料觸手可及。"
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "繼續專注時自動開啟：清理畫面，讓學習資料觸手可及。",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "使用計時器和適應每個資料庫的工作空間，專注於你的工作。",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "選擇在此資料庫工作時顯示的內容。只會變更專注模式，常用側邊欄保持不變。",
+    "Por ejemplo, avanzar en mi proyecto": "例如，推進我的專案",
+    "Todas las bóvedas": "所有資料庫",
+    "Tiempo por bóveda": "依資料庫統計時間"
   },
   "ja": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "集中",
     "Ocultar paneles": "パネルを非表示にする",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "大切なことに一区切りを。学習時間と継続を振り返りましょう。",
@@ -1179,9 +1234,15 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "フォーカスモードを終了し、ブロックは一時停止中です。取り組んだ時間は保存済みです。",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "フォーカスモードを終了しました。取り組んだ時間は保存済みです。",
     "Dejarla en pausa": "一時停止のままにする",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "ブロック再開時にオンになります。画面をすっきりさせ、資料をすぐ手に取れるようにします。"
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "ブロック再開時にオンになります。画面をすっきりさせ、資料をすぐ手に取れるようにします。",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "タイマーと各保管庫に適応する作業スペースで、仕事に集中しましょう。",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "この保管庫で作業中に表示する項目を選びます。集中モードだけが変わり、通常のサイドバーはそのままです。",
+    "Por ejemplo, avanzar en mi proyecto": "例：自分のプロジェクトを進める",
+    "Todas las bóvedas": "すべての保管庫",
+    "Tiempo por bóveda": "保管庫別の時間"
   },
   "ko": {
+    "Nodus Focus": "Nodus Focus",
     "Concentración": "집중",
     "Ocultar paneles": "패널 숨기기",
     "Dedica un bloque a lo que importa. Consulta tu tiempo y tu constancia.": "중요한 일에 한 블록을 쓰세요. 시간과 꾸준함을 확인하세요.",
@@ -1297,6 +1358,11 @@ export const STUDY_FOCUS_TRANSLATIONS = {
     "Has salido del modo concentración y el bloque está en pausa. El tiempo dedicado ya está guardado.": "집중 모드에서 나왔고 블록이 일시정지되었습니다. 투자한 시간은 이미 저장되었습니다.",
     "Has salido del modo concentración. El tiempo dedicado ya está guardado.": "집중 모드에서 나왔습니다. 투자한 시간은 이미 저장되었습니다.",
     "Dejarla en pausa": "일시정지 상태로 두기",
-    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "블록을 다시 시작하면 켜집니다. 화면을 정리하고 자료를 가까이 둡니다."
+    "Se activa al reanudar el bloque: despeja la pantalla y deja a mano tus materiales.": "블록을 다시 시작하면 켜집니다. 화면을 정리하고 자료를 가까이 둡니다.",
+    "Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.": "타이머와 각 보관함에 맞춰지는 작업 공간으로 작업에 집중하세요.",
+    "Elige qué ves mientras trabajas en esta bóveda. Solo cambia el modo concentración: el menú lateral de siempre no se toca.": "이 보관함에서 작업할 때 표시할 항목을 선택하세요. 집중 모드만 바뀌며 평소 사이드바는 그대로 유지됩니다.",
+    "Por ejemplo, avanzar en mi proyecto": "예: 내 프로젝트 진행하기",
+    "Todas las bóvedas": "모든 보관함",
+    "Tiempo por bóveda": "보관함별 시간"
   }
 };

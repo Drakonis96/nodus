@@ -19,7 +19,9 @@ if (channel !== 'latest' && channel !== 'beta') {
 //     ago updates through them. Renaming the product to "Nodus Research" once
 //     went through that template and renamed every artifact, which failed the
 //     v4.2.4 upload on all three platforms. The displayed name may change freely;
-//     these filenames may not. Held by scripts/test-release-artifact-names.mjs.
+//     these filenames may not. AppImage overrides the template to omit Linux;
+//     finalize-linux-appimage.mjs retains the old name as an identical alias.
+//     Held by scripts/test-release-artifact-names.mjs.
 //
 //  2. electron-builder validates this object against a STRICT schema that rejects
 //     unknown properties outright, so `pkg.build` cannot carry a documentation

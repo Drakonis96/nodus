@@ -1,4 +1,5 @@
 import { registerStudyFocusIpc } from './ipc/studyFocus';
+import { synchronizeFocusVault } from './study/focusRuntime';
 import { scheduleManualIndex } from './ai/manualIdeaIndex';
 import { getDocumentVisuals, enrichDocumentVisuals, cancelDocumentVisuals, undoVisualEnrichment, removeDocumentFigure } from './ai/documentVisuals';
 import { dialogTitle } from './dialogTitles';
@@ -303,6 +304,7 @@ export function registerIpc(
   });
 
   const emitVaultChanged = () => {
+    synchronizeFocusVault();
     const payload = withVaultKeyProviders(getActiveVault());
     // Broadcast to every window (main + the Nodi overlay) so Nodi's per-vault look
     // updates live wherever it is shown.

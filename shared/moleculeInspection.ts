@@ -6,6 +6,10 @@
  * so a model reasons over a verified graph instead of re-reading SMILES text. */
 
 import { correctionTargetPlanRule, ROUTE_LABEL_LINES, ROUTE_SPECIES_RULES } from './routeRules';
+import { similarityBand } from './reactionSimilarity';
+import { conditionsText, normalizeReactionConditions, type ReactionConditions } from './reactionConditions';
+
+export { similarityBand };
 
 export interface MoleculeAtom {
   /** 0-based position in the parsed graph; bond endpoints use this index. */
@@ -105,6 +109,9 @@ export interface RouteStepAudit {
   nameProblems?: string[];
   /** The request declared this step racemic; its open centres are a stated outcome. */
   racemic?: boolean;
+  /** The step's open stereocentres cannot reach the target (requested without stereo), so the
+   *  checker does not require them to be specified or declared. */
+  stereoNotRequired?: boolean;
   /** The equation balances only by assembling a product from more than one substrate. */
   assemblyProblem?: string;
 }
@@ -136,6 +143,101 @@ export interface RouteAudit {
   isolated?: number[];
   /** Whether the route forms the requested target; absent when none was named. */
   target?: RouteTargetAudit;
+}
+
+/** One looked-up reaction or product, with how many precedents the local index holds. */
+export interface ReactionPrecedentEntry {
+  input: string;
+  count: number;
+  /** For a product, a few example reaction hashes that make it. */
+  keys?: string[];
+  /** For a reaction, which form of the step matched when it was not the step as written. */
+  form?: string;
+  /** For a reaction, the products are all among the reactants (a purification or salt step). */
+  unchanged?: boolean;
+  /** For a matched reaction, up to three Open Reaction Database ids that record it. */
+  samples?: string[];
+  /** For a matched reaction, the index's SMILES for it, to draw. */
+  reaction?: string;
+  /** For a reaction, the reaction classes the package reads from its group changes. */
+  classes?: string[];
+  /** For a matched reaction, what up to two of its recorded samples were run with. */
+  conditions?: ReactionConditions[];
+}
+
+export interface ReactionPrecedentNeighbor {
+  key: string;
+  distance: number;
+  count: number;
+  /** Tanimoto similarity of the reaction fingerprints, 0..1 (1 = the same bond changes). */
+  similarity?: number;
+  reaction?: string;
+  /** The package's drawing of the reaction exactly as recorded (unbalanced). */
+  svg?: string;
+  /** For the closest reaction of an unmatched step: its recorded sample ids and their conditions. */
+  samples?: string[];
+  conditions?: ReactionConditions[];
+}
+
+export interface ReactionPrecedentSimilar {
+  input: string;
+  neighbors: ReactionPrecedentNeighbor[];
+  unchanged?: boolean;
+}
+
+/** Evidence from the local Open Reaction Database index, looked up by the application. */
+export interface ReactionPrecedent {
+  reactions: ReactionPrecedentEntry[];
+  products: ReactionPrecedentEntry[];
+  similar: ReactionPrecedentSimilar[];
+}
+
+/** One route step as looked up in the index: its 0-based step index and the query sent. */
+export interface PrecedentQuery {
+  step: number;
+  query: string;
+}
+
+/** What the precedent section needs beyond the lookup: which route step each query is, the
+ *  species names to title it with, the target, and the ORD reaction drawn for each step. */
+export interface PrecedentContext {
+  queries: PrecedentQuery[];
+  labels: RouteSpeciesLabel[][];
+  target?: { smiles: string; name?: string } | null;
+  /** Rendered drawing per 0-based route step. */
+  drawings?: Map<number, string>;
+  /** Textbook support and ORD alternatives per 0-based route step. */
+  support?: Map<number, StepSupport>;
+}
+
+/** Evidence for one route step beyond its own precedent: a textbook passage on its reaction
+ *  class, and — for a step that failed or has no precedent — other ways the index records or
+ *  proposes to make its product. */
+export interface StepSupport {
+  passage?: { title: string; location: string | null; citation: string; excerpt: string; about: string; scanned?: boolean };
+  alternatives?: { product: string; proposals: Array<{ precursors: string; classes: string[]; recorded: number }> };
+  /** High-severity functional-group clashes the compatibility check found in the step. */
+  compatibility?: string[];
+}
+
+const ALTERNATIVES_SHOWN = 3;
+
+function alternativeLine(proposal: { precursors: string; classes: string[]; recorded: number }): string {
+  const about = [proposal.classes[0], proposal.recorded > 0 ? `recorded ${proposal.recorded}×` : 'template only'].filter(Boolean).join('; ');
+  return `\`${proposal.precursors}\` (${about})`;
+}
+
+/** The support lines under a step in the precedent section. */
+function stepSupportLines(entry: ReactionPrecedentEntry, support: StepSupport | undefined): string[] {
+  const lines: string[] = [];
+  if (entry.classes?.length) lines.push(`- Reaction class: ${entry.classes.join(', ')}.`);
+  if (support?.passage) {
+    const { title, location, citation, excerpt, about } = support.passage;
+    lines.push(`- Textbook, on ${about}: [${title}${location ? `, ${location}` : ''}](${citation})${support?.passage?.scanned ? ' (scanned book, OCR text)' : ''} — “${excerpt}”`);
+  }
+  const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
+  if (alternatives.length) lines.push(`- Other ways to make \`${support!.alternatives!.product}\` (Open Reaction Database): ${alternatives.map(alternativeLine).join(' · ')}.`);
+  return lines;
 }
 
 const SMILES_CHARS = /^[A-Za-z0-9@+\-=\\#()[\]/.,%*:]+$/;
@@ -390,6 +492,154 @@ function stepProseText(title: string, block: string): string {
   return prose ? `${title} — ${prose}` : title;
 }
 
+/** Each step's whole section of the answer, as written (links included), in step order; missing
+ *  steps are empty strings. A step starts at a line that begins "Step N" (a heading, a bold
+ *  lead-in or plain) and runs to the next step, a markdown heading or a whole-line bold heading
+ *  ("**Target structure**"): those belong to the answer, not to the last step. The first
+ *  section for each number wins. The evidence summary reads its citations from here. */
+export function findStepBlocks(text: string, count: number): string[] {
+  const lines = text.split('\n');
+  let starts: Array<{ step: number; line: number }> = [];
+  lines.forEach((line, at) => {
+    const match = /^[ \t]{0,3}(?:#{1,6}[ \t]*|\*\*|__)?[ \t]*Step[ \t]+(\d+)\b/i.exec(line);
+    if (match) starts.push({ step: Number(match[1]) - 1, line: at });
+  });
+  // No "Step N" anywhere: a numbered list ("1. **Acid-catalysed rearrangement.** …") is the
+  // route when its items, and only they, carry the labelled species lines — a numbered list of
+  // conditions inside one step does not.
+  if (!starts.length) {
+    const numbered = lines.flatMap((line, at) => {
+      // Unindented only: an indented item belongs to a list inside a step.
+      const match = /^(?:#{1,6}[ \t]*)?(\d+)[.)][ \t]+\S/.exec(line);
+      return match ? [{ step: Number(match[1]) - 1, line: at }] : [];
+    });
+    const labelled = numbered.filter((entry, index) => {
+      const end = numbered[index + 1]?.line ?? lines.length;
+      return lines.slice(entry.line, end).some((line) => /^\s*(?:[-*]\s*)?(?:`{1,2}|\*\*|__)?\s*(?:reactants|products)\s*[:：]/i.test(line));
+    });
+    if (labelled.length === count && labelled.every((entry, index) => entry.step === index)) starts = labelled;
+  }
+  const blocks: string[] = Array.from({ length: count }, () => '');
+  starts.forEach(({ step, line }, index) => {
+    if (step < 0 || step >= count || blocks[step]) return;
+    const next = starts[index + 1]?.line ?? lines.length;
+    let stop = next;
+    for (let at = line + 1; at < next; at++) {
+      if (HASH_HEADING.test(lines[at]) || BOLD_HEADING.test(lines[at])) { stop = at; break; }
+    }
+    blocks[step] = lines.slice(line, stop).join('\n');
+  });
+  return blocks;
+}
+
+/** A step block's heading title without its "Step N" prefix ("Oxidation of 4-nitrotoluene"). */
+function stepBlockTitle(block: string): string {
+  const firstLine = block.split(/\r?\n/)[0] ?? '';
+  const heading = (HASH_HEADING.exec(firstLine) ?? /^[ \t]{0,3}(?:\*\*|__)(.+?)(?:\*\*|__)/.exec(firstLine))?.[1] ?? '';
+  return heading.replace(/[*_`]/g, '').replace(/^step\s*\d+\s*[—–:.-]*\s*/i, '').replace(/[.:]\s*$/, '').trim();
+}
+
+/** One step's support among the four sources a route can draw on. */
+export interface StepEvidence {
+  step: number;
+  title: string;
+  /** Open Reaction Database: a recorded precedent, or the closest record's similarity (0..1). */
+  ord: { kind: 'exact'; count: number } | { kind: 'similar'; similarity: number } | null;
+  /** Library passages cited in the step: passage ids (route evidence and corpus search alike). */
+  library: Array<{ id: string; label: string }>;
+  /** Web pages cited in the step. */
+  web: Array<{ label: string; host: string }>;
+  /** The textbook passage the route check found for the step's reaction class, if any. */
+  found?: string;
+}
+
+/** ORD counts as support for a step at a recorded precedent or at the "same transformation,
+ *  different substrate" band of the similarity scale. */
+const ORD_SUPPORT_SIMILARITY = 0.7;
+const PASSAGE_LINK = /\[([^\]]+)\]\(nodus:\/\/passage\/([^)\s]+)\)/g;
+const WEB_LINK = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
+
+function citationsIn(text: string): { library: StepEvidence['library']; web: StepEvidence['web'] } {
+  const library: StepEvidence['library'] = [];
+  const web: StepEvidence['web'] = [];
+  for (const match of text.matchAll(PASSAGE_LINK)) {
+    let id = match[2];
+    try { id = decodeURIComponent(id); } catch { /* keep as written */ }
+    if (id.startsWith('web:')) { if (!web.some((entry) => entry.label === match[1])) web.push({ label: match[1], host: '' }); }
+    else if (!library.some((entry) => entry.id === id)) library.push({ id, label: match[1] });
+  }
+  for (const match of text.matchAll(WEB_LINK)) {
+    let host = '';
+    try { host = new URL(match[2]).host.replace(/^www\./, ''); } catch { /* keep the label */ }
+    if (!web.some((entry) => entry.host === host && entry.label === match[1])) web.push({ label: match[1], host });
+  }
+  return { library, web };
+}
+
+/** Where each step's support came from: the ORD lookup for the step and the citations in the
+ *  step's own section of the answer. Citations outside every step are returned separately. */
+export function collectStepEvidence(answer: string, stepCount: number, precedent: ReactionPrecedent | null, queries: PrecedentQuery[], support: Map<number, StepSupport> = new Map()): { steps: StepEvidence[]; elsewhere: { library: StepEvidence['library']; web: StepEvidence['web'] } } {
+  const blocks = findStepBlocks(answer, stepCount);
+  const similarByInput = new Map((precedent?.similar ?? []).map((item) => [item.input, item]));
+  const ordByStep = new Map<number, StepEvidence['ord']>();
+  (precedent?.reactions ?? []).forEach((entry, position) => {
+    const step = queries[position]?.step ?? position;
+    if (entry.unchanged) return;
+    if (entry.count > 0) { ordByStep.set(step, { kind: 'exact', count: entry.count }); return; }
+    const scores = (similarByInput.get(entry.input)?.neighbors ?? []).map((neighbor) => neighbor.similarity).filter((value): value is number => typeof value === 'number');
+    if (scores.length) ordByStep.set(step, { kind: 'similar', similarity: Math.max(...scores) });
+  });
+  const steps = blocks.map((block, index) => ({ step: index, title: stepBlockTitle(block), ord: ordByStep.get(index) ?? null, ...citationsIn(block), ...foundPassage(support.get(index)) }));
+  let rest = answer;
+  for (const block of blocks) if (block) rest = rest.replace(block, '');
+  const reports = rest.search(/^### (?:Route check|Structure check|Known reactions)/m);
+  return { steps, elsewhere: citationsIn(reports >= 0 ? rest.slice(0, reports) : rest) };
+}
+
+function foundPassage(support: StepSupport | undefined): { found?: string } {
+  const passage = support?.passage;
+  const page = passage?.location ? (/^\d/.test(passage.location) ? `p. ${passage.location}` : passage.location) : null;
+  return passage ? { found: `${page ? `${passage.title}, ${page}` : passage.title}${passage.scanned ? ' (scanned)' : ''}` } : {};
+}
+
+const ordSupports = (ord: StepEvidence['ord']): boolean => ord?.kind === 'exact' || (ord?.kind === 'similar' && ord.similarity >= ORD_SUPPORT_SIMILARITY);
+
+/** The evidence summary appended to a checked route: one row per step, the four sources
+ *  (Open Reaction Database, textbooks and library, web, the model's own knowledge) and a total.
+ *  `sourceFor` turns a library passage id into "Title, p. N" when the library holds it. */
+export function formatEvidenceSources(evidence: ReturnType<typeof collectStepEvidence>, sourceFor: (passageId: string) => string | null = () => null): string {
+  const { steps, elsewhere } = evidence;
+  if (!steps.length) return '';
+  const library = (entries: StepEvidence['library']) => [...new Set(entries.map((entry) => sourceFor(entry.id) ?? entry.label))];
+  const web = (entries: StepEvidence['web']) => [...new Set(entries.map((entry) => entry.host || entry.label))];
+  const lines = ['### Where the evidence came from',
+    'Generated by the application from the answer\'s own citations and the Open Reaction Database lookup (a local snapshot); the model does not write it. The database column says whether the snapshot records the step or a reaction with the same bond changes (70% similar or more); it is coverage, not a confidence score. "Found by the check" marks a textbook passage the route check looked up for the step\'s reaction class, not one the answer cited. A step with none of these rests on the model\'s own knowledge — which says where the claim comes from, not whether it is right.', '',
+    '| Step | Open Reaction Database | Textbooks and library | Web |', '|---|---|---|---|'];
+  let ordCount = 0, libraryCount = 0, webCount = 0, modelOnly = 0, foundCount = 0;
+  for (const step of steps) {
+    const ord = step.ord?.kind === 'exact' ? `recorded (${step.ord.count}×)`
+      : step.ord?.kind === 'similar' ? `${Math.round(step.ord.similarity * 100)}% similar${step.ord.similarity >= ORD_SUPPORT_SIMILARITY ? ' (same transformation)' : ' (weak)'}` : '—';
+    const books = library(step.library);
+    const pages = web(step.web);
+    const supported = ordSupports(step.ord);
+    ordCount += supported ? 1 : 0;
+    libraryCount += books.length ? 1 : 0;
+    webCount += pages.length ? 1 : 0;
+    const none = !supported && !books.length && !pages.length;
+    modelOnly += none ? 1 : 0;
+    const title = step.title ? ` — ${step.title.replace(/\|/g, '/').slice(0, 60)}` : '';
+    foundCount += step.found ? 1 : 0;
+    const shelf = [...books, ...(step.found && !books.includes(step.found) ? [`${step.found} (found by the check)`] : [])];
+    lines.push(`| ${step.step + 1}${title} | ${ord} | ${shelf.join('; ') || '—'} | ${pages.join('; ') || '—'}${none ? ' · _model knowledge only_' : ''} |`);
+  }
+  const n = steps.length;
+  lines.push('', `**${n} step(s):** the Open Reaction Database snapshot records ${ordCount} (or the same transformation), the answer cites textbooks or library passages in ${libraryCount} and the web in ${webCount}${foundCount ? `, the check found a textbook passage for ${foundCount}` : ''}; ${modelOnly} rest${modelOnly === 1 ? 's' : ''} on the model's own knowledge.`);
+  const otherBooks = library(elsewhere.library);
+  const otherPages = web(elsewhere.web);
+  if (otherBooks.length || otherPages.length) lines.push('', `Cited outside the steps: ${[...otherBooks, ...otherPages].join('; ')}.`);
+  return `\n${lines.join('\n')}\n`;
+}
+
 /** The “Step N — <title>” heading and the paragraph under it for each step, in step order, so
  *  the route review can judge the transformation the author intended, not only the species.
  *  The heading already names the reaction ("Dehydration of citric acid…"); the prose explains
@@ -404,31 +654,28 @@ export function findStepProse(text: string, count: number): string[] {
       if (!section) return '';
       const block = text.slice(section.start, section.end);
       const firstLine = block.split(/\r?\n/)[0] ?? '';
-      const title = ((HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1] ?? '').trim();
-      return stepProseText(title, block);
+      const heading = (HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1];
+      if (heading !== undefined) return stepProseText(heading.trim(), block);
+      // A bold lead-in ("**Step 2: aldol addition.** Treat the triketone…"): the first line is the
+      // paragraph itself, so keep what follows the bold title as the step's prose.
+      const leadIn = BOLD_LEAD_IN.exec(firstLine);
+      if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
+      // Neither a heading nor a bold title: the first line is already the step's prose.
+    return stepProseText('', `\n${block}`);
     });
   }
-  const found: string[] = [];
-  let pending: { title: string; start: number } | null = null;
-  let offset = 0;
-  const commit = (end: number) => {
-    if (!pending) return;
-    found.push(stepProseText(pending.title, text.slice(pending.start, end)));
-    pending = null;
-  };
-  for (const line of text.split(/\r?\n/)) {
-    const heading = HASH_HEADING.exec(line) ?? BOLD_HEADING.exec(line);
-    const title = (heading?.[1] ?? '').trim();
-    if (title) {
-      commit(offset);
-      if (STEP_TITLE.test(title)) pending = { title, start: offset };
-    }
-    offset += line.length + 1;
-  }
-  commit(text.length);
-  const out: string[] = [];
-  for (let index = 0; index < count; index++) out.push(found[index] ?? '');
-  return out;
+  // No sections: split on the step openings ("## Step 1 …", "**Step 1 — …**", or a bold lead-in
+  // that opens the paragraph, "**Step 1: … .** Treat…") as the evidence summary does.
+  return findStepBlocks(text, count).map((block) => {
+    if (!block) return '';
+    const firstLine = block.split(/\r?\n/)[0] ?? '';
+    const heading = (HASH_HEADING.exec(firstLine) ?? BOLD_HEADING.exec(firstLine))?.[1];
+    if (heading !== undefined) return stepProseText(heading.trim(), block);
+    const leadIn = BOLD_LEAD_IN.exec(firstLine);
+    if (leadIn) return stepProseText(leadIn[1].trim(), `\n${firstLine.slice(leadIn[0].length)}${block.slice(firstLine.length)}`);
+    // Neither a heading nor a bold title: the first line is already the step's prose.
+    return stepProseText('', `\n${block}`);
+  });
 }
 
 // ---------------------------------------------------------------- species labels
@@ -448,6 +695,8 @@ const NAME_ROLE_MARKER = /(?:`{1,2}|\*\*|__)?[ \t]*\b(reactants|products|by[-\s]
 const HASH_HEADING = /^[ \t]{0,3}#{1,6}[ \t]+(.+?)\s*$/;
 const BOLD_HEADING = /^[ \t]{0,3}\*\*([^*]+)\*\*[ \t]*$/;
 const STEP_TITLE = /^step\b[ \t]*\d+/i;
+/** A bold title that opens a paragraph ("**Step 2: aldol addition.** Treat…"). */
+const BOLD_LEAD_IN = /^[ \t]{0,3}(?:\d+[.)][ \t]+)?(?:\*\*|__)([^*_]+?)(?:\*\*|__)[ \t]*/;
 function roleOf(label: string): { role: RouteLabelRole; byproduct: boolean } | null {
   const value = label.toLowerCase().replace(/\s+/g, '');
   if (value.startsWith('reactant')) return { role: 'reactant', byproduct: false };
@@ -725,6 +974,18 @@ export function classifyCoProducts<T extends { role: RouteLabelRole; byproduct: 
   return step.map((entry) => entry.role === 'product' && !entry.byproduct && entry.smiles && !smilesHasCarbon(entry.smiles) ? { ...entry, byproduct: true } : entry);
 }
 
+/** The steps as looked up in the reaction index: byproducts are left out, because the Open
+ *  Reaction Database records a reaction's main product and an extra species never matches. A
+ *  step that marks every product as a byproduct keeps them all rather than being dropped. */
+export function buildPrecedentQueries(labels: RouteSpeciesLabel[][]): PrecedentQuery[] {
+  return labels.flatMap((step, index) => {
+    const main = step.filter((entry) => !(entry.role === 'product' && entry.byproduct));
+    // Built one step at a time so an unusable step does not shift the later step numbers.
+    const [query] = buildRouteSteps([main.some((entry) => entry.role === 'product') ? main : step]);
+    return query ? [{ step: index, query }] : [];
+  });
+}
+
 /** Attach the resolved SMILES to each species entry in place, replacing any declared SMILES.
  *  Only the species-list span of each role segment is rewritten, so a name that is a substring
  *  of another ("cyclohexanone" in "cyclohexanone oxime"), and the prose and headings around it,
@@ -793,10 +1054,10 @@ export function formatNameCorrectionNote(corrections: string[]): string {
 /** App report sections an assistant turn carries, as they appear in replayed history. The route
  *  drawings are always dropped: once their pictures are stripped, only empty step labels and a
  *  "Not drawn" list repeating the route check remain. The structure and route checks are kept
- *  for the latest answer only, as are the model review, its "Not verified" recap and the known
+ *  for the latest answer only, as are the model review, its "Check failed" recap and the known
  *  reactions: that is the route the next turn corrects, and every earlier one has been superseded
  *  (a correction prompt repeats the failures it asks about anyway). */
-const HISTORY_ALWAYS_DROPPED = ['### Route drawings (RDKit)'];
+const HISTORY_ALWAYS_DROPPED = ['### Route drawings (RDKit)', '### Where the evidence came from'];
 const HISTORY_LATEST_ONLY = [
   '### Structure check (RDKit)', '### Route check (RDKit)',
   '### Route review (model)', '### Route review (model, advisory)',
@@ -894,15 +1155,31 @@ export function requestedTargetFor(userMessages: string[]): string | null {
   return null;
 }
 
-const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bachiral\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?\s+(?:is\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
+// "Achiral" is not here: an achiral product has no stereocentre to excuse, and calling a chiral
+// product achiral is a mistake the checker should report, not accept.
+const RACEMIC_PATTERN = /\bracemic\b|\bracemate\b|\bracemi[cs]\b|\bmeso\b|\bnot\s+stereodefined\b|\bnot\s+stereo(?:chemically\s+)?(?:defined|specified|assigned)\b|\bstereo(?:chemistry)?(?:\s+(?:of|at|in)\s+(?:this|the|each|that)\s+(?:step|reaction|centres?|centers?|carbons?))?\s+(?:is\s+|are\s+)?not\s+(?:controlled|defined|specified|assigned)\b|\b(?:mixture|pair)\s+of\s+(?:enantiomers|diastereomers)\b|\bunassigned\s+stereo(?:centres?|centers?|chemistry)?\b/i;
 
-/** Whether the answer declares a stereochemically open outcome. The model may state it in
- *  several ways — a racemate, a meso/achiral product, or "stereochemistry not controlled" —
+/** Whether a step's prose declares a stereochemically open outcome. The model may state it in
+ *  several ways — a racemate, a meso product, or "stereochemistry not controlled" —
  *  and each is a stated outcome, so the route audit reports the open centre as declared
  *  instead of refusing the step for leaving it unspecified. This is model prose, not a
  *  verification. */
 export function declaresRacemic(text: string): boolean {
   return RACEMIC_PATTERN.test(text);
+}
+
+/** Per step: whether its own section of the answer declares an open outcome. Read from the
+ *  whole section, not the 360-character prose the reviewer gets: Sonnet's declarations ("The
+ *  stereochemistry of this step is not controlled. The product is racemic…") came after 324–470
+ *  characters, and four correct steps failed four turns each. The labelled species lines are
+ *  left out, so a name never counts as a declaration. */
+export function stepDeclaresRacemic(answer: string, count: number): boolean[] {
+  const blocks = findStepBlocks(answer, count);
+  const prose = findStepProse(answer, count);
+  return Array.from({ length: count }, (_, index) => {
+    const block = (blocks[index] ?? '').split(/\r?\n/).filter((line) => !/^\s*(?:[-*]\s*)?(?:`{1,2}|\*\*|__)?\s*(?:reactants|products|by[-\s]?products|agents)\s*[:：]/i.test(line)).join('\n');
+    return declaresRacemic(block) || declaresRacemic(prose[index] ?? '');
+  });
 }
 
 function stringArray(value: unknown): string[] {
@@ -966,6 +1243,7 @@ function normalizeRouteStep(entry: unknown, index: number): RouteStepAudit | nul
     unspecifiedStereocentres: numberOr(value.unspecifiedStereocentres, 0),
     ...(stringArray(value.nameProblems).length ? { nameProblems: stringArray(value.nameProblems).map((entry) => entry.slice(0, 300)).slice(0, 24) } : {}),
     ...(value.racemic === true ? { racemic: true } : {}),
+    ...(value.stereoNotRequired === true ? { stereoNotRequired: true } : {}),
     ...(typeof value.assemblyProblem === 'string' && value.assemblyProblem ? { assemblyProblem: value.assemblyProblem.slice(0, 400) } : {}),
   };
 }
@@ -1022,6 +1300,171 @@ export function normalizeRouteAudit(data: unknown): RouteAudit | null {
   return { steps, links, continuous: boolOr(value.continuous, blocked.length === 0), blocked, ...(isolated ? { isolated } : {}), ...(target ? { target } : {}) };
 }
 
+const PRECEDENT_FORM = /^(?:as-written|organic-reactants|agents-as-reactants)(?:\+organic-products)?$/;
+
+const PRECEDENT_FORM_NOTE: Record<string, string> = {
+  'organic-reactants': 'counting only the organic reactants',
+  'agents-as-reactants': 'counting the agents as reactants',
+  'organic-products': 'counting only the organic products',
+};
+
+const ORD_ID = /^ord-[0-9a-f]{32}$/;
+/** A drawn recorded reaction is tens of kilobytes; anything far larger is not one. */
+const MAX_PRECEDENT_SVG = 256 * 1024;
+
+/** A reaction SMILES as the index writes it: SMILES on each side of `>`, agents optional. */
+function reactionSmilesOr(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value || value.length > 4000) return undefined;
+  const parts = value.split('>');
+  if (parts.length !== 2 && parts.length !== 3) return undefined;
+  const ends = [parts[0], parts[parts.length - 1]];
+  const middle = parts.length === 3 ? parts[1] : '';
+  return ends.every((part) => SMILES_CHARS.test(part)) && (!middle || SMILES_CHARS.test(middle)) ? value : undefined;
+}
+
+function normalizePrecedentEntry(entry: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedentEntry | null {
+  const value = asRecord(entry);
+  if (!value || typeof value.input !== 'string' || !value.input) return null;
+  const samples = Array.isArray(value.samples) ? stringArray(value.samples).filter((id) => idPattern.test(id)).slice(0, 3) : [];
+  const reaction = reactionSmilesOr(value.reaction);
+  return {
+    input: value.input.slice(0, 4000),
+    count: numberOr(value.count, 0),
+    ...(Array.isArray(value.keys) ? { keys: stringArray(value.keys).slice(0, 8) } : {}),
+    ...(typeof value.form === 'string' && PRECEDENT_FORM.test(value.form) ? { form: value.form } : {}),
+    ...(value.unchanged === true ? { unchanged: true } : {}),
+    ...(samples.length ? { samples } : {}),
+    ...(reaction ? { reaction } : {}),
+    ...(Array.isArray(value.classes) ? { classes: stringArray(value.classes).map((name) => name.slice(0, 120)).slice(0, 3) } : {}),
+    ...withConditions(value.conditions, idPattern),
+  };
+}
+
+function withConditions(value: unknown, idPattern: RegExp): { conditions?: ReactionConditions[] } {
+  const conditions = normalizeReactionConditions(value, idPattern);
+  return conditions.length ? { conditions } : {};
+}
+
+function normalizePrecedentNeighbor(item: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedentNeighbor | null {
+  const neighbor = asRecord(item);
+  if (!neighbor || typeof neighbor.key !== 'string') return null;
+  const similarity = typeof neighbor.similarity === 'number' && neighbor.similarity >= 0 && neighbor.similarity <= 1 ? neighbor.similarity : undefined;
+  const reaction = reactionSmilesOr(neighbor.reaction);
+  const svg = typeof neighbor.svg === 'string' && neighbor.svg.startsWith('<svg') && neighbor.svg.length <= MAX_PRECEDENT_SVG ? neighbor.svg : undefined;
+  return {
+    key: neighbor.key,
+    distance: numberOr(neighbor.distance, 0),
+    count: numberOr(neighbor.count, 0),
+    ...(similarity !== undefined ? { similarity } : {}),
+    ...(reaction ? { reaction } : {}),
+    ...(svg && reaction ? { svg } : {}),
+    ...(Array.isArray(neighbor.samples) ? { samples: stringArray(neighbor.samples).filter((id) => idPattern.test(id)).slice(0, 3) } : {}),
+    ...withConditions(neighbor.conditions, idPattern),
+  };
+}
+
+/** Accepts only a precedent payload the capability can actually have produced. Sample ids must
+ *  be Open Reaction Database ids unless another index's pattern is given (textbook schemes: tb-…). */
+export function normalizeReactionPrecedent(data: unknown, idPattern: RegExp = ORD_ID): ReactionPrecedent | null {
+  const value = asRecord(data);
+  if (!value) return null;
+  const reactions = (Array.isArray(value.reactions) ? value.reactions : [])
+    .map((entry) => normalizePrecedentEntry(entry, idPattern)).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+  const products = (Array.isArray(value.products) ? value.products : [])
+    .map((entry) => normalizePrecedentEntry(entry, idPattern)).filter((entry): entry is ReactionPrecedentEntry => entry !== null).slice(0, 32);
+  const similar = (Array.isArray(value.similar) ? value.similar : []).map((entry) => {
+    const record = asRecord(entry);
+    if (!record || typeof record.input !== 'string') return null;
+    const neighbors = (Array.isArray(record.neighbors) ? record.neighbors : [])
+      .map((item) => normalizePrecedentNeighbor(item, idPattern)).filter((item): item is ReactionPrecedentNeighbor => item !== null).slice(0, 8);
+    return { input: record.input.slice(0, 4000), neighbors, ...(record.unchanged === true ? { unchanged: true } : {}) };
+  }).filter((entry): entry is ReactionPrecedentSimilar => entry !== null).slice(0, 16);
+  if (!reactions.length && !products.length && !similar.length) return null;
+  return { reactions, products, similar };
+}
+
+/** The drawing shown for a step: its closest known reaction, as the package drew it. An exact
+ *  match is not drawn: it is the step itself, already drawn under the route drawings. */
+export function precedentDrawingFor(entry: ReactionPrecedentEntry | undefined, similar: ReactionPrecedentSimilar | undefined): ReactionPrecedentNeighbor | null {
+  if (entry && entry.count > 0) return null;
+  return similar?.neighbors.find((neighbor) => neighbor.svg && neighbor.reaction) ?? null;
+}
+
+/** "reactant + reactant → product (agent)" from the step's names; byproducts are left out. */
+function stepTitle(step: RouteSpeciesLabel[] | undefined): string {
+  if (!step?.length) return '';
+  const names = (role: RouteLabelRole, byproduct?: boolean) => step
+    .filter((entry) => entry.role === role && (byproduct === undefined || entry.byproduct === byproduct))
+    .map((entry) => entry.name || entry.smiles).filter(Boolean);
+  const reactants = names('reactant');
+  const products = names('product', false);
+  const agents = names('agent');
+  if (!reactants.length || !products.length) return '';
+  return `${reactants.join(' + ')} → ${products.join(' + ')}${agents.length ? ` (${agents.join(', ')})` : ''}`;
+}
+
+/** "  - Run with: Pd-C, ethanol · 8 h · yield 92% · US05320776 (`ord-…`)", one line per recorded sample. */
+function conditionLines(conditions: ReactionConditions[] | undefined, lead: string): string[] {
+  // Two samples of one patent often record the same run: one line for it.
+  const seen = new Set<string>();
+  return (conditions ?? []).flatMap((item) => {
+    const text = conditionsText(item);
+    if (!text || seen.has(text)) return [];
+    seen.add(text);
+    return [`  - ${lead}: ${text} (\`${item.id}\`)`];
+  });
+}
+
+const SIMILARITY_FOOTNOTE = '_Similarity compares which bonds and groups change in a reaction (its DRFP fingerprint, Tanimoto). 100% means the same changes, not necessarily the same molecules. It is not a confidence score: a low figure for a textbook reaction usually means this snapshot records it with different reagents or in one pot. A step not recorded here is not thereby new._';
+
+/** The deterministic precedent section, one block per route step; the model never authors it.
+ *  Without a context (an older caller) the steps are numbered in query order, untitled. */
+export function formatReactionPrecedents(precedent: ReactionPrecedent, context?: PrecedentContext): string {
+  const lines = ['### Known reactions (Open Reaction Database)',
+    'This block is generated by the application, not by the model, from a local snapshot.', ''];
+  const product = precedent.products[0];
+  if (product) {
+    const target = context?.target;
+    const name = target?.name ? `**${target.name}** — ` : '';
+    lines.push(`Target: ${name}\`${product.input}\` · ${product.count > 0 ? `${product.count} recorded route(s) to it in this local snapshot` : 'no route to it in this local snapshot (a gap in the snapshot\'s coverage, not a sign the chemistry is new)'}.`, '');
+  }
+  const similarByInput = new Map(precedent.similar.map((item) => [item.input, item]));
+  let usedSimilarity = false;
+  precedent.reactions.forEach((entry, position) => {
+    const step = context?.queries[position]?.step ?? position;
+    const title = stepTitle(context?.labels[step]);
+    lines.push(`**Step ${step + 1}**${title ? ` — ${title}` : ''}`, `\`${entry.input}\``);
+    if (entry.unchanged) {
+      lines.push('- Changes no structure (a purification or salt step), so it is not looked up.', '');
+      return;
+    }
+    if (entry.count > 0) {
+      const notes = (entry.form ?? '').split('+').map((part) => PRECEDENT_FORM_NOTE[part]).filter(Boolean);
+      const ids = entry.samples?.length ? `: ${entry.samples.map((id) => `\`${id}\``).join(', ')}` : '';
+      lines.push(`- ✔ Exact match — ${entry.count} recorded precedent(s)${notes.length ? ` (${notes.join(', ')})` : ''}${ids}.`);
+      lines.push(...conditionLines(entry.conditions, 'Run with'));
+    } else {
+      const item = similarByInput.get(entry.input);
+      const closest = item?.neighbors[0];
+      if (!closest) {
+        lines.push('- Not recorded in this snapshot, and no close known reaction in it.');
+      } else if (closest.similarity !== undefined) {
+        usedSimilarity = true;
+        lines.push(`- Not recorded in this snapshot. Closest recorded reaction: ${Math.round(closest.similarity * 100)}% similar — ${similarityBand(closest.similarity)}.`);
+        lines.push(...conditionLines(closest.conditions, 'The closest reaction was run with'));
+      } else {
+        lines.push(`- Not recorded in this snapshot. Closest recorded reaction is ${closest.distance} fingerprint bit(s) away.`);
+      }
+    }
+    lines.push(...stepSupportLines(entry, context?.support?.get(step)));
+    const drawing = context?.drawings?.get(step);
+    if (drawing) lines.push('', '_The closest known reaction, as recorded in the database (species as listed, not a balanced equation):_', '', drawing);
+    lines.push('');
+  });
+  if (usedSimilarity) lines.push(SIMILARITY_FOOTNOTE);
+  return `\n${lines.join('\n').trimEnd()}\n`;
+}
+
 const ROUTE_TARGET_REASONS: RouteTargetAudit['reason'][] = ['formed', 'stereo-mismatch', 'not-formed', 'unparsed'];
 
 function normalizeRouteTarget(entry: unknown): RouteTargetAudit | null {
@@ -1054,6 +1497,76 @@ const sideTrace = (species: RouteSpeciesSummary[], names?: Map<string, string>):
   // odd stoichiometry is visible rather than hidden behind a bare "+".
   return entry.coefficient && entry.coefficient > 1 ? `${entry.coefficient} ${label}` : label;
 }).join(' + ');
+
+/** Element counts of a formula written as the checker writes it ("C2H5O", "Cr2O7"); charges ignored. */
+function formulaCounts(formula: string): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const match of formula.matchAll(/([A-Z][a-z]?)(\d*)/g)) counts.set(match[1], (counts.get(match[1]) ?? 0) + (match[2] ? Number(match[2]) : 1));
+  return counts;
+}
+
+/** A formula in Hill order (C, H, then alphabetical; alphabetical without carbon). */
+function hillFormula(counts: Map<string, number>): string {
+  const elements = [...counts.keys()].filter((element) => (counts.get(element) ?? 0) > 0);
+  const carbon = elements.includes('C');
+  const order = carbon ? ['C', 'H', ...elements.filter((element) => element !== 'C' && element !== 'H').sort()] : elements.sort();
+  return order.filter((element) => elements.includes(element)).map((element) => `${element}${counts.get(element)! > 1 ? counts.get(element) : ''}`).join('');
+}
+
+/** Largest salt coefficient the display search tries; the solver's own cap is 30. */
+const SALT_DISPLAY_MAX = 30;
+
+/** One side of a step as the reader should see it: each named salt whose ions are all on this
+ *  side is shown whole ("sodium dichromate (Cr2Na2O7)"), with the count the ions' solved
+ *  coefficients imply. The checker balances ions separately (that is how it solves salts), but
+ *  "Na + Cr2O7 + … + Na" reads as a lost sodium. Ions shared between salts (sulfate in sodium and
+ *  chromium(III) sulfate) are split by a small integer search; when no exact split exists the
+ *  side is shown as the checker solved it. */
+function groupedSideTrace(species: RouteSpeciesSummary[], labels: RouteSpeciesLabel[], names: Map<string, string>, balanced: boolean, otherSide: RouteSpeciesSummary[] = []): string {
+  // An ion on both sides (sodium in a dichromate oxidation) is a spectator the solver cancels, so
+  // its solved count is arbitrary (often 1:1); the salts fix it instead.
+  const spectators = new Set(otherSide.map((entry) => entry.input));
+  const byInput = new Map(species.map((entry) => [entry.input, entry]));
+  const salts = labels
+    .filter((label) => label.smiles.includes('.'))
+    .map((label) => {
+      const parts = label.smiles.split('.').map((part) => part.trim()).filter(Boolean);
+      const multiplicity = new Map<string, number>();
+      for (const part of parts) multiplicity.set(part, (multiplicity.get(part) ?? 0) + 1);
+      return { label, multiplicity };
+    })
+    .filter((salt) => [...salt.multiplicity.keys()].every((part) => byInput.has(part)));
+  if (!salts.length || salts.length > 4) return sideTrace(species, names);
+  const used = new Set(salts.flatMap((salt) => [...salt.multiplicity.keys()]));
+  const coefficient = (input: string) => byInput.get(input)?.coefficient ?? 1;
+  // Salt counts k_s with Σ k_s · m(s, ion) = the ion's solved coefficient for every ion.
+  let found: number[] | null = null;
+  if (!balanced) found = salts.map(() => 1);
+  else {
+    const search = (index: number, counts: number[]): void => {
+      if (found) return;
+      if (index === salts.length) {
+        const ok = [...used].every((ion) => spectators.has(ion) || salts.reduce((sum, salt, position) => sum + counts[position] * (salt.multiplicity.get(ion) ?? 0), 0) === coefficient(ion));
+        if (ok) found = [...counts];
+        return;
+      }
+      for (let k = 1; k <= SALT_DISPLAY_MAX; k++) search(index + 1, [...counts, k]);
+    };
+    search(0, []);
+  }
+  if (!found) return sideTrace(species, names);
+  const counts: number[] = found;
+  const saltTerms = salts.map((salt, position) => {
+    const total = new Map<string, number>();
+    for (const [ion, times] of salt.multiplicity) {
+      for (const [element, n] of formulaCounts(byInput.get(ion)?.formula ?? '')) total.set(element, (total.get(element) ?? 0) + n * times);
+    }
+    const label = `${salt.label.name} (${hillFormula(total)})`;
+    return balanced && counts[position] > 1 ? `${counts[position]} ${label}` : label;
+  });
+  const rest = species.filter((entry) => !used.has(entry.input));
+  return [...(rest.length ? [sideTrace(rest, names)] : []), ...saltTerms].join(' + ');
+}
 
 /** A lookup from a declared SMILES to the IUPAC name the author wrote beside it. The
  *  authoring labels carry the name and the exact token; the audit species carries the
@@ -1102,7 +1615,9 @@ export const ROUTE_REVIEW_SYSTEM = [
   'A cheminformatics toolkit has already checked that every equation balances and that every intermediate is carried over as the same structure; the request says which steps, if any, it refused. Never report a balance, stoichiometry or "cannot be written as one balanced equation" problem: that is the checker\'s job, and its findings are reported separately. A step that forms several bonds or combines bond-forming events into one balanced net equation is allowed — a one-pot cascade such as the Robinson tropinone synthesis is one step — so do not report a step merely for merging or splitting transformations, with one exception: a separate workup folded into a transformation (see "blocking" below).',
   'Every structure below is a canonical isomeric SMILES, and so is the target. Two identical SMILES strings are the same compound; two different strings are different compounds. The checker has already compared each product to the target by canonical structure and reports in the request whether the target is formed — when it says the target is formed, do not report that step\'s product as a different compound from the target.',
   'Report only a specific, confident problem from this list, and set its "severity":',
-  '- "blocking" when the named structure is wrong for the step: a product that is a different compound than the requested target; a product whose formula matches the intended one but whose connectivity or regiochemistry differs — a swapped substituent, or the wrong ring or epoxide regioisomer; a step whose prose describes a different transformation than the species named; or an atom-inconsistent or impossible byproduct; or a step that folds a separate workup into a different transformation — an acidification, basification or quench that converts the transformation\'s product into another form (a Kolbe–Schmitt carboxylation and the acidification that frees the acid, written as one step), which are two operations and belong in two steps. These are the mistakes the balance checker cannot see, so they stop the route.',
+  '- "blocking" when the named structure is wrong for the step: a product that is a different compound than the requested target; a product whose formula matches the intended one but whose connectivity or regiochemistry differs — a swapped substituent, or the wrong ring or epoxide regioisomer; a step whose prose describes a different transformation than the species named; or an atom-inconsistent or impossible byproduct; or a step that folds a separate workup into a different transformation — an acidification, basification or quench that converts the transformation\'s product into another form (a Kolbe–Schmitt carboxylation and the acidification that frees the acid, written as one step), which are two operations and belong in two steps. A step folds a workup only when its species include the workup\'s acid or base alongside the transformation\'s reagents; a product written in its isolated form (an amine or its hydrochloride) is not a folded workup. These are the mistakes the balance checker cannot see, so they stop the route.',
+  '- The checker derived every species\' formula and charge from its structure. Never dispute what a SMILES denotes (`Cl` is hydrogen chloride; chloride is `[Cl-]`), a formula, or whether a salt is charge-balanced, and never report a spent inorganic reagent\'s oxidation state (tin(II) or tin(IV) chloride, a chromium or manganese salt) as blocking: which one a step names is advisory when it balances.',
+  '- The form a product is isolated in — a free amine or its hydrochloride, an acid or its carboxylate — is the author\'s choice when the step\'s species balance and the next step consumes exactly the species this step names. Report such a choice only as advisory, and never report both forms in turn: only a separate workup folded into a transformation (above) is blocking.',
   '- "advisory" for everything else — a step you doubt can give the named product under the stated conditions (the wrong reagent for the transformation, an unusual or advanced route, feasibility, conditions, yield or mechanism), a one-pot cascade, a named reaction you would not have chosen, or a redundant or pointless step. An advisory finding is shown to the reader but never blocks the route.',
   'Be conservative. Never invent a compound, reaction or mechanism, and never report a step that is merely unusual but chemically possible. Do not repeat an equation or continuity problem the checker already found.',
   'Return EXCLUSIVELY one JSON object: {"status":"ok"} when there is no such problem, or {"status":"problems","problems":[{"step":<1-based step number, or 0 for a route-level problem>,"severity":"blocking"|"advisory","detail":"<one sentence>"}]}. A problem with no severity is treated as advisory. Do not write anything outside the JSON.',
@@ -1226,31 +1741,40 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
   lines.push(verified
     ? reviewPending
       ? `**Route checks passed** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}. The model review is still running.`
-      : `**Route verified** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}.`
-    : `**Route not verified** — ${reasons.join('; ')}.`);
+      : `**Route checked: balanced and connected** — every equation balances and every intermediate is carried over${audit.target ? ', and the target is formed' : ''}. This is bookkeeping only: conditions, selectivity, yields and safety are not checked.`
+    : `**Route check failed** — ${reasons.join('; ')}.`);
   for (const step of audit.steps) {
     const label = `Step ${step.index + 1}`;
     if (!step.ok) { lines.push(`- ${label} FAIL — ${step.error ?? 'could not be parsed'}`); continue; }
     const racemic = step.racemic === true && step.unspecifiedStereocentres > 0;
+    const moot = !racemic && step.stereoNotRequired === true && step.unspecifiedStereocentres > 0;
     const nameFailure = (step.nameProblems?.length ?? 0) > 0;
     const assemblyFailure = Boolean(step.assemblyProblem);
-    const verdict = !nameFailure && !assemblyFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic) ? 'OK' : 'FAIL';
+    const verdict = !nameFailure && !assemblyFailure && step.balanced && (step.unspecifiedStereocentres === 0 || racemic || moot) ? 'OK' : 'FAIL';
     const stereo = step.unspecifiedStereocentres
       ? racemic
         ? ', declared racemic (stereochemistry not controlled)'
-        : `, ${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
+        : moot
+          ? `, ${step.unspecifiedStereocentres} open stereocentre(s) not required (lost before the target)`
+          : `, ${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)`
       : '';
     const balance = step.balanced ? 'balanced' : `NOT balanced (${step.differences.join('; ')})`;
     const nameNote = nameFailure ? ` name check failed: ${step.nameProblems!.join('; ')}.` : '';
     // A step can balance only by solving an odd stoichiometry (8 citric acid → 9 …); the numbers
     // are shown, and a large one is called out, because that usually means a byproduct is wrong.
-    const largest = Math.max(1, ...[...step.reactants, ...step.agents, ...step.products].map((entry) => entry.coefficient ?? 1));
+    // Only the carbon compounds count: water, acids and inorganic salts reach 7 or more in an
+    // ordinary metal-oxo oxidation, while 8 citric acid → 9 … means a wrong product or byproduct.
+    const organic = [...step.reactants, ...step.products].filter((entry) => formulaCounts(entry.formula || '').has('C'));
+    const largest = Math.max(1, ...organic.map((entry) => entry.coefficient ?? 1));
     const largeNote = step.balanced && !assemblyFailure && largest > LARGE_COEFFICIENT
-      ? ` The equation balances only with large coefficients (up to ${largest}); a byproduct is likely missing or wrong.`
+      ? ` Note: the carbon compounds balance only with large coefficients (up to ${largest}); the step passes, but check that its products and byproducts are the intended ones.`
       : '';
     const assemblyNote = assemblyFailure ? ` ${step.assemblyProblem}.` : '';
     const agents = step.agents.length ? ` [agents: ${sideTrace(step.agents, names)}]` : '';
-    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${sideTrace(step.reactants, names)}${agents} → ${sideTrace(step.products, names)}`);
+    const stepLabels = labels[step.index] ?? [];
+    const reactantSide = groupedSideTrace(step.reactants, stepLabels.filter((entry) => entry.role === 'reactant'), names, step.balanced === true, step.products);
+    const productSide = groupedSideTrace(step.products, stepLabels.filter((entry) => entry.role === 'product'), names, step.balanced === true, step.reactants);
+    lines.push(`- ${label} ${verdict} — ${balance}${stereo}.${nameNote}${largeNote}${assemblyNote} ${reactantSide}${agents} → ${productSide}`);
   }
   if (audit.links.length) {
     lines.push('', 'Intermediate continuity:', '');
@@ -1300,8 +1824,8 @@ export function formatRouteAudit(audit: RouteAudit, labels: RouteSpeciesLabel[][
   const recap = [...audit.blocked];
   if (reviewProblems.length) recap.push(`The route review raised ${reviewProblems.length} problem(s).`);
   lines.push('', verified
-    ? reviewPending ? 'Checks passed so far; the verdict waits for the model review.' : 'Route verified: every intermediate is carried over as the same structure.'
-    : `Not verified: ${recap.join(' ')}`.trimEnd());
+    ? reviewPending ? 'Checks passed so far; the verdict waits for the model review.' : 'Balanced and connected: every intermediate is carried over as the same structure.'
+    : `Check failed: ${recap.join(' ')}`.trimEnd());
   return lines.join('\n');
 }
 
@@ -1361,6 +1885,26 @@ function labelledStepLines(labels: RouteSpeciesLabel[][], step: RouteStepAudit):
 /** Why a step's own equation needs correcting, or null when it passes on its own terms. */
 /** Why a step fails the route check, or null when it passes. The one verdict every part of the
  *  report uses — the FAIL lines, the drawings and the correction prompts — so they never disagree. */
+/** A request that gives its target without stereochemistry asks for the racemate (or does not
+ *  care): a step whose only unspecified stereocentres are in that target is racemic by the
+ *  request, not a failure to declare it. Intermediates, and a target requested with stereo,
+ *  are still held to naming their stereoisomer. Marks such steps racemic in place. */
+export function implyRacemicTarget(audit: RouteAudit, requestedTarget: string | null | undefined): RouteAudit {
+  const target = audit.target?.canonicalSmiles;
+  if (!requestedTarget || /[@/\\]/.test(requestedTarget) || !target) return audit;
+  for (const step of audit.steps) {
+    if (step.racemic || !(step.unspecifiedStereocentres > 0)) continue;
+    const open = (step.products ?? []).filter((product) => product.unspecifiedStereocentres > 0);
+    if (open.length && open.every((product) => product.canonicalSmiles === target)) {
+      step.racemic = true;
+      // The checker's own sentence about this step's open centres is stale now; the route
+      // review is told what the checker found, so it must not read it.
+      audit.blocked = audit.blocked.filter((entry) => !entry.startsWith(`Step ${step.index + 1} leaves `));
+    }
+  }
+  return audit;
+}
+
 export function routeStepFailure(step: RouteStepAudit): string | null {
   if (step.nameProblems?.length) return step.nameProblems.join('; ');
   if (!step.ok) return step.error ?? 'could not be parsed';
@@ -1369,7 +1913,11 @@ export function routeStepFailure(step: RouteStepAudit): string | null {
   // assembles a product from more than one substrate. The report already shows this, so the
   // one-click prompts must name it too, or they point at a different step than the checker did.
   if (step.assemblyProblem) return step.assemblyProblem;
-  if (step.unspecifiedStereocentres > 0 && step.racemic !== true) return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s) — name the stereoisomer, or state in the prose that the outcome is racemic, that the product is meso or achiral, or that its stereochemistry is not controlled`;
+  if (step.unspecifiedStereocentres > 0 && step.racemic !== true && step.stereoNotRequired !== true) {
+    // Say where the open centres are, so a model that already named something knows which name.
+    const open = step.products.filter((entry) => entry.unspecifiedStereocentres > 0).map((entry) => `${entry.name ? `“${entry.name}”` : `\`${entry.canonicalSmiles}\``} (${entry.unspecifiedStereocentres})`);
+    return `${step.unspecifiedStereocentres} unspecified stereocentre(s) or double bond(s)${open.length ? ` in ${open.join(', ')}` : ''} — name the stereoisomer formed (descriptors in its systematic name), or state in this step's own paragraph that the outcome is racemic, that the product is meso, or that its stereochemistry is not controlled (a mixture of diastereomers)`;
+  }
   return null;
 }
 
@@ -1427,6 +1975,17 @@ function routeTargetDescriptor(audit: RouteAudit): string {
   return smiles ? `canonical SMILES \`${smiles}\`` : '';
 }
 
+/** Evidence under a rejected step in a correction: the index's other ways to make its product
+ *  and a textbook passage, marked as evidence so the model weighs it and still writes names. */
+function fixEvidence(support: StepSupport | undefined, indent: string): string {
+  const lines: string[] = [];
+  const alternatives = support?.alternatives?.proposals.slice(0, ALTERNATIVES_SHOWN) ?? [];
+  if (alternatives.length) lines.push(`${indent}Evidence, not an instruction — the Open Reaction Database makes \`${support!.alternatives!.product}\` from: ${alternatives.map(alternativeLine).join(' · ')}. Write any species you take from it by name.`);
+  if (support?.passage) lines.push(`${indent}Textbook, on ${support.passage.about}: ${support.passage.title}${support.passage.location ? `, ${support.passage.location}` : ''} (${support.passage.citation}).`);
+  for (const clash of support?.compatibility ?? []) lines.push(`${indent}Compatibility check (evidence, not an instruction): ${clash}.`);
+  return lines.length ? `\n${lines.join('\n')}` : '';
+}
+
 function namedFixPreamble(failures: string[], problems: string[], review: RouteReviewProblem[] = []): string[] {
   return [
     ROUTE_FIX_PROMPT_LEAD,
@@ -1441,7 +2000,15 @@ function namedFixPreamble(failures: string[], problems: string[], review: RouteR
  *  fix all failed steps, work backwards from the target, or fix one flagged step on its own
  *  (with split/combine allowed). Each shows the species as IUPAC names only — never the
  *  derived SMILES, which the model did not write. Empty when nothing needs fixing. */
-export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null): string {
+/** The note under a step whose species did not resolve: the checker built the step without
+ *  them, so its balance failure is a symptom, and the fix is a name the resolver knows. */
+function unresolvedStepLines(names: UnresolvedName[], indent: string): string {
+  if (!names.length) return '';
+  const roleWord = (entry: UnresolvedName) => (entry.byproduct ? 'Byproduct' : entry.role === 'reactant' ? 'Reactant' : entry.role === 'product' ? 'Product' : 'Agent');
+  return names.map((entry) => `${indent}- “${entry.name}” (${roleWord(entry)}) could not be resolved to a structure, so the checker built this step without it; any balance failure above follows from that. Give it a systematic IUPAC name for the whole species (a salt by its cation and anion), or — for a reactive intermediate such as an enolate salt, which references rarely name — its isomeric SMILES.\n`).join('');
+}
+
+export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit: RouteAudit, review: RouteReview | null = null, support?: Map<number, StepSupport>, unresolved: UnresolvedName[] = []): string {
   const problems = namedRouteProblems(labels, audit);
   const isolated = new Set(isolatedSteps(audit));
   const reviewProblems = blockingReviewProblems(review);
@@ -1455,8 +2022,13 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
     .filter((entry) => entry.reasons.length);
   const failures = flagged
     .filter((entry) => routeStepFailure(entry.step) !== null)
-    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}`);
-  if (!flagged.length && !problems.length && !reviewProblems.length) return '';
+    .map((entry) => `- Step ${entry.step.index + 1}: ${routeStepFailure(entry.step)}\n${namedStepLines(labels, entry.step.index)}${unresolvedStepLines(unresolved.filter((name) => name.step === entry.step.index + 1), '  ')}${fixEvidence(support?.get(entry.step.index), '  ')}`);
+  // A step whose unresolved species left it passing (or unchecked) still needs the name fixed.
+  const failedSteps = new Set(flagged.filter((entry) => routeStepFailure(entry.step) !== null).map((entry) => entry.step.index + 1));
+  for (const step of [...new Set(unresolved.map((name) => name.step))].filter((step) => !failedSteps.has(step)).sort((a, b) => a - b)) {
+    failures.push(`- Step ${step}: a species did not resolve to a structure\n${unresolvedStepLines(unresolved.filter((name) => name.step === step), '  ')}`);
+  }
+  if (!flagged.length && !problems.length && !reviewProblems.length && !unresolved.length) return '';
 
   const target = routeTargetDescriptor(audit);
   const atTarget = target ? ` (${target})` : '';
@@ -1495,7 +2067,7 @@ export function formatNamedRouteFixPrompts(labels: RouteSpeciesLabel[][], audit:
         `${ROUTE_FIX_STEP_LEAD}${index + 1} of the synthesis route above.`,
         '',
         `Step ${index + 1} was rejected: ${entry.reasons.join('; ')}`,
-        namedStepLines(labels, index),
+        namedStepLines(labels, index) + unresolvedStepLines(unresolved.filter((name) => name.step === index + 1), '') + fixEvidence(support?.get(index), ''),
         '',
         'For context:',
         previous >= 0

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { AppLanguage, UpdateCheckResponse, UpdateProgressEvent } from '../../../shared/types';
 import { UpdateReadyNotice } from '../../../src/components/UpdateReadyNotice';
 import { useUpdateProgress } from '../../../src/useUpdateProgress';
-import { canInstallUpdate, installUpdateManually, pendingUpdateVersion, updateStatusMessage } from '../../../src/updateStatus';
+import { canInstallUpdate, installUpdateManually, pendingUpdateVersion, updateInstallBusy, updateStatusMessage } from '../../../src/updateStatus';
 import { setActiveLang, t } from '../../../src/i18n';
 
 const f = window as unknown as { config: { initial: UpdateProgressEvent | null; lang: AppLanguage; startup?: boolean; holdSnapshot?: boolean; holdCheck?: boolean; rejectCheck?: boolean; checked?: boolean; strict?: boolean }; emit: (event: UpdateProgressEvent) => void; snapshot: UpdateProgressEvent | null; resolveSnapshot: (value: UpdateProgressEvent | null) => void; checks: number; resolveCheck: (value: UpdateCheckResponse) => void; installs: number; throwInstall: boolean; finishInstall: (value: UpdateProgressEvent) => void };
@@ -43,10 +43,9 @@ function Fixture() {
   return <div className="h-full flex flex-col">
     <header className="flex items-center gap-4 p-3 border-b border-neutral-800">
       <b>Nodus · {t('Actualizaciones')}</b>
-      {version && <button data-testid="update-indicator" onClick={() => setDeferred(null)}>{t('Actualización lista')}</button>}
       <button data-testid="settings-toggle" onClick={() => setSettingsOpen(!settingsOpen)}>{t('Ajustes')}</button>
     </header>
-    {update && (showStartupProgress || (key && key !== deferred)) && <UpdateReadyNotice update={update} onUpdate={setUpdate} onLater={() => setDeferred(key)} onRecovery={() => setSettingsOpen(true)} />}
+    {update && (updateInstallBusy(update) || showStartupProgress || (key && key !== deferred)) && <UpdateReadyNotice update={update} onUpdate={setUpdate} onLater={() => setDeferred(key)} onRecovery={() => setSettingsOpen(true)} />}
     <main className="flex-1 p-8"><label>{t('Notas')}<textarea data-testid="working-document" className="input block mt-2 h-40 w-full" defaultValue="Documento de ejemplo: se puede seguir trabajando durante la descarga." /></label>{settingsOpen && <SettingsSubscriber />}</main>
   </div>;
 }

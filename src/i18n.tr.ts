@@ -69,6 +69,7 @@ import { DEEP_RESEARCH_VERSION_TRANSLATIONS } from './i18n.deepResearchVersions'
 import { DOCUMENT_UNDERSTANDING_TRANSLATIONS } from './i18n.documentUnderstanding';
 import { STALE_MODEL_TRANSLATIONS } from './i18n.staleModels';
 import { SCHEME_DECLUTTER_TRANSLATIONS } from './i18n.schemeDeclutter';
+import { CHEMISTRY_STOCK_TRANSLATIONS } from './i18n.chemistryStock';
 import { DEEP_RESEARCH_QUALITY_TRANSLATIONS } from './i18n.deepResearchQuality';
 import { TEXT_PROVENANCE_TRANSLATIONS } from './i18n.textProvenance';
 import { MODEL_SETTINGS_TRANSLATIONS } from './i18n.modelSettings';
@@ -129,6 +130,7 @@ export const TR: Record<string, string> = {
   ...DOCUMENT_UNDERSTANDING_TRANSLATIONS.tr,
   ...STALE_MODEL_TRANSLATIONS.tr,
   ...SCHEME_DECLUTTER_TRANSLATIONS.tr,
+  ...CHEMISTRY_STOCK_TRANSLATIONS.tr,
   ...DEEP_RESEARCH_QUALITY_TRANSLATIONS.tr,
   ...TEXT_PROVENANCE_TRANSLATIONS.tr,
   ...LIBRARY_BIBLIOGRAPHY_TRANSLATIONS.tr,

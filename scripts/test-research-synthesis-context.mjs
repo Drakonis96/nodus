@@ -1,0 +1,272 @@
+// Exercise the actual prompt builder and retrieval against an isolated native database.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import test from 'node:test';
+import { installRuntimeHooks, repoRoot, requireElectronRuntime } from './lib/tsRuntimeHooks.mjs';
+
+if (requireElectronRuntime(fileURLToPath(import.meta.url), '--native-synthesis-context')) {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'nodus-synthesis-context-'));
+  installRuntimeHooks(scratch);
+  const require = createRequire(import.meta.url);
+  const load = file => require(path.join(repoRoot, file));
+  // Expose private orchestration only in this test; production code is compiled unchanged.
+  const originalTs = require.extensions['.ts'];
+  require.extensions['.ts'] = (mod, file) => {
+    if (file === path.join(repoRoot, 'electron/ai/researchAssistant.ts')) {
+      const compile = mod._compile;
+      mod._compile = (code, name) => compile.call(mod, code + '\nexports.testBuildPrompt = buildResearchChatPrompt;\nexports.testExecution = skillExecution;\n', name);
+    }
+    originalTs(mod, file);
+  };
+  const dbModule = load('electron/db/database.ts');
+  const db = dbModule.getDb();
+  const ai = load('electron/ai/aiClient.ts');
+  ai.embed = async () => null;
+  ai.localModelContextWindow = async () => null;
+  const molecule = load('electron/ai/moleculeInspection.ts');
+  molecule.inspectResearchMolecules = async () => [];
+  load('electron/db/settingsRepo.ts').updateSettings({ promptLanguage: 'en', researchWebSearch: 'off' });
+  const passages = load('electron/db/passagesRepo.ts');
+  load('electron/zotero/zoteroClient.ts').getItem = async () => null;
+  load('electron/extraction/textExtractor.ts').resolveWorkText = async () => ({ text: '', sourceType: 'text' });
+  for (const id of ['selected', 'outside']) {
+    db.prepare(`INSERT INTO works(nodus_id,zotero_key,title,authors_json,year,item_type,source_type,archived,light_status,deep_status,summary_status,summary_hash,deep_hash) VALUES(?,?,?,'[]',2020,'book','text',0,'done','done','done','hash','hash')`).run(id, id, `Organic Chemistry ${id}`);
+    const text = `Benzocaine is made by Fischer esterification of a carboxylic acid with an alcohol under acid catalysis. The equilibrium is driven toward the ester by using the alcohol as the solvent and removing the water that forms. Concentrated sulfuric acid usually catalyses the reaction through protonation of the carbonyl group, addition of the alcohol, and elimination of water from the tetrahedral intermediate. Several experimental procedures describe this transformation with practical details about purification and isolation of the desired product. ${id.toUpperCase()}_ONLY evidence.`;
+    passages.replaceWorkPassages(id, 'hash', [{ text, pageLabel: '1', embedding: [1, 0] }]);
+  }
+  globalThis.fetch = () => { throw Error('Network forbidden in synthesis context regression tests'); };
+  const research = load('electron/ai/researchAssistant.ts');
+  const evidence = load('electron/ai/synthesisEvidence.ts');
+  const realGather = evidence.gatherSynthesisEvidence;
+  let optionsSeen, questionSeen;
+  evidence.gatherSynthesisEvidence = async (question, options) => {
+    optionsSeen = options; questionSeen = question;
+    return realGather(question, options);
+  };
+  const selection = { ideas: false, themes: false, contradictions: false, gaps: false, readingPath: false, authors: false, documents: true, passages: true, graph: false, graphParts: {}, layers: { ideas: false, documents: true }, sourceFilter: { enabled: true, authorIds: [], workIds: ['selected'] } };
+  const request = { model: { provider: 'openai', model: 'test' }, messages: [{ role: 'user', content: 'Propose a synthesis of benzocaine (SMILES: CCOC(=O)c1ccc(N)cc1).' }], selection, webSearch: 'off' };
+  const skill = { id: 'chemistry-test', name: 'Chemistry', instructions: '', enabled: { assistant: true, nodi: false }, capabilities: ['nodus:chemistry'] };
+  const build = async (input = request, signal = new AbortController().signal) => JSON.parse((await research.testBuildPrompt(input, [skill], undefined, signal)).user);
+
+  test.after(() => { dbModule.closeDb(); fs.rmSync(scratch, { recursive: true, force: true }); });
+
+  test('selected works constrain pre-answer chemistry evidence and post-answer options', async () => {
+    const controller = new AbortController();
+    const payload = await build(request, controller.signal);
+    assert.ok(payload.evidencia_para_la_ruta.textbook_passages.some(p => p.text.includes('SELECTED_ONLY')));
+    assert.ok(!JSON.stringify(payload.evidencia_para_la_ruta).includes('OUTSIDE_ONLY'));
+    assert.equal(optionsSeen.signal, controller.signal);
+    assert.deepEqual([...research.testExecution(request).evidenceScope.workIds], ['selected']);
+    assert.equal(optionsSeen.evidenceScope.external, false);
+  });
+
+  test('documents switched off contribute no chemistry passages, even with selected books', async () => {
+    const payload = await build({ ...request, selection: { ...selection, layers: { ideas: false, documents: false } } });
+    assert.equal(payload.evidencia_para_la_ruta, undefined);
+  });
+
+  test('an empty source selection remains empty instead of searching the full library', async () => {
+    const payload = await build({ ...request, selection: { ...selection, sourceFilter: { enabled: true, authorIds: [], workIds: [] } } });
+    assert.equal(payload.evidencia_para_la_ruta, undefined);
+  });
+
+  test('an authorized notebook limits chemistry to its own works', () => {
+    const inventory = load('electron/ai/researchCorpusInventory.ts').researchCorpusInventory();
+    const document = inventory.documents.find(document => document.workId === 'selected');
+    assert.ok(document);
+    const notebooks = load('electron/db/researchNotebooksRepo.ts');
+    const notebook = notebooks.saveResearchNotebook({ name: 'Selected chemistry', sources: [{ kind: 'work', id: 'selected' }], exclusions: [], mode: 'fixed' }, [document.id]);
+    const scope = load('electron/ai/researchNotebookService.ts').resolveResearchNotebook(notebook.id);
+    assert.deepEqual(scope.documents.map(document => document.workId), ['selected']);
+    const service = load('electron/ai/researchNotebookService.ts');
+    const preparation = load('electron/ai/documentaryPreparation.ts');
+    const original = preparation.getResearchPreparationInventory;
+    preparation.getResearchPreparationInventory = () => ({ documents: [{ id: document.id, title: document.title, preparation: { status: 'ready', embeddings: 'ready' } }] });
+    try {
+      const authorized = service.authorizeNotebookRequest({ ...request, selection: { ...selection, notebookId: notebook.id, sourceFilter: { enabled: false } } });
+      const grant = research.testExecution(authorized).evidenceScope;
+      assert.deepEqual([...grant.workIds], ['selected']);
+      assert.equal(grant.external, false);
+      assert.deepEqual(evidence.synthesisEvidenceWorkIds(grant), ['selected']);
+    } finally { preparation.getResearchPreparationInventory = original; }
+  });
+
+  test('automatic academic authorization preserves external chemistry evidence; explicit restrictions do not', () => {
+    const service = load('electron/ai/researchNotebookService.ts');
+    const full = service.authorizeNotebookRequest({ ...request, selection: { ...selection, sourceFilter: { enabled: false } } });
+    const grant = research.testExecution(full).evidenceScope;
+    assert.equal(grant.external, true);
+    assert.equal(service.hasResearchSourceRestriction(full), false);
+    assert.equal(service.hasResearchSourceRestriction(service.authorizeNotebookRequest(full)), false, 'reauthorization preserves the original grant');
+    const restricted = service.authorizeNotebookRequest(request);
+    assert.equal(research.testExecution(restricted).evidenceScope.external, false);
+    assert.equal(service.hasResearchSourceRestriction(restricted), true);
+    assert.equal(research.testExecution({ ...full, selection: { ...full.selection, layers: { ideas: false, documents: false } } }).evidenceScope.external, false);
+  });
+
+  for (const window of [4096, null]) test(`repeated correction retains the original target beyond the ${window ?? 'cloud'} history window`, async () => {
+    ai.localModelContextWindow = async () => window;
+    const fix = { role: 'user', content: 'Correction needed for the synthesis route above. Fix the rejected step.' };
+    const messages = [request.messages[0]];
+    for (let i = 0; i < 8; i++) messages.push({ role: 'assistant', content: 'Step 1 draft' }, fix);
+    try {
+      const payload = await build({ ...request, messages });
+      assert.equal(questionSeen, request.messages[0].content);
+      assert.ok(payload.evidencia_para_la_ruta.textbook_passages.some(p => p.text.includes('SELECTED_ONLY')));
+    } finally { ai.localModelContextWindow = async () => null; }
+  });
+
+  test('cancelling a prompt interrupts the evidence embedding instead of finishing retrieval', async () => {
+    const controller = new AbortController();
+    let started;
+    const ready = new Promise(resolve => { started = resolve; });
+    ai.embed = async (_query, signal) => {
+      assert.equal(signal, controller.signal);
+      started();
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    };
+    try {
+      const pending = build(request, controller.signal);
+      pending.catch(() => {});
+      let timer;
+      try {
+        await Promise.race([ready, new Promise((_, reject) => { timer = setTimeout(() => reject(Error('embedding never received the caller signal')), 2000); })]);
+      } finally { clearTimeout(timer); }
+      controller.abort();
+      await assert.rejects(pending, { name: 'AbortError' });
+    } finally { ai.embed = async () => null; }
+  });
+
+  test('cancellation reaches concurrent route tools and disposes every runner', async () => {
+    const registry = load('electron/capabilities/registry.ts');
+    const reactions = load('electron/reactionIndex/index.ts');
+    const originalRunner = molecule.chemistryRunner;
+    const originalRegistry = registry.capabilityRegistry;
+    const originalService = reactions.reactionIndexService;
+    const controller = new AbortController();
+    let running = 0, disposed = 0, started;
+    const ready = new Promise(resolve => { started = resolve; });
+    registry.capabilityRegistry = () => ({ providers: new Map([['nodus:chemistry', { tools: [{ id: 'search-routes' }, { id: 'propose-disconnections' }] }]]) });
+    reactions.reactionIndexService = () => ({ localDirectory: async () => '/isolated-ord' });
+    molecule.chemistryRunner = options => ({
+      runner: { invoke: async () => {
+        assert.equal(options.signal, controller.signal);
+        running++;
+        if (running === 2) started();
+        return new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true }));
+      } },
+      dispose: async () => { disposed++; },
+    });
+    try {
+      const pending = realGather(request.messages[0].content, { signal: controller.signal });
+      pending.catch(() => {});
+      await ready;
+      controller.abort();
+      await assert.rejects(pending, { name: 'AbortError' });
+      assert.equal(disposed, 2);
+    } finally {
+      molecule.chemistryRunner = originalRunner;
+      registry.capabilityRegistry = originalRegistry;
+      reactions.reactionIndexService = originalService;
+    }
+  });
+
+  test('post-answer checks preserve structural verification while respecting the source grant', async () => {
+    const registry = load('electron/capabilities/registry.ts');
+    const reactions = load('electron/reactionIndex/index.ts');
+    const originalRegistry = registry.capabilityRegistry, originalService = reactions.reactionIndexService, originalComplete = ai.completeText;
+    registry.capabilityRegistry = () => ({ providers: new Map([['nodus:chemistry', { tools: [
+      { id: 'verify-route', inputSchema: { properties: { labels: {} } } }, { id: 'known-reactions' }, { id: 'check-compatibility' }, { id: 'check-stock' },
+    ] }]]) });
+    reactions.reactionIndexService = () => ({ localDirectory: async () => '/isolated-ord' });
+    ai.completeText = async () => '{"issues":[]}';
+    const stock = path.join(scratch, 'stock'); fs.mkdirSync(stock); fs.writeFileSync(path.join(stock, 'fixture.u64'), 'fixture');
+    process.env.NODUS_STOCK_DIR = stock;
+    const labels = [[{ role: 'reactant', name: 'ethanol', smiles: 'CCO' }, { role: 'product', name: 'ethanal', smiles: 'CC=O' }]];
+    const steps = ['CCO>>CC=O'];
+    const calls = [];
+    const runner = { invoke: async ({ toolId, input }) => {
+      calls.push({ toolId, input });
+      if (toolId === 'verify-route') return { artifacts: [{ artifactType: 'route-audit', data: { continuous: true, links: [], blocked: [], steps: [{ index: 0, reaction: steps[0], ok: true, balanced: true, chargeBalanced: true, differences: [], unspecifiedStereocentres: 0, reactants: [], agents: [], products: [] }] } }] };
+      return { artifacts: [] };
+    } };
+    const prose = 'Step 1: Oxidation\nReagents and conditions: PCC, dichloromethane.';
+    try {
+      const grant = { workIds: new Set(), external: false, web: false };
+      const answer = await molecule.appendRouteReportAndDrawings(prose, prose, { runner, evidenceScope: grant }, { steps, labels });
+      assert.match(answer, /Route check/);
+      assert.deepEqual(calls.map(call => call.toolId), ['verify-route', 'check-compatibility']);
+      assert.equal(calls[1].input.textbookDir, undefined);
+      calls.length = 0;
+      await molecule.appendRouteReportAndDrawings(prose, prose, { runner }, { steps, labels });
+      assert.ok(calls.some(call => call.toolId === 'known-reactions'), 'ORD still runs with an unrestricted grant');
+      assert.ok(calls.some(call => call.toolId === 'check-stock'), 'stock still runs with an unrestricted grant');
+    } finally {
+      registry.capabilityRegistry = originalRegistry; reactions.reactionIndexService = originalService; ai.completeText = originalComplete;
+      delete process.env.NODUS_STOCK_DIR;
+    }
+  });
+
+  test('the opt-in revision pass honours web-off and propagates web cancellation', async () => {
+    const pass = load('electron/ai/routeEvidencePass.ts');
+    const web = load('electron/websearch/searxngService.ts');
+    const originalResolve = molecule.resolveNamedRoute, originalRunner = molecule.chemistryRunner, originalSearch = web.searchSearxng;
+    molecule.resolveNamedRoute = async () => ({ legacy: false, labels: [[{ role: 'reactant', name: 'ethanol', smiles: 'CCO' }, { role: 'product', name: 'ethanal', smiles: 'CC=O' }]] });
+    molecule.chemistryRunner = () => ({ runner: {}, dispose: async () => {} });
+    let searches = 0;
+    web.searchSearxng = async () => { searches++; throw Error('web must be off'); };
+    const grant = { workIds: new Set(), external: false, web: false };
+    try {
+      const found = await pass.gatherRouteEvidence('draft', { evidenceScope: grant });
+      assert.equal(searches, 0);
+      assert.ok(found.every(step => !step.ord && !step.textbook && !step.web));
+      const controller = new AbortController();
+      web.searchSearxng = async (_query, _options, signal) => { assert.equal(signal, controller.signal); controller.abort(); throw signal.reason; };
+      await assert.rejects(pass.gatherRouteEvidence('draft', { evidenceScope: { ...grant, web: true }, signal: controller.signal }), { name: 'AbortError' });
+    } finally { molecule.resolveNamedRoute = originalResolve; molecule.chemistryRunner = originalRunner; web.searchSearxng = originalSearch; }
+  });
+
+  test('scheme indexes are searched only when every record and template is in scope', async () => {
+    const schemes = load('electron/ai/textbookSchemes.ts');
+    const index = path.join(scratch, 'schemes');
+    fs.mkdirSync(index);
+    for (const name of ['exact.tsv.zst', 'products.tsv.zst', 'reaction-smiles.tsv.zst', 'molecules.tsv.zst', 'reactions.faiss.zst', 'reaction-keys.txt.zst', 'retro-templates.tsv.zst']) fs.writeFileSync(path.join(index, name), 'fixture');
+    fs.writeFileSync(path.join(index, 'manifest.json'), JSON.stringify({ source: 'nodus.textbook-schemes' }));
+    const id = `tb-${'a'.repeat(32)}`;
+    const scope = { workIds: new Set(['selected']), external: false, web: false };
+    const record = { nodusId: 'selected', book: 'Organic Chemistry selected', page: 1, kind: 'crop' };
+    const write = (records, sources) => {
+      fs.writeFileSync(path.join(index, 'records.json'), JSON.stringify(records));
+      fs.writeFileSync(path.join(index, 'template-sources.json'), JSON.stringify({ 'a>>b': { sources } }));
+    };
+    process.env.NODUS_SCHEME_INDEX_DIR = index;
+    try {
+      write({ [id]: record }, [record]);
+      assert.equal(schemes.textbookSchemeDirectory(scope), index, 'an entirely selected index stays usable');
+      assert.equal(schemes.textbookCitations([id], index, scope).length, 1);
+      write({ [id]: record }, [{ ...record, nodusId: 'outside' }]);
+      assert.equal(schemes.textbookSchemeDirectory(scope), null, 'an excluded template is enough to refuse the entire index');
+      assert.deepEqual(schemes.textbookTemplateCitations(['a>>b'], index, 2, scope), []);
+      write({ [id]: { ...record, nodusId: 'outside' } }, [record]);
+      assert.equal(schemes.textbookSchemeDirectory(scope), null);
+      assert.deepEqual(schemes.textbookCitations([id], index, scope), []);
+      write({ [id]: { ...record, nodusId: 'different-vault-book' } }, [record]);
+      assert.equal(schemes.textbookSchemeDirectory({ ...scope, workIds: null }), null, 'the active library cannot read another vault index');
+      write({ [id]: record }, [{ book: 'Unattributed', page: 1 }]);
+      assert.equal(schemes.textbookSchemeDirectory(scope), null, 'unknown provenance fails closed');
+      write({ [id]: record }, [record]);
+      assert.equal(schemes.textbookSchemeDirectory({ ...scope, workIds: new Set() }), null);
+      db.prepare("UPDATE works SET archived=1 WHERE nodus_id='selected'").run();
+      assert.equal(schemes.textbookSchemeDirectory(scope), null, 'archiving invalidates the grant without rebuilding the index');
+    } finally {
+      db.prepare("UPDATE works SET archived=0 WHERE nodus_id='selected'").run();
+      delete process.env.NODUS_SCHEME_INDEX_DIR;
+    }
+  });
+}

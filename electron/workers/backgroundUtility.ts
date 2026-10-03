@@ -10,4 +10,8 @@ const worker = new Worker(process.argv[2]);
 port.on('message', message => worker.postMessage(message.data));
 worker.on('message', message => port.postMessage(message));
 worker.once('error', () => process.exit(1));
-worker.once('exit', code => process.exit(code));
+// A clean exit right after the worker's last message would race the forwarding of that message
+// to the main process (port.postMessage is asynchronous): under CPU load the utility could exit
+// first and the owner saw "worker stopped" with the result lost. On success, give the message
+// time to leave; the owner terminates this process as soon as it has the result.
+worker.once('exit', code => { if (code) process.exit(code); else setTimeout(() => process.exit(0), 2000); });

@@ -1,0 +1,721 @@
+{
+ "source": "~/Nodus-Notes/Synthesis test suites (items 1-8 prompts, items 11-27 reference routes); items 9, 10, 28-30 are strategy-level and not scored",
+ "scoring": "For each reference step, the ORD lookup for the step's product should return a disconnection whose organic precursors include every expected precursor (inorganic reagents are ignored), within the top k.",
+ "cases": [
+  {
+   "item": 1,
+   "name": "(Z)-hex-3-ene",
+   "target": "CC/C=C\\CC",
+   "steps": [
+    {
+     "product": "CCC#C",
+     "precursors": [
+      "C#C",
+      "CCBr"
+     ]
+    },
+    {
+     "product": "CCC#CCC",
+     "precursors": [
+      "CCC#C",
+      "CCBr"
+     ]
+    },
+    {
+     "product": "CC/C=C\\CC",
+     "precursors": [
+      "CCC#CCC"
+     ]
+    }
+   ],
+   "starts": [
+    "C#C",
+    "CCBr"
+   ]
+  },
+  {
+   "item": 2,
+   "name": "3-bromoaniline",
+   "target": "Nc1cccc(Br)c1",
+   "steps": [
+    {
+     "product": "O=[N+]([O-])c1ccccc1",
+     "precursors": [
+      "c1ccccc1"
+     ]
+    },
+    {
+     "product": "O=[N+]([O-])c1cccc(Br)c1",
+     "precursors": [
+      "O=[N+]([O-])c1ccccc1"
+     ]
+    },
+    {
+     "product": "Nc1cccc(Br)c1",
+     "precursors": [
+      "O=[N+]([O-])c1cccc(Br)c1"
+     ]
+    }
+   ],
+   "starts": [
+    "c1ccccc1"
+   ]
+  },
+  {
+   "item": 3,
+   "name": "aspirin",
+   "target": "CC(=O)Oc1ccccc1C(=O)O",
+   "steps": [
+    {
+     "product": "O=C(O)c1ccccc1O",
+     "precursors": [
+      "Oc1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Oc1ccccc1C(=O)O",
+     "precursors": [
+      "O=C(O)c1ccccc1O",
+      "CC(=O)OC(C)=O"
+     ]
+    }
+   ],
+   "starts": [
+    "Oc1ccccc1",
+    "CC(=O)OC(C)=O"
+   ]
+  },
+  {
+   "item": 4,
+   "name": "2-methylbutanoic acid",
+   "target": "CCC(C)C(=O)O",
+   "steps": [
+    {
+     "product": "CCOC(=O)C(C)C(=O)OCC",
+     "precursors": [
+      "CCOC(=O)CC(=O)OCC",
+      "CI"
+     ]
+    },
+    {
+     "product": "CCOC(=O)C(C)(CC)C(=O)OCC",
+     "precursors": [
+      "CCOC(=O)C(C)C(=O)OCC",
+      "CCBr"
+     ]
+    },
+    {
+     "product": "CCC(C)(C(=O)O)C(=O)O",
+     "precursors": [
+      "CCOC(=O)C(C)(CC)C(=O)OCC"
+     ]
+    },
+    {
+     "product": "CCC(C)C(=O)O",
+     "precursors": [
+      "CCC(C)(C(=O)O)C(=O)O"
+     ]
+    }
+   ],
+   "starts": [
+    "CCOC(=O)CC(=O)OCC",
+    "CI",
+    "CCBr"
+   ]
+  },
+  {
+   "item": 5,
+   "name": "4-bromoaniline",
+   "target": "Nc1ccc(Br)cc1",
+   "steps": [
+    {
+     "product": "O=[N+]([O-])c1ccccc1",
+     "precursors": [
+      "c1ccccc1"
+     ]
+    },
+    {
+     "product": "Nc1ccccc1",
+     "precursors": [
+      "O=[N+]([O-])c1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Nc1ccccc1",
+     "precursors": [
+      "Nc1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Nc1ccc(Br)cc1",
+     "precursors": [
+      "CC(=O)Nc1ccccc1"
+     ]
+    },
+    {
+     "product": "Nc1ccc(Br)cc1",
+     "precursors": [
+      "CC(=O)Nc1ccc(Br)cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "c1ccccc1"
+   ]
+  },
+  {
+   "item": 6,
+   "name": "sulfanilamide",
+   "target": "Nc1ccc(cc1)S(N)(=O)=O",
+   "steps": [
+    {
+     "product": "CC(=O)Nc1ccccc1",
+     "precursors": [
+      "Nc1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Nc1ccc(S(=O)(=O)Cl)cc1",
+     "precursors": [
+      "CC(=O)Nc1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Nc1ccc(S(N)(=O)=O)cc1",
+     "precursors": [
+      "CC(=O)Nc1ccc(S(=O)(=O)Cl)cc1"
+     ]
+    },
+    {
+     "product": "Nc1ccc(cc1)S(N)(=O)=O",
+     "precursors": [
+      "CC(=O)Nc1ccc(S(N)(=O)=O)cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "c1ccccc1",
+    "N"
+   ]
+  },
+  {
+   "item": 7,
+   "name": "ibuprofen",
+   "target": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+   "steps": [
+    {
+     "product": "CC(=O)c1ccc(CC(C)C)cc1",
+     "precursors": [
+      "CC(C)Cc1ccccc1"
+     ]
+    },
+    {
+     "product": "CC(O)c1ccc(CC(C)C)cc1",
+     "precursors": [
+      "CC(=O)c1ccc(CC(C)C)cc1"
+     ]
+    },
+    {
+     "product": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+     "precursors": [
+      "CC(O)c1ccc(CC(C)C)cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "CC(C)Cc1ccccc1"
+   ]
+  },
+  {
+   "item": 8,
+   "name": "tropinone",
+   "target": "CN1C2CCC1CC(=O)C2",
+   "steps": [
+    {
+     "product": "O=CCCC=O",
+     "precursors": [
+      "COC1CCC(OC)O1"
+     ]
+    },
+    {
+     "product": "O=C(O)CC(=O)CC(=O)O",
+     "precursors": [
+      "OC(=O)CC(O)(CC(=O)O)C(=O)O"
+     ]
+    },
+    {
+     "product": "CN1C2CCC1CC(=O)C2",
+     "precursors": [
+      "O=CCCC=O",
+      "CN"
+     ]
+    }
+   ],
+   "starts": [
+    "COC1CCC(OC)O1",
+    "OC(=O)CC(O)(CC(=O)O)C(=O)O",
+    "CN"
+   ]
+  },
+  {
+   "item": 11,
+   "name": "phenylacetic acid",
+   "target": "OC(=O)Cc1ccccc1",
+   "steps": [
+    {
+     "product": "BrCc1ccccc1",
+     "precursors": [
+      "Cc1ccccc1"
+     ]
+    },
+    {
+     "product": "N#CCc1ccccc1",
+     "precursors": [
+      "BrCc1ccccc1"
+     ]
+    },
+    {
+     "product": "OC(=O)Cc1ccccc1",
+     "precursors": [
+      "N#CCc1ccccc1"
+     ]
+    }
+   ],
+   "starts": [
+    "Cc1ccccc1"
+   ]
+  },
+  {
+   "item": 12,
+   "name": "benzocaine",
+   "target": "CCOC(=O)c1ccc(N)cc1",
+   "steps": [
+    {
+     "product": "O=C(O)c1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "Cc1ccc([N+](=O)[O-])cc1"
+     ]
+    },
+    {
+     "product": "CCOC(=O)c1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "O=C(O)c1ccc([N+](=O)[O-])cc1",
+      "CCO"
+     ]
+    },
+    {
+     "product": "CCOC(=O)c1ccc(N)cc1",
+     "precursors": [
+      "CCOC(=O)c1ccc([N+](=O)[O-])cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "Cc1ccc([N+](=O)[O-])cc1"
+   ]
+  },
+  {
+   "item": 13,
+   "name": "(E)-stilbene",
+   "target": "C(/c1ccccc1)=C/c1ccccc1",
+   "steps": [
+    {
+     "product": "C(/c1ccccc1)=C/c1ccccc1",
+     "precursors": [
+      "O=Cc1ccccc1"
+     ]
+    }
+   ],
+   "starts": [
+    "BrCc1ccccc1",
+    "O=Cc1ccccc1"
+   ]
+  },
+  {
+   "item": 14,
+   "name": "benzilic acid",
+   "target": "OC(=O)C(O)(c1ccccc1)c1ccccc1",
+   "steps": [
+    {
+     "product": "OC(c1ccccc1)C(=O)c1ccccc1",
+     "precursors": [
+      "O=Cc1ccccc1"
+     ]
+    },
+    {
+     "product": "O=C(c1ccccc1)C(=O)c1ccccc1",
+     "precursors": [
+      "OC(c1ccccc1)C(=O)c1ccccc1"
+     ]
+    },
+    {
+     "product": "OC(=O)C(O)(c1ccccc1)c1ccccc1",
+     "precursors": [
+      "O=C(c1ccccc1)C(=O)c1ccccc1"
+     ]
+    }
+   ],
+   "starts": [
+    "O=Cc1ccccc1"
+   ]
+  },
+  {
+   "item": 15,
+   "name": "2-hexanone",
+   "target": "CCCCC(C)=O",
+   "steps": [
+    {
+     "product": "CCCC(C(C)=O)C(=O)OCC",
+     "precursors": [
+      "CCOC(=O)CC(C)=O",
+      "CCCBr"
+     ]
+    },
+    {
+     "product": "CCCCC(C)=O",
+     "precursors": [
+      "CCCC(C(C)=O)C(=O)OCC"
+     ]
+    }
+   ],
+   "starts": [
+    "CCOC(=O)CC(C)=O",
+    "CCCBr"
+   ]
+  },
+  {
+   "item": 16,
+   "name": "acetaminophen",
+   "target": "CC(=O)Nc1ccc(O)cc1",
+   "steps": [
+    {
+     "product": "O=[N+]([O-])c1ccc(O)cc1",
+     "precursors": [
+      "Oc1ccccc1"
+     ]
+    },
+    {
+     "product": "Nc1ccc(O)cc1",
+     "precursors": [
+      "O=[N+]([O-])c1ccc(O)cc1"
+     ]
+    },
+    {
+     "product": "CC(=O)Nc1ccc(O)cc1",
+     "precursors": [
+      "Nc1ccc(O)cc1",
+      "CC(=O)OC(C)=O"
+     ]
+    }
+   ],
+   "starts": [
+    "Oc1ccccc1"
+   ]
+  },
+  {
+   "item": 17,
+   "name": "epsilon-caprolactam",
+   "target": "O=C1CCCCCN1",
+   "steps": [
+    {
+     "product": "O=C1CCCCC1",
+     "precursors": [
+      "OC1CCCCC1"
+     ]
+    },
+    {
+     "product": "ON=C1CCCCC1",
+     "precursors": [
+      "O=C1CCCCC1"
+     ]
+    },
+    {
+     "product": "O=C1CCCCCN1",
+     "precursors": [
+      "ON=C1CCCCC1"
+     ]
+    }
+   ],
+   "starts": [
+    "OC1CCCCC1"
+   ]
+  },
+  {
+   "item": 18,
+   "name": "fluorobenzene",
+   "target": "Fc1ccccc1",
+   "steps": [
+    {
+     "product": "O=[N+]([O-])c1ccccc1",
+     "precursors": [
+      "c1ccccc1"
+     ]
+    },
+    {
+     "product": "Nc1ccccc1",
+     "precursors": [
+      "O=[N+]([O-])c1ccccc1"
+     ]
+    },
+    {
+     "product": "Fc1ccccc1",
+     "precursors": [
+      "Nc1ccccc1"
+     ]
+    }
+   ],
+   "starts": [
+    "c1ccccc1"
+   ]
+  },
+  {
+   "item": 19,
+   "name": "p-cresol",
+   "target": "Cc1ccc(O)cc1",
+   "steps": [
+    {
+     "product": "Cc1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "Cc1ccccc1"
+     ]
+    },
+    {
+     "product": "Cc1ccc(N)cc1",
+     "precursors": [
+      "Cc1ccc([N+](=O)[O-])cc1"
+     ]
+    },
+    {
+     "product": "Cc1ccc(O)cc1",
+     "precursors": [
+      "Cc1ccc(N)cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "Cc1ccccc1"
+   ]
+  },
+  {
+   "item": 20,
+   "name": "cyclobutanecarboxylic acid",
+   "target": "OC(=O)C1CCC1",
+   "steps": [
+    {
+     "product": "CCOC(=O)C1(C(=O)OCC)CCC1",
+     "precursors": [
+      "CCOC(=O)CC(=O)OCC",
+      "BrCCCBr"
+     ]
+    },
+    {
+     "product": "OC(=O)C1(C(=O)O)CCC1",
+     "precursors": [
+      "CCOC(=O)C1(C(=O)OCC)CCC1"
+     ]
+    },
+    {
+     "product": "OC(=O)C1CCC1",
+     "precursors": [
+      "OC(=O)C1(C(=O)O)CCC1"
+     ]
+    }
+   ],
+   "starts": [
+    "CCOC(=O)CC(=O)OCC",
+    "BrCCCBr"
+   ]
+  },
+  {
+   "item": 21,
+   "name": "cis-cyclohexane-1,2-dicarboxylic acid",
+   "target": "OC(=O)C1CCCCC1C(=O)O",
+   "steps": [
+    {
+     "product": "O=C1OC(=O)C2CC=CCC12",
+     "precursors": [
+      "C=CC=C",
+      "O=C1C=CC(=O)O1"
+     ]
+    },
+    {
+     "product": "O=C1OC(=O)C2CCCCC12",
+     "precursors": [
+      "O=C1OC(=O)C2CC=CCC12"
+     ]
+    },
+    {
+     "product": "OC(=O)C1CCCCC1C(=O)O",
+     "precursors": [
+      "O=C1OC(=O)C2CCCCC12"
+     ]
+    }
+   ],
+   "starts": [
+    "C=CC=C",
+    "O=C1OC(=O)C=C1"
+   ]
+  },
+  {
+   "item": 22,
+   "name": "barbital",
+   "target": "CCC1(CC)C(=O)NC(=O)NC1=O",
+   "steps": [
+    {
+     "product": "CCOC(=O)C(CC)C(=O)OCC",
+     "precursors": [
+      "CCOC(=O)CC(=O)OCC",
+      "CCBr"
+     ]
+    },
+    {
+     "product": "CCOC(=O)C(CC)(CC)C(=O)OCC",
+     "precursors": [
+      "CCOC(=O)C(CC)C(=O)OCC",
+      "CCBr"
+     ]
+    },
+    {
+     "product": "CCC1(CC)C(=O)NC(=O)NC1=O",
+     "precursors": [
+      "CCOC(=O)C(CC)(CC)C(=O)OCC",
+      "NC(N)=O"
+     ]
+    }
+   ],
+   "starts": [
+    "CCOC(=O)CC(=O)OCC",
+    "CCBr",
+    "NC(N)=O"
+   ]
+  },
+  {
+   "item": 23,
+   "name": "procaine",
+   "target": "CCN(CC)CCOC(=O)c1ccc(N)cc1",
+   "steps": [
+    {
+     "product": "O=C(O)c1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "Cc1ccc([N+](=O)[O-])cc1"
+     ]
+    },
+    {
+     "product": "O=C(Cl)c1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "O=C(O)c1ccc([N+](=O)[O-])cc1"
+     ]
+    },
+    {
+     "product": "CCN(CC)CCOC(=O)c1ccc([N+](=O)[O-])cc1",
+     "precursors": [
+      "O=C(Cl)c1ccc([N+](=O)[O-])cc1",
+      "CCN(CC)CCO"
+     ]
+    },
+    {
+     "product": "CCN(CC)CCOC(=O)c1ccc(N)cc1",
+     "precursors": [
+      "CCN(CC)CCOC(=O)c1ccc([N+](=O)[O-])cc1"
+     ]
+    }
+   ],
+   "starts": [
+    "Cc1ccc([N+](=O)[O-])cc1",
+    "CCN(CC)CCO"
+   ]
+  },
+  {
+   "item": 24,
+   "name": "DL-phenylalanine",
+   "target": "NC(Cc1ccccc1)C(=O)O",
+   "steps": [
+    {
+     "product": "CCOC(=O)C(Cc1ccccc1)(NC(C)=O)C(=O)OCC",
+     "precursors": [
+      "CC(=O)NC(C(=O)OCC)C(=O)OCC",
+      "ClCc1ccccc1"
+     ]
+    },
+    {
+     "product": "NC(Cc1ccccc1)C(=O)O",
+     "precursors": [
+      "CCOC(=O)C(Cc1ccccc1)(NC(C)=O)C(=O)OCC"
+     ]
+    }
+   ],
+   "starts": [
+    "CC(=O)NC(C(=O)OCC)C(=O)OCC",
+    "ClCc1ccccc1"
+   ]
+  },
+  {
+   "item": 25,
+   "name": "camphor",
+   "target": "CC1(C)C2CCC1(C)C(=O)C2",
+   "steps": [
+    {
+     "product": "CC1(C)C2CCC1(C)C(O)C2",
+     "precursors": [
+      "CC(=O)OC1CC2CCC1(C)C2(C)C"
+     ]
+    },
+    {
+     "product": "CC1(C)C2CCC1(C)C(=O)C2",
+     "precursors": [
+      "CC1(C)C2CCC1(C)C(O)C2"
+     ]
+    }
+   ],
+   "starts": [
+    "CC1(C)C2CCC(C2)C1=C"
+   ]
+  },
+  {
+   "item": 26,
+   "name": "Wieland-Miescher ketone",
+   "target": "CC12CCC(=O)C=C1CCCC2=O",
+   "steps": [
+    {
+     "product": "CC(=O)CCC1(C)C(=O)CCCC1=O",
+     "precursors": [
+      "CC1C(=O)CCCC1=O",
+      "C=CC(C)=O"
+     ]
+    },
+    {
+     "product": "CC12CCC(=O)C=C1CCCC2=O",
+     "precursors": [
+      "CC(=O)CCC1(C)C(=O)CCCC1=O"
+     ]
+    }
+   ],
+   "starts": [
+    "CC1C(=O)CCCC1=O",
+    "C=CC(C)=O"
+   ]
+  },
+  {
+   "item": 27,
+   "name": "adamantane",
+   "target": "C1C2CC3CC1CC(C2)C3",
+   "steps": [
+    {
+     "product": "C1CC2C3CCC(C3)C2C1",
+     "precursors": [
+      "C1=CC2C3C=CC(C3)C2C1"
+     ]
+    },
+    {
+     "product": "C1C2CC3CC1CC(C2)C3",
+     "precursors": [
+      "C1CC2C3CCC(C3)C2C1"
+     ]
+    }
+   ],
+   "starts": [
+    "C1C=CC=C1"
+   ]
+  }
+ ]
+}
