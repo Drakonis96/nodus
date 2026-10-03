@@ -1,5 +1,5 @@
 {
-  "run": "https://github.com/Drakonis96/nodus/actions/runs/35979124961",
+  "run": "https://github.com/jorgepb96/nodus/actions/runs/35979124961",
   "commit": "2c7f1c4a",
   "note": "macOS x64 first failed in capabilities:bootstrap on an HTTP 500 from a GitHub release asset; only that job was re-run on the same commit and passed.",
   "platforms": [

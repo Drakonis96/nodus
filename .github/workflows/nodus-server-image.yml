@@ -44,7 +44,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/drakonis96/nodus-server
+  IMAGE: ghcr.io/jorgepb96/nodus-server
 
 jobs:
   # Build and boot the image without publishing it. The image's dependencies are
@@ -167,7 +167,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=Nodus Server
             org.opencontainers.image.description=Experimental self-hosted Nodus MCP server
-            org.opencontainers.image.source=https://github.com/Drakonis96/nodus
+            org.opencontainers.image.source=https://github.com/jorgepb96/nodus
             org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.version=5.7.4
             org.opencontainers.image.revision=${{ github.sha }}
@@ -230,7 +230,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=Nodus Server
             org.opencontainers.image.description=Experimental self-hosted Nodus MCP server
-            org.opencontainers.image.source=https://github.com/Drakonis96/nodus
+            org.opencontainers.image.source=https://github.com/jorgepb96/nodus
             org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.version=5.7.4
             org.opencontainers.image.revision=${{ github.sha }}

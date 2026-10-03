@@ -25,7 +25,7 @@ import {
 import './NodusBookmarks.css';
 
 const NODUS_SITE = 'https://nodusresearch.com/';
-const NODUS_REPOSITORY = 'https://github.com/Drakonis96/nodus';
+const NODUS_REPOSITORY = 'https://github.com/jorgepb96/nodus';
 const NODUS_LOGO = new URL('../../../site/assets/nodus-logo.svg', import.meta.url).href;
 const NODUS_ORGANISM_SCRIPT = new URL('../../../site/assets/js/organism.js', import.meta.url).href;
 
@@ -150,7 +150,7 @@ function NodusSiteHeader({ page }: { page: 'atlas' | 'bookmarks' }) {
   useEffect(() => {
     const controller = new AbortController();
     const compact = (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-    void fetch('https://api.github.com/repos/Drakonis96/nodus', { signal: controller.signal })
+    void fetch('https://api.github.com/repos/jorgepb96/nodus', { signal: controller.signal })
       .then((response) => response.ok ? response.json() : null)
       .then((result) => { if (typeof result?.stargazers_count === 'number') setStars(compact(result.stargazers_count)); })
       .catch(() => {});

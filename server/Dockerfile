@@ -19,9 +19,9 @@ ARG NODUS_VERSION=5.7.4
 ARG NODUS_REVISION=unknown
 LABEL org.opencontainers.image.title="Nodus Server" \
       org.opencontainers.image.description="Experimental self-hosted Nodus MCP server" \
-      org.opencontainers.image.source="https://github.com/Drakonis96/nodus" \
-      org.opencontainers.image.url="https://github.com/Drakonis96/nodus" \
-      org.opencontainers.image.documentation="https://github.com/Drakonis96/nodus/blob/v5.7.4/server/README.md" \
+      org.opencontainers.image.source="https://github.com/jorgepb96/nodus" \
+      org.opencontainers.image.url="https://github.com/jorgepb96/nodus" \
+      org.opencontainers.image.documentation="https://github.com/jorgepb96/nodus/blob/v5.7.4/server/README.md" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.version="${NODUS_VERSION}" \
       org.opencontainers.image.revision="${NODUS_REVISION}" \
@@ -47,7 +47,7 @@ COPY --from=web-build /src/server/dist/web ./dist/web
 ENV NODUS_DATA_DIR=/data \
     NODUS_HOST=0.0.0.0 \
     NODUS_PORT=7443 \
-    NODUS_SOURCE_URL=https://github.com/Drakonis96/nodus/tree/v5.7.4
+    NODUS_SOURCE_URL=https://github.com/jorgepb96/nodus/tree/v5.7.4
 
 RUN mkdir -p /data && chown -R node:node /app /data
 USER node

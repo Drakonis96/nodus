@@ -15,7 +15,7 @@
  },
  "catalog": { "pullRequest": "NodusResearch/nodus-research-skill-marketplace#42", "mergeCommit": "24bef77f", "bytes": 19454481 },
  "pin": {
-  "mainPullRequest": "Drakonis96/nodus#942 (not merged)",
+  "mainPullRequest": "jorgepb96/nodus#942 (not merged)",
   "branchCommit": "7831f7f8",
   "verification": ["NODUS_REQUIRE_BOOTSTRAP=1 npm run capabilities:bootstrap: 3 packages bundled", "npm run verify:cross-repo against marketplace main 24bef77: CROSS-REPO PASS", "npm run verify:capability-migration: CAPABILITY MIGRATION PASS", "#942 CI: cross-repo passed on macos-14, ubuntu-latest and windows-latest"]
  },

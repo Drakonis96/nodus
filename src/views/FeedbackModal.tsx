@@ -5,7 +5,7 @@ import { Icon } from '../components/ui';
 import { t } from '../i18n';
 
 // GitHub repository that receives the preformatted reports and feedback.
-const REPO = 'Drakonis96/nodus';
+const REPO = 'jorgepb96/nodus';
 const PRODUCT_FEEDBACK_THREAD = 272;
 
 type FeedbackKind = 'feature' | 'bug' | 'vault' | 'feedback';

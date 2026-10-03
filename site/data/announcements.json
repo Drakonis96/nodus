@@ -73,7 +73,7 @@
       "id": "2026-09-local-models-nvidia-gpus",
       "date": "2026-09-16",
       "severity": "warning",
-      "url": "https://github.com/Drakonis96/nodus/issues/851",
+      "url": "https://github.com/jorgepb96/nodus/issues/851",
       "expiresAt": "2026-10-16",
       "copy": {
         "es": {
@@ -142,7 +142,7 @@
       "id": "contribute-to-nodus",
       "date": "2026-09-13",
       "severity": "info",
-      "url": "https://github.com/Drakonis96/nodus",
+      "url": "https://github.com/jorgepb96/nodus",
       "copy": {
         "es": {
           "title": "Ayuda a construir Nodus Research",
@@ -210,7 +210,7 @@
       "id": "2026-09-09-github-star",
       "date": "2026-09-09",
       "severity": "info",
-      "url": "https://github.com/Drakonis96/nodus",
+      "url": "https://github.com/jorgepb96/nodus",
       "copy": {
         "es": {
           "title": "¿Te gusta Nodus?",
@@ -346,7 +346,7 @@
       "id": "2026-08-21-github-star",
       "date": "2026-08-21",
       "severity": "info",
-      "url": "https://github.com/Drakonis96/nodus",
+      "url": "https://github.com/jorgepb96/nodus",
       "copy": {
         "es": {
           "title": "¿Te gusta Nodus?",
@@ -551,7 +551,7 @@
       "id": "2026-08-nodus-4-agpl-license",
       "date": "2026-08-13",
       "severity": "warning",
-      "url": "https://github.com/Drakonis96/nodus/blob/main/LICENSE",
+      "url": "https://github.com/jorgepb96/nodus/blob/main/LICENSE",
       "minVersion": "4.0.0",
       "copy": {
         "es": {

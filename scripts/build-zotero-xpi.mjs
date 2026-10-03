@@ -34,7 +34,7 @@ function parseBase() {
   if (arg) return arg.slice('--base='.length);
   const i = process.argv.indexOf('--base');
   if (i >= 0 && process.argv[i + 1]) return process.argv[i + 1];
-  return process.env.ZOTERO_XPI_BASE || 'https://github.com/Drakonis96/nodus/releases/latest/download/';
+  return process.env.ZOTERO_XPI_BASE || 'https://github.com/jorgepb96/nodus/releases/latest/download/';
 }
 
 // Files to include: the whole plugin tree, minus junk. manifest.json lands at

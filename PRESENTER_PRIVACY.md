@@ -56,7 +56,7 @@ correct or delete presentation data on your devices.
 
 For support, visit [Nodus Research support](https://nodusresearch.com/faq/).
 For private security or privacy concerns, use the project's
-[private reporting channel](https://github.com/Drakonis96/nodus/security/advisories/new).
+[private reporting channel](https://github.com/jorgepb96/nodus/security/advisories/new).
 If you contact the project yourself, the information you send is handled by the
 service you choose under that service's privacy terms. Apple separately processes
 App Store and optional system diagnostic information under its own policies.

@@ -15,7 +15,7 @@ export class WebFetchError extends Error {
 export const WEB_PAGE_LIMITS = { htmlBytes: 3 * 1024 * 1024, pdfBytes: 12 * 1024 * 1024, timeoutMs: 9000 };
 // A browser-shaped identity that still names Nodus. It is a plain declaration,
 // not a disguise: pages that answer with a bot check are reported as blocked.
-const USER_AGENT = 'Mozilla/5.0 (compatible; Nodus Research/5.6; +https://github.com/Drakonis96/nodus) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36';
+const USER_AGENT = 'Mozilla/5.0 (compatible; Nodus Research/5.6; +https://github.com/jorgepb96/nodus) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Safari/537.36';
 
 async function readBounded(response: Response, maxBytes: number, signal: AbortSignal): Promise<Uint8Array> {
   if (!response.body) return new Uint8Array();

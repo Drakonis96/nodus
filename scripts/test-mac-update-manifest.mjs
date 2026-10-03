@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 const { MacUpdater } = require('electron-updater/out/MacUpdater.js');
 const { findFile, resolveFiles } = require('electron-updater/out/providers/Provider.js');
 
-const BASE_URL = new URL('https://github.com/Drakonis96/nodus/releases/download/v5.1.6/');
+const BASE_URL = new URL('https://github.com/jorgepb96/nodus/releases/download/v5.1.6/');
 
 // The arm64 half is the manifest published for 5.1.6, verbatim.
 const ARM64_MANIFEST = {

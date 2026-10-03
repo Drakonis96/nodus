@@ -140,7 +140,7 @@ test('public intake pins DNS, disallows redirects and enforces response bytes wi
  const get=https.get,lookup=dns.lookup;let status=200,large=false,lookups=0;
  dns.lookup=async()=>{lookups++;return [{address:'93.184.215.14',family:4}];};
  https.get=(url,options,receive)=>{
-  assert.equal(options.agent,false);assert.deepEqual(Object.keys(options.headers),['User-Agent','Accept']);assert.match(options.headers['User-Agent'],/^Nodus\/[^ ]+ \(https:\/\/github.com\/Drakonis96\/nodus\)$/);
+  assert.equal(options.agent,false);assert.deepEqual(Object.keys(options.headers),['User-Agent','Accept']);assert.match(options.headers['User-Agent'],/^Nodus\/[^ ]+ \(https:\/\/github.com\/jorgepb96\/nodus\)$/);
   options.lookup(url.hostname,{all:true},(error,addresses)=>{assert.equal(error,null);assert.deepEqual(addresses,[{address:'93.184.215.14',family:4}]);});
   const request=new EventEmitter();request.setTimeout=()=>request;request.destroy=error=>request.emit('error',error);
   queueMicrotask(()=>{const response=Readable.from([Buffer.from('image')]);response.statusCode=status;response.headers={'content-length':large?'99999999':'5'};receive(response);});return request;

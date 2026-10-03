@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-only
 The project was created by Jorge Pérez Burgueño. Its public identifiers are:
 
 - Domain: `nodusresearch.com`
-- Repository: `Drakonis96/nodus`
+- Repository: `jorgepb96/nodus`
 - ORCID: `0000-0002-1150-1930`
 - Conceptual DOI: `10.5281/zenodo.21515531`
 

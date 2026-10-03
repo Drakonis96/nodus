@@ -60,7 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported privately through the Nodus repository's
-[confidential reporting form](https://github.com/Drakonis96/nodus/security/advisories/new).
+[confidential reporting form](https://github.com/jorgepb96/nodus/security/advisories/new).
 Start the report title with `[Code of Conduct]`. Do not include sensitive incident
 details in a public issue.
 

@@ -10,7 +10,7 @@
   "homepage": "https://nodusresearch.com/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Drakonis96/nodus.git"
+    "url": "https://github.com/jorgepb96/nodus.git"
   },
   "releaseMetadata": {
     "dateReleased": "2026-10-02",
@@ -368,7 +368,7 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "drakonis96",
+        "owner": "jorgepb96",
         "repo": "nodus",
         "releaseType": "draft",
         "channel": "latest"
@@ -445,7 +445,7 @@
         "rpm"
       ],
       "category": "Office",
-      "maintainer": "Drakonis96 <Drakonis96@users.noreply.github.com>"
+      "maintainer": "jorgepb96 <jorgepb96@users.noreply.github.com>"
     },
     "appImage": {
       "artifactName": "Nodus-${arch}.${ext}"

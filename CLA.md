@@ -9,8 +9,8 @@ This agreement grants licensing permission; it does not transfer copyright.
 ## Parties and scope
 
 This agreement is between you and **Jorge Pérez Burgueño**
-([Drakonis96](https://github.com/Drakonis96)), the maintainer of
-[Nodus Research](https://github.com/Drakonis96/nodus) (the "Maintainer").
+([jorgepb96](https://github.com/jorgepb96)), the maintainer of
+[Nodus Research](https://github.com/jorgepb96/nodus) (the "Maintainer").
 A "Contribution" is original code, documentation, translations, tests, or other
 copyrightable material that you intentionally submit through a pull request for
 inclusion in Nodus Research and that you own or are authorized to license.

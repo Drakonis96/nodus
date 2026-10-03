@@ -1,7 +1,7 @@
 # Acceptance evidence and limits
 
 Implementation: `codex/agentic-corpus-notebooks`, starting from `f54995e7`.
-[Draft PR #932](https://github.com/Drakonis96/nodus/pull/932) is the live validation
+[Draft PR #932](https://github.com/jorgepb96/nodus/pull/932) is the live validation
 record. This table maps evidence to requirements; a passing row does not imply
 exhaustive acceptance of every related combination.
 
@@ -25,16 +25,16 @@ exhaustive acceptance of every related combination.
 
 ## Verification checkpoints
 
-- `736823e0`: [general CI](https://github.com/Drakonis96/nodus/actions/runs/35862272044)
+- `736823e0`: [general CI](https://github.com/jorgepb96/nodus/actions/runs/35862272044)
   passed 3,814 tests, zero failures and two explicit skips; all application E2Es and
   cross-repository targets passed. Skips concern standalone Electron ABI and the
   unavailable sibling marketplace checkout.
-- Same code: [native matrix](https://github.com/Drakonis96/nodus/actions/runs/35862271958)
-  and [installer matrix](https://github.com/Drakonis96/nodus/actions/runs/35862266301)
+- Same code: [native matrix](https://github.com/jorgepb96/nodus/actions/runs/35862271958)
+  and [installer matrix](https://github.com/jorgepb96/nodus/actions/runs/35862266301)
   passed all four targets.
 - `e7cea9f8`: local build/types/lint and real Electron/Zotero passed; four focused
   scripts passed in `/private/tmp/nodus-research-W8Ei0H`. The process change's
-  [installer matrix](https://github.com/Drakonis96/nodus/actions/runs/35876799855)
+  [installer matrix](https://github.com/jorgepb96/nodus/actions/runs/35876799855)
   adds actual packaged PDF extraction and first-page source evidence. Consult the
   draft PR checks for its result and subsequent documentation-only revisions.
 
@@ -234,20 +234,20 @@ to about USD 0.57.
 
 ### CI, platforms and distribution at `91a82aa0`
 
-- Earlier failure at `07f0e8bb`: general CI [35911521709](https://github.com/Drakonis96/nodus/actions/runs/35911521709)
+- Earlier failure at `07f0e8bb`: general CI [35911521709](https://github.com/jorgepb96/nodus/actions/runs/35911521709)
   failed because the new cinematic welcome intercepted clicks in the Stellar
   demonstration E2E. Fixed in `b2d8174c` (the demonstration profiles record the
   welcome's Later decision); at that SHA CI passed with a third skip, the
   preparation welcome browser fixture, which looked for Chrome only at Linux paths.
   Fixed in `7628f15c`.
-- General CI [35961146567](https://github.com/Drakonis96/nodus/actions/runs/35961146567):
+- General CI [35961146567](https://github.com/jorgepb96/nodus/actions/runs/35961146567):
   3,831 tests, 3,829 passed, 0 failed, 2 skipped (standalone Electron ABI suite and
   the absent sibling marketplace checkout); real-app smoke, Stellar, graph-tab and
   argument-map E2Es and three cross-repository targets passed.
-- Native integration [35961146556](https://github.com/Drakonis96/nodus/actions/runs/35961146556):
+- Native integration [35961146556](https://github.com/jorgepb96/nodus/actions/runs/35961146556):
   macOS ARM64, macOS x64, Windows x64 and Linux x64 passed (hash-locked private
   runtime, license inventory, managed stdio, two-profile lifecycle, focused suites).
-- Disposable installers [35961146159](https://github.com/Drakonis96/nodus/actions/runs/35961146159):
+- Disposable installers [35961146159](https://github.com/jorgepb96/nodus/actions/runs/35961146159):
   actual upgrade from the published v5.6.0 installer (hash-verified release asset)
   to the private test version `5.6.1-research.11`, launch of both versions,
   preservation of a legacy note, the profile and foreign resources, then native
@@ -304,14 +304,14 @@ inventory), `ab322ae4` (a replaced source treated as unauthorized and shown as a
 extraction failure), `b5dc96a7` (contrast). Local on the same code: 40/40 focused
 isolated suites and the 6/6 OS-isolation suite; lint of every changed file.
 
-**Platforms at `2c7f1c4a`:** general CI [35979349389](https://github.com/Drakonis96/nodus/actions/runs/35979349389)
+**Platforms at `2c7f1c4a`:** general CI [35979349389](https://github.com/jorgepb96/nodus/actions/runs/35979349389)
 (dispatched): the test job passed 3,830 tests with 0 failures and 2 skips, and all
 E2Es passed; the three cross-repository jobs failed on "chemistry-studio: the pinned
 version is the one the marketplace publishes" because the external marketplace now
 publishes 2.5.6 while both this branch and `main` pin 2.5.1 (the latest `main` CI,
-[35974026979](https://github.com/Drakonis96/nodus/actions/runs/35974026979), fails the
-same three jobs). Native matrix [35979358827](https://github.com/Drakonis96/nodus/actions/runs/35979358827)
-passed four targets. Installers [35979124961](https://github.com/Drakonis96/nodus/actions/runs/35979124961):
+[35974026979](https://github.com/jorgepb96/nodus/actions/runs/35974026979), fails the
+same three jobs). Native matrix [35979358827](https://github.com/jorgepb96/nodus/actions/runs/35979358827)
+passed four targets. Installers [35979124961](https://github.com/jorgepb96/nodus/actions/runs/35979124961):
 actual v5.6.0 → `5.6.1-research.12` upgrade, preservation and removal passed on all four
 targets (`2026-09-24-installers-2c7f1c4a.json`); macOS x64 was re-run once after an HTTP 500
 from a release asset during capability bootstrap.
@@ -341,12 +341,12 @@ Evidence: `2026-09-24-closure-followup.json`.
   replaced; the read is refused as `original_revision_changed`, the run is partial
   and abstains, and the replaced text never reaches the report.
 - All eight earlier scenarios and 41/41 focused suites were rerun on the merged code.
-- CI [35988824092](https://github.com/Drakonis96/nodus/actions/runs/35988824092) at
+- CI [35988824092](https://github.com/jorgepb96/nodus/actions/runs/35988824092) at
   `25b45ef9`: test job 3,828 tests, 0 failures, 2 skips, all E2Es; the three
   cross-repository jobs still fail on the Chemistry Studio pin (below). Native
-  [35988824127](https://github.com/Drakonis96/nodus/actions/runs/35988824127): four
+  [35988824127](https://github.com/jorgepb96/nodus/actions/runs/35988824127): four
   targets passed (macOS x64 re-run once after an artifact-upload DNS failure).
-- Installers [35988849000](https://github.com/Drakonis96/nodus/actions/runs/35988849000)
+- Installers [35988849000](https://github.com/jorgepb96/nodus/actions/runs/35988849000)
   at `25b45ef9`: actual v5.6.0 → private test version upgrade, preservation and removal
   passed on all four targets (`2026-09-24-installers-25b45ef9.json`); Windows x64 was
   re-run once after a download connection closed during the private runtime build.
@@ -370,7 +370,7 @@ screenshots `2026-09-24-end-to-end-queue.png` and `2026-09-24-end-to-end-quote-p
   5.3.2 (5.7.0 would make every 5.6.0 checkout refuse it). Release
   `chemistry-studio-v2.5.6` is cut and verified (nr02 signature, 19,454,481 bytes,
   SHA-256 `06251c4b…`); the catalog size is corrected in #42. The bootstrap pin is on
-  this branch (`7831f7f8`) and in Drakonis96/nodus#942 against `main` (not merged), whose
+  this branch (`7831f7f8`) and in jorgepb96/nodus#942 against `main` (not merged), whose
   three cross-repo jobs pass. No 5.6.2 reference exists; the version stays 5.6.0.
 - **Script.** `scripts/verify-research-end-to-end.mjs` drives a fresh isolated profile
   through the real UI with the real providers (DeepSeek Flash, OpenRouter bge-m3) and a

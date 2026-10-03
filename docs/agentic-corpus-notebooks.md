@@ -2,8 +2,8 @@
 
 ## Current acceptance status (2026-09-23)
 
-Implemented on `codex/agentic-corpus-notebooks`; [PR #932](https://github.com/Drakonis96/nodus/pull/932)
-remains draft and tracks [issue #931](https://github.com/Drakonis96/nodus/issues/931).
+Implemented on `codex/agentic-corpus-notebooks`; [PR #932](https://github.com/jorgepb96/nodus/pull/932)
+remains draft and tracks [issue #931](https://github.com/jorgepb96/nodus/issues/931).
 The sections below are a chronological engineering record. Statements such as
 “no paid inference yet” describe their checkpoint, not the current state.
 
@@ -601,7 +601,7 @@ maximums for unresolved/cancelled requests, under the single USD 5 ledger at
 `/private/tmp/nodus-research-iAyBHl/artifacts/cost-ledger.json`. This is a bounded
 accounting figure, not an assertion that every reservation was actually billed.
 
-Native run [35854275566](https://github.com/Drakonis96/nodus/actions/runs/35854275566)
+Native run [35854275566](https://github.com/jorgepb96/nodus/actions/runs/35854275566)
 completed successfully at `154ac96a` on macOS ARM64, macOS Intel, Windows x64 and
 Linux x64, including compilation, locked runtime preparation, scoped stdio,
 directory lifecycle and focused regressions; macOS also ran real Electron. This
@@ -645,14 +645,14 @@ verification and the installer hash. License text files themselves are retained.
 
 ### Full native verification and Linux installer correction
 
-At `49a927f0`, general CI [35857600969](https://github.com/Drakonis96/nodus/actions/runs/35857600969)
+At `49a927f0`, general CI [35857600969](https://github.com/jorgepb96/nodus/actions/runs/35857600969)
 passed 3,812 tests with zero failures and two explicit skips (CompassStore's
 standalone Node/Electron ABI case and a missing sibling marketplace checkout).
 It also passed the real application smoke, Stellar, tab and argument-map E2Es.
-Native matrix [35857600938](https://github.com/Drakonis96/nodus/actions/runs/35857600938)
+Native matrix [35857600938](https://github.com/jorgepb96/nodus/actions/runs/35857600938)
 passed macOS ARM64/x64, Windows x64 and Linux x64.
 
-Installer campaign [35856767251](https://github.com/Drakonis96/nodus/actions/runs/35856767251)
+Installer campaign [35856767251](https://github.com/jorgepb96/nodus/actions/runs/35856767251)
 built `e2d7f202`. Both signed/notarized macOS packages and Windows NSIS passed real
 installation, two packaged launches across same-version reinstallation, private
 Python loading and removal with retained profiles/notebooks and foreign fixtures.
@@ -668,7 +668,7 @@ bounded diagnostics in the evidence JSON instead of only a window timeout.
 
 ### Four-platform native installer results
 
-Campaign [35862266301](https://github.com/Drakonis96/nodus/actions/runs/35862266301)
+Campaign [35862266301](https://github.com/jorgepb96/nodus/actions/runs/35862266301)
 passed at `736823e0` on macOS ARM64/x64, Windows x64 and Linux x64. macOS packages
 were signed and notarized. All four installed the native package, launched the
 packaged application twice across same-version reinstallation, loaded the private
@@ -707,7 +707,7 @@ UI evidence from the corrected isolation campaign (synthetic content only):
 ### Installer fixture and responsiveness regression correction
 
 All four native integration targets passed at documentation head `6aec41cc`
-([35877174580](https://github.com/Drakonis96/nodus/actions/runs/35877174580)). General
+([35877174580](https://github.com/jorgepb96/nodus/actions/runs/35877174580)). General
 CI found one failure in the old responsiveness fixture: it still implemented
 worker-thread IPC while extraction now uses child-process IPC. The fixture keeps
 its event-loop latency assertions and additionally requires a distinct OS PID.

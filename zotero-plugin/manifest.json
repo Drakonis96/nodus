@@ -15,7 +15,7 @@
   "applications": {
     "zotero": {
       "id": "nodus-zotero@nodus.app",
-      "update_url": "https://github.com/Drakonis96/nodus/releases/latest/download/updates.json",
+      "update_url": "https://github.com/jorgepb96/nodus/releases/latest/download/updates.json",
       "strict_min_version": "9.0",
       "strict_max_version": "10.*"
     }

@@ -90,7 +90,7 @@ The Nodus project, maintained by Jorge Pérez Burgueño, publishes the software 
 or access the content stored in a normal installation or in a third-party-hosted Nodus Server. The
 project does not operate a cloud, account or central backend. For security incidents that need not
 be public, the private channel GitHub can be used:
-https://github.com/Drakonis96/nodus/security/advisories/new
+https://github.com/jorgepb96/nodus/security/advisories/new
 
 The person, university, educational center, company or organization who decides which personal data
 he or she introduces, what he or she uses them for, and how long he or she normally retains them is

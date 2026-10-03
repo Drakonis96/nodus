@@ -18,7 +18,7 @@
 export const NODUS_VERSION = '5.7.4';
 export const NODUS_LICENSE = 'AGPL-3.0-only';
 
-const OFFICIAL_SOURCE_URL = `https://github.com/Drakonis96/nodus/tree/v${NODUS_VERSION}`;
+const OFFICIAL_SOURCE_URL = `https://github.com/jorgepb96/nodus/tree/v${NODUS_VERSION}`;
 
 function configuredSourceUrl(value) {
   const candidate = String(value ?? '').trim() || OFFICIAL_SOURCE_URL;

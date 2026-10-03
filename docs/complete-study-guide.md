@@ -1,6 +1,6 @@
 # Complete study guide (Study vault Deep Research mode)
 
-Tracks item 4 of [issue #779](https://github.com/Drakonis96/nodus/issues/779):
+Tracks item 4 of [issue #779](https://github.com/jorgepb96/nodus/issues/779):
 generate a study report / review sheet from selected Materials, grounded in them,
 separating AI-written explanation from source content, exportable to MD, PDF and DOCX.
 

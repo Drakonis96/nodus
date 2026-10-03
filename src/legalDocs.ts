@@ -29,7 +29,7 @@ export interface LegalDoc {
   content: Record<AppLanguage, LegalDocContent>;
 }
 
-const NODUS_REPOSITORY_URL = 'https://github.com/Drakonis96/nodus';
+const NODUS_REPOSITORY_URL = 'https://github.com/jorgepb96/nodus';
 
 const PRIVACY: Record<AppLanguage, LegalDocContent> = {
   es: {

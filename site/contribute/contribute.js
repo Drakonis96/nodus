@@ -10,8 +10,8 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
 (function () {
   'use strict';
 
-  const REPO = 'https://api.github.com/repos/Drakonis96/nodus';
-  const REPO_URL = 'https://github.com/Drakonis96/nodus';
+  const REPO = 'https://api.github.com/repos/jorgepb96/nodus';
+  const REPO_URL = 'https://github.com/jorgepb96/nodus';
   // GitHub counts a few automation accounts as contributors; they are not people
   const BOTS = /(\[bot\]$|^dependabot|^github-actions|^renovate|^snyk|^imgbot|^allcontributors)/i;
   // Assistants and the platform account show up among GitHub contributors. This
@@ -20,7 +20,7 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
   // The project's owner opens the contributor list, whatever the counts say,
   // and their own issues and proposals are not community ones: the card that
   // counts them asks GitHub to leave the owner out.
-  const OWNER_LOGIN = 'Drakonis96';
+  const OWNER_LOGIN = 'jorgepb96';
   const OWNER = OWNER_LOGIN.toLowerCase();
 
   // A face is 20px wide and overlaps the one before it by 7px; the counter that
@@ -177,7 +177,7 @@ leave a card empty or wrong: an unknown number is shown as unknown, never as 0.
     // The card is the community's, so the owner's own issues and pull requests
     // are excluded at the source: the qualifier removes them from the total and
     // from the faces in the same request, and no arithmetic here can drift.
-    const query = encodeURIComponent(`repo:Drakonis96/nodus -author:${OWNER_LOGIN}`);
+    const query = encodeURIComponent(`repo:jorgepb96/nodus -author:${OWNER_LOGIN}`);
     // A whole page of entries, not just the faces the card shows: the newest of
     // them can all belong to one person, and a row of one repeated face says
     // nothing about who is behind the rest.

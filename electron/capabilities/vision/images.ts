@@ -28,7 +28,7 @@ export async function fetchPublicImage(source: Extract<VisionCandidateInput['sou
   if (!addresses.length || addresses.some(a=>privateAddress(a.address))) throw new Error('Image source must be public.');
   const address = addresses[0];
   const bytes = await new Promise<Buffer>((resolve,reject) => {
-    const request = https.get(url, { agent:false, signal, headers:{'User-Agent':`${nodusUserAgent()} (https://github.com/Drakonis96/nodus)`,Accept:'image/png,image/jpeg,image/webp,image/gif,image/avif'}, lookup: (_host,opts,callback) => opts.all ? callback(null,[address]) : callback(null,address.address,address.family) }, response => {
+    const request = https.get(url, { agent:false, signal, headers:{'User-Agent':`${nodusUserAgent()} (https://github.com/jorgepb96/nodus)`,Accept:'image/png,image/jpeg,image/webp,image/gif,image/avif'}, lookup: (_host,opts,callback) => opts.all ? callback(null,[address]) : callback(null,address.address,address.family) }, response => {
       if (response.statusCode !== 200 || Number(response.headers['content-length'] ?? 0) > limit) { response.destroy(); reject(new Error('Image source failed or exceeded its size limit.')); return; }
       const chunks: Buffer[] = []; let size = 0;
       response.on('data',(chunk: Buffer)=>{size += chunk.length; if(size>limit) response.destroy(new Error('Image is too large.')); else chunks.push(chunk);});

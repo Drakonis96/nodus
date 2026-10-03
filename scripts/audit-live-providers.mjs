@@ -43,7 +43,7 @@ const embeddingResponse = await fetch('https://openrouter.ai/api/v1/embeddings',
   headers: {
     Authorization: `Bearer ${openRouterKey}`,
     'Content-Type': 'application/json',
-    'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
+    'HTTP-Referer': 'https://github.com/jorgepb96/nodus',
     'X-Title': 'Nodus AI audit',
   },
   body: JSON.stringify({

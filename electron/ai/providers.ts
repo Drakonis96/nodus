@@ -285,7 +285,7 @@ export function openRouterRoutingBody(sortByThroughput: boolean): Record<string,
 
 /** Attribution headers OpenRouter uses for ranking/rate-limit identity. */
 export const OPENROUTER_HEADERS: Record<string, string> = {
-  'HTTP-Referer': 'https://github.com/Drakonis96/nodus',
+  'HTTP-Referer': 'https://github.com/jorgepb96/nodus',
   'X-Title': 'Nodus',
 };
 

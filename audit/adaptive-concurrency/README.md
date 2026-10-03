@@ -5,7 +5,7 @@ documentos del usuario. El modo automático es el valor predeterminado de la ver
 normal. El lanzamiento a `main` permanece bloqueado hasta que el evaluador final
 apruebe y el propietario dé su consentimiento explícito. Ambas condiciones se
 cumplieron el 30 de agosto de 2026; la integración se tramita mediante
-[issue #622](https://github.com/Drakonis96/nodus/issues/622) y PR.
+[issue #622](https://github.com/jorgepb96/nodus/issues/622) y PR.
 
 El estado real de la implementación, las campañas ejecutadas y los bloqueos de
 certificación están en [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md).

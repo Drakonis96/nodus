@@ -241,7 +241,7 @@ page is still a complete, readable document.
 
     function fetchRelease() {
       const version = document.getElementById('dl-version');
-      fetch('https://api.github.com/repos/Drakonis96/nodus/releases/latest', { cache: 'no-store' })
+      fetch('https://api.github.com/repos/jorgepb96/nodus/releases/latest', { cache: 'no-store' })
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error('no release'))))
         .then((release) => {
           if (version) version.textContent = `Latest release · ${release.tag_name} · ${new Date(release.published_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;

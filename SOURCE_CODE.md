@@ -13,10 +13,10 @@ under the MIT license that accompanied those releases.
 The preferred form for modifying the official Nodus 5.7.4 release is available
 from the immutable release tag and its source archives:
 
-- Tag and release: https://github.com/Drakonis96/nodus/releases/tag/v5.7.4
-- Source tree: https://github.com/Drakonis96/nodus/tree/v5.7.4
-- Tar archive: https://github.com/Drakonis96/nodus/archive/refs/tags/v5.7.4.tar.gz
-- ZIP archive: https://github.com/Drakonis96/nodus/archive/refs/tags/v5.7.4.zip
+- Tag and release: https://github.com/jorgepb96/nodus/releases/tag/v5.7.4
+- Source tree: https://github.com/jorgepb96/nodus/tree/v5.7.4
+- Tar archive: https://github.com/jorgepb96/nodus/archive/refs/tags/v5.7.4.tar.gz
+- ZIP archive: https://github.com/jorgepb96/nodus/archive/refs/tags/v5.7.4.zip
 
 The source includes the desktop app, Nodus Server, the Zotero add-on, build
 scripts, lockfile and the material needed to rebuild the distributed work.

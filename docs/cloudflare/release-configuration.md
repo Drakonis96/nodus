@@ -3,7 +3,7 @@
 “Deploy to Cloudflare” no requiere cliente OAuth, dominio de Nodus, backend de aprovisionamiento ni credenciales del proyecto. Desktop construye el enlace oficial:
 
 ```text
-https://deploy.workers.cloudflare.com/?url=https://github.com/Drakonis96/nodus/tree/main/cloudflare
+https://deploy.workers.cloudflare.com/?url=https://github.com/jorgepb96/nodus/tree/main/cloudflare
 ```
 
 La plantilla debe permanecer pública y la subcarpeta `cloudflare/` debe funcionar como raíz de proyecto aislada. Cloudflare crea en la cuenta del usuario una copia Git, los recursos definidos por bindings y un deployment administrable por el propio usuario. Véase [Deploy to Cloudflare](https://developers.cloudflare.com/workers/platform/deploy-buttons/).

@@ -1,5 +1,5 @@
 {
-  "run": "https://github.com/Drakonis96/nodus/actions/runs/35961146159",
+  "run": "https://github.com/jorgepb96/nodus/actions/runs/35961146159",
   "commit": "91a82aa0",
   "note": "macOS x64 first failed before installation: the release asset download returned HTTP 500; only that job was re-run on the same commit and passed. macOS artifacts were signed, notarized and verified in the workflow before installation.",
   "platforms": [

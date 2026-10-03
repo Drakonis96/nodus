@@ -5,7 +5,7 @@ The installation created by **Deploy to Cloudflare** lives in a copy of the repo
 ## Updating
 
 1. Read the release notes for the new version of Nodus and its migrations.
-2. Bring the changes published at `https://github.com/Drakonis96/nodus/tree/main/cloudflare` into your copy, through the GitHub/GitLab interface or with Git.
+2. Bring the changes published at `https://github.com/jorgepb96/nodus/tree/main/cloudflare` into your copy, through the GitHub/GitLab interface or with Git.
 3. Commit the changes. Workers Builds runs `npm run deploy`, applies the D1 migrations and publishes the Worker.
 4. Open Nodus Desktop and force a synchronisation to confirm the connection.
 

@@ -16,7 +16,7 @@ export function updateInformation(channel) {
   if (channel !== 'latest' && channel !== 'beta') throw new Error(`Unsupported release channel: ${channel}`);
   // Beta users also receive a newer stable release, just like electron-updater.
   const selector = channel === 'latest' ? 'latest' : 'latest-all';
-  return `gh-releases-zsync|Drakonis96|nodus|${selector}|${APPIMAGE_NAME}.zsync`;
+  return `gh-releases-zsync|jorgepb96|nodus|${selector}|${APPIMAGE_NAME}.zsync`;
 }
 
 async function readAt(file, offset, length) {
@@ -101,7 +101,7 @@ export async function verifyAppImage(filePath, manifest, channel) {
     const zsync = (await readFile(`${filePath}.zsync`)).toString('latin1').split('\n\n', 1)[0];
     const fields = Object.fromEntries(zsync.split('\n').map((line) => { const colon = line.indexOf(': '); return [line.slice(0, colon), line.slice(colon + 2)]; }));
     if (fields.Filename !== APPIMAGE_NAME || Number(fields.Length) !== size || fields['SHA-1'] !== digest.sha1 ||
-        fields.URL !== `https://github.com/Drakonis96/nodus/releases/download/v${manifest.version}/${APPIMAGE_NAME}`) {
+        fields.URL !== `https://github.com/jorgepb96/nodus/releases/download/v${manifest.version}/${APPIMAGE_NAME}`) {
       throw new Error('zsync metadata does not match the finalized AppImage');
     }
     return { size, blockMapSize, ...digest, updateInformation: embedded };
@@ -139,7 +139,7 @@ export async function finalizeLinuxAppImage(releaseDir, channel) {
     manifest.path = APPIMAGE_NAME;
     manifest.sha512 = info.sha512;
     // zsync must describe the FINAL file, including Electron's new blockmap.
-    execFileSync('zsyncmake', ['-u', `https://github.com/Drakonis96/nodus/releases/download/v${manifest.version}/${APPIMAGE_NAME}`, '-o', `${APPIMAGE_NAME}.zsync`, APPIMAGE_NAME], { cwd: work, stdio: 'inherit' });
+    execFileSync('zsyncmake', ['-u', `https://github.com/jorgepb96/nodus/releases/download/v${manifest.version}/${APPIMAGE_NAME}`, '-o', `${APPIMAGE_NAME}.zsync`, APPIMAGE_NAME], { cwd: work, stdio: 'inherit' });
     await chmod(image, 0o755);
     const verification = await verifyAppImage(image, manifest, channel);
     await copyFile(image, path.join(work, LEGACY_APPIMAGE_NAME));
