@@ -43,3 +43,9 @@ Eight openings with 300 paragraphs, 100 citations, and context open produced the
 The final visual campaign covered desktop and web, light/dark themes, list/cards, editor, context, navigator, focus, academic dialogs, and export previews at 1280×800, 1440×900, and 1920×1080, with additional narrow-window menu checks. The audited galleries and detailed reports remain reproducible through the scripts; generated runtime output and profiles are intentionally excluded from Git.
 
 The AI streaming regression controls only the provider transport; real UI, selections, persistence, cancellation, and one-step undo are exercised without sending test content to an external AI provider. Voice panels were visually audited at rest; the general smoke suite uses a fake microphone for capture/privacy checks. This work does not provide external peer review, automated grading, or remote-media fetching beyond existing policies.
+
+## Pull-request integration checks
+
+After merging current main, 133 focused checks and 50 translation/Focus/security checks passed. The final general `npm run test:e2e` completed successfully through the real Electron app, including Scriptor/Study writing, prompts, selection, native persistence, voice, Primary Sources, Worldbuilding, and Genealogy; it reported no renderer page errors and schema v199. Lint, both typechecks, Desktop/Server Web builds, and license verification also passed locally. The complete repository test inventory remains a separate CI requirement.
+
+Follow-up fixes ensure Escape closes the foreground synonyms panel before the native formatting popover handles it, and the production Server image includes the portable sidebar migration dependency. The Server image health check and cross-repository capability verification passed on Linux, macOS, and Windows on the preceding code commit.

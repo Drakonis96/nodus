@@ -3051,7 +3051,7 @@ try {
   await page.getByTestId('primary-sources-nav-search').click();
   await page.getByTestId('primary-sources-search-input').fill('San Martín');
   await page.getByTestId('primary-sources-search-result').first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('primary-sources-nav-notes').click();
+  await page.locator('[data-tour="nav-notes"]').click();
   await page.getByTestId('primary-sources-notes').waitFor({ timeout: 30_000 });
 
   // Primary Sources reuses the universal Toolkit catalogue. Its old dedicated
