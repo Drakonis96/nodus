@@ -41,7 +41,7 @@ audit dates and the AppImage upgrade fixture retain their original versions.
 The local origin now uses the canonical `jorgepb96/nodus` repository.
 
 `docs/release-5.8.0-notes.md` is generated from the exact English modal text and
-displayed order. Stable release publication regenerates that body from its tag.
+displayed order. The changelog uses the same entries. Stable release publication regenerates that body from its tag.
 
 ## Translation and visual verification
 
