@@ -5,8 +5,8 @@ import { readSource } from './ipc-channel-census.mjs';
 
 const read = async (file) => readSource(file);
 
-// Radar joins the Browser and Toolkit as a cross-cutting tool. The eight
-// vault-specific sections stay closed while all three global tools remain available.
+// Domain sections stay in the vault sidebar. Scriptor and the other transverse
+// tools come from the shared tools group, without a second notes shortcut.
 test('primary sources owns the agreed vault shell plus global tools', async () => {
   const [sidebar, navigation, app] = await Promise.all([
     read('src/components/PrimarySourcesSidebar.tsx'),
@@ -18,7 +18,8 @@ test('primary sources owns the agreed vault shell plus global tools', async () =
     sidebar.indexOf('const GROUPS')
   );
   const views = [...itemBlock.matchAll(/\bid: '([a-zA-Z]+)'/g)].map((match) => match[1]);
-  assert.deepEqual(views, ['search', 'archive', 'persons', 'timeline', 'map', 'relations', 'researchChat', 'notes']);
+  assert.deepEqual(views, ['search', 'archive', 'persons', 'timeline', 'map', 'relations', 'researchChat']);
+  assert.match(navigation, /\{ id: 'notes', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' \}/, 'Scriptor is supplied by the universal tools group');
   assert.match(navigation, /primary_sources:\s*\[\s*'search', 'archive', 'persons', 'timeline', 'map', 'relations', 'researchChat', 'notes', 'browser', 'radar', 'compass', 'toolkit'/);
   assert.match(app, /if \(isPrimarySources\)[\s\S]{0,500}<PrimarySourcesSidebar/);
   assert.match(

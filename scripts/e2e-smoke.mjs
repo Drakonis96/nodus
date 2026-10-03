@@ -1711,7 +1711,7 @@ try {
     'a note and an idea stay open side by side in tabs'
   );
   // Notes and ideas use the same native canvas and save-status contract as Study.
-  await page.locator('.nodus-blocknote .bn-editor').waitFor({ timeout: 10_000 });
+  await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 10_000 });
   await page.getByTestId('study-editor-save-state').waitFor({ timeout: 10_000 });
   console.log('[e2e] workspace: notes and ideas open in tabs with the full Study editor');
 

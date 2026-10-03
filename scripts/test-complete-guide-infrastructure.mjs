@@ -40,7 +40,8 @@ test('migration 197 tables are local-only (never synced) and the schema version 
   for (const table of ['complete_guide_runs', 'complete_guide_units', 'complete_guide_chunk_cache', 'complete_guide_artifacts']) {
     assert.match(sync, new RegExp(`'${table}'`), `${table} is classified as not synced`);
   }
-  assert.match(fs.readFileSync('electron/db/migrations.ts', 'utf8'), /export const SCHEMA_VERSION = 197;/);
+  const version = fs.readFileSync('electron/db/migrations.ts', 'utf8').match(/export const SCHEMA_VERSION = (\d+);/);
+  assert.ok(version && Number(version[1]) >= 197, 'the schema includes the complete guide migration');
 });
 
 test('a run freezes its first snapshot; checkpoints resume by unit and are deleted with the run', () => {

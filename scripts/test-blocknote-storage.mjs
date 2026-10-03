@@ -118,6 +118,18 @@ try {
   database.closeDb();
   assert.deepEqual(workspace.getWorkspaceNoteEditorData(note.id).nativeDocument, document, 'close/reopen preserves complete JSON');
   assert.deepEqual(study.getStudyDocEditorData(studyDoc.id).nativeDocument, studyNative);
+  // Replay an additive migration from a partially upgraded branch without losing
+  // native documents, version history, revisions or existing comment anchors.
+  const db = database.getDb();
+  const { runMigrations, SCHEMA_VERSION } = require(path.join(repoRoot, 'electron/db/migrations.ts'));
+  const persisted = () => ['study_docs', 'study_doc_versions', 'note_versions', 'note_annotations'].map(table => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+  const beforeReplay = persisted();
+  db.exec('ALTER TABLE study_annotations DROP COLUMN anchor_json');
+  db.pragma('user_version = 197');
+  runMigrations(db);
+  assert.deepEqual(persisted(), beforeReplay, 'replaying native storage migrations preserves all persisted data');
+  assert.equal(db.pragma('user_version', { simple: true }), SCHEMA_VERSION);
+  assert.ok(db.prepare('PRAGMA table_info(study_annotations)').all().some(column => column.name === 'anchor_json'), 'the missing part of the migration is restored');
   database.closeDb();
   console.log('BlockNote storage: lossless notes/study, projections, versions, legacy edits, conflicts and anchors passed.');
 } finally { await rm(root, { recursive: true, force: true }); }

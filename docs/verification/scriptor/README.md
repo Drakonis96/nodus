@@ -55,3 +55,11 @@ Follow-up fixes ensure Escape closes the foreground synonyms panel before the na
 The catalogue creation trigger is now a 32 px icon-only plus with a translated accessible name, retaining the Note, Idea, Manuscript, and Collection menu. Its menu remains anchored below the trigger. Scriptor tab tracks reserve 4 px above and below their 28 px tabs, so borders and shadows are fully visible without changing the header height or application sidebar.
 
 Real Desktop and Server Web checks passed in light/dark themes at 1280×800, 1440×900, and 1920×1080 (12 combinations), covering the catalogue and editor, multiple open tabs, menu position/options, and keyboard activation. Desktop also verifies one application tooltip; Server Web retains its existing native title-tooltip behavior. Typechecks, targeted lint, and both renderer builds passed. [Creation menu](create-menu.png) and [editor tabs](editor-tabs.png) show isolated synthetic fixtures.
+
+## CI compatibility follow-up
+
+Migration 198 now adds only missing columns, matching the existing branch-renumbering recovery convention. The storage regression replays migrations 198–199 against a partially upgraded database and compares native documents, versions, revisions and comment anchors before and after, while checking that the absent column is restored.
+
+Scriptor validation/export errors now use the shared runtime error catalogue. Translation tests cover all eight non-Spanish languages checked by CI, preserve revision/projection conflict codes through IPC, and retain the unsupported formula element in export errors. Formula toolbar metadata uses the existing sigma icon. Navigation tests reflect Scriptor’s move into Tools while preserving each dedicated vault’s domain routes; MCP checks read the canonical manuscript note and verify a subsequent Markdown update through the tool API. Generic BlockNote presence waits select the first matching editor, avoiding strict-selector ambiguity.
+
+All 92 checks in the focused CI regression run passed under Node 22.23.2, including the 17 previously failing test files and native storage replay. Full repository coverage is also required by the PR’s CI run.

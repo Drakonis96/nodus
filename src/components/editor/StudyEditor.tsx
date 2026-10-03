@@ -845,7 +845,7 @@ export function StudyEditor({
     { id: 'audio', label: t('Insertar bloque de audio'), icon: 'play', group: t('Inserción'), onSelect: () => insertCommand('audio') },
     { id: 'quiz', label: t('Insertar pregunta de test'), icon: 'help', group: t('Inserción'), onSelect: () => insertCommand('test') },
     { id: 'code', label: t('Código en línea'), icon: 'code', group: t('Inserción'), testId: 'study-inline-code', disabled: raw || locked, onSelect: () => canvasRef.current?.runInlineCommand('code') },
-    { id: 'formula', label: t('Fórmula en línea'), icon: 'formula', group: t('Inserción'), testId: 'study-inline-formula', disabled: raw || locked, onSelect: () => canvasRef.current?.runInlineCommand('formula') },
+    { id: 'formula', label: t('Fórmula en línea'), icon: 'sigma', group: t('Inserción'), testId: 'study-inline-formula', disabled: raw || locked, onSelect: () => canvasRef.current?.runInlineCommand('formula') },
     { id: 'print', label: t('Vista previa de impresión'), icon: 'external', group: t('Gestión'), onSelect: () => window.print() },
     { id: 'duplicate', label: t('Duplicar'), icon: 'copy', group: t('Gestión'), onSelect: () => void onDuplicate() },
     { id: 'trash', label: t('Mover a la papelera'), icon: 'trash', group: t('Gestión'), pinnable: false, onSelect: () => void onTrash() },

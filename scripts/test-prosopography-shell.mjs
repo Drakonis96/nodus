@@ -24,8 +24,11 @@ test('prosopography has six exclusive domain views and no genealogical UI', asyn
   const views = [...sidebar.matchAll(/view: '(prosop\w+|notes)'/g)].map((match) => match[1]);
   assert.deepEqual(views, [
     'prosopSearch', 'prosopPopulation', 'prosopPersons', 'prosopSources',
-    'prosopAnalysis', 'prosopNetworks', 'notes',
+    'prosopAnalysis', 'prosopNetworks',
   ]);
+  const navigation = await readFile(path.join(root, 'src/navigation.ts'), 'utf8');
+  assert.match(navigation, /\{ id: 'notes', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' \}/);
+  assert.equal(vaultTypes.isViewAllowedForVaultType('notes', 'prosopography'), true);
   for (const view of views) assert.equal(vaultTypes.isViewAllowedForVaultType(view, 'prosopography'), true);
   for (const forbidden of ['persons', 'tree', 'relations', 'archive', 'graph']) {
     assert.equal(vaultTypes.isViewAllowedForVaultType(forbidden, 'prosopography'), false, `${forbidden} must not leak`);

@@ -9576,17 +9576,16 @@ export const migrations: Migration[] = [
       created_at   TEXT NOT NULL
     );
   ` },
-  { version: 198, up: /* sql */ `
-    ALTER TABLE study_docs ADD COLUMN native_document_json TEXT;
-    ALTER TABLE study_docs ADD COLUMN native_schema_version INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE study_docs ADD COLUMN editor_revision INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE study_doc_versions ADD COLUMN native_document_json TEXT;
-    ALTER TABLE study_doc_versions ADD COLUMN native_schema_version INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE note_versions ADD COLUMN native_document_json TEXT;
-    ALTER TABLE note_versions ADD COLUMN native_schema_version INTEGER NOT NULL DEFAULT 1;
-    ALTER TABLE study_annotations ADD COLUMN anchor_json TEXT;
-    ALTER TABLE note_annotations ADD COLUMN anchor_json TEXT;
-  ` },
+  { version: 198, up: 'SELECT 1;', after: (db) => {
+    // Earlier branch builds can have all or part of these additive columns under
+    // a different version. Complete the schema without replacing saved documents.
+    for (const table of ['study_docs', 'study_doc_versions', 'note_versions']) {
+      addColumnIfMissing(db, table, 'native_document_json', 'TEXT');
+      addColumnIfMissing(db, table, 'native_schema_version', 'INTEGER NOT NULL DEFAULT 1');
+    }
+    addColumnIfMissing(db, 'study_docs', 'editor_revision', 'INTEGER NOT NULL DEFAULT 0');
+    for (const table of ['study_annotations', 'note_annotations']) addColumnIfMissing(db, table, 'anchor_json', 'TEXT');
+  } },
   { version: 199, up: 'SELECT 1;', after: (db) => {
     for (const table of ['study_docs', 'study_doc_versions', 'note_versions']) addColumnIfMissing(db, table, 'academic_metadata_json', 'TEXT');
   } },
