@@ -87,13 +87,12 @@ test('real update UI: work, postpone, revisit, retry and install in all language
       assert.equal(await page.getByTestId('working-document').evaluate((e) => document.activeElement === e), true, 'arrival must not steal focus');
       await page.getByRole('button', { name: 'Más tarde', exact: true }).click();
       await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
-      await page.getByTestId('update-indicator').waitFor(); assert.equal(await page.evaluate(() => window.installs), 0);
+      assert.equal(await page.evaluate(() => window.installs), 0);
       await page.getByTestId('settings-toggle').click();
       await page.getByTestId('settings-status').getByRole('button', { name: 'Instalar y reiniciar' }).waitFor();
       await page.getByTestId('settings-toggle').click(); await page.getByTestId('settings-toggle').click();
       await page.getByTestId('settings-status').getByRole('button', { name: 'Instalar y reiniciar' }).waitFor();
-      await page.getByTestId('update-indicator').click(); await page.getByTestId('update-ready-notice').waitFor();
-      await page.getByTestId('update-ready-notice').getByRole('button', { name: 'Instalar y reiniciar' }).click();
+      await page.getByTestId('settings-status').getByRole('button', { name: 'Instalar y reiniciar' }).click();
       assert.equal(await page.evaluate(() => window.installs), 1);
       await page.getByText('Creando y verificando una copia de seguridad antes de actualizar…', { exact: true }).first().waitFor();
       assert.equal(await page.getByTestId('update-ready-notice').getByRole('button', { name: 'Instalar y reiniciar' }).count(), 0);
@@ -150,7 +149,7 @@ test('real update UI: work, postpone, revisit, retry and install in all language
     await t.test('a stale initial snapshot cannot overwrite a downloaded event', async () => {
       await fresh({ holdSnapshot: true }); await emit(ready);
       await page.evaluate(() => window.resolveSnapshot({ status: 'not-available', message: '', version: '5.1.7', downloadedVersion: null }));
-      await page.getByTestId('update-indicator').waitFor();
+      await page.getByTestId('update-ready-notice').waitFor();
       assert.match(await page.getByTestId('update-ready-notice').innerText(), /5.2.0/);
     });
     await t.test('install failure stays retryable and never displays the untranslated native exception', async () => {
@@ -160,8 +159,8 @@ test('real update UI: work, postpone, revisit, retry and install in all language
       await page.getByText(tr('fr', 'No se pudo instalar la actualización. Puedes volver a intentarlo.')).waitFor();
       assert.doesNotMatch(await page.locator('body').innerText(), /Untranslated native error/);
       await page.getByRole('button', { name: tr('fr', 'Más tarde'), exact: true }).click();
-      await page.getByTestId('update-indicator').click();
-      await page.getByRole('button', { name: tr('fr', 'Instalar y reiniciar') }).waitFor();
+      await page.getByTestId('settings-toggle').click();
+      await page.getByTestId('settings-status').getByRole('button', { name: tr('fr', 'Instalar y reiniciar') }).waitFor();
     });
     await t.test('startup ready state offers install or later in every supported language and theme', async () => {
       for (const lang of languages) for (const theme of ['light', 'dark']) {
@@ -170,11 +169,12 @@ test('real update UI: work, postpone, revisit, retry and install in all language
         const modal = page.getByTestId('update-ready-notice');
         await modal.waitFor();
         await modal.getByRole('button', { name: tr(lang, 'Instalar y reiniciar') }).waitFor();
+        if (process.env.UPDATE_QA_DIR && lang === 'es') await page.screenshot({ path: path.join(process.env.UPDATE_QA_DIR, `${theme}.png`) });
         await modal.getByRole('button', { name: tr(lang, 'Más tarde'), exact: true }).click();
         assert.equal(await page.getByTestId('update-ready-notice').count(), 0, `${lang}: later must not immediately reopen the banner`);
         assert.equal(await page.evaluate(() => window.installs), 0);
-        await page.getByTestId('update-indicator').click(); await page.getByTestId('update-ready-notice').waitFor();
-        if (process.env.UPDATE_QA_DIR && lang === 'es') await page.screenshot({ path: path.join(process.env.UPDATE_QA_DIR, `${theme}.png`) });
+        await page.getByTestId('settings-toggle').click();
+        await page.getByTestId('settings-status').getByRole('button', { name: tr(lang, 'Instalar y reiniciar') }).waitFor();
       }
     });
     await t.test('recovery failures stay localized and provide the recovery action', async () => {

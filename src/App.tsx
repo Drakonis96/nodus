@@ -1689,14 +1689,6 @@ export function App() {
               />
             </span>
           )}
-          {readyVersion && <HeaderAction
-            icon="download"
-            label={updateProgress?.status === 'backing-up' ? t('Protegiendo tus datos') : updateInstallBusy(updateProgress) ? t('Instalando actualización') : t('Actualización lista')}
-            title={t('Actualización lista')}
-            showLabel
-            onClick={() => setDeferredUpdate(null)}
-            focusKeep
-          />}
           {/* Queue and task progress, moved here from the bottom strip: same dropdown
               treatment as the notification centre, with a live-work badge. */}
           <span className="relative inline-flex">
@@ -1792,7 +1784,7 @@ export function App() {
       </header>
 
       {isEstudio && <FocusCompletionNotice />}
-      {updateProgress && (showStartupProgress || (updateNoticeKey && deferredUpdate !== updateNoticeKey)) && <UpdateReadyNotice
+      {updateProgress && (updateInstallBusy(updateProgress) || showStartupProgress || (updateNoticeKey && deferredUpdate !== updateNoticeKey)) && <UpdateReadyNotice
         update={updateProgress}
         onUpdate={setUpdateProgress}
         onLater={() => setDeferredUpdate(updateNoticeKey)}
