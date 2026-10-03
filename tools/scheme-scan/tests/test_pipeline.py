@@ -79,7 +79,7 @@ class PipelineTests(unittest.TestCase):
         base = 'CCBr>>CCC#N'
         new = row(CYANIDE, ['[Na+].[C-]#N'], 'NaCN', base=base)
         self.put(new, CYANIDE, .921)
-        old = row(CYANIDE_OLD, base=base)
+        old = row(CYANIDE_OLD, conditions='NaCN', base=base)
         fallback = self.fallback(old, CYANIDE_OLD, .834)
         t.merge(fallback)
         self.assertEqual(t.mapping_inputs(), (t.MERGED, t.MERGED_ROWS))
@@ -150,6 +150,14 @@ class PipelineTests(unittest.TestCase):
         new = row(ESTER_WATER, ['O'], base='changed')
         self.put(new, ESTER_WATER, .29)
         old = row(ESTER, base='older')
+        t.merge(self.fallback(old, ESTER))
+        self.assertFalse(t.load_rows(t.MERGED))
+
+    def test_changed_metadata_does_not_reuse_old_fallback(self):
+        base = 'CCOC(=O)c1ccccc1>>O=C(O)c1ccccc1'
+        new = row(ESTER_WATER, ['O'], base=base)
+        self.put(new, ESTER_WATER, .29)
+        old = dict(row(ESTER, base=base), book='outdated citation')
         t.merge(self.fallback(old, ESTER))
         self.assertFalse(t.load_rows(t.MERGED))
 

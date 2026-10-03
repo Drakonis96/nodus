@@ -276,6 +276,13 @@ def file_hash(path):
     return digest.hexdigest()
 
 
+def same_record(left, right):
+    """Fallback geometry and citation metadata must describe the current scanned record."""
+    added_fields = {'rxn', 'reagentSmiles', 'unresolvedReagents'}
+    return ({k: v for k, v in left.items() if k not in added_fields}
+            == {k: v for k, v in right.items() if k not in added_fields})
+
+
 def reagent_atoms_used(mapped, reagent_smiles):
     """Whether any product atom maps onto a reagent molecule (one added from the conditions text)."""
     from rdkit import Chem
@@ -317,7 +324,7 @@ def merge(fallback):
     chosen_maps, chosen_rows = [], []
     for rid in sorted(new_rows):
         new, old = new_maps.get(rid), old_maps.get(rid)
-        if old and old_rows[rid].get('baseReaction') != new_rows[rid].get('baseReaction'):
+        if old and not same_record(old_rows[rid], new_rows[rid]):
             old = None  # the scan changed, so this is no longer a fallback for the same reaction
         used = bool(new and new.get('mapped') and reagent_atoms_used(new['mapped'], new_rows[rid].get('reagentSmiles')))
         candidates = [(new, new_rows[rid], 'reagents used')] if used else []
