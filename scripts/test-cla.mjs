@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
-  STATUS, SIGNATURE_BRANCH, acceptance, agreement, connection, contributors,
+  STATUS, SIGNATURE_BRANCH, acceptance, agreement, compatibleAgreements, connection, contributors,
   isAiAttribution, run, signaturePath,
 } from './cla.mjs';
 
@@ -79,7 +79,7 @@ function harness(prs, options = {}) {
   return {
     statuses, writes, files, errors, github, core,
     summary: () => summary,
-    execute: () => run({ github, core, document, context: { repo: { owner: 'example', repo: 'nodus' }, runId: 123 } }),
+    execute: () => run({ github, core, document: options.document ?? document, context: { repo: { owner: 'example', repo: 'nodus' }, runId: 123 } }),
   };
 }
 
@@ -167,6 +167,102 @@ test('a persisted signature unblocks every open PR and survives deleted comments
   await next.execute();
   assert.equal(next.writes.length, 0);
   assert.equal(next.statuses.at(-1).state, 'success');
+});
+
+test('persisted signatures from before the maintainer rename unblock all PRs without rewriting records', async () => {
+  const [current, previous] = compatibleAgreements(cla);
+  assert.equal(current.digest, '28018d5b63a8adcded0dfde9323a88f3c5e8611460b9bc27f3f1c67013e48aca');
+  assert.equal(previous.digest, '68b2b9153b43fb63d3f8d7bee0156375d02005d3023dc73822994a0273fdbaf1');
+  // Persist authentic signatures under the historical document first.
+  const oldPr = fixture();
+  oldPr.comments = [signingComment(alice, { body: previous.statement })];
+  const old = harness([oldPr], { document: previous.text });
+  await old.execute();
+  assert.equal(old.writes.length, 1);
+  const snapshot = [...old.files];
+
+  const renamed = fixture(2, { ...alice, login: 'alice-renamed' });
+  renamed.commits = [commit(renamed.author, bob)];
+  renamed.comments = [signingComment(bob)];
+  const another = fixture(3, renamed.author);
+  // Even an existing current acceptance comment must not copy Alice's record.
+  another.comments = [signingComment(renamed.author)];
+  const next = harness([renamed, another], { files: old.files });
+  await next.execute();
+  assert.deepEqual(next.errors, []);
+  assert.deepEqual(next.statuses.slice(-2).map(s => s.state), ['success', 'success']);
+  assert.equal(next.writes.length, 1, 'only the newly signed coauthor gets a record');
+  assert.equal(next.writes[0].path, signaturePath(current, bob.id));
+  assert.equal(next.files.get(snapshot[0][0]), snapshot[0][1], 'historical record stays byte-for-byte unchanged');
+  assert.equal(next.files.has(signaturePath(current, alice.id)), false);
+});
+
+test('rename compatibility does not cover future edits, version changes or unsigned coauthors', async () => {
+  const [, previous] = compatibleAgreements(cla);
+  const pr = fixture();
+  pr.comments = [signingComment(alice, { body: previous.statement })];
+  const old = harness([pr], { document: previous.text });
+  await old.execute();
+  const unsignedCoauthor = fixture(2);
+  unsignedCoauthor.commits = [commit(alice, bob)];
+  const gate = harness([unsignedCoauthor], { files: old.files });
+  await gate.execute();
+  assert.equal(gate.statuses.at(-1).state, 'failure');
+  assert.match(gate.statuses.at(-1).description, /@bob/);
+  assert.doesNotMatch(gate.statuses.at(-1).description, /@alice/);
+
+  for (const changedText of [
+    `${document}\nChanged terms.\n`,
+    document.replace('Version 1 (', 'Version 2 ('),
+    document.replace('royalty-free', 'royalty-bearing'),
+    document.replace('jorgepb96', 'another-maintainer'),
+    `${document}\n`,
+  ]) {
+    const changed = agreement(changedText);
+    assert.deepEqual(compatibleAgreements(changed), [changed]);
+    assert.equal(acceptance(signingComment(alice, { body: previous.statement }), changed), false);
+    const next = harness([fixture()], { files: old.files, document: changedText });
+    await next.execute();
+    assert.equal(next.statuses.at(-1).state, 'failure');
+    assert.match(next.statuses.at(-1).description, /@alice/);
+    assert.equal(next.writes.length, 0);
+  }
+});
+
+test('corrupt or mismatched historical signatures and historical API errors fail closed', async () => {
+  const [, previous] = compatibleAgreements(cla);
+  const pr = fixture();
+  pr.comments = [signingComment(alice, { body: previous.statement })];
+  const old = harness([pr], { document: previous.text });
+  await old.execute();
+  const path = signaturePath(previous, alice.id);
+  const original = JSON.parse(Buffer.from(old.files.get(path), 'base64').toString('utf8'));
+  for (const mutate of [
+    record => { record.user.id = bob.id; },
+    record => { record.document.text += '\n'; },
+    record => { record.document.sha256 = cla.digest; },
+    record => { record.document.version = '2'; },
+    record => { record.statement = cla.statement; },
+    record => { record.comment.id = ''; },
+  ]) {
+    const record = structuredClone(original);
+    mutate(record);
+    const files = new Map([[path, Buffer.from(JSON.stringify(record)).toString('base64')]]);
+    const next = harness([fixture()], { files });
+    await next.execute();
+    assert.equal(next.statuses.at(-1).state, 'failure');
+    assert.ok(next.errors.length);
+    assert.equal(next.writes.length, 0);
+  }
+  const unavailable = harness([fixture()]);
+  const read = unavailable.github.rest.repos.getContent;
+  unavailable.github.rest.repos.getContent = async args => {
+    if (args.path === path) throw Object.assign(new Error('Unavailable'), { status: 503 });
+    return read(args);
+  };
+  await unavailable.execute();
+  assert.equal(unavailable.statuses.at(-1).state, 'failure');
+  assert.ok(unavailable.errors.length);
 });
 
 test('one signed author cannot cover an unsigned human coauthor', async () => {
