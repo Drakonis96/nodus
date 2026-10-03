@@ -345,7 +345,7 @@ async function main() {
   fs.mkdirSync(generatedRoot, { recursive: true });
   const remoteFiles = await ensureRemoteNotices();
   const packageInventory = aggregatePackageLicenses();
-  const electronFiles = copyElectronLegalFiles();
+  const electronFiles = process.argv.includes('--server-web') ? [] : copyElectronLegalFiles();
   const buildManifest = {
     schemaVersion: 1,
     nodusVersion: readJson(path.join(root, 'package.json')).version,

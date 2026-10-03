@@ -1,3 +1,5 @@
+import {academicMarkdownProjection,assertAcademicSupplement} from '@shared/academicProjection';
+import { normalizeAcademicMetadata } from '@shared/academicDocument';
 import { isManualAcademic } from '../ai/academicMode';
 import { scheduleManualIndex } from '../ai/manualIdeaIndex';
 // El Workspace por dentro: el editor completo sobre una NOTA, y los enlaces con la
@@ -34,7 +36,11 @@ import { normalizeStudyDocStyle, parseStudyDocLinks } from '@shared/studyEditor'
 import type { Note, WorkspaceLibraryLink, WorkspaceLibraryLinkInput } from '@shared/types';
 import { getDb } from './database';
 import { getNote } from './notesRepo';
-import { reconcileLegacyNoteCache, synchronizeNotePage } from './pagesRepo';
+import { getPageDocumentForNote, reconcileLegacyNoteCache, synchronizeNotePage, savePageDocument } from './pagesRepo';
+import { blockNoteToPageBlocks, markdownToBlockNote, nativeDocumentText, parseNativeDocument, validateBlockNoteDocument } from '@shared/blockNoteDocument';
+import { markdownToPageBlocks } from '@shared/pages';
+import type { PageDocument } from '@shared/pages';
+import { resolveBlockAnnotations } from '@shared/blockNoteAnnotations';
 
 type Row = Record<string, unknown>;
 
@@ -66,6 +72,9 @@ const toVersion = (row: Row): StudyDocVersion => ({
   versionNo: Number(row.version_no),
   title: String(row.title),
   contentMarkdown: String(row.content_markdown),
+  nativeDocument: parseNativeDocument(row.native_document_json),
+  academicMetadata: normalizeAcademicMetadata(parseJson(row.academic_metadata_json, null)),
+  schemaVersion: Number(row.native_schema_version ?? 1),
   style: normalizeStudyDocStyle(parseJson<Partial<StudyDocStyle>>(row.style_json, {})),
   reason: String(row.reason) as StudyDocVersion['reason'],
   contentHash: String(row.content_hash),
@@ -83,6 +92,7 @@ const toAnnotation = (row: Row): StudyAnnotation => ({
   from: Number(row.from_pos),
   to: Number(row.to_pos),
   selectedText: text(row.selected_text),
+  anchor: parseJson(row.anchor_json, null),
   comment: text(row.comment),
   color: row.color ? String(row.color) : null,
   resolvedAt: row.resolved_at ? String(row.resolved_at) : null,
@@ -104,10 +114,10 @@ export function listWorkspaceNoteVersions(noteId: string): StudyDocVersion[] {
 }
 
 /** Guarda el estado ACTUAL como versión. Un contenido ya archivado no se repite. */
-function snapshot(row: Row, reason: StudyDocVersion['reason']): StudyDocVersion | null {
+function snapshot(row: Row, reason: StudyDocVersion['reason'], native = getPageDocumentForNote(String(row.id))): StudyDocVersion | null {
   const db = getDb();
   const style = normalizeStudyDocStyle(parseJson<Partial<StudyDocStyle>>(row.style_json, {}));
-  const hash = contentHash(String(row.title), text(row.content), style);
+  const hash = contentHash(String(row.title), text(row.content) + '\0' + JSON.stringify(native?.nativeDocument ?? null) + '\0' + JSON.stringify(native?.academicMetadata ?? null), style);
   const duplicate = db
     .prepare('SELECT 1 FROM note_versions WHERE note_id = ? AND content_hash = ? LIMIT 1')
     .get(row.id, hash);
@@ -117,9 +127,9 @@ function snapshot(row: Row, reason: StudyDocVersion['reason']): StudyDocVersion 
     .get(row.id) as Row;
   const id = crypto.randomUUID();
   db.prepare(
-    `INSERT INTO note_versions (id, note_id, version_no, title, content_markdown, style_json, reason, content_hash, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, row.id, Number(next.value), row.title, text(row.content), JSON.stringify(style), reason, hash, now());
+    `INSERT INTO note_versions (id, note_id, version_no, title, content_markdown, style_json, reason, content_hash, created_at, native_document_json, native_schema_version, academic_metadata_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, row.id, Number(next.value), row.title, text(row.content), JSON.stringify(style), reason, hash, now(), native?.nativeDocument ? JSON.stringify(native.nativeDocument) : null, native?.schemaVersion ?? 1, JSON.stringify(native?.academicMetadata ?? null));
   return toVersion(db.prepare('SELECT * FROM note_versions WHERE id = ?').get(id) as Row);
 }
 
@@ -177,15 +187,22 @@ function noteBacklinks(noteId: string, title: string): StudyDocLink[] {
 // ── Lo que el editor pide al abrir una nota ──────────────────────────────────────
 
 export function getWorkspaceNoteEditorData(noteId: string): StudyDocEditorData {
-  reconcileLegacyNoteCache(noteId);
+  const existing = getPageDocumentForNote(noteId);
+  const document = existing && !existing.nativeDocument ? existing : reconcileLegacyNoteCache(noteId);
   const db = getDb();
   const row = noteRow(noteId);
   return {
+    documentTitle: String(row.title),
+    contentMarkdown: text(row.content),
+    nativeDocument: document.nativeDocument,
+    academicMetadata: document.academicMetadata,
+    schemaVersion: document.schemaVersion,
+    revision: document.revision,
     versions: listWorkspaceNoteVersions(noteId),
-    annotations: (db.prepare(
+    annotations: resolveBlockAnnotations((db.prepare(
       `SELECT * FROM note_annotations WHERE note_id = ?
         ORDER BY resolved_at IS NOT NULL, pinned DESC, position, created_at DESC`
-    ).all(noteId) as Row[]).map(toAnnotation),
+    ).all(noteId) as Row[]).map(toAnnotation), document.nativeDocument),
     outgoingLinks: outgoingNoteLinks(noteId, text(row.content)),
     backlinks: noteBacklinks(noteId, String(row.title)),
     style: normalizeStudyDocStyle(parseJson<Partial<StudyDocStyle>>(row.style_json, {})),
@@ -199,24 +216,33 @@ export function updateWorkspaceNote(noteId: string, input: StudyDocUpdateInput):
   const db = getDb();
   return db.transaction(() => {
     const current = noteRow(noteId);
+    const pageDocument = getPageDocumentForNote(noteId) ?? reconcileLegacyNoteCache(noteId);
+    if (input.expectedRevision !== undefined && input.expectedRevision !== pageDocument.revision) throw new Error('REVISION_CONFLICT: La nota ha cambiado en otra sesión. El borrador se conserva.');
+    if(input.nativeDocument===undefined)assertAcademicSupplement(pageDocument.markdown,input.contentMarkdown);
+    const native = input.nativeDocument === undefined
+      ? (pageDocument.nativeDocument ? markdownToBlockNote(input.contentMarkdown, pageDocument.nativeDocument) : null)
+      : input.nativeDocument === null ? null : validateBlockNoteDocument(input.nativeDocument);
+    const academicMetadata = normalizeAcademicMetadata(input.academicMetadata ?? pageDocument.academicMetadata);
     const style = normalizeStudyDocStyle({
       ...parseJson<Partial<StudyDocStyle>>(current.style_json, {}),
       ...(input.style ?? {}),
     });
     const title = input.title.trim() || 'Nota sin título';
-    const content = input.contentMarkdown.replace(/\r\n/g, '\n');
+    const content = native ? academicMarkdownProjection(native,academicMetadata) : input.contentMarkdown.replace(/\r\n/g, '\n');
     const locked = db.prepare(
-      `SELECT selected_text FROM note_annotations
+      `SELECT * FROM note_annotations
         WHERE note_id = ? AND locked = 1 AND resolved_at IS NULL AND selected_text <> ''`
     ).all(noteId) as Row[];
-    const missing = locked.find((fragment) => !content.includes(text(fragment.selected_text)));
+    const missing = locked.find(fragment => native && fragment.anchor_json
+      ? resolveBlockAnnotations([toAnnotation(fragment)],native)[0].anchorStatus === 'missing'
+      : !content.includes(text(fragment.selected_text)) && !(native && nativeDocumentText(native).includes(text(fragment.selected_text))));
     if (missing) throw new Error(`El fragmento bloqueado ya no está presente: ${text(missing.selected_text).slice(0, 80)}`);
 
     const styleChanged = JSON.stringify(style) !== JSON.stringify(
       normalizeStudyDocStyle(parseJson<Partial<StudyDocStyle>>(current.style_json, {}))
     );
-    if (title !== current.title || content !== text(current.content) || styleChanged) {
-      snapshot(current, input.reason ?? 'manual');
+    if (JSON.stringify(academicMetadata) !== JSON.stringify(pageDocument.academicMetadata) || title !== current.title || content !== text(current.content) || styleChanged || JSON.stringify(native) !== JSON.stringify(pageDocument.nativeDocument ?? null)) {
+      snapshot(current, input.reason ?? 'manual', pageDocument);
     }
     db.prepare(
       `UPDATE notes SET title = ?, content = ?, style_json = ?, spellcheck_language = ?,
@@ -233,8 +259,13 @@ export function updateWorkspaceNote(noteId: string, input: StudyDocUpdateInput):
         .run(title, content, title, content, source.ref);
       scheduleManualIndex();
     }
-    synchronizeNotePage(noteId, title, content);
-    return getNote(noteId)!;
+    let savedDocument: PageDocument;
+    if (native || input.nativeDocument === null || input.academicMetadata !== undefined) {
+      const saved = savePageDocument({ pageId: pageDocument.page.id, expectedRevision: pageDocument.revision, blocks: native ? blockNoteToPageBlocks(native) : markdownToPageBlocks(content), nativeDocument: native, schemaVersion: input.schemaVersion, academicMetadata, reason: input.reason });
+      if (!saved.ok) throw new Error('REVISION_CONFLICT: La nota ha cambiado en otra sesión.');
+      savedDocument = saved.document;
+    } else savedDocument = synchronizeNotePage(noteId, title, content);
+    return { ...getNote(noteId)!, editorRevision: savedDocument.revision };
   })();
 }
 
@@ -247,6 +278,9 @@ export function restoreWorkspaceNoteVersion(noteId: string, versionId: string): 
   return updateWorkspaceNote(noteId, {
     title: version.title,
     contentMarkdown: version.contentMarkdown,
+    nativeDocument: version.nativeDocument ?? undefined,
+    schemaVersion: version.schemaVersion,
+    academicMetadata: version.academicMetadata,
     style: version.style,
     reason: 'restore',
   });
@@ -271,6 +305,7 @@ export function createWorkspaceAnnotation(noteId: string, input: StudyAnnotation
     input.comment.trim(), input.color ?? null, input.locked ? 1 : 0, input.pinned ? 1 : 0,
     position, timestamp, timestamp
   );
+  if (input.anchor) db.prepare('UPDATE note_annotations SET anchor_json = ? WHERE id = ?').run(JSON.stringify(input.anchor), id);
   return toAnnotation(db.prepare('SELECT * FROM note_annotations WHERE id = ?').get(id) as Row);
 }
 
@@ -282,13 +317,15 @@ export function updateWorkspaceAnnotation(
   const current = db.prepare('SELECT * FROM note_annotations WHERE id = ?').get(id) as Row | undefined;
   if (!current) return null;
   db.prepare(
-    'UPDATE note_annotations SET comment = ?, color = ?, locked = ?, pinned = ?, resolved_at = ?, updated_at = ? WHERE id = ?'
+    'UPDATE note_annotations SET comment = ?, color = ?, locked = ?, pinned = ?, resolved_at = ?, anchor_json = ?, from_pos = ?, to_pos = ?, selected_text = ?, updated_at = ? WHERE id = ?'
   ).run(
     patch.comment ?? current.comment,
     patch.color === undefined ? current.color : patch.color,
     patch.locked === undefined ? current.locked : patch.locked ? 1 : 0,
     patch.pinned === undefined ? current.pinned : patch.pinned ? 1 : 0,
     patch.resolved === undefined ? current.resolved_at : patch.resolved ? now() : null,
+    patch.anchor === undefined ? current.anchor_json : patch.anchor ? JSON.stringify(patch.anchor) : null,
+    patch.from ?? current.from_pos, patch.to ?? current.to_pos, patch.selectedText ?? current.selected_text,
     now(), id
   );
   return toAnnotation(db.prepare('SELECT * FROM note_annotations WHERE id = ?').get(id) as Row);

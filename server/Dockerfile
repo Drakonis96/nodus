@@ -12,6 +12,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build:server-web
+RUN node scripts/generate-third-party-licenses.mjs --server-web
 
 FROM node:22-alpine
 
@@ -26,6 +27,8 @@ LABEL org.opencontainers.image.title="Nodus Server" \
       org.opencontainers.image.version="${NODUS_VERSION}" \
       org.opencontainers.image.revision="${NODUS_REVISION}" \
       app.nodus.stability="experimental"
+
+RUN apk add --no-cache chromium font-noto font-noto-cjk
 
 WORKDIR /app
 COPY server/package.json ./
@@ -43,6 +46,7 @@ COPY shared/serverProfilePreferences.mjs /shared/serverProfilePreferences.mjs
 COPY shared/appThemes.mjs /shared/appThemes.mjs
 COPY LICENSE SOURCE_CODE.md THIRD_PARTY_NOTICES.md ./
 COPY --from=web-build /src/server/dist/web ./dist/web
+COPY --from=web-build /src/legal/generated ./legal/generated
 
 ENV NODUS_DATA_DIR=/data \
     NODUS_HOST=0.0.0.0 \

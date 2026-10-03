@@ -2395,6 +2395,8 @@ export interface AppSettings {
    * `sidebarHidden` and this flips true, so their choice is respected thereafter.
    */
   sidebarCustomized: boolean;
+  /** Release migration that enables Nodus Scriptor once, before later manual choices. */
+  scriptorSidebarVersion: number;
   /** Toolkit destinations explicitly pinned as independent sidebar shortcuts. */
   toolkitPinnedPages: ToolkitToolPage[];
   /** Default wooden frame design for the genealogy tree (per-person overrides win). */
@@ -6360,6 +6362,7 @@ export interface NoteFolder {
 }
 
 export interface Note {
+  editorRevision?: number;
   id: string;
   folderId: string | null;
   title: string;
@@ -9410,6 +9413,7 @@ export interface NodusApi extends StudyFocusApi, ProsopographyApi, TestimoniesAp
   renameVault(id: string, name: string): Promise<VaultSummary>;
   setVaultType(id: string, type: VaultType): Promise<VaultSummary>;
   switchVault(id: string, options?: VaultSwitchOptions): Promise<VaultSwitchResult>;
+  onBeforeEditorLeave(callback: () => Promise<boolean>): () => void;
   duplicateVault(id: string, name: string, options?: VaultSwitchOptions): Promise<VaultDuplicateResult>;
   deleteVault(id: string, deleteFiles?: boolean): Promise<void>;
   resetVault(id: string): Promise<VaultSummary>;

@@ -1,3 +1,5 @@
+import type { AcademicMetadata } from './academicDocument';
+import type { BlockNoteDocument } from './blockNoteDocument';
 /**
  * Universal page and block contracts shared by SQLite, Electron and the renderer.
  *
@@ -75,6 +77,9 @@ export interface PageBlock {
 }
 
 export interface PageDocument {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: import('./blockNoteDocument').BlockNoteDocument | null;
+  schemaVersion?: number;
   page: Page;
   blocks: PageBlock[];
   /** Full Yjs state after the last persisted update. */
@@ -110,6 +115,9 @@ export interface PageRevisionPage {
 }
 
 export interface PageRevisionSnapshot {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
   revision: PageRevision;
   page: Page;
   blocks: PageBlock[];
@@ -289,6 +297,9 @@ export interface CreatePageInput {
 }
 
 export interface SavePageDocumentInput {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: import('./blockNoteDocument').BlockNoteDocument | null;
+  schemaVersion?: number;
   pageId: string;
   expectedRevision: number;
   blocks: PageBlockDraft[];
@@ -404,19 +415,19 @@ export function markdownToPageBlocks(markdown: string, idFactory?: () => string)
     }
     const task = trimmed.match(/^[-*+]\s+\[([ xX])\]\s+(.*)$/);
     if (task) {
-      out.push(block('task', { text: task[2], checked: task[1].toLowerCase() === 'x' }, idFactory));
+      out.push(block('task', { text: task[2], checked: task[1].toLowerCase() === 'x', indent: line.length - line.trimStart().length }, idFactory));
       index++;
       continue;
     }
     const bullet = trimmed.match(/^[-*+]\s+(.+)$/);
     if (bullet) {
-      out.push(block('bulleted_list', { text: bullet[1] }, idFactory));
+      out.push(block('bulleted_list', { text: bullet[1], indent: line.length - line.trimStart().length }, idFactory));
       index++;
       continue;
     }
     const numbered = trimmed.match(/^\d+[.)]\s+(.+)$/);
     if (numbered) {
-      out.push(block('numbered_list', { text: numbered[1] }, idFactory));
+      out.push(block('numbered_list', { text: numbered[1], indent: line.length - line.trimStart().length }, idFactory));
       index++;
       continue;
     }
@@ -521,6 +532,18 @@ export function markdownToPageBlocks(markdown: string, idFactory?: () => string)
     // A special marker not recognized above is preserved raw and advances the loop.
     if (index === before) out.push(block('markdown', { markdown: lines[index++] }, idFactory));
   }
+  const listStack: Array<{ indent: number; item: PageBlockDraft }> = [];
+  for (const item of out) {
+    if (!['bulleted_list','numbered_list','task'].includes(item.type)) { listStack.length=0; continue; }
+    const indent=Number(item.content?.indent ?? 0);
+    while (listStack.length && listStack.at(-1)!.indent >= indent) listStack.pop();
+    if (indent>0 && listStack.length) {
+      const parent=listStack.at(-1)!.item;
+      parent.id ??= idFactory?.() ?? globalThis.crypto.randomUUID();
+      item.parentBlockId=parent.id;
+    }
+    listStack.push({indent,item});
+  }
   return out.length ? out : [block('paragraph', { text: source }, idFactory)];
 }
 
@@ -540,6 +563,8 @@ function tableMarkdown(content: Record<string, unknown>): string {
 
 export function pageBlockToMarkdown(blockValue: Pick<PageBlock, 'type' | 'content'> | PageBlockDraft): string {
   const content = blockValue.content ?? {};
+  const projection = Object.fromEntries(Object.entries(content).filter(([key]) => !key.startsWith('_blockNote')));
+  if (typeof content._blockNoteMarkdown === 'string' && JSON.stringify(projection) === content._blockNoteProjection) return content._blockNoteMarkdown;
   const value = text(content);
   switch (blockValue.type) {
     case 'paragraph': return value;
@@ -573,7 +598,16 @@ export function pageBlockToMarkdown(blockValue: Pick<PageBlock, 'type' | 'conten
 
 export function pageBlocksToMarkdown(blocks: Array<Pick<PageBlock, 'type' | 'content' | 'parentBlockId' | 'order'> | PageBlockDraft>): string {
   const sorted = [...blocks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  return sorted.map((entry) => pageBlockToMarkdown(entry)).join('\n\n').replace(/\n{4,}/g, '\n\n\n').trimEnd();
+  const ids = new Set(sorted.map(entry => (entry as PageBlockDraft).id).filter(Boolean));
+  const render = (entry: typeof sorted[number], seen: Set<string>): string => {
+    const id = (entry as PageBlockDraft).id;
+    const own = pageBlockToMarkdown(entry);
+    if (!id || seen.has(id)) return own;
+    const next = new Set(seen).add(id);
+    const children = sorted.filter(child => child.parentBlockId === id).map(child => render(child, next)).join('\n\n');
+    return own + (children ? '\n' + children.split('\n').map(line => '  ' + line).join('\n') : '');
+  };
+  return sorted.filter(entry => !entry.parentBlockId || !ids.has(entry.parentBlockId)).map(entry => render(entry, new Set())).join('\n\n').replace(/\n{4,}/g, '\n\n\n').trimEnd();
 }
 
 export function defaultPageBlockContent(type: PageBlockType): Record<string, unknown> {

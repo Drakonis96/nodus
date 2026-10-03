@@ -20,16 +20,13 @@ test('study vault uses its teal header logo and the shared dock accent', async (
   assert.match(dock, /vaultTypeColor\(type\)/);
 });
 
-test('study and teaching notes autosave like Nodi without losing navigation edits', async () => {
-  const editor = await read('src/components/editor/StudyEditor.tsx');
-  assert.match(editor, /const STUDY_AUTOSAVE_DELAY_MS = 600/);
-  assert.match(editor, /window\.setTimeout\(\(\) => void save\('autosave'\), STUDY_AUTOSAVE_DELAY_MS\)/);
-  assert.match(editor, /saveQueueRef/, 'overlapping editor saves stay serialized');
-  assert.match(editor, /useEffect\(\(\) => \(\) => \{ void saveLatestRef\.current\('autosave'\); \}, \[\]\)/, 'unmount flushes the latest edit');
-  assert.match(editor, /await save\('autosave'\);\s*onActivate\(documentId\)/, 'tab changes flush before navigation');
-  assert.match(editor, /if \(documentId === active\.id\) await save\('autosave'\)/, 'closing flushes even before dirty state paints');
-  assert.match(editor, /data-testid="study-editor-save-state"[^>]*role="status"[^>]*aria-live="polite"/);
-  assert.match(editor, /t\(saveState === 'saved' \? 'Guardado automático'/);
+test('study and teaching notes serialize saves and keep local drafts on failure', async () => {
+  const [editor,chrome]=await Promise.all([read('src/components/editor/StudyEditor.tsx'),read('src/components/workspace/EditorialChrome.tsx')]);
+  assert.match(editor,/const STUDY_AUTOSAVE_DELAY_MS = 800/);
+  assert.match(editor,/saveQueueRef/);
+  assert.match(editor,/if \(documentId === active.id && !await flushLatest\(\)\) return/);
+  assert.match(editor,/retainEditorialDraft/);assert.match(editor,/expectedRevision: revisionRef/);
+  assert.match(chrome,/data-testid="study-editor-save-state"[^>]*role="status"[^>]*aria-live="polite"/);
 });
 
 test('study and teaching expandable icon buttons remain centred while labels are hidden', async () => {
@@ -506,56 +503,19 @@ test('apple calendar panel asks for consent only on an explicit action and needs
   assert.match(ipc, /listAppleCalendars\(true\)/);
 });
 
-test('study editor keeps Crepe controls contained and uses a compact icon toolbar', async () => {
-  const [editor, css] = await Promise.all([
-    read('src/components/editor/StudyEditor.tsx'),
-    read('src/index.css'),
-  ]);
-  assert.match(editor, /@milkdown\/crepe\/theme\/common\/style\.css/);
-  assert.match(editor, /data-testid="study-insert-toolbar"/);
-  assert.match(editor, /data-testid="study-heading-level"/);
-  assert.match(editor, /insert\(markdown\)\(ctx\)/);
-  assert.match(editor, /data-testid="study-editor-undo"/);
-  assert.match(editor, /data-testid="study-editor-redo"/);
-  assert.match(editor, /aria-keyshortcuts="Control\+Z Meta\+Z"/);
-  assert.match(editor, /aria-keyshortcuts="Control\+Y Control\+Shift\+Z Meta\+Shift\+Z"/);
-  assert.match(editor, /commandsCtx\)\.call\(undoCommand\.key\)/);
-  assert.match(editor, /commandsCtx\)\.call\(redoCommand\.key\)/);
-  assert.match(editor, /undoDepth\(view\.state\)/);
-  assert.match(editor, /redoDepth\(view\.state\)/);
-  assert.match(editor, /data-testid="study-inline-code"/);
-  assert.match(editor, /toggleInlineCodeCommand\.key/);
-  assert.match(editor, /data-testid="study-inline-formula"/);
-  assert.match(editor, /commands\.call\('ToggleLatex'\)/);
-  assert.match(editor, /data-testid="study-selection-tools-divider"/);
-  assert.match(editor, /data-testid="study-selection-text-color"/);
-  assert.match(editor, /data-testid="study-selection-heading"/);
-  assert.match(editor, /study-selection-tools-host/);
-  assert.match(editor, /data-testid={`study-toolbar-quick-improve-/);
-  assert.match(editor, /data-testid="study-editor-model-picker"/);
-  assert.match(editor, /data-testid="study-doc-style"[^]*study-editor-style-button[^]*<Icon name="palette" size=\{16\}/);
-  assert.match(editor, /useFeatureModel\(settings, 'improveModel'\)/);
-  assert.match(editor, /model: aiModel/);
-  assert.match(editor, /triggerModelOnly ariaLabel=/);
-  assert.match(editor, /wrapInHeadingCommand\.key/);
-  assert.match(editor, /view\.state\.tr\.replaceWith\(0, view\.state\.doc\.content\.size, parsed\.content\)/);
-  assert.match(editor, /setMeta\('addToHistory', false\)/);
-  assert.match(editor, /transaction = closeHistory\(transaction\)/);
-  assert.match(editor, /requestAnimationFrame\(flush\)/);
-  assert.match(editor, /studyImproveToolbarStyleIds\.slice\(0, 4\)/);
-  assert.doesNotMatch(editor, /event\.key\.toLowerCase\(\) === 'z'/, 'the window listener must not hijack Milkdown history');
-  assert.match(editor, /setTableDialogOpen\(true\)/);
-  assert.match(editor, /tableRows/);
-  assert.match(editor, /tableColumns/);
-  assert.match(editor, /Renombrar apunte/);
-  assert.match(editor, /pendingCloseId && <ConfirmModal/);
-  assert.match(editor, /runQuickImprovement/);
-  assert.doesNotMatch(editor, />\/\{command\}</);
-  assert.doesNotMatch(editor, /input min-w-44 flex-1 border-0 bg-transparent text-base font-semibold/);
-  assert.match(css, /\.study-editor-shell \.milkdown \{[^}]*position:\s*relative/s);
-  assert.match(css, /\.study-editor-model-picker \.model-picker-trigger\s*\{[^}]*border-radius:\s*9999px/s);
-  assert.match(css, /\.study-editor-style-button:not\(\.is-active\)\s*\{[^}]*var\(--vault-accent/s);
-  assert.match(css, /\.study-editor-shell \.milkdown \.milkdown-slash-menu \{[^}]*max-width:/s);
+test('study editor exposes BlockNote controls through contextual menus and selection', async () => {
+  const [editor, canvas, css] = await Promise.all([read('src/components/editor/StudyEditor.tsx'),read('src/components/editor/BlockNoteCanvas.tsx'),read('src/components/workspace/editorialWorkspace.css')]);
+  for (const id of ['study-insert-toolbar','study-heading-level','study-editor-undo','study-editor-redo','study-inline-code','study-inline-formula','study-selection-text-color','study-selection-heading','study-editor-model-picker','study-doc-style']) assert.ok(editor.includes(id),id);
+  assert.match(canvas, /@blocknote\/ariakit/);
+  assert.match(canvas,/FormattingToolbarController/);
+  assert.match(canvas,/editor\.undo\(\)/); assert.match(canvas,/editor\.redo\(\)/);
+  assert.match(canvas,/setMeta\('addToHistory', false\)/);assert.match(canvas,/closeHistory\(tr\)/);
+  assert.match(editor,/requestAnimationFrame\(flush\)/);
+  assert.match(editor,/useFeatureModel\(settings, 'improveModel'\)/);
+  assert.match(editor,/onToolbarElement=\{setSelectionToolbar\}/);
+  assert.match(css,/editorial-options:not\(\[open\]\)/);
+  assert.doesNotMatch(editor,/@milkdown/);
+  assert.doesNotMatch(css,/\.milkdown/);
 });
 
 test('study search follows the minimal global-search layout', async () => {
@@ -740,8 +700,8 @@ test('study recordings use explicit light and dark surfaces throughout the audio
   assert.match(recordings, /text-neutral-900 outline-none dark:text-neutral-100/);
   assert.match(repository, /requestedPlacements/);
   assert.match(repository, /addStudyPlacement\(document\.id, placement\)/);
-  assert.match(editor, /a\[href\^="nodus:\/\/study\/recording\/"\]/);
-  assert.match(editor, /onOpenRecording\(decodeURIComponent\(match\[1\]\)/);
+  assert.match(await read('src/components/editor/BlockNoteCanvas.tsx'), /onOpenRecording\?\.\(decodeURIComponent/);
+  assert.match(editor, /onOpenRecording=\{onOpenRecording\}/);
   assert.match(markdown, /onStudyRecording/);
   assert.match(organization, /onOpenRecording=\{onOpenRecording\}/);
   assert.match(app, /setStudyRecordingTarget\(\{ id, timestamp \}\); ctx\.setView\('studyRecordings'\)/);

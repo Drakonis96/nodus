@@ -6,18 +6,20 @@ export const TOOL_DOC_TOPICS: readonly NodusDocTopic[] = [
     id: 'toolkit-hub',
     area: 'tools',
     title: { es: 'Nodus Toolkit: el hub de herramientas', en: 'Nodus Toolkit: the tools hub' },
-    keywords: ['toolkit', 'herramientas', 'hub', 'nodus tools', 'catalogo', 'fijar', 'desfijar', 'utilidades', 'convert', 'protect', 'translate', 'presenter', 'ocr'],
+    keywords: ['toolkit', 'herramientas', 'hub', 'nodus tools', 'catalogo', 'fijar', 'desfijar', 'nodus scriptor', 'utilidades', 'convert', 'protect', 'translate', 'presenter', 'ocr'],
     body: {
       es: `- Herramientas es una sección de la barra lateral en su propio grupo y también tiene icono en la cabecera («Abrir Nodus Toolkit»). Aparece en todos los tipos de bóveda.
-- Su página principal es un hub con las tarjetas del catálogo: Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter y OCR Workspace. Cada tarjeta se puede fijar como atajo en la barra lateral («Fijar» / «Desfijar»).
+- Su página principal es un hub con las tarjetas del catálogo: Nodus Apps, Nodus Browser, Nodus Compass, Nodus Convert, Nodus Drift, Nodus Protect, Nodus Radar, Nodus Scriptor, Nodus Translate, PDF Presenter y OCR Workspace. Cada tarjeta se puede fijar como atajo en la barra lateral («Fijar» / «Desfijar»).
+- Nodus Scriptor está fijado por defecto en Herramientas, con fondo blanco y edición por bloques. El usuario puede desfijarlo; la elección se conserva después de la activación inicial de esta actualización.
 - Dentro de una herramienta, el botón a la izquierda de su título vuelve al hub.
 - Utilidades locales para investigación, docencia y estudio: convertir y procesar archivos sin salir de Nodus.`,
       en: `- Tools is a sidebar section in its own group and also has a header icon ("Open Nodus Toolkit"). It appears in every vault type.
-- Its home is a hub with the catalogue cards: Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter and OCR Workspace. Each card can be pinned as a sidebar shortcut ("Pin" / "Unpin").
+- Its home is a hub with the catalogue cards: Nodus Apps, Nodus Browser, Nodus Compass, Nodus Convert, Nodus Drift, Nodus Protect, Nodus Radar, Nodus Scriptor, Nodus Translate, PDF Presenter and OCR Workspace. Each card can be pinned as a sidebar shortcut ("Pin" / "Unpin").
+- Nodus Scriptor is pinned under Tools by default, with a white background and block editing. Users can unpin it; that choice persists after this update initially enables it.
 - Inside a tool, the button to the left of its title returns to the hub.
 - Local utilities for research, teaching and study: convert and process files without leaving Nodus.`,
     },
-    related: ['toolkit-convert', 'toolkit-ocr'],
+    related: ['toolkit-convert', 'toolkit-ocr', 'sections-workspace-notes'],
   },
   {
     id: 'toolkit-convert',

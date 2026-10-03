@@ -11,6 +11,7 @@ export default defineConfig({
     alias: [
       { find: '@shared', replacement: path.resolve(__dirname, 'shared') },
       { find: '../i18n', replacement: path.resolve(__dirname, 'src/serverWeb/i18nShim.ts') },
+      { find: '../../i18n', replacement: path.resolve(__dirname, 'src/serverWeb/i18nShim.ts') },
     ],
   },
   // Vite preserves the source file's directory for an HTML input outside the project root.

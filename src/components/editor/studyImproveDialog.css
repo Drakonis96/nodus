@@ -1,0 +1,88 @@
+/* The prompt library is portalled; keep its surfaces and controls scoped here. */
+.study-prompts-backdrop {
+  position: fixed; inset: 0; z-index: 140; display: flex; align-items: center;
+  justify-content: center; padding: 24px; background: rgb(0 0 0 / .22);
+}
+.study-prompts-dialog {
+  --sp-bg: #fff; --sp-panel: #fafafa; --sp-line: #e5e5e5; --sp-text: #302e3a;
+  --sp-muted: #736e7d; --sp-accent: #7560b7; --sp-tint: #f2eef8;
+  width: min(960px,100%); height: min(720px,calc(100dvh - 48px)); min-width: 0;
+  display: flex; flex-direction: column; overflow: hidden; background: var(--sp-bg);
+  color: var(--sp-text); border: 1px solid var(--sp-line); border-radius: 14px;
+  box-shadow: 0 16px 60px rgb(0 0 0 / .18); font: 13px/1.5 system-ui,sans-serif;
+}
+.dark .study-prompts-dialog {
+  --sp-bg: #202026; --sp-panel: #25242c; --sp-line: #36343e; --sp-text: #e4e1ea;
+  --sp-muted: #9d98a8; --sp-accent: #b8a0eb; --sp-tint: #343041;
+}
+.study-prompts-header { display: flex; flex-shrink: 0; align-items: center; gap: 10px; padding: 18px 22px 14px; }
+.study-prompts-heading-mark { color: var(--sp-accent); flex-shrink: 0; }
+.study-prompts-header h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.study-prompts-close { display: grid; place-items: center; width: 30px; height: 30px; margin-left: auto; border-radius: 6px; }
+.study-prompts-toolbar { display: flex; flex-shrink: 0; gap: 12px; align-items: center; padding: 0 22px 18px; border-bottom: 1px solid var(--sp-line); }
+.study-prompts-search { position: relative; display: block; min-width: 0; flex: 1; }
+.study-prompts-search > svg { position: absolute; left: 12px; top: 11px; color: var(--sp-muted); pointer-events: none; }
+.study-prompts-dialog .input { width: 100%; min-width: 0; background: var(--sp-bg); color: var(--sp-text); border: 1px solid var(--sp-line); border-radius: 7px; padding: 8px 10px; font-size: 13px; }
+.study-prompts-search .input { height: 36px; padding-left: 35px; background: var(--sp-panel); }
+.study-prompts-dialog .btn { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 6px; min-height: 34px; height: auto; padding: 6px 10px; color: var(--sp-text); border: 1px solid transparent; border-radius: 6px; font-size: 12px; background: transparent; white-space: nowrap; }
+.study-prompts-dialog .btn:hover, .study-prompts-close:hover { background: var(--sp-tint); }
+.study-prompts-dialog .study-prompts-new { border-color: var(--sp-line); }
+.study-prompts-layout { display: grid; grid-template-columns: 260px minmax(0,1fr); min-height: 0; flex: 1; }
+.study-prompts-sidebar { display: flex; flex-direction: column; min-height: 0; min-width: 0; border-right: 1px solid var(--sp-line); background: var(--sp-panel); }
+.study-prompts-list { min-height: 0; flex: 1; padding: 12px 10px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.study-prompts-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; border-radius: 7px; }
+.study-prompts-row:hover { background: var(--sp-tint); }
+.study-prompts-row.is-selected { background: var(--sp-tint); color: var(--sp-accent); }
+.study-prompts-choice { display: flex; align-items: flex-start; gap: 10px; min-width: 0; flex: 1; padding: 10px; text-align: left; font-size: 12px; line-height: 1.5; }
+.study-prompts-choice > svg { flex-shrink: 0; margin-top: 1px; }
+.study-prompts-choice span { overflow-wrap: anywhere; }
+.study-prompts-pin { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 30px; margin-right: 5px; border-radius: 5px; color: var(--sp-muted); }
+.study-prompts-pin.is-pinned { color: var(--sp-accent); }
+.study-prompts-pin:hover { background: var(--sp-bg); }
+.study-prompts-shortcuts { display: flex; flex-shrink: 0; align-items: flex-start; gap: 7px; border-top: 1px solid var(--sp-line); padding: 12px 16px; color: var(--sp-muted); font-size: 10px; line-height: 1.5; }
+.study-prompts-shortcuts > svg { flex-shrink: 0; margin-top: 2px; }
+.study-prompts-shortcuts > span { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.study-prompts-shortcuts p { margin: 0; }
+.study-prompts-main { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.study-prompts-detail-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 18px 22px; border-bottom: 1px solid var(--sp-line); }
+.study-prompts-identity { display: flex; min-width: 0; flex: 1 1 220px; align-items: center; gap: 10px; }
+.study-prompts-identity > svg { color: var(--sp-accent); flex-shrink: 0; }
+.study-prompts-identity > div { min-width: 0; }
+.study-prompts-detail-header h3 { margin: 0; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.study-prompts-identity p { margin: 3px 0 0; color: var(--sp-muted); font-size: 11px; }
+.study-prompts-detail-actions { display: flex; flex-shrink: 0; align-items: center; gap: 3px; }
+.study-prompts-dialog .study-prompts-delete:hover:not(:disabled) { color: #b23b3b; background: #fff0f0; }
+.dark .study-prompts-dialog .study-prompts-delete:hover:not(:disabled) { color: #f4aaaa; background: #3b252b; }
+.study-prompts-content { min-height: 0; min-width: 0; flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: 22px; }
+.study-prompts-description { margin: 0 0 22px; color: var(--sp-muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.study-prompts-builtin-notice { margin: -10px 0 22px; font-size: 11px; color: var(--sp-muted); }
+.study-prompts-content h4 { margin: 0 0 12px; font-size: 10px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase; color: var(--sp-muted); }
+.study-prompts-text { margin: 0; font: 13px/1.8 system-ui,sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+.study-prompts-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; font-size: 12px; color: var(--sp-muted); }
+.study-prompts-text-field textarea { min-height: 230px; resize: vertical; line-height: 1.7; }
+.study-prompts-warning { padding: 12px; border: 1px solid #e8d4a7; border-radius: 7px; color: #866226; font-size: 11px; }
+.study-prompts-warning p { margin: 0; }
+.dark .study-prompts-warning { border-color: #6f5932; color: #dfc490; }
+.study-prompts-message { flex-shrink: 0; margin: 0; padding: 10px 22px; color: var(--sp-muted); font-size: 12px; overflow-wrap: anywhere; }
+.study-prompts-footer { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--sp-line); }
+.study-prompts-save-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.study-prompts-dialog .study-prompts-shortcut-toggle { padding-left: 0; color: var(--sp-muted); }
+.study-prompts-dialog .study-prompts-shortcut-toggle[aria-pressed=true] { color: var(--sp-accent); }
+.study-prompts-dialog .study-prompts-primary { color: #fff; background: var(--sp-accent); border-color: transparent; }
+.study-prompts-dialog .study-prompts-primary:hover { background: var(--sp-accent); filter: brightness(.95); }
+.dark .study-prompts-dialog .study-prompts-primary { color: #201c2b; }
+.study-prompts-empty { padding: 22px 12px; color: var(--sp-muted); font-size: 12px; }
+.study-prompts-dialog button:disabled { opacity: .45; cursor: default; }
+.study-prompts-dialog :is(button,input,textarea,select):focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 3px; }
+@media (max-width: 800px) { .study-prompts-layout { grid-template-columns: 220px minmax(0,1fr); } }
+@media (max-width: 640px) {
+  .study-prompts-backdrop { padding: 12px; }
+  .study-prompts-dialog { height: calc(100dvh - 24px); }
+  .study-prompts-layout { grid-template-columns: minmax(0,1fr); grid-template-rows: 140px minmax(0,1fr); }
+  .study-prompts-sidebar { border-right: 0; border-bottom: 1px solid var(--sp-line); }
+  .study-prompts-shortcuts { display: none; }
+  .study-prompts-header { padding: 14px 16px 10px; }
+  .study-prompts-toolbar { padding: 0 16px 14px; gap: 8px; }
+  .study-prompts-detail-header, .study-prompts-content { padding: 16px; }
+  .study-prompts-footer { padding: 12px 16px; }
+}

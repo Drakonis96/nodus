@@ -40,6 +40,15 @@ import { driftApi } from './drift';
 // runs at a time (the composer is disabled while sending).
 let activeNodiChatRequestId: string | null = null;
 
+const editorFlushers = new Set<() => Promise<boolean>>();
+async function flushEditors(): Promise<boolean> {
+  const results = await Promise.allSettled([...editorFlushers].map(flush => flush()));
+  return results.every(result => result.status === 'fulfilled' && result.value);
+}
+ipcRenderer.on('editor:flush', (_event, requestId: string) => {
+  void flushEditors().then(saved => ipcRenderer.send('editor:flushed', requestId, saved));
+});
+
 const DEFAULT_OVERLAY_PLACEMENT: NodiOverlayPlacement = { x: 16, y: 16, horizontal: 'left', vertical: 'up' };
 
 /**
@@ -289,7 +298,10 @@ export const nodusApi: NodusApi = {
   replicaDetach: (vaultId) => ipcRenderer.invoke('vaults:replicaDetach', vaultId),
   renameVault: (id, name) => ipcRenderer.invoke('vaults:rename', id, name),
   setVaultType: (id, type) => ipcRenderer.invoke('vaults:setType', id, type),
-  switchVault: (id, options) => ipcRenderer.invoke('vaults:switch', id, options),
+  onBeforeEditorLeave: callback => { editorFlushers.add(callback); return () => { editorFlushers.delete(callback); }; },
+  switchVault: async (id, options) => await flushEditors()
+    ? ipcRenderer.invoke('vaults:switch', id, options)
+    : { ok: false, message: 'No se han podido guardar los cambios.', copiedProviders: [] },
   duplicateVault: (id, name, options) => ipcRenderer.invoke('vaults:duplicate', id, name, options),
   deleteVault: (id, deleteFiles) => ipcRenderer.invoke('vaults:delete', id, deleteFiles).then(() => undefined),
   resetVault: (id) => ipcRenderer.invoke('vaults:reset', id),

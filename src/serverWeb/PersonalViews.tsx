@@ -1,3 +1,17 @@
+import {assertAcademicSupplement} from '@shared/academicProjection';
+import { AcademicTools, AcademicPanel, type AcademicToolsHandle } from '../components/editor/AcademicTools';
+import { normalizeAcademicMetadata, cloneAcademicDocument, type AcademicMetadata } from '@shared/academicDocument';
+import { documentReferences, parseEditorReference, type EditorReference } from '@shared/editorReferences';
+import { EditorialReferences } from '../components/editor/EditorReferences';
+import { WorkspaceTabStrip } from "../components/library/LibraryWorkspaceTabs";
+import { useEditorialFocus } from "../components/workspace/editorialFocus";
+import { readEditorialDraft, retainEditorialDraft, clearEditorialDraft, downloadEditorialDraft } from '../components/workspace/editorialDrafts';
+import { flushEditorialDraft } from '../components/workspace/flushEditorialDraft';
+import { BlockNoteCanvas, type BlockNoteCanvasHandle } from '../components/editor/BlockNoteCanvas';
+import { EditorialActionBar, EditorialActionMenu, type EditorialAction } from '../components/workspace/EditorialActions';
+import { EditorialHeader, EditorialTitle, EditorialNavigator, EditorialCards, CatalogViewControl, EditorialCatalogRow, EditorialInspector } from '../components/workspace/EditorialChrome';
+import { markdownToBlockNote, parseNativeDocument, type BlockNoteDocument } from '@shared/blockNoteDocument';
+import { readViewSnapshot, patchViewSnapshot } from '../app/viewSnapshots';
 import {
   useCallback,
   useEffect,
@@ -17,7 +31,8 @@ import {
 import { FindInPage } from "../components/FindInPage";
 import { NodiViewContextSource } from "../components/NodiViewContextSource";
 import { api, ApiError } from "./api";
-import { MarkdownReader } from "./readers";
+import { registerServerEditorFlush } from "./editorNavigation";
+import { MarkdownReader, serverHrefForNodus } from "./readers";
 import {
   parseServerCitation,
   ServerCitationModal,
@@ -54,6 +69,7 @@ function valueText(value: unknown, fallback = ""): string {
 
 function plainReading(markdown: string): string {
   return markdown
+    .replace(/<!--[\s\S]*?-->/g, "")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
@@ -61,6 +77,11 @@ function plainReading(markdown: string): string {
     .replace(/^\s*[-*+]\s+/gm, "• ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+// Catalog previews show prose, without the generated footnote definitions.
+function workspaceExcerpt(markdown: string): string {
+  return plainReading(markdown.replace(/^\[\^[^\]]+\]:.*(?:\n[ \t]+.*)*/gm, "").replace(/\[\^[^\]]+\]/g, ""));
 }
 
 function formatReportDate(value: unknown): string {
@@ -988,7 +1009,7 @@ export function LegacyPrivateNotesServerView({
               onClick={() => setActiveId(null)}
             >
               <Icon name="chevronLeft" size={13} />
-              {t("Espacio de trabajo")}
+              Nodus Scriptor
             </button>
             <span className="flex-1" />
             {!active.metadata?.published && (
@@ -1065,6 +1086,7 @@ function ServerWorkspaceCollections({
   onToggle,
   onRename,
   onDelete = () => undefined,
+  onDrop,
 }: {
   folders: UserArtifact[];
   selected: string;
@@ -1074,6 +1096,7 @@ function ServerWorkspaceCollections({
   onToggle: (id: string) => void;
   onRename: (folder: UserArtifact) => void;
   onDelete?: (folder: UserArtifact) => void;
+  onDrop?: (folder: UserArtifact, transfer: DataTransfer) => void;
 }): ReactNode {
   const children = (parentId: string | null) =>
     folders
@@ -1087,7 +1110,7 @@ function ServerWorkspaceCollections({
     const open = expanded.has(folder.id);
     const meta = serverWorkspaceMeta(folder);
     return (
-      <div key={folder.id}>
+      <div key={folder.id} draggable={Boolean(onDrop && !meta.published)} onDragStart={event => { event.stopPropagation(); event.dataTransfer.setData('application/x-nodus-workspace-collection',folder.id); }} onDragOver={event => { if (onDrop && !meta.published && [...event.dataTransfer.types].some(type=>type.startsWith('application/x-nodus-workspace-'))) event.preventDefault(); }} onDrop={event => { if (onDrop && !meta.published) {event.preventDefault();event.stopPropagation();onDrop(folder,event.dataTransfer);} }}>
         <div
           className="group flex items-center gap-1"
           style={{ paddingLeft: `${8 + depth * 13}px` }}
@@ -1146,13 +1169,59 @@ function ServerWorkspaceCollections({
  * read-only rows; all edits, folders and trash live in the authenticated artifact store. */
 export function PrivateNotesServerView({
   spaceId,
+  userId = 'authenticated',
   csrfToken,
   kind = "workspace-note",
 }: {
   spaceId: string;
+  userId?: string;
   csrfToken?: string;
   kind?: "workspace-note" | "nodi-note";
 }) {
+  const snapshotKey = `server:${userId}:${spaceId}`;
+  const initialSnapshot = useMemo(() => readViewSnapshot(snapshotKey, 'workspace'), [snapshotKey]);
+  const [pinnedActionIds, setPinnedActionIds] = useState<string[]>(initialSnapshot?.pinnedActionIds ?? []);
+  const [layout, setLayout] = useState(initialSnapshot?.layout ?? 'editorial');
+  const [catalogView, setCatalogView] = useState<'list' | 'cards'>(initialSnapshot?.catalogView ?? 'list');
+  const [contextOpen, setContextOpen] = useState(initialSnapshot?.contextOpen ?? false);
+  const [focus, setFocus] = useState(false);
+  const editorialFocus = useEditorialFocus(focus, active => { setFocus(active); if (active) { setLayout('editorial'); setContextOpen(false); } });
+  const [raw, setRaw] = useState(false);
+  const hydratedId = useRef('');
+  const draftRevision = useRef<number | null>(null);
+  const [editorKey, setEditorKey] = useState(0);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [split, setSplit] = useState(false);
+  const [contextTab, setContextTab] = useState<'sources' | 'details' | 'history' | 'checks' | 'structure'>('sources');
+  const [nativeDocument, setNativeDocument] = useState<BlockNoteDocument | null>(null);
+  const [academicMetadata,setAcademicMetadata] = useState<AcademicMetadata>(()=>normalizeAcademicMetadata(null));
+  const academicRef=useRef(academicMetadata);academicRef.current=academicMetadata;
+  const academicTools=useRef<AcademicToolsHandle>(null);
+  const nativeRef = useRef<BlockNoteDocument | null>(null);
+  const baseline = useRef('');
+  const latestSignature = useRef('');
+  const saveQueue = useRef<Promise<boolean>>(Promise.resolve(true));
+  const savedSignatures = useRef(new Map<string,string>());
+  const saveLatest = useRef<() => Promise<boolean>>(async () => true);
+  const flushLatest = useCallback(() => flushEditorialDraft(() => saveLatest.current(), () => !hydratedId.current || latestSignature.current === baseline.current), []);
+  const listReferences = useCallback(async (): Promise<EditorReference[]> => {
+    const response = await api.editorReferences(spaceId);
+    return [...response.items, ...itemsRef.current.filter(entry => !serverWorkspaceTrashed(entry)).map(entry => ({ id: entry.id, kind: 'note' as const, title: entry.title, href: `nodus://note/${encodeURIComponent(entry.id)}` }))];
+  }, [spaceId]);
+  const navigateReference = async (href: string) => {
+    if (!await flushLatest()) return;
+    const reference = parseEditorReference(href);
+    const entry = reference?.kind === 'note' && itemsRef.current.find(item => item.id === reference.id);
+    if (entry) void openItem(entry);
+    else if (/^https?:\/\//i.test(href)) window.open(href, '_blank', 'noopener,noreferrer');
+    else { const target = serverHrefForNodus(href); if (target) window.location.assign(target); }
+  };
+
+  const itemsRef = useRef<UserArtifact[]>([]);
+  const canvasRef = useRef<BlockNoteCanvasHandle>(null);
+  const rawEditorRef = useRef<HTMLTextAreaElement>(null);
+  const rawSelection = useRef<{id:string;content:string;from:number;to:number}|null>(null);
+  const [historyState,setHistoryState] = useState({canUndo:false,canRedo:false});
   const [items, setItems] = useState<UserArtifact[]>([]);
   const [folders, setFolders] = useState<UserArtifact[]>([]);
   const [folderFilter, setFolderFilter] = useState("");
@@ -1162,11 +1231,19 @@ export function PrivateNotesServerView({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [query, setQuery] = useState("");
+  const [sortOrder,setSortOrder] = useState("recent");
+  const [kindFilter,setKindFilter] = useState("");
+  const [tagFilter,setTagFilter] = useState("");
+  const [showFind,setShowFind] = useState(false);
+  const [find,setFind] = useState("");
+  const [replace,setReplace] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [tagDraft, setTagDraft] = useState("");
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const active = items.find((entry) => entry.id === activeId) || null;
+  itemsRef.current = items;
+  useEffect(() => { patchViewSnapshot(snapshotKey, 'workspace', { layout, catalogView, contextOpen, focusMode: focus, pinnedActionIds }); }, [snapshotKey,layout,catalogView,contextOpen,focus,pinnedActionIds]);
   const trashMode = folderFilter === "__trash__";
   const load = useCallback(async () => {
     const [{ artifacts }, notes, privateFolders] = await Promise.all([
@@ -1245,7 +1322,7 @@ export function PrivateNotesServerView({
     void load().catch(setError);
   }, [load]);
   useEffect(() => {
-    if (!active?.metadata?.published || !active.id || active.content) return;
+    if (!active?.metadata?.published || !active.id || active.metadata?.detailLoaded) return;
     api
       .detail(spaceId, "notes", active.id)
       .then((response) => {
@@ -1257,7 +1334,7 @@ export function PrivateNotesServerView({
         setItems((current) =>
           current.map((entry) =>
             entry.id === active.id
-              ? { ...entry, content: valueText(note.content) }
+              ? { ...entry, content: valueText(note.content), metadata: { ...entry.metadata, detailLoaded: true } }
               : entry,
           ),
         );
@@ -1265,24 +1342,38 @@ export function PrivateNotesServerView({
       .catch(() => undefined);
   }, [active?.id, active?.metadata?.published, active?.content, spaceId]);
   useEffect(() => {
-    setTitle(active?.title || "");
-    setContent(active?.content || "");
-    setTagDraft("");
+    const native = active ? parseNativeDocument(active.metadata?.nativeDocument) ?? markdownToBlockNote(active.content) : null;
+    const academic=normalizeAcademicMetadata(active?.metadata?.academicMetadata);setAcademicMetadata(academic);
+    nativeRef.current = native; setNativeDocument(native);
+    setTitle(active?.title || ''); setContent(active?.content || '');
+    baseline.current = JSON.stringify({ title: active?.title || '', content: active?.content || '', native, academicMetadata:academic });
+    if (active) savedSignatures.current.set(active.id,baseline.current);
+    setTagDraft(""); setError(undefined);
+    draftRevision.current = active?.revision ?? null;
+    hydratedId.current = active?.id ?? '';
+    if (active && !serverWorkspacePublished(active)) {
+      const recovered = readEditorialDraft(snapshotKey,active.id);
+      if (recovered) { if(recovered.academicMetadata)setAcademicMetadata(normalizeAcademicMetadata(recovered.academicMetadata));setTitle(recovered.title); setContent(recovered.contentMarkdown); nativeRef.current = recovered.nativeDocument ?? markdownToBlockNote(recovered.contentMarkdown); setNativeDocument(nativeRef.current); draftRevision.current = recovered.revision; if (recovered.revision !== active.revision) setError(new Error(t('La versión guardada ha cambiado. El borrador se conserva.'))); }
+    }
   }, [active?.id]);
-  const openItem = (entry: UserArtifact) => {
+  const openItem = async (entry: UserArtifact) => {
+    if (!await flushLatest()) return;
     setOpenIds((current) =>
       current.includes(entry.id) ? current : [...current, entry.id],
     );
     setActiveId(entry.id);
   };
-  const closeItem = (id: string) => {
+  const closeItem = async (id: string) => {
+    if (activeId === id && !await flushLatest()) return;
     setOpenIds((current) => current.filter((entry) => entry !== id));
     if (activeId === id) setActiveId(null);
   };
   const updateMeta = async (entry: UserArtifact, patch: JsonRecord) => {
+    if (entry.id === activeId && !await flushLatest()) throw new Error(t('No se han podido guardar los cambios.'));
+    entry = itemsRef.current.find(item => item.id === entry.id) ?? entry;
     const { artifact } = await api.updateArtifact(
       entry.id,
-      { metadata: { ...serverWorkspaceMeta(entry), ...patch } },
+      { expectedRevision: entry.revision, metadata: { ...serverWorkspaceMeta(entry), ...patch } },
       csrfToken,
     );
     setItems((current) =>
@@ -1290,7 +1381,7 @@ export function PrivateNotesServerView({
     );
     return artifact;
   };
-  const create = async () => {
+  const create = async (entity: 'note' | 'idea' = 'note') => {
     try {
       const { artifact } = await api.createArtifact(
         {
@@ -1300,6 +1391,7 @@ export function PrivateNotesServerView({
           content: "",
           metadata: {
             surface: "workspace",
+            entity,
             private: true,
             tags: [],
             folderId: null,
@@ -1312,6 +1404,17 @@ export function PrivateNotesServerView({
     } catch (cause) {
       setError(cause);
     }
+  };
+  const duplicate = async (entry = active) => {
+    if (!entry || !await flushLatest()) return;
+    const current=itemsRef.current.find(item=>item.id===entry.id) ?? entry; const native=parseNativeDocument(current.metadata?.nativeDocument);
+    const cloned=native?cloneAcademicDocument(native,current.metadata?.academicMetadata):null;const {artifact}=await api.createArtifact({vaultId:spaceId,kind,title:current.title+' · '+t('Copia'),content:current.content,metadata:{...serverWorkspaceMeta(current),nativeDocument:cloned?.document??null,academicMetadata:cloned?.metadata,editorVersions:[]}},csrfToken);setItems(items=>[artifact,...items]);void openItem(artifact);
+  };
+  const createManuscript = async () => {
+    const folderId=folderFilter&&!folderFilter.startsWith('__')?folderFilter:null;
+    const metadata=normalizeAcademicMetadata(null);metadata.manuscript={kind:'paper',chapters:itemsRef.current.filter(entry=>!serverWorkspacePublished(entry)&&folderId&&serverWorkspaceMeta(entry).folderId===folderId).map(entry=>({documentId:entry.id,kind:'note' as const,title:entry.title,included:true})),authors:'',abstract:'',keywords:'',includeContents:false,paper:'A4',marginMm:25};
+    const {artifact}=await api.createArtifact({vaultId:spaceId,kind,title:t('Nuevo manuscrito'),content:'',metadata:{entity:'note',folderId,nativeDocument:[],schemaVersion:2,academicMetadata:metadata}},csrfToken);
+    setItems(items=>[artifact,...items]);void openItem(artifact);
   };
   const createFolder = async () => {
     try {
@@ -1335,24 +1438,45 @@ export function PrivateNotesServerView({
       setError(cause);
     }
   };
-  const save = async () => {
-    if (!active || serverWorkspacePublished(active)) return;
-    setBusy(true);
-    try {
-      const { artifact } = await api.updateArtifact(
-        active.id,
-        { title, content, metadata: serverWorkspaceMeta(active) },
-        csrfToken,
-      );
-      setItems((current) =>
-        current.map((entry) => (entry.id === artifact.id ? artifact : entry)),
-      );
-    } catch (cause) {
-      setError(cause);
-    } finally {
-      setBusy(false);
-    }
+  const signature = JSON.stringify({ title, content, native: nativeDocument, academicMetadata });
+  latestSignature.current = signature;
+  const dirty = signature !== baseline.current;
+  const save = async (): Promise<boolean> => {
+    if (!active || hydratedId.current !== active.id || serverWorkspacePublished(active) || signature === baseline.current) return true;
+    const snapshot = { id: active.id, title, content, native: nativeRef.current, academicMetadata:academicRef.current, signature };
+    const operation = saveQueue.current.then(async () => {
+      if (savedSignatures.current.get(snapshot.id) === snapshot.signature) return true;
+      setBusy(true);
+      try {
+        const current = itemsRef.current.find(entry => entry.id === snapshot.id);
+        if (!current) return false;
+        const { artifact } = await api.updateArtifact(snapshot.id, { title: snapshot.title, content: snapshot.content, expectedRevision: draftRevision.current ?? current.revision, metadata: { ...serverWorkspaceMeta(current), nativeDocument: snapshot.native, schemaVersion: 2, academicMetadata:snapshot.academicMetadata } }, csrfToken);
+        itemsRef.current = itemsRef.current.map(entry => entry.id === artifact.id ? artifact : entry);
+        savedSignatures.current.set(snapshot.id,snapshot.signature);
+        setItems(itemsRef.current); draftRevision.current = artifact.revision; baseline.current = snapshot.signature; setError(undefined);
+        if (latestSignature.current === snapshot.signature) clearEditorialDraft(snapshotKey,snapshot.id);
+        return true;
+      } catch (cause) { setError(cause); return false; }
+      finally { setBusy(false); }
+    });
+    saveQueue.current = operation;
+    return await operation;
   };
+  saveLatest.current = save;
+  useEffect(() => registerServerEditorFlush(flushLatest), [flushLatest]);
+  useEffect(() => {
+    if (!active || hydratedId.current !== active.id || serverWorkspacePublished(active) || !dirty) return;
+    retainEditorialDraft(snapshotKey,active.id,{title,contentMarkdown:content,nativeDocument:nativeRef.current,academicMetadata:academicRef.current,revision:draftRevision.current ?? active.revision});
+    if (error) return;
+    const timer = window.setTimeout(() => void saveLatest.current(), 800);
+    return () => window.clearTimeout(timer);
+  }, [signature,active?.id,active?.revision,dirty,error]);
+  useEffect(() => () => { void saveLatest.current(); }, []);
+  useEffect(() => {
+    if (active && serverWorkspacePublished(active) && active.metadata?.detailLoaded) { setContent(active.content); setNativeDocument(null); }
+  }, [active?.id,active?.metadata?.detailLoaded]);
+  useEffect(() => { const handler = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase()==='s') {event.preventDefault();void saveLatest.current();} if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase()==='f' && activeId) {event.preventDefault();setShowFind(true);} }; document.addEventListener('keydown',handler); return () => document.removeEventListener('keydown',handler); }, [activeId]);
+  const home = async () => { if (await flushLatest()) setActiveId(null); };
   const remove = async (ids: string[]) => {
     try {
       await Promise.all(ids.map((id) => api.deleteArtifact(id, csrfToken)));
@@ -1445,6 +1569,30 @@ export function PrivateNotesServerView({
       setError(cause);
     }
   };
+  const dropIntoFolder = async (folder: UserArtifact, transfer: DataTransfer) => {
+    try {
+      const collectionId=transfer.getData('application/x-nodus-workspace-collection');
+      if(collectionId) {
+        const moving=folders.find(item=>item.id===collectionId);if(!moving || serverWorkspacePublished(moving)) return;
+        let parent: UserArtifact | undefined=folder;const visited=new Set<string>();
+        while(parent && !visited.has(parent.id)) {if(parent.id===collectionId) return;visited.add(parent.id);parent=folders.find(item=>item.id===serverWorkspaceMeta(parent!).parentId);}
+        const {artifact}=await api.updateArtifact(moving.id,{expectedRevision:moving.revision,metadata:{...serverWorkspaceMeta(moving),parentId:folder.id}},csrfToken);setFolders(current=>current.map(item=>item.id===artifact.id?artifact:item));
+      } else {
+        const ids=JSON.parse(transfer.getData('application/x-nodus-workspace-notes') || '[]') as string[];
+        await Promise.all(ids.map(id=>{const entry=itemsRef.current.find(item=>item.id===id);return entry && !serverWorkspacePublished(entry)?updateMeta(entry,{folderId:folder.id}):Promise.resolve();}));
+      }
+    } catch(cause) {setError(cause);}
+  };
+  const deleteFolder = async (folder: UserArtifact) => {
+    if(serverWorkspacePublished(folder) || !window.confirm(t('Eliminar colección')+' · '+folder.title)) return;
+    try {
+      const parentId=serverWorkspaceMeta(folder).parentId ?? null;
+      await Promise.all(itemsRef.current.filter(item=>serverWorkspaceMeta(item).folderId===folder.id && !serverWorkspacePublished(item)).map(item=>updateMeta(item,{folderId:parentId})));
+      const children=folders.filter(item=>serverWorkspaceMeta(item).parentId===folder.id && !serverWorkspacePublished(item));
+      const changed=await Promise.all(children.map(item=>api.updateArtifact(item.id,{expectedRevision:item.revision,metadata:{...serverWorkspaceMeta(item),parentId}},csrfToken)));
+      await api.deleteArtifact(folder.id,csrfToken);setFolders(current=>current.filter(item=>item.id!==folder.id).map(item=>changed.find(result=>result.artifact.id===item.id)?.artifact ?? item));if(folderFilter===folder.id) setFolderFilter('');
+    } catch(cause) {setError(cause);}
+  };
   const visible = useMemo(() => {
     const scopeFolders = new Set<string>(
       folderFilter && !trashMode ? [folderFilter] : [],
@@ -1468,11 +1616,14 @@ export function PrivateNotesServerView({
       .filter((entry) => {
         const trashed = serverWorkspaceTrashed(entry);
         if (trashMode ? !trashed : trashed) return false;
+        if (folderFilter === "__unfiled__" && serverWorkspaceMeta(entry).folderId) return false;
         if (
-          scopeFolders.size &&
+          scopeFolders.size && folderFilter !== "__unfiled__" &&
           !scopeFolders.has(valueText(serverWorkspaceMeta(entry).folderId))
         )
           return false;
+        if (kindFilter && (serverWorkspaceMeta(entry).entity ?? "note") !== kindFilter) return false;
+        if (tagFilter && !serverWorkspaceTags(entry).includes(tagFilter)) return false;
         const needle = query.trim().toLocaleLowerCase();
         return (
           !needle ||
@@ -1481,8 +1632,8 @@ export function PrivateNotesServerView({
             .includes(needle)
         );
       })
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [items, folders, folderFilter, query, trashMode]);
+      .sort((a,b)=>sortOrder === "title" ? a.title.localeCompare(b.title) : (sortOrder === "oldest" ? 1 : -1)*b.updatedAt.localeCompare(a.updatedAt));
+  }, [items, folders, folderFilter, query, trashMode, sortOrder,kindFilter,tagFilter]);
   const counts = useMemo(
     () =>
       new Map(
@@ -1511,57 +1662,58 @@ export function PrivateNotesServerView({
       ),
     [folders, items],
   );
+  const tabs = <WorkspaceTabStrip
+    alwaysShowHome homeLabel="Nodus Scriptor" homeIcon="notebook" homeTestId="workspace-server-tab-home"
+    tabTestId={tab => 'workspace-server-tab-' + tab.key} closeTestId={tab => 'workspace-server-tab-close-' + tab.key}
+    tabs={openIds.flatMap(id => { const entry = items.find(item => item.id === id); return entry ? [{ key: id, title: entry.title || t('Sin título'), icon: serverWorkspacePublished(entry) ? 'book' : 'notebook' }] : []; })}
+    activeKey={active?.id ?? null} onActivateHome={() => void home()}
+    onActivateTab={id => { const entry = items.find(item => item.id === id); if (entry) void openItem(entry); }}
+    onCloseTab={id => void closeItem(id)}
+  />;
+  const preserveSelection = () => {
+    if (raw && active && rawEditorRef.current) rawSelection.current = {id:active.id,content,from:rawEditorRef.current.selectionStart,to:rawEditorRef.current.selectionEnd};
+    else canvasRef.current?.preserveSelection();
+  };
+  const restoreSelection = () => {
+    const checkpoint=rawSelection.current;
+    if(raw && checkpoint?.id===active?.id && checkpoint?.content===content) {rawEditorRef.current?.focus();rawEditorRef.current?.setSelectionRange(checkpoint!.from,checkpoint!.to);}
+    else if(!raw) canvasRef.current?.restoreSelection();
+  };
+  const published = !active || serverWorkspacePublished(active);
+  const editorActions: EditorialAction[] = [
+    {id:'undo',label:t('Deshacer'),icon:'undo',group:t('Edición'),essential:true,disabled:published||raw||!historyState.canUndo,shortcut:'Ctrl/⌘+Z',keyShortcuts:'Control+Z Meta+Z',onSelect:()=>canvasRef.current?.undo()},
+    {id:'redo',label:t('Rehacer'),icon:'redo',group:t('Edición'),essential:true,disabled:published||raw||!historyState.canRedo,shortcut:'Ctrl+Y / Ctrl/⌘+Shift+Z',keyShortcuts:'Control+Y Control+Shift+Z Meta+Shift+Z',onSelect:()=>canvasRef.current?.redo()},
+    ...(!published ? [
+      {id:'link',label:t('Enlazar con Nodus'),icon:'link',group:t('Fuentes'),essential:true,disabled:raw,shortcut:'[[',onSelect:()=>canvasRef.current?.openReferenceMenu()},
+      {id:'cite',label:t('Citar fuente'),icon:'quote',group:t('Fuentes'),essential:true,disabled:raw,testId:'academic-cite',onSelect:()=>academicTools.current?.open('cite')},
+    ] : []),
+    {id:'find',label:t('Buscar y reemplazar'),icon:'search',group:t('Búsqueda'),essential:true,pressed:showFind,onSelect:()=>setShowFind(!showFind)},
+    {id:'save',label:t('Guardar'),icon:'save',group:t('Documento'),disabled:published,onSelect:()=>void save()},
+    ...(!published ? [
+      {id:'note',label:t('Nota al pie'),icon:'notebook',group:t('Escritura académica'),testId:'academic-note',disabled:raw,onSelect:()=>academicTools.current?.open('note')},
+      {id:'crossref',label:t('Referencia cruzada'),icon:'link',group:t('Escritura académica'),testId:'academic-crossref',disabled:raw,onSelect:()=>academicTools.current?.open('crossref')},
+      {id:'evidence',label:t('Vincular evidencia'),icon:'link',group:t('Escritura académica'),testId:'academic-evidence',disabled:raw,onSelect:()=>academicTools.current?.open('evidence')},
+      {id:'manuscript',label:t('Manuscrito y citas'),icon:'settings',group:t('Escritura académica'),testId:'academic-settings',onSelect:()=>academicTools.current?.open('settings')},
+      {id:'delivery',label:t('Preparar entrega'),icon:'external',group:t('Escritura académica'),testId:'academic-delivery',onSelect:()=>academicTools.current?.open('delivery')},
+    ] : []),
+    {id:'markdown',label:t('Markdown'),icon:'code',group:t('Vistas'),pressed:raw,onSelect:()=>setRaw(!raw)},
+    {id:'split',label:t('Dividir vista'),icon:'columns',group:t('Vistas'),pressed:split,onSelect:()=>setSplit(!split)},
+    {id:'history',label:t('Historial'),icon:'clock',group:t('Vistas'),onSelect:()=>{setContextOpen(true);setContextTab('history');}},
+    {id:'print',label:t('Imprimir'),icon:'external',group:t('Gestión'),onSelect:()=>window.print()},
+    {id:'duplicate',label:t('Duplicar'),icon:'copy',group:t('Gestión'),disabled:published,onSelect:()=>void duplicate().catch(setError)},
+    {id:'trash',label:t('Papelera'),icon:'trash',group:t('Gestión'),pinnable:false,disabled:published,onSelect:()=>{if(active)void trash([active.id]);}},
+  ];
+
   return (
     <div
-      className="library-theme flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
+      className="editorial-workspace library-theme relative flex h-full min-h-0 flex-col bg-white text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100"
       data-testid="private-notes-view"
     >
-      <nav
-        className="flex min-w-0 shrink-0 items-end gap-1 overflow-x-auto border-b border-neutral-200 px-3 pt-2 dark:border-neutral-800"
-        aria-label={t("Pestañas del espacio de trabajo")}
-      >
-        <button
-          data-testid="workspace-server-tab-home"
-          className={`flex h-9 shrink-0 items-center gap-2 rounded-t-lg border border-b-0 px-3 text-xs ${!active ? "border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900" : "border-transparent text-neutral-500"}`}
-          onClick={() => setActiveId(null)}
-        >
-          <Icon name="notebook" size={13} />
-          {t(artifactLabel(kind))}
-        </button>
-        {openIds.map((id) => {
-          const entry = items.find((item) => item.id === id);
-          if (!entry) return null;
-          return (
-            <div
-              key={id}
-              className={`flex h-9 shrink-0 items-center rounded-t-lg border border-b-0 ${activeId === id ? "border-neutral-300 bg-white dark:border-neutral-700 dark:bg-neutral-900" : "border-transparent text-neutral-500"}`}
-            >
-              <button
-                className="flex h-full max-w-64 items-center gap-2 px-3 text-xs"
-                onClick={() => setActiveId(id)}
-              >
-                <Icon
-                  name={serverWorkspacePublished(entry) ? "book" : "notebook"}
-                  size={13}
-                />
-                <span className="truncate">
-                  {entry.title || t("Sin título")}
-                </span>
-              </button>
-              <button
-                className="mr-1 grid h-6 w-6 place-items-center rounded hover:bg-neutral-200 dark:hover:bg-neutral-800"
-                onClick={() => closeItem(id)}
-                aria-label={tx("Cerrar {title}", { title: entry.title })}
-              >
-                <Icon name="x" size={11} />
-              </button>
-            </div>
-          );
-        })}
-      </nav>
+      {!active && <div className="editorial-editor-header"><button className="editorial-header-action" disabled aria-label={t('Navegador de documentos')}><Icon name="list" size={14} /></button><div className="editorial-header-leading">{tabs}</div></div>}
+      {!active && <header className="library-header-bar"><div className="library-header-title"><h1>Nodus Scriptor</h1><p>{items.length} {t('documentos')} · {t('Privado para ti')}</p></div><div className="library-header-actions"><button className="editorial-header-action editorial-collection-toggle" onClick={() => setCollectionsOpen(!collectionsOpen)}>{t('Colecciones')}</button><CatalogViewControl value={catalogView} onChange={setCatalogView} /><details className="editorial-options"><summary>{t('Crear')} +</summary><div className="editorial-create-menu"><button data-testid="workspace-server-create-note" onClick={() => void create()}>{t('Nota')}</button><button onClick={() => void create('idea')}>{t('Idea')}</button><button data-testid="workspace-server-create-manuscript" onClick={()=>void createManuscript()}>{t('Manuscrito')}</button><button onClick={() => void createFolder()}>{t('Colección')}</button></div></details></div></header>}
       {!active ? (
         <div className="flex min-h-0 flex-1">
-          <aside className="w-64 shrink-0 border-r border-neutral-200 dark:border-neutral-800">
+          <aside className={`editorial-collections w-64 shrink-0 border-r border-neutral-200 dark:border-neutral-800 ${collectionsOpen ? 'is-open' : ''}`}>
             <div className="flex items-center justify-between border-b border-neutral-200 p-3 dark:border-neutral-800">
               <div>
                 <h1 className="text-sm font-semibold">{t("Colecciones")}</h1>
@@ -1578,14 +1730,7 @@ export function PrivateNotesServerView({
                 >
                   <Icon name="folderPlus" size={13} />
                 </button>
-                <button
-                  data-testid="workspace-server-create-note"
-                  className="btn h-8 text-xs"
-                  onClick={() => void create()}
-                >
-                  <Icon name="plus" size={12} />
-                  {t("Nueva")}
-                </button>
+
               </div>
             </div>
             <button
@@ -1602,7 +1747,7 @@ export function PrivateNotesServerView({
                 {items.filter((entry) => !serverWorkspaceTrashed(entry)).length}
               </span>
             </button>
-            <div className="space-y-1 px-2">
+            <div className="space-y-1 px-2 flex-1 overflow-auto">
               <ServerWorkspaceCollections
                 folders={folders}
                 selected={folderFilter}
@@ -1621,9 +1766,10 @@ export function PrivateNotesServerView({
                   })
                 }
                 onRename={(folder) => void renameFolder(folder)}
+                onDelete={folder=>void deleteFolder(folder)} onDrop={(folder,transfer)=>void dropIntoFolder(folder,transfer)}
               />
             </div>
-            <div className="mt-2 border-t border-neutral-200 px-2 py-2 dark:border-neutral-800">
+            <div className="mt-2 border-t border-neutral-200 px-2 py-2 dark:border-neutral-800"><button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs" onClick={()=>{setFolderFilter("__unfiled__");setSelected(new Set());}}><Icon name="folder" size={14} />{t("Sin colección")}</button>
               <button
                 data-testid="workspace-server-scope-trash"
                 className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs ${trashMode ? "bg-red-500/15 text-red-500" : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-900"}`}
@@ -1656,10 +1802,7 @@ export function PrivateNotesServerView({
                   placeholder={t("Buscar en notas e ideas…")}
                 />
               </div>
-              <button className="btn h-8 text-xs" onClick={() => void create()}>
-                <Icon name="plus" size={12} />
-                {t("Nueva nota")}
-              </button>
+              <select aria-label={t('Tipo')} className="input h-8 text-xs" value={kindFilter} onChange={event=>setKindFilter(event.target.value)}><option value="">{t('Todo')}</option><option value="note">{t('Notas')}</option><option value="idea">{t('Ideas')}</option></select><select aria-label={t('Ordenar documentos')} className="input h-8 text-xs" value={sortOrder} onChange={event=>setSortOrder(event.target.value)}><option value="recent">{t('Recientes')}</option><option value="oldest">{t('Más antiguos')}</option><option value="title">{t('Título')}</option></select><select aria-label={t('Etiquetas')} className="input h-8 text-xs" value={tagFilter} onChange={event=>setTagFilter(event.target.value)}><option value="">{t('Etiquetas')}</option>{[...new Set(items.flatMap(serverWorkspaceTags))].sort().map(tag=><option key={tag}>{tag}</option>)}</select>
             </div>
             {selected.size > 0 && (
               <div
@@ -1759,10 +1902,12 @@ export function PrivateNotesServerView({
               <span className="text-right">{t("Modificado")}</span>
             </div>
             <div className="min-h-0 flex-1 overflow-auto">
+              {catalogView === 'cards' && !trashMode && <EditorialCards items={visible.slice(0,3).map(entry => ({ id: entry.id, title: entry.title, snippet: workspaceExcerpt(entry.content), collection: folders.find(folder => folder.id === serverWorkspaceMeta(entry).folderId)?.title }))} onOpen={id => { const entry = items.find(item => item.id === id); if (entry) void openItem(entry); }} />}
               {visible.length ? (
-                visible.map((entry) => (
-                  <div
+                (catalogView === 'cards' && !trashMode ? visible.slice(3) : visible).map((entry) => (
+                  <EditorialCatalogRow data-selected={selected.has(entry.id)}
                     key={entry.id}
+                    draggable={!serverWorkspacePublished(entry)} onDragStart={event=>event.dataTransfer.setData('application/x-nodus-workspace-notes',JSON.stringify(selected.has(entry.id)?[...selected]:[entry.id]))}
                     data-testid={`workspace-server-item-${entry.id}`}
                     className={`grid min-h-[62px] grid-cols-[28px_22px_minmax(0,1fr)_minmax(120px,.45fr)_90px] items-center border-b border-neutral-100 px-4 text-left text-xs hover:bg-neutral-50 dark:border-neutral-900 dark:hover:bg-neutral-900/60 ${selected.has(entry.id) ? "bg-indigo-500/10" : ""}`}
                   >
@@ -1791,8 +1936,9 @@ export function PrivateNotesServerView({
                       <strong className="block truncate text-sm font-normal">
                         {entry.title || t("Sin título")}
                       </strong>
+                      <small className="block truncate text-[10px] text-neutral-500">{folders.find(folder=>folder.id===serverWorkspaceMeta(entry).folderId)?.title ?? t("Sin colección")}</small>
                       <small className="mt-1 block truncate text-[11px] text-neutral-500">
-                        {plainReading(entry.content).slice(0, 150) ||
+                        {workspaceExcerpt(entry.content).slice(0, 150) ||
                           t("Sin contenido")}
                       </small>
                     </button>
@@ -1813,9 +1959,9 @@ export function PrivateNotesServerView({
                         ? new Date(entry.updatedAt).toLocaleDateString(
                             getActiveLang(),
                           )
-                        : "—"}
+                        : "—"}<span className="editorial-row-actions"><details className="editorial-options"><summary aria-label={t('Opciones del documento')}>···</summary><div className="study-editor-toolbar"><button className="btn" onClick={()=>void openItem(entry)}>{t('Abrir')}</button>{!serverWorkspacePublished(entry) && <><button className="btn" onClick={()=>void duplicate(entry).catch(setError)}>{t('Duplicar')}</button><button className="btn" onClick={()=>void trash([entry.id])}>{t('Papelera')}</button></>}</div></details></span>
                     </span>
-                  </div>
+                  </EditorialCatalogRow>
                 ))
               ) : (
                 <div className="grid h-48 place-items-center text-sm text-neutral-500">
@@ -1830,79 +1976,25 @@ export function PrivateNotesServerView({
           </section>
         </div>
       ) : (
-        <section className="flex min-h-0 flex-1 flex-col">
-          <header className="flex shrink-0 items-center gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
-            <button
-              className="btn btn-ghost h-8 text-xs"
-              onClick={() => setActiveId(null)}
-            >
-              <Icon name="chevronLeft" size={13} />
-              {t("Espacio de trabajo")}
-            </button>
-            <span className="flex-1" />
-            {!serverWorkspacePublished(active) && (
-              <button
-                className="btn btn-ghost h-8 text-xs text-red-500"
-                onClick={() => void trash([active.id])}
-              >
-                <Icon name="trash" size={12} />
-                {t("Papelera")}
-              </button>
-            )}
-            <button
-              className="btn h-8 text-xs"
-              disabled={busy || serverWorkspacePublished(active)}
-              onClick={() => void save()}
-            >
-              <Icon name="save" size={12} />
-              {serverWorkspacePublished(active)
-                ? t("Solo lectura")
-                : busy
-                  ? t("Guardando…")
-                  : t("Guardar")}
-            </button>
-          </header>
-          <div className="min-h-0 flex-1 overflow-auto bg-neutral-50 p-5 dark:bg-neutral-950">
-            <div className="mx-auto grid min-h-full max-w-6xl gap-5 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 lg:grid-cols-2">
-              <div>
-                <div className="mb-3 flex items-center gap-2 text-[10px] uppercase tracking-wider text-neutral-500">
-                  <Icon
-                    name={serverWorkspacePublished(active) ? "book" : "lock"}
-                    size={12}
-                  />
-                  {serverWorkspacePublished(active)
-                    ? t("Publicado · solo lectura")
-                    : t("Privado para ti")}
-                </div>
-                <input
-                  className="server-note-title text-neutral-900 dark:text-neutral-100"
-                  readOnly={serverWorkspacePublished(active)}
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  placeholder={t("Título")}
-                />
-                <textarea
-                  data-testid="workspace-server-markdown-editor"
-                  className="server-note-editor min-h-[55vh] text-neutral-800 dark:text-neutral-200"
-                  readOnly={serverWorkspacePublished(active)}
-                  value={content}
-                  onChange={(event) => setContent(event.target.value)}
-                  placeholder={t("Escribe en Markdown…")}
-                />
-              </div>
-              <article
-                data-testid="workspace-server-markdown-preview"
-                className="min-w-0 border-l border-neutral-100 pl-5 dark:border-neutral-800"
-              >
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-500">
-                  {t("Vista previa")}
-                </h2>
-                <MarkdownReader value={content || `*${t("Sin contenido")}*`} />
-              </article>
-            </div>
+        <section className="editorial-editor flex min-h-0 flex-1 flex-col">
+          {nativeDocument&&!serverWorkspacePublished(active)&&<AcademicTools ref={academicTools} id={active.id} title={title} document={nativeDocument} metadata={academicMetadata} onChange={setAcademicMetadata} canvas={canvasRef} adapter={{inspect:async()=>(await api.inspectAcademicArtifact(active.id,itemsRef.current.find(item=>item.id===active.id)?.revision??active.revision,csrfToken)).issues,flush:flushLatest,loadChapter:async id=>{const item=itemsRef.current.find(item=>item.id===id);if(!item)throw new Error(t('Documento no disponible.'));return parseNativeDocument(item.metadata?.nativeDocument)??markdownToBlockNote(item.content);},searchEvidence:async query=>(await api.editorReferences(spaceId,{includePassages:true,search:query})).items.filter(ref=>['idea','work','passage'].includes(ref.kind)&&ref.title.toLowerCase().includes(query.toLowerCase())).slice(0,50).map(ref=>({href:ref.href,title:ref.title,pageLabel:ref.pageLabel,physicalPage:ref.physicalPage})),listChapters:async()=>itemsRef.current.filter(entry=>!serverWorkspacePublished(entry)&&entry.vaultId===spaceId).map(entry=>({documentId:entry.id,title:entry.title,kind:'note' as const})),searchSources:async query=>(await api.editorReferences(spaceId)).items.filter(ref=>ref.bibliography&&ref.title.toLowerCase().includes(query.toLowerCase())).map(ref=>({id:'vault:'+ref.id,refId:ref.id,scope:'vault' as const,metadata:ref.bibliography!,citationKey:null,href:ref.href})),export:(format,acceptWarnings)=>api.exportAcademicArtifact(active.id,format,itemsRef.current.find(item=>item.id===active.id)?.revision??active.revision,acceptWarnings,csrfToken)}} />}
+          <EditorialHeader title={title} location={folders.find(folder=>folder.id===serverWorkspaceMeta(active).folderId)?.title ?? t('Sin colección')} status={serverWorkspacePublished(active) ? t('Solo lectura') : error ? t('Error al guardar') : busy ? t('Guardando…') : dirty ? t('Sin guardar') : t('Guardado')} contextOpen={contextOpen} focus={focus} onContext={() => setContextOpen(!contextOpen)} onFocus={() => void editorialFocus.toggleFocus()} navigationOpen={editorialFocus.navigationOpen} onNavigation={editorialFocus.toggleNavigation} leading={<><button className="editorial-header-action" aria-label={t('Navegador de documentos')} onClick={() => setLayout(layout === 'navigator' ? 'editorial' : 'navigator')}><Icon name="list" size={14} /></button>{tabs}</>} onPreserveSelection={preserveSelection} options={<EditorialActionMenu actions={editorActions} pins={pinnedActionIds} onPinsChange={setPinnedActionIds} beforeAction={restoreSelection} />} />
+          <EditorialActionBar actions={editorActions} pins={pinnedActionIds} beforeAction={restoreSelection} onPreserveSelection={preserveSelection} />
+          {showFind && <div className="editorial-searchbar flex flex-wrap gap-2 p-3 border-b" role="search"><input className="input text-xs" aria-label={t('Buscar')} value={find} onChange={event=>setFind(event.target.value)} /><input className="input text-xs" aria-label={t('Reemplazar')} value={replace} onChange={event=>setReplace(event.target.value)} /><button className="btn text-xs" disabled={!find || serverWorkspacePublished(active)} onClick={()=>{const next=content.split(find).join(replace); if(raw) {setContent(next);const native=markdownToBlockNote(next,nativeRef.current);nativeRef.current=native;setNativeDocument(native);} else canvasRef.current?.replaceAllMarkdown(next,{closeHistory:true});}}>{t('Reemplazar todo')}</button><button aria-label={t('Cerrar')} onClick={()=>setShowFind(false)}><Icon name="x" size={14} /></button></div>}
+          <div className="editorial-editor-body flex min-h-0 flex-1">
+            {layout === 'navigator' && <EditorialNavigator collectionControl={<select className="input" aria-label={t('Colección')} value={folderFilter} onChange={event=>setFolderFilter(event.target.value)}><option value="">{t('Todo')}</option><option value="__unfiled__">{t('Sin colección')}</option>{folders.map(folder=><option key={folder.id} value={folder.id}>{folder.title}</option>)}</select>} items={visible.map(entry => ({ id: entry.id,title: entry.title,snippet: workspaceExcerpt(entry.content) }))} activeId={active.id} search={query} onSearch={setQuery} onOpen={id => { const entry = items.find(item => item.id === id); if (entry) void openItem(entry); }} onClose={() => setLayout('editorial')} />}
+            <div className={`min-w-0 flex-1 overflow-auto ${split ? 'grid grid-cols-2' : ''}`}><div className="editorial-document-scroll"><EditorialTitle testId="workspace-server-title" value={title} readOnly={serverWorkspacePublished(active)} onChange={setTitle} />
+              {serverWorkspacePublished(active) ? <MarkdownReader value={content} /> : raw ? <textarea ref={rawEditorRef} data-testid="workspace-server-markdown-editor" className="server-note-editor" value={content} onChange={event => { try {assertAcademicSupplement(content,event.target.value);const native = markdownToBlockNote(event.target.value,nativeRef.current);setContent(event.target.value);setNativeDocument(native);nativeRef.current=native;} catch(err){setError(err instanceof Error?err:new Error(String(err)));} }} /> : nativeDocument && <BlockNoteCanvas key={`${active.id}-${editorKey}`} documentId={`${active.id}-${editorKey}`} ref={canvasRef} onHistoryChange={setHistoryState} value={content} nativeDocument={nativeDocument} academicMetadata={academicMetadata} onAcademicAction={(action,payload)=>academicTools.current?.open(action,payload)} listReferences={listReferences} onNavigateLink={href => void navigateReference(href)} onWikiLink={reference => { const entry=items.find(item=>item.id===reference||item.title===reference);if(entry) void openItem(entry); }} onChange={(markdown,native) => { setContent(markdown); setNativeDocument(native); nativeRef.current = native; }} />}
+            </div>{split && <article className="p-8" data-testid="workspace-server-markdown-preview"><MarkdownReader value={content} /></article>}</div>
+            {contextOpen && <EditorialInspector activeTab={contextTab} tabs={[{id:'sources',label:t('Fuentes')},{id:'details',label:t('Detalles')},{id:'history',label:t('Historial')}]} onTabChange={id=>setContextTab(id as typeof contextTab)} onClose={()=>setContextOpen(false)}><div className="editorial-context-views"><button aria-pressed={contextTab==='structure'} onClick={()=>setContextTab('structure')}>{t('Estructura')}</button><button aria-pressed={contextTab==='checks'} onClick={()=>setContextTab('checks')}>{t('Comprobaciones')}</button></div>{(contextTab==='checks'||contextTab==='structure') ? <AcademicPanel document={nativeDocument??[]} metadata={academicMetadata} onChange={value=>{if(!serverWorkspacePublished(active))setAcademicMetadata(value);}} canvas={serverWorkspacePublished(active)?null:canvasRef.current} view={contextTab} onOpenSource={href=>void navigateReference(href)} onSettings={()=>{if(!serverWorkspacePublished(active))academicTools.current?.open('settings');}} /> : contextTab === 'sources' ? <><AcademicPanel document={nativeDocument??[]} metadata={academicMetadata} onChange={value=>{if(!serverWorkspacePublished(active))setAcademicMetadata(value);}} canvas={serverWorkspacePublished(active)?null:canvasRef.current} view="sources" onOpenSource={href=>void navigateReference(href)} onSettings={()=>{if(!serverWorkspacePublished(active))academicTools.current?.open('settings');}} /><EditorialReferences items={documentReferences(nativeDocument)} onOpen={href => void navigateReference(href)} /></> : contextTab === 'details' ? <div className="p-4"><p className="text-xs mb-4">{serverWorkspacePublished(active) ? t('Publicado · solo lectura') : t('Privado para ti')}</p><label className="text-xs">{t('Colección')}<select className="input w-full mt-2" value={valueText(serverWorkspaceMeta(active).folderId)} disabled={serverWorkspacePublished(active)} onChange={event => void updateMeta(active,{folderId:event.target.value || null})}><option value="">{t('Sin colección')}</option>{folders.filter(folder => !serverWorkspacePublished(folder)).map(folder => <option key={folder.id} value={folder.id}>{folder.title}</option>)}</select></label><p className="mt-4 text-xs">{serverWorkspaceTags(active).join(' · ') || t('Sin etiquetas')}</p></div> : <div className="p-4">{Array.isArray(active.metadata?.editorVersions) ? (active.metadata.editorVersions as Array<{title: string;content: string;nativeDocument: unknown;savedAt: string}>).slice().reverse().map((version,index) => <button key={index} className="block w-full text-left p-3 text-xs" onClick={() => { if (serverWorkspacePublished(active)) return; setAcademicMetadata(normalizeAcademicMetadata((version as {academicMetadata?:unknown}).academicMetadata));setTitle(version.title); setContent(version.content); const native = parseNativeDocument(version.nativeDocument) ?? markdownToBlockNote(version.content); nativeRef.current = native; setNativeDocument(native); setEditorKey(key=>key+1); }}>{version.title} · {new Date(version.savedAt).toLocaleString()}</button>) : <p className="text-xs">{t('El historial aparecerá después del primer cambio guardado.')}</p>}</div>}</EditorialInspector>}
           </div>
         </section>
       )}
+      {Boolean(error) && active && !serverWorkspacePublished(active) && <div className="editorial-save-error"><button onClick={() => void save()}>{t('Reintentar')}</button><button onClick={() => downloadEditorialDraft({ title, contentMarkdown:content, nativeDocument:nativeRef.current, academicMetadata })}>{t('Recuperar borrador')}</button><button onClick={() => void (async () => {
+        const response=await api.artifact(active.id); const current=response.artifact;
+        const native=parseNativeDocument(current.metadata?.nativeDocument) ?? markdownToBlockNote(current.content);
+        itemsRef.current=itemsRef.current.map(entry=>entry.id===current.id?current:entry);setItems(itemsRef.current);setTitle(current.title);setContent(current.content);nativeRef.current=native;setNativeDocument(native);draftRevision.current=current.revision;setAcademicMetadata(normalizeAcademicMetadata(current.metadata?.academicMetadata));baseline.current=JSON.stringify({title:current.title,content:current.content,native,academicMetadata:normalizeAcademicMetadata(current.metadata?.academicMetadata)});savedSignatures.current.set(current.id,baseline.current);clearEditorialDraft(snapshotKey,current.id);setError(undefined);setEditorKey(key=>key+1);
+      })().catch(setError)}>{t('Cargar versión actual')}</button></div>}
       <ErrorNotice error={error} />
     </div>
   );

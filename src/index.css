@@ -340,11 +340,6 @@ body {
   color: #000;
 }
 
-.reading-focus .study-editor-shell .milkdown .ProseMirror {
-  --study-editor-width: 48rem;
-  --study-editor-line: 1.8;
-}
-
 .reading-focus .study-editor-shell {
   background-image: none !important;
 }
@@ -1530,85 +1525,8 @@ html.theme-active.light .nodus-tooltip { border-color: var(--theme-border-light)
   outline: none;
 }
 
-.study-milkdown .milkdown-toolbar {
-  overflow: visible;
-  align-items: center;
-}
-
-/* Immediate, localized labels for every selection-toolbar action. Native `title`
-   tooltips wait for the OS hover delay and Crepe's own buttons have no names at all;
-   this shared treatment appears on hover or keyboard focus without a delay. */
-.study-milkdown .milkdown-toolbar .study-selection-tooltip {
-  position: relative;
-  overflow: visible;
-}
-
-.study-milkdown .milkdown-toolbar .study-selection-tooltip::after {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 7px);
-  left: 50%;
-  width: max-content;
-  max-width: min(19rem, calc(100vw - 2rem));
-  padding: 0.35rem 0.5rem;
-  border: 1px solid rgba(82, 82, 82, 0.9);
-  border-radius: 0.4rem;
-  background: rgba(23, 23, 23, 0.98);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
-  color: #fafafa;
-  content: attr(data-study-tooltip);
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1.35;
-  text-align: center;
-  white-space: normal;
-  pointer-events: none;
-  opacity: 0;
-  transform: translate(-50%, -3px);
-  transition: opacity 80ms ease, transform 80ms ease;
-}
-
-.study-milkdown .milkdown-toolbar .study-selection-tooltip:hover::after,
-.study-milkdown .milkdown-toolbar .study-selection-tooltip:focus-visible::after,
-.study-milkdown .milkdown-toolbar .study-selection-tooltip:focus-within::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-.light .study-milkdown .milkdown-toolbar .study-selection-tooltip::after {
-  border-color: #d6d3d1;
-  background: rgba(255, 255, 255, 0.99);
-  box-shadow: 0 8px 22px rgba(28, 25, 23, 0.18);
-  color: #292524;
-}
-
 .study-selection-tools-host {
   display: contents;
-}
-
-.study-milkdown .milkdown-toolbar .study-selection-tool {
-  display: grid;
-  place-items: center;
-  color: #404040;
-}
-
-/* Crepe fills every toolbar SVG by default because its own glyphs are solid.
-   Nodus icons are stroked; filling them turns the AI thesaurus into a grey
-   smudge and thickens every prompt mark. Keep our appended controls outlined. */
-.study-milkdown .milkdown-toolbar .study-selection-tool svg,
-.study-milkdown .milkdown-toolbar .study-selection-color svg {
-  fill: none !important;
-  stroke: currentColor;
-  color: currentColor;
-}
-
-.study-milkdown .milkdown-toolbar .study-synonyms-trigger:hover {
-  border-color: rgba(13, 148, 136, 0.42);
-  background: rgba(13, 148, 136, 0.15);
-}
-
-.dark .study-milkdown .milkdown-toolbar .study-selection-tool {
-  color: #e5e5e5;
 }
 
 .study-selection-color {
@@ -4891,9 +4809,8 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   }
 }
 
-/* Study editor: Milkdown owns document structure; these variables keep visual
+/* Study editor appearance: these variables keep visual
    preferences outside the Markdown so typography never mutates content. */
-.study-editor-shell .study-milkdown { min-height: 100%; background: transparent; }
 .study-editor-model-picker .model-picker-trigger {
   min-height: 2rem;
   border-color: color-mix(in srgb, var(--vault-accent, #0f766e) 52%, #404040);
@@ -4938,89 +4855,7 @@ body:has(.library-document-reader [data-testid="library-reader-sidebar"]) .app-t
   color: color-mix(in srgb, var(--vault-accent, #0f766e) 92%, #0c0a09);
   background: color-mix(in srgb, var(--vault-accent, #0f766e) 15%, white);
 }
-.study-editor-shell .milkdown {
-  position: relative;
-  min-height: 100%;
-  background: transparent;
-  color: inherit;
-  --crepe-color-background: #171717;
-  --crepe-color-on-background: #e5e5e5;
-  --crepe-color-surface: #262626;
-  --crepe-color-surface-low: #1f1f1f;
-  --crepe-color-on-surface: #f5f5f5;
-  --crepe-color-on-surface-variant: #a3a3a3;
-  --crepe-color-outline: #737373;
-  --crepe-color-primary: #2dd4bf;
-  --crepe-color-secondary: #134e4a;
-  --crepe-color-on-secondary: #ccfbf1;
-  --crepe-color-inverse: #f5f5f5;
-  --crepe-color-on-inverse: #171717;
-  --crepe-color-hover: #333333;
-  --crepe-color-selected: #404040;
-  --crepe-color-inline-area: #292524;
-}
-.study-editor-shell .milkdown .milkdown-slash-menu {
-  max-width: min(360px, calc(100vw - 2rem));
-}
-.study-editor-shell .milkdown .ProseMirror {
-  box-sizing: border-box;
-  width: min(100%, var(--study-editor-width));
-  min-height: 100%;
-  margin: 0 auto;
-  padding: 48px var(--study-editor-margin) 120px;
-  font-family: var(--study-editor-font);
-  font-size: var(--study-editor-size);
-  line-height: var(--study-editor-line);
-  text-align: var(--study-editor-align);
-  color: #d4d4d4;
-  outline: none;
-}
-.study-editor-shell .milkdown .ProseMirror p { margin-block: var(--study-editor-spacing); text-indent: var(--study-editor-indent); }
-.study-editor-shell .milkdown .ProseMirror li > p,
-.study-editor-shell .milkdown .ProseMirror blockquote p,
-.study-editor-shell .milkdown .ProseMirror td p { text-indent: 0; }
-.study-editor-shell .milkdown .ProseMirror h1,
-.study-editor-shell .milkdown .ProseMirror h2,
-.study-editor-shell .milkdown .ProseMirror h3,
-.study-editor-shell .milkdown .ProseMirror h4 { scroll-margin-top: 100px; text-align: left; color: #f5f5f5; }
-.study-editor-shell.study-theme-paper .milkdown .ProseMirror {
-  background: #171717;
-  box-shadow: 0 0 0 1px rgb(64 64 64 / 0.55), 0 18px 50px rgb(0 0 0 / 0.22);
-}
-.study-editor-shell.study-theme-soft .milkdown .ProseMirror { background: #13201f; }
-.study-editor-shell.study-theme-contrast .milkdown .ProseMirror { background: #050505; color: #fff; }
-.study-editor-shell .milkdown .ProseMirror table { width: 100%; border-collapse: collapse; }
-.study-editor-shell .milkdown .ProseMirror th,
-.study-editor-shell .milkdown .ProseMirror td { border: 1px solid #404040; padding: 0.45rem 0.6rem; text-align: left; }
-.study-editor-shell .milkdown .ProseMirror blockquote { border-left: 3px solid #0d9488; padding-left: 1rem; color: #a3a3a3; }
-.study-editor-shell .milkdown .ProseMirror pre { overflow-x: auto; border-radius: 0.5rem; background: #0a0a0a; padding: 1rem; text-align: left; }
 .light .study-editor-shell { background: #f5f5f4; }
-.light .study-editor-shell .milkdown {
-  --crepe-color-background: #fffefb;
-  --crepe-color-on-background: #292524;
-  --crepe-color-surface: #ffffff;
-  --crepe-color-surface-low: #f5f5f4;
-  --crepe-color-on-surface: #292524;
-  --crepe-color-on-surface-variant: #57534e;
-  --crepe-color-outline: #78716c;
-  --crepe-color-primary: #0f766e;
-  --crepe-color-secondary: #ccfbf1;
-  --crepe-color-on-secondary: #134e4a;
-  --crepe-color-inverse: #292524;
-  --crepe-color-on-inverse: #fafaf9;
-  --crepe-color-hover: #f0fdfa;
-  --crepe-color-selected: #ccfbf1;
-  --crepe-color-inline-area: #f5f5f4;
-}
-.light .study-editor-shell .milkdown .ProseMirror { color: #292524; }
-.light .study-editor-shell .milkdown .ProseMirror h1,
-.light .study-editor-shell .milkdown .ProseMirror h2,
-.light .study-editor-shell .milkdown .ProseMirror h3,
-.light .study-editor-shell .milkdown .ProseMirror h4 { color: #0c0a09; }
-.light .study-editor-shell.study-theme-paper .milkdown .ProseMirror { background: #fffefb; box-shadow: 0 0 0 1px #e7e5e4, 0 18px 50px rgb(120 113 108 / 0.12); }
-.light .study-editor-shell.study-theme-soft .milkdown .ProseMirror { background: #f0fdfa; }
-.light .study-editor-shell.study-theme-contrast .milkdown .ProseMirror { background: white; color: black; box-shadow: 0 0 0 2px #111827; }
-.light .study-editor-shell .milkdown .ProseMirror pre { background: #f5f5f4; }
 
 /* Cinematic release modal: a compact premiere scene rather than a full-screen tour. */
 .whats-new-backdrop { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: color-mix(in srgb, var(--n-950) 78%, transparent); backdrop-filter: blur(10px); animation: modal-backdrop-in .24s ease-out both; }
@@ -5623,10 +5458,6 @@ html.theme-active .whats-new-scope-tooltip { border-color: var(--wn-border); col
 
 @media print {
   body * { visibility: hidden; }
-  .study-editor-shell .study-milkdown,
-  .study-editor-shell .study-milkdown * { visibility: visible; }
-  .study-editor-shell .study-milkdown { position: fixed; inset: 0; background: white; }
-  .study-editor-shell .milkdown .ProseMirror { color: black; background: white; box-shadow: none; }
 }
 
 /* Testimonios vault → cyan (#0891b2) accent instead of the indigo default. Same remap

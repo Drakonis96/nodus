@@ -1,3 +1,4 @@
+import { exportAcademicDocument, inspectAcademicDocument } from '../export/academicExport';
 import * as preparationExperience from '../ai/researchPreparationExperience';
 import { onDocumentaryPreparationChanged } from '../ai/documentaryPreparationEvents';
 import { manualIndexStatus, scheduleManualIndex } from '../ai/manualIdeaIndex';
@@ -190,6 +191,7 @@ import { reorderNotesByAI } from '../ai/notesOrder';
 import { suggestFolderIdeas } from '../ai/folderIdeaSuggestions';
 import { verifyCitations, previewCitation } from '../citations/verifyCitations';
 import { getSearchResultDetail, globalSearch } from '../db/searchRepo';
+import { listEditorReferences } from '../db/editorReferencesRepo';
 import { semanticSearch, findSimilarToIdea } from '../ai/semanticSearch';
 import { listSavedSearches, saveSearch, deleteSavedSearch } from '../db/savedSearchesRepo';
 import { getCorpusHealth } from '../db/corpusHealthRepo';
@@ -1977,6 +1979,7 @@ export function registerAcademicIpc(context: IpcContext): void {
   h('notes:folders:suggestIdeas', async (_e, folderId: string) => suggestFolderIdeas(folderId));
 
   // workspace — el editor completo sobre una nota, y sus enlaces con la biblioteca
+  h('workspace:academic:export', async (_e, input) => exportAcademicDocument(input));
   h('workspace:editor:data', async (_e, noteId: string) => workspace.getWorkspaceNoteEditorData(noteId));
   h('workspace:editor:update', async (_e, noteId: string, input: StudyDocUpdateInput) =>
     workspace.updateWorkspaceNote(noteId, input));
@@ -2014,6 +2017,8 @@ export function registerAcademicIpc(context: IpcContext): void {
       .map((hit) => ({ ...hit, snippet: searchSnippet(hit.snippet, query ?? '') }))
   );
   h('search:detail', async (_e, kind: SearchResultKind, id: string) => getSearchResultDetail(kind, id));
+  h('workspace:academic:inspect',async (_event,input)=>inspectAcademicDocument(input));
+  h('editor:references', async (_event,options) => listEditorReferences(options));
   h('search:semantic', async (_e, query: string, options?: SemanticSearchOptions) =>
     semanticSearch(query ?? '', options ?? {})
   );

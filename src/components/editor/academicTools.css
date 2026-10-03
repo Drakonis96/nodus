@@ -1,0 +1,86 @@
+/* Scoped to the academic inspector and its portalled dialogs. */
+.academic-dialog, .academic-panel {
+  --academic-bg: #fff; --academic-line: #e4e4e7; --academic-text: #302e3a;
+  --academic-muted: #6f6a79; --academic-accent: #7560b7; --academic-tint: #f1edf9;
+  color: var(--academic-text);
+}
+.dark .academic-dialog, .dark .academic-panel {
+  --academic-bg: #202026; --academic-line: #36343e; --academic-text: #e4e1ea;
+  --academic-muted: #aaa4b5; --academic-accent: #b8a0eb; --academic-tint: #343041;
+}
+.academic-modal-backdrop { position: fixed; inset: 0; z-index: 180; display: flex; align-items: center; justify-content: center; background: rgb(0 0 0 / .22); padding: 24px; }
+.academic-dialog { width: min(620px,100%); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; background: var(--academic-bg); border: 1px solid var(--academic-line); border-radius: 14px; box-shadow: 0 16px 60px rgb(0 0 0 / .18); overflow: hidden; font: 13px/1.5 system-ui,sans-serif; }
+.academic-dialog header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--academic-line); }
+.academic-dialog h2 { font-size: 16px; font-weight: 600; margin: 0; }
+.academic-dialog header button, .academic-panel-heading button { padding: 6px; border-radius: 6px; }
+.academic-dialog-body { padding: 24px; overflow: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 18px; min-height: 0; min-width: 0; }
+.academic-dialog-body > * { flex-shrink: 0; }
+.academic-dialog label { font-size: 12px; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.academic-dialog label:has(input[type=checkbox]) { flex-direction: row; align-items: center; }
+.academic-dialog label > input[type=checkbox] { width: auto; flex-shrink: 0; accent-color: var(--academic-accent); }
+.academic-dialog .input, .academic-panel .input { width: 100%; min-width: 0; background: var(--academic-bg); color: inherit; border: 1px solid var(--academic-line); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.academic-dialog .academic-dialog-body select.input { appearance: auto; background-image: none; background-repeat: no-repeat; padding-right: 12px; }
+.academic-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.academic-form-grid textarea { resize: vertical; }
+.academic-source-results { max-height: 260px; overflow: auto; display: flex; flex-direction: column; gap: 4px; overscroll-behavior: contain; }
+.academic-source-results button { display: flex; flex-direction: column; text-align: left; padding: 10px 12px; border-radius: 7px; gap: 5px; font-size: 13px; flex-shrink: 0; overflow-wrap: anywhere; }
+.academic-source-results button:hover { background: var(--academic-tint); }
+.academic-source-results button[aria-pressed=true] { background: var(--academic-tint); color: var(--academic-accent); }
+.academic-source-results small, .academic-source small, .academic-evidence small { font-size: 11px; color: var(--academic-muted); display: block; line-height: 1.6; }
+.academic-selected-sources { display: flex; gap: 6px; flex-wrap: wrap; }
+.academic-selected-sources:empty { display: none; }
+.academic-selected-sources > span { display: flex; gap: 8px; align-items: center; border: 1px solid var(--academic-line); border-radius: 6px; padding: 6px 8px; font-size: 11px; max-width: 100%; overflow-wrap: anywhere; }
+.academic-selected-sources button { flex-shrink: 0; min-width: 24px; min-height: 24px; }
+.academic-muted { font-size: 12px; color: var(--academic-muted); line-height: 1.65; }
+.academic-panel { padding: 20px 18px; font-size: 12px; }
+.academic-panel h3 { font-size: 12px; font-weight: 600; margin: 0 0 12px; }
+.academic-panel-heading { display: flex; justify-content: space-between; align-items: center; }
+.academic-panel-heading h3 { margin: 0; }
+.academic-source, .academic-evidence { padding: 14px 0; border-bottom: 1px solid var(--academic-line); overflow-wrap: anywhere; }
+.academic-source > button, .academic-evidence > button:first-child { text-align: left; font-size: 13px; line-height: 1.5; }
+.academic-evidence > button:not(:first-child) { font-size: 11px; margin: 8px 12px 0 0; color: var(--academic-accent); }
+.academic-issue { display: flex; align-items: baseline; gap: 8px; text-align: left; padding: 10px 0; font-size: 12px; line-height: 1.55; width: 100%; overflow-wrap: anywhere; }
+.academic-error-dot, .academic-warning-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #b66b39; }
+.academic-error-dot { background: #ba4d4d; }
+.academic-chapter { display: flex; align-items: center; gap: 8px; padding: 12px 0; border-bottom: 1px solid var(--academic-line); }
+.academic-chapter span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.academic-chapter button { padding: 4px; }
+.academic-chapter button:disabled { opacity: .35; }
+.academic-citation, .academic-cross-reference { color: var(--ew-accent,#7560b7); cursor: pointer; border-bottom: 1px dotted #b7accf; }
+.academic-note-call { color: var(--ew-accent,#7560b7); cursor: pointer; padding: 0 2px; }
+.dark .academic-citation, .dark .academic-cross-reference, .dark .academic-note-call { color: var(--ew-accent,#b8a0eb); }
+.academic-excerpt { font-size: 14px; line-height: 1.6; border-left: 2px solid var(--academic-line); padding-left: 12px; overflow-wrap: anywhere; }
+.academic-error { font-size: 12px; color: #a53c3c; white-space: pre-line; overflow-wrap: anywhere; }
+.dark .academic-error { color: #f0b7b7; }
+.academic-delivery-dialog { width: min(860px,100%); }
+.academic-export-preview { width: 100%; height: 440px; min-height: 400px; border: 1px solid var(--academic-line); background: #fff; }
+.academic-dialog-footer { flex-shrink: 0; display: flex; align-items: center; justify-content: flex-end; gap: 16px; padding: 16px 24px; border-top: 1px solid var(--academic-line); }
+.academic-dialog-footer > small { margin-right: auto; }
+.academic-dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.academic-dialog .btn, .academic-panel .btn { min-height: 34px; padding: 7px 12px; border: 1px solid var(--academic-line); border-radius: 7px; color: var(--academic-text); font-size: 12px; background: transparent; }
+.academic-dialog .btn:hover, .academic-panel .btn:hover { background: var(--academic-tint); }
+.academic-dialog .academic-primary { background: var(--academic-accent); border-color: transparent; color: #fff; }
+.academic-dialog .academic-primary:hover { filter: brightness(.95); background: var(--academic-accent); }
+.dark .academic-dialog .academic-primary { color: #201c2b; }
+.academic-dialog button:disabled { opacity: .5; cursor: default; }
+.academic-dialog :is(button,input,select,textarea,summary):focus-visible, .academic-panel :is(button,input,summary):focus-visible { outline: 2px solid var(--academic-accent); outline-offset: 3px; }
+.academic-dialog hr { border-color: var(--academic-line); }
+.academic-source-edit summary, .academic-source-links summary { cursor: pointer; font-size: 12px; line-height: 1.6; padding-block: 6px; }
+.academic-source-edit > .btn { margin-top: 12px; }
+.academic-source-edit .academic-form-grid { margin-top: 16px; }
+.academic-delivery-checks { max-height: 180px; overflow: auto; }
+.academic-caption-row { padding: 12px 0; border-bottom: 1px solid var(--academic-line); display: flex; flex-direction: column; gap: 8px; }
+.academic-caption-row label { font-size: 11px; color: var(--academic-muted); }
+.academic-live-bibliography { font-family: Georgia,serif; font-size: 13px; line-height: 1.65; margin-top: 18px; overflow-wrap: anywhere; }
+.academic-live-bibliography > div > div { padding-left: 12px; text-indent: -12px; margin-bottom: 12px; }
+.academic-file-input { width: 100%; min-width: 0; font-size: 11px; }
+.academic-file-input::file-selector-button { padding: 8px 10px; margin-right: 8px; border: 1px solid var(--academic-line); border-radius: 7px; background: var(--academic-bg); color: inherit; }
+.academic-dialog .nodus-blocknote { border: 1px solid var(--academic-line); border-radius: 8px; overflow: hidden; --bn-colors-editor-background: var(--academic-bg); --bn-colors-editor-text: var(--academic-text); }
+.academic-dialog .bn-editor { min-height: 160px; padding: 16px 30px; font-family: Georgia,Cambria,serif; font-size: 16px; line-height: 1.75; background: var(--academic-bg); color: var(--academic-text); }
+@media(max-width:650px) {
+  .academic-modal-backdrop { padding: 12px; }
+  .academic-dialog { max-height: calc(100dvh - 24px); }
+  .academic-form-grid { grid-template-columns: 1fr; }
+  .academic-dialog-body { padding: 18px; }
+  .academic-dialog-footer { padding: 14px 18px; flex-wrap: wrap; }
+}

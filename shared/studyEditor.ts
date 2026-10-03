@@ -1,3 +1,6 @@
+import type { AcademicMetadata } from './academicDocument';
+import type { BlockNoteDocument } from './blockNoteDocument';
+
 export type StudyEditorSaveReason = 'autosave' | 'manual' | 'restore' | 'import' | 'command';
 export type StudyEditorAlignment = 'left' | 'center' | 'right' | 'justify';
 export type StudyEditorTheme = 'paper' | 'soft' | 'contrast';
@@ -16,7 +19,7 @@ export interface StudyDocStyle {
 
 export const DEFAULT_STUDY_DOC_STYLE: StudyDocStyle = {
   fontFamily: 'serif',
-  fontSize: 17,
+  fontSize: 18,
   lineHeight: 1.75,
   pageWidth: 820,
   marginX: 56,
@@ -27,6 +30,9 @@ export const DEFAULT_STUDY_DOC_STYLE: StudyDocStyle = {
 };
 
 export interface StudyDocVersion {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
   id: string;
   shortId: string;
   documentId: string;
@@ -44,6 +50,8 @@ export interface StudyDocVersion {
 }
 
 export interface StudyAnnotation {
+  anchor?: StudyBlockAnchor | null;
+  anchorStatus?: 'attached' | 'ambiguous' | 'missing';
   id: string;
   shortId: string;
   documentId: string;
@@ -78,6 +86,12 @@ export interface StudyDocLink {
 }
 
 export interface StudyDocEditorData {
+  academicMetadata?: AcademicMetadata;
+  documentTitle?: string;
+  contentMarkdown?: string;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
+  revision?: number;
   versions: StudyDocVersion[];
   annotations: StudyAnnotation[];
   outgoingLinks: StudyDocLink[];
@@ -88,6 +102,10 @@ export interface StudyDocEditorData {
 }
 
 export interface StudyDocUpdateInput {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
+  expectedRevision?: number;
   title: string;
   contentMarkdown: string;
   style?: Partial<StudyDocStyle>;
@@ -97,6 +115,7 @@ export interface StudyDocUpdateInput {
 }
 
 export interface StudyAnnotationInput {
+  anchor?: StudyBlockAnchor | null;
   from: number;
   to: number;
   selectedText: string;
@@ -104,6 +123,13 @@ export interface StudyAnnotationInput {
   color?: string | null;
   locked?: boolean;
   pinned?: boolean;
+}
+
+export interface StudyBlockAnchor {
+  blockId: string;
+  endBlockId?: string;
+  from: number;
+  to: number;
 }
 
 export interface StudyOutlineItem {

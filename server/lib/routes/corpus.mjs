@@ -14,6 +14,7 @@ import { securityHeaders } from '../http.mjs';
 import { counts, page, readLimit, readOffset, rows, visibleEdges, worksById } from '../core/snapshot.mjs';
 import { getDebate, listDebates } from '../core/debates.mjs';
 import { lexicalSearch, matchesRow } from '../core/search.mjs';
+import { editorReferenceCatalog } from '../core/generated/editorReferences.mjs';
 import {
   workspaceArgumentRoutes,
   workspaceAuthorDossier,
@@ -1044,6 +1045,16 @@ export function createCorpusRoutes({ readSnapshot, readAssetBytes, renderPdf }) 
   async function handle(req, res, { json, url, space, segments }) {
     const [head, ...rest] = segments;
     const key = `${url.pathname}?${url.searchParams.toString()}`;
+
+    if (head === 'editor-references' && !rest.length) {
+      const snapshot = requireSnapshot(res, json, space.id);
+      if (!snapshot) return true;
+      // Membership has already been checked. Private notes are supplied only by
+      // the authenticated user's artifact API, never by the publication snapshot.
+      const tables = Object.fromEntries(['ideas', 'authors', 'works', 'study_docs', 'study_materials'].map(table => [table, rows(snapshot, table)]));
+      if(url.searchParams.get('passages')==='1'){const query=(url.searchParams.get('q')??'').slice(0,200).toLowerCase();tables.passages=rows(snapshot,'passages').filter(row=>String(row.text??'').toLowerCase().includes(query)).slice(0,50).map(row=>({...row,text:String(row.text??'').slice(0,160)}));}
+      return send(res, json, { items: editorReferenceCatalog(tables), revision: space.revision });
+    }
 
     if (head === undefined) {
       const snapshot = readSnapshot(space.id);

@@ -309,7 +309,7 @@ export function HomeView({
         </StatusCard>
 
         <StatusCard
-          title={t('Espacio de trabajo')}
+          title="Nodus Scriptor"
           icon="notebook"
           tone="indigo"
           metric={stats.ideaNodes > 0 ? t('lista') : t('pendiente')}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { desktopSettingsPatchFromServerProfile, extractServerProfilePreferences } from '../../shared/serverProfilePreferences.mjs';
+import { desktopSettingsPatchFromServerProfile, extractServerProfilePreferences, sanitizeServerProfilePreferences } from '../../shared/serverProfilePreferences.mjs';
 import { withServer } from '../../scripts/lib/nodusServerHarness.mjs';
 
 function desktopSettings(overrides = {}) {
@@ -50,6 +50,20 @@ async function sessionApi(origin, cookie, csrf, pathname, method = 'GET', value)
     ...(value === undefined ? {} : { body: JSON.stringify(value) }),
   });
 }
+
+test('legacy portable profiles enable Scriptor once and retain later manual hiding', () => {
+  const legacy = extractServerProfilePreferences(desktopSettings());
+  delete legacy.workspace.scriptorSidebarVersion;
+  legacy.workspace.sidebarHidden = ['workspace','notes','graph'];
+  legacy.workspace.sidebarOrder = ['workspace','toolkit','notes','library'];
+  const migrated = sanitizeServerProfilePreferences(legacy);
+  assert.equal(migrated.workspace.scriptorSidebarVersion,1);
+  assert.deepEqual(migrated.workspace.sidebarHidden,['graph']);
+  assert.deepEqual(migrated.workspace.sidebarOrder,['toolkit','library']);
+  migrated.workspace.sidebarHidden.push('notes');
+  assert.deepEqual(sanitizeServerProfilePreferences(migrated).workspace.sidebarHidden,['graph','notes']);
+  assert.equal(desktopSettingsPatchFromServerProfile(migrated).scriptorSidebarVersion,1);
+});
 
 test('Desktop profile preferences persist per user without secrets or embedding configuration', async () => {
   const portable = extractServerProfilePreferences(desktopSettings());

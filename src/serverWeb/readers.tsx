@@ -19,7 +19,7 @@ type MarkdownReaderProps = ReaderProps & {
   hardBreaks?: boolean;
 };
 
-function serverHrefForNodus(href: string): string | null {
+export function serverHrefForNodus(href: string): string | null {
   const encodedId = (raw: string): string | null => {
     try {
       const decoded = decodeURIComponent(raw);

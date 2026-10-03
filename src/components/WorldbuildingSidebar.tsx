@@ -42,7 +42,6 @@ export const WORLDBUILDING_GROUPS: WorldbuildingGroup[] = [
     { label: 'Preguntas abiertas', icon: 'help', view: 'questions' },
   ] },
   { id: 'create', label: 'Crear', items: [
-    { label: 'Notas', icon: 'notebook', view: 'notes' },
     { label: 'Escenas', icon: 'image', view: 'scenes' },
     { label: 'Manuscrito', icon: 'edit', view: 'manuscript' },
   ] },
