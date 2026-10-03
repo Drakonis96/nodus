@@ -30,6 +30,19 @@ export type MainErrorTranslations = Partial<Record<AppLanguage, string>> & { en:
 
 /** Messages whose text is fixed, matched exactly. */
 export const MAIN_PROCESS_ERRORS: Record<string, MainErrorTranslations> = {
+  'La copia de Focus está dañada.': {
+    en: 'The Focus backup is corrupted.',
+    fr: 'La sauvegarde de Focus est endommagée.',
+    de: 'Die Focus-Sicherung ist beschädigt.',
+    pt: 'A cópia de segurança do Focus está danificada.',
+    'pt-BR': 'O backup do Focus está corrompido.',
+    it: 'Il backup di Focus è danneggiato.',
+    tr: 'Focus yedeği bozuk.',
+    'zh-CN': 'Focus 备份已损坏。',
+    'zh-TW': 'Focus 備份已損毀。',
+    ja: 'Focus のバックアップが破損しています。',
+    ko: 'Focus 백업이 손상되었습니다.',
+  },
   'El proveedor no devolvió un catálogo de modelos válido.': {
     en: 'The provider did not return a valid model catalogue.',
     fr: 'Le fournisseur n’a pas renvoyé de catalogue de modèles valide.',

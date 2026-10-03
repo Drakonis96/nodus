@@ -1,37 +1,29 @@
 import { app, Notification, powerMonitor } from 'electron';
-import { getDb, onBeforeDatabaseClose } from '../db/database';
 import { getActiveVault } from '../vaults/vaultRegistry';
 import { setMascotFocusSuppressed } from '../mascotWindow';
-import { FocusService } from '../study/focusService';
+import { closeGlobalFocusRuntime, getGlobalFocusService, getGlobalFocusSnapshot, onGlobalFocusCompleted, onGlobalFocusContextChanged, pauseGlobalFocus } from '../study/focusRuntime';
 import { getSettings } from '../db/settingsRepo';
 import { uiText } from '../../shared/uiLanguage';
 import { FOCUS_NOTIFICATION_COPY } from '../../shared/studyFocus';
-import type { FocusAction, FocusPreferences, FocusSnapshot } from '../../shared/studyFocus';
+import type { FocusAction, FocusPreferences } from '../../shared/studyFocus';
 import type { IpcContext } from './context';
 
 export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
-  let service: FocusService | null = null;
-  let vaultId = '';
-  const snapshot = (): FocusSnapshot => ({ vaultId, state: current().snapshot() });
-  const emit = () => { if (service) getWindow()?.webContents.send('studyFocus:changed', snapshot()); };
-  const current = () => {
-    const vault = getActiveVault();
-    if (vault.type !== 'estudio') throw new Error('Concentración está disponible en bóvedas de Estudio.');
-    if (!service) {
-      vaultId = vault.id;
-      service = new FocusService(getDb(), undefined, undefined, state => {
-        const payload = { vaultId, state };
-        const win = getWindow();
-        win?.webContents.send('studyFocus:completed', payload);
-        if ((!win || !win.isFocused() || win.isMinimized()) && Notification.isSupported()) {
-          const language = getSettings().uiLanguage;
-          const body = state.phase === 'work' ? FOCUS_NOTIFICATION_COPY.workDone : FOCUS_NOTIFICATION_COPY.breakDone;
-          new Notification({ title: uiText(language, FOCUS_NOTIFICATION_COPY.title), body: uiText(language, body), silent: true }).show();
-        }
-      });
+  let initialized = false;
+  const snapshot = getGlobalFocusSnapshot;
+  const emit = () => { if (initialized) getWindow()?.webContents.send('studyFocus:changed', snapshot()); };
+  const current = () => { initialized = true; snapshot(); return getGlobalFocusService(); };
+  onGlobalFocusContextChanged(emit);
+  onGlobalFocusCompleted(payload => {
+    const state = payload.state;
+    const win = getWindow();
+    win?.webContents.send('studyFocus:completed', payload);
+    if ((!win || !win.isFocused() || win.isMinimized()) && Notification.isSupported()) {
+      const language = getSettings().uiLanguage;
+      const body = state.phase === 'work' ? FOCUS_NOTIFICATION_COPY.workDone : FOCUS_NOTIFICATION_COPY.breakDone;
+      new Notification({ title: uiText(language, FOCUS_NOTIFICATION_COPY.title), body: uiText(language, body), silent: true }).show();
     }
-    return service;
-  };
+  });
   const checkVault = (id: string) => { if (id !== getActiveVault().id) throw new Error('La bóveda ha cambiado.'); };
   h('studyFocus:get', () => { current(); return snapshot(); });
   h('studyFocus:configure', (_e, id: string, patch: Partial<FocusPreferences>) => {
@@ -49,11 +41,7 @@ export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
     if (value) current();
     setMascotFocusSuppressed(value);
   });
-  const pause = () => { if (service) { service.pause(); emit(); } };
-  onBeforeDatabaseClose(() => {
-    pause(); service = null; vaultId = '';
-    setMascotFocusSuppressed(false, false);
-  });
+  const pause = () => { pauseGlobalFocus(); emit(); };
   powerMonitor.on('suspend', pause);
   app.on('before-quit', pause);
   // Windows created after macOS closes its last main window need the same hook.
@@ -71,9 +59,9 @@ export function registerStudyFocusIpc({ h, getWindow }: IpcContext) {
   });
   const timer = setInterval(() => {
     hookWindow();
-    try { if (service) { service.tick(); emit(); } }
+    try { if (initialized) { current().tick(); emit(); } }
     catch (error) { console.error('[study-focus] checkpoint failed', error); }
   }, 1000);
   timer.unref();
-  app.once('will-quit', () => clearInterval(timer));
+  app.once('will-quit', () => { clearInterval(timer); closeGlobalFocusRuntime(); });
 }

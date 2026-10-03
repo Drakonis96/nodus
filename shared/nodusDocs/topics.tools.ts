@@ -3,21 +3,38 @@ import type { NodusDocTopic } from './types';
 /** Nodus Toolkit: the hub and each tool with its requirements and limits. */
 export const TOOL_DOC_TOPICS: readonly NodusDocTopic[] = [
   {
+    id: 'toolkit-focus', area: 'tools',
+    title: { es: 'Nodus Focus: concentración entre bóvedas', en: 'Nodus Focus: focus across vaults' },
+    keywords: ['focus', 'concentración', 'temporizador', 'pomodoro', 'sesión', 'bóveda', 'historial'],
+    body: {
+      es: `- Nodus Focus aparece en Nodus Tools y en Herramientas por defecto. También puedes abrir el temporizador desde la cabecera o la paleta de comandos.
+- Iniciar o reanudar un bloque de trabajo activa el modo concentración. Si desmarcas la casilla, se recuerda tu elección en todas las bóvedas.
+- Cambiar de bóveda conserva la sesión y el temporizador en marcha; el panel se adapta a las secciones y la personalización de la nueva bóveda. Estudio y Docencia mantienen sus asignaturas, apuntes y materiales.
+- El historial es global y muestra cuánto tiempo has dedicado a cada bóveda. Los descansos y las pausas no suman tiempo de trabajo.
+- Salir del modo pausa el bloque y permite finalizar la sesión o dejarla en pausa. La suspensión y el cierre también pausan; tras un fallo se recupera hasta el último punto guardado.`,
+      en: `- Nodus Focus appears in Nodus Tools and the Tools sidebar group by default. You can also open the timer from the header or command palette.
+- Starting or resuming a work block enables focus mode. Unticking the checkbox remembers your choice across all vaults.
+- Switching vaults preserves the session and running timer; the panel adapts to the new vault's sections and customisation. Study and Teaching retain their subjects, notes and materials.
+- History is global and shows the time spent in each vault. Breaks and pauses do not count as work time.
+- Leaving focus mode pauses the block and offers to end the session or keep it paused. Suspension and closing also pause; after a crash, recovery uses the last checkpoint.`,
+    }, related: ['toolkit-hub'],
+  },
+  {
     id: 'toolkit-hub',
     area: 'tools',
     title: { es: 'Nodus Toolkit: el hub de herramientas', en: 'Nodus Toolkit: the tools hub' },
     keywords: ['toolkit', 'herramientas', 'hub', 'nodus tools', 'catalogo', 'fijar', 'desfijar', 'utilidades', 'convert', 'protect', 'translate', 'presenter', 'ocr'],
     body: {
       es: `- Herramientas es una sección de la barra lateral en su propio grupo y también tiene icono en la cabecera («Abrir Nodus Toolkit»). Aparece en todos los tipos de bóveda.
-- Su página principal es un hub con las tarjetas del catálogo: Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter y OCR Workspace. Cada tarjeta se puede fijar como atajo en la barra lateral («Fijar» / «Desfijar»).
+- Su página principal es un hub con las tarjetas del catálogo, incluido Nodus Focus, además de Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter y OCR Workspace. Cada tarjeta se puede fijar como atajo en la barra lateral («Fijar» / «Desfijar»).
 - Dentro de una herramienta, el botón a la izquierda de su título vuelve al hub.
 - Utilidades locales para investigación, docencia y estudio: convertir y procesar archivos sin salir de Nodus.`,
       en: `- Tools is a sidebar section in its own group and also has a header icon ("Open Nodus Toolkit"). It appears in every vault type.
-- Its home is a hub with the catalogue cards: Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter and OCR Workspace. Each card can be pinned as a sidebar shortcut ("Pin" / "Unpin").
+- Its home is a hub with catalogue cards including Nodus Focus, alongside Nodus Apps, Nodus Convert, Nodus Protect, Nodus Translate, PDF Presenter and OCR Workspace. Each card can be pinned as a sidebar shortcut ("Pin" / "Unpin").
 - Inside a tool, the button to the left of its title returns to the hub.
 - Local utilities for research, teaching and study: convert and process files without leaving Nodus.`,
     },
-    related: ['toolkit-convert', 'toolkit-ocr'],
+    related: ['toolkit-focus', 'toolkit-convert', 'toolkit-ocr'],
   },
   {
     id: 'toolkit-convert',

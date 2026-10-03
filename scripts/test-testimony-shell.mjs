@@ -42,7 +42,7 @@ const participantsSource = await readFile(path.join(repoRoot, 'src/views/Testimo
 
 test.after(() => rm(outDir, { recursive: true, force: true }));
 
-/** Las secciones acordadas, incluidos los cuatro instrumentos globales, en orden. */
+/** Las secciones acordadas, incluidos los instrumentos globales, en orden. */
 const AGREED_SECTIONS = [
   'home',
   'search',
@@ -55,10 +55,11 @@ const AGREED_SECTIONS = [
   'radar',
   'compass',
   'toolkit',
+  'studyFocus',
   'settings',
 ];
 
-// Research chat se suma a las once secciones anteriores: es transversal como Browser, Radar y Toolkit — consultar
+// Research chat y Focus son transversales como Browser, Radar y Toolkit — consultar
 // un archivo o un fondo en la web sirve igual aquí que en cualquier otra bóveda —
 // y como el Toolkit no aporta ninguna superficie de OTRO vault al menú, que es lo
 // que esta lista cerrada protege.
@@ -112,7 +113,8 @@ test('el sidebar y la lista de navegación no pueden separarse', () => {
   // El grupo «Herramientas» lo pinta App.tsx aparte para todas las bóvedas dedicadas
   // (`navGroups.filter(group => group.id === 'tools')`), así que sus entradas son las
   // únicas de la lista que no están en el sidebar propio de Testimonios.
-  const paintedByShell = new Set(['toolkit', 'compass', 'browser', 'radar']);
+  const paintedByShell = new Set(['toolkit', 'compass', 'browser', 'radar', 'studyFocus']);
+  assert.equal(navigation.NAV_ITEMS.find((item) => item.id === 'studyFocus')?.group, 'tools');
   assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => !paintedByShell.has(id)).sort());
 });
 
@@ -160,6 +162,7 @@ test('las superficies ocultas por defecto no incluyen Buscar ni Notas', () => {
   const hidden = new Set(vaultTypes.defaultHiddenViewsForType('testimonios'));
   assert.equal(hidden.has('search'), false, 'Buscar es una de las ocho secciones');
   assert.equal(hidden.has('notes'), false, 'Notas es una de las ocho secciones');
+  assert.equal(hidden.has('studyFocus'), false, 'Nodus Focus es una herramienta transversal visible por defecto');
   for (const id of ['library', 'graph', 'ideas', 'authors', 'writing', 'projects', 'deepResearch']) {
     assert.equal(hidden.has(id), true, id);
   }

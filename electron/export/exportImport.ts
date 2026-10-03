@@ -14,6 +14,7 @@ import { testimonyBackupInventory } from './testimonyExport';
 import { getSettings } from '../db/settingsRepo';
 import { listVaults, getActiveVault, restoreVaultDatabase, setActiveVault } from '../vaults/vaultRegistry';
 import { closeGlobalLibraryRuntime } from '../library/libraryRuntime';
+import { globalFocusFile, restoreGlobalFocusBackupFile, snapshotGlobalFocusForBackup } from '../study/focusRuntime';
 import { configuredLibraryRoot } from '../library/libraryPaths';
 import { pathStaysInside } from '../library/libraryFileUtils';
 import type { VaultType } from '@shared/types';
@@ -257,6 +258,10 @@ async function addAuxiliaryFiles(
   vaults: ReturnType<typeof listVaults>,
   selection: BackupSelection
 ): Promise<void> {
+  if (selection.includeHistories) {
+    const focus = await snapshotGlobalFocusForBackup();
+    if (focus) files['aux/global/focus.sqlite'] = focus;
+  }
   if (selection.includePreferences) {
     for (const name of GLOBAL_AUXILIARY_FILES) {
       await addFileIfPresent(files, `aux/global/${name}`, path.join(app.getPath('userData'), name));
@@ -940,6 +945,7 @@ function plannedRestoreEntries(
   }
 
   const selection = normalizeBackupSelection(payloadManifest.selection as Partial<BackupSelection> | undefined, false);
+  if (selection.includeHistories) add('aux/global/focus.sqlite');
   if (selection.includePreferences) {
     for (const name of GLOBAL_AUXILIARY_FILES) add(`aux/global/${name}`);
     const prefix = 'aux/global/plugins/installed/';
@@ -1090,6 +1096,14 @@ async function restoreAuxiliaryFilesFromFile(
   tracker?: RestoreByteTracker,
 ): Promise<void> {
   const selection = normalizeBackupSelection(payloadManifest.selection as Partial<BackupSelection> | undefined, false);
+  const focus = selection.includeHistories ? payload.entry('aux/global/focus.sqlite') : undefined;
+  if (focus) {
+    const staged = `${globalFocusFile()}.restore-${process.pid}`;
+    try {
+      await extractAtomicEntry(payload, focus, staged, tracker);
+      restoreGlobalFocusBackupFile(staged);
+    } finally { fs.rmSync(staged, { force: true }); }
+  }
   if (selection.includePreferences) {
     let restoredBookmarks = false;
     for (const name of GLOBAL_AUXILIARY_FILES) {
@@ -1476,6 +1490,14 @@ function archiveTargetInside(root: string, relative: string): string | null {
 
 function restoreAuxiliaryFiles(payload: AdmZip, payloadManifest: PayloadManifest): void {
   const selection = normalizeBackupSelection(payloadManifest.selection, false);
+  const focus = selection.includeHistories ? payload.getEntry('aux/global/focus.sqlite') : null;
+  if (focus) {
+    const staged = `${globalFocusFile()}.restore-${process.pid}`;
+    try {
+      writeAtomicFile(staged, focus.getData());
+      restoreGlobalFocusBackupFile(staged);
+    } finally { fs.rmSync(staged, { force: true }); }
+  }
   if (selection.includePreferences) {
     let restoredBookmarks = false;
     for (const name of GLOBAL_AUXILIARY_FILES) {

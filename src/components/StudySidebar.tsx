@@ -17,7 +17,6 @@ export function announceStudyWorkspaceChanged(): void {
 export const STUDY_SECTIONS = [
   { view: 'studyCourses', icon: 'graduation', label: 'Cursos y asignaturas' },
   { view: 'studySchedule', icon: 'clock', label: 'Horarios' },
-  { view: 'studyFocus', icon: 'focus', label: 'Concentración' },
   { view: 'studyCalendar', icon: 'calendar', label: 'Calendario' },
   { view: 'studySearch', icon: 'search', label: 'Buscar' },
   { view: 'studyLibrary', icon: 'book', label: 'Materiales' },
