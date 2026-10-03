@@ -166,7 +166,7 @@ test('the hub renders every built tool including Nodus Translate', async () => {
   );
   assert.deepEqual(
     navigation.TOOLKIT_TOOLS.filter((tool) => tool.state === 'wip').map((tool) => tool.page),
-    ['apps', 'browser', 'compass', 'convert', 'drift', 'protect', 'radar', 'workspace', 'translate', 'ocr', 'presenter'],
+    ['apps', 'browser', 'compass', 'convert', 'drift', 'studyFocus', 'protect', 'radar', 'workspace', 'translate', 'ocr', 'presenter'],
     'every tool uses the in-development badge'
   );
   assert.match(view, /const disabled = state === 'soon'/);

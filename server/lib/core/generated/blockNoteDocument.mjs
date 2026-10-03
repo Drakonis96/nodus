@@ -378,7 +378,7 @@ function markdownInline(value) {
   for (const match of value.matchAll(token)) {
     if (match.index > cursor) result.push({ type: "text", text: value.slice(cursor, match.index), styles: {} });
     if (match[13]) result.push({ type: "text", text: match[13].slice(3, -3), styles: { bold: true, italic: true } });
-    else if (match[3] && !match[1].startsWith("!")) result.push({ type: "link", href: match[3], content: markdownInline(match[2].replace(/\\([\[\]\\])/g, "$1")) });
+    else if (match[3] && !match[1].startsWith("!")) result.push({ type: "link", href: match[3], content: markdownInline(match[2].replace(/\\([[\]\\])/g, "$1")) });
     else if (match[4]) result.push({ type: "nodusWiki", props: { reference: match[4], label: match[5] || match[4] } });
     else if (match[12]) result.push({ type: "nodusFormula", props: { formula: match[12] } });
     else if (match[1].startsWith("!")) result.push({ type: "text", text: match[1], styles: {} });
@@ -397,7 +397,7 @@ function nativeInlineMarkdown(value) {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
   return value.map((entry) => {
-    if (entry.type === "link") return `[${nativeInlineMarkdown(entry.content).replace(/\\/g, "\\\\").replace(/[\[\]]/g, "\\$&")}](${entry.href ?? ""})`;
+    if (entry.type === "link") return `[${nativeInlineMarkdown(entry.content).replace(/\\/g, "\\\\").replace(/[[\]]/g, "\\$&")}](${entry.href ?? ""})`;
     if (["nodusCitation", "nodusFootnote", "nodusCrossReference"].includes(entry.type)) return `<!--nodus:inline:${encodeURIComponent(JSON.stringify(entry))}-->${String(entry.props?.label ?? (entry.type === "nodusFootnote" ? "[Nota]" : "Referencia")).replace(/[<>]/g, "")}<!--/nodus:inline-->`;
     if (entry.type === "nodusWiki") return `[[${entry.props?.reference ?? ""}|${entry.props?.label ?? entry.props?.reference ?? ""}]]`;
     if (entry.type === "nodusFormula") return `$${entry.props?.formula ?? ""}$`;

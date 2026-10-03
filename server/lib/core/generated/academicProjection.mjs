@@ -19025,7 +19025,7 @@ function nativeInlineMarkdown(value) {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
   return value.map((entry) => {
-    if (entry.type === "link") return `[${nativeInlineMarkdown(entry.content).replace(/\\/g, "\\\\").replace(/[\[\]]/g, "\\$&")}](${entry.href ?? ""})`;
+    if (entry.type === "link") return `[${nativeInlineMarkdown(entry.content).replace(/\\/g, "\\\\").replace(/[[\]]/g, "\\$&")}](${entry.href ?? ""})`;
     if (["nodusCitation", "nodusFootnote", "nodusCrossReference"].includes(entry.type)) return `<!--nodus:inline:${encodeURIComponent(JSON.stringify(entry))}-->${String(entry.props?.label ?? (entry.type === "nodusFootnote" ? "[Nota]" : "Referencia")).replace(/[<>]/g, "")}<!--/nodus:inline-->`;
     if (entry.type === "nodusWiki") return `[[${entry.props?.reference ?? ""}|${entry.props?.label ?? entry.props?.reference ?? ""}]]`;
     if (entry.type === "nodusFormula") return `$${entry.props?.formula ?? ""}$`;

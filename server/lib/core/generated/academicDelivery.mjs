@@ -26908,7 +26908,6 @@ function academicLatex(compiled, assets = {}) {
       case "bulletListItem":
       case "numberedListItem":
       case "checkListItem": {
-        const kind = block.type === "numberedListItem" ? "enumerate" : "itemize";
         return `\\item ${block.type === "checkListItem" ? block.props.checked ? "[x] " : "[ ] " : ""}${text2}
 ${render3(block.children ?? [], chapter)}`;
       }
