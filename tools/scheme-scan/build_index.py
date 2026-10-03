@@ -3,7 +3,7 @@
 as the ORD index (tools/reaction-index/build_index.py), so the Chemistry Studio worker's
 known-reactions and propose-disconnections tools read it unchanged.
 
-  build_index.py [--out DIR]     default: <scan db dir>/index
+  build_index.py [--out DIR] [--templates templates.json]     default: <scan db dir>/index
 
 Records used: status confirmed or repaired (a repaired record's SMILES are replaced by the structure
 its name and formula agree on). Generic schemes (R groups) and flagged records are left out.
@@ -68,6 +68,8 @@ def library_titles(zotero):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', default=os.path.join(os.path.dirname(scan.DB), 'index'))
+    ap.add_argument('--templates', default=os.path.join(os.path.dirname(scan.DB), 'templates', 'templates.json'),
+                    help='templates.json from templates.py extract (a side work directory builds an alternative set)')
     ap.add_argument('--zotero', default=os.path.expanduser('~/Zotero/zotero.sqlite'), help='for full book titles in citations')
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
@@ -135,7 +137,7 @@ def main():
     write_zst_blocked(out('exact.tsv.zst'), [f'{k}\t{exact[k]}\t{",".join(exact_samples[k])}' for k in sorted(exact)])
     # Retro templates (templates.py): one row per template, most supported first; their book/page
     # sources go to template-sources.json for citation.
-    templates_path = os.path.join(os.path.dirname(scan.DB), 'templates', 'templates.json')
+    templates_path = args.templates
     templates = json.load(open(templates_path)) if os.path.exists(templates_path) else {}
     ranked = sorted(templates.items(), key=lambda kv: (-kv[1]['count'], kv[0]))
     write_zst(out('templates.tsv.zst'), '\n'.join(f'{t["count"]}\t{t["count"]}\t0\t\t{smarts}' for smarts, t in ranked))
