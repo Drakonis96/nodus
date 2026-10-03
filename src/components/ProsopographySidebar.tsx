@@ -27,9 +27,6 @@ export const PROSOPOGRAPHY_GROUPS: ProsopographyGroup[] = [
     { label: 'Análisis', icon: 'chartBar', view: 'prosopAnalysis' },
     { label: 'Redes', icon: 'network', view: 'prosopNetworks' },
   ] },
-  { id: 'create', label: 'Registrar', items: [
-    { label: 'Notas', icon: 'notebook', view: 'notes' },
-  ] },
 ];
 
 export function ProsopographySidebar({

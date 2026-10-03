@@ -1,4 +1,5 @@
 import { initializeChatSkillDefaults } from './chatSkills';
+import { flushWindowEditors, installEditorCloseGuard } from './editorFlush';
 import { claimIsolatedProfile } from './qa/isolatedProfile';
 import { initializePluginStore } from './skillPlugins';
 import { initializeCapabilityPluginStore } from './capabilities/pluginStoreV2';
@@ -574,6 +575,7 @@ function createWindow(): void {
     },
   });
   protectMainWindowNavigation(mainWindow);
+  installEditorCloseGuard(mainWindow, () => quitting);
 
   // Right-clicking any text field in Nodus — the browser's address bar above all
   // — offers Cut, Copy and Paste. Views that draw their own HTML context menu
@@ -1277,7 +1279,20 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+let editorQuitApproved = false;
+let editorQuitPending = false;
+app.on('before-quit', event => {
+  if (!editorQuitApproved && mainWindow && !mainWindow.isDestroyed()) {
+    event.preventDefault();
+    if (!editorQuitPending) {
+      editorQuitPending = true;
+      void flushWindowEditors(mainWindow).then(saved => {
+        editorQuitPending = false;
+        if (saved) { editorQuitApproved = true; app.quit(); }
+      });
+    }
+    return;
+  }
   quitting = true;
   stopDocumentaryPreparation();
   void stopResearchZotero();

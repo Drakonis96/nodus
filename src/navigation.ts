@@ -28,7 +28,7 @@ export interface NavGroupDef {
 export const NAV_GROUPS: NavGroupDef[] = [
   { id: 'explore', label: 'Explorar' },
   { id: 'analyze', label: 'Analizar' },
-  { id: 'create', label: 'Escribir' },
+  { id: 'create', label: 'Crear' },
   { id: 'tools', label: 'Herramientas' },
 ];
 
@@ -130,11 +130,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'hypothesis', label: 'Hipótesis', icon: 'flask', group: 'analyze' },
   { id: 'reading', label: 'Ruta de lectura', icon: 'route', group: 'analyze' },
   { id: 'deepResearch', label: 'Deep Research', icon: 'telescope', group: 'analyze' },
-  // Escribir — producir salidas con citas.
-  // La bóveda académica llama Espacio de trabajo a su sección unificada. Los demás
-  // vaults conservan la entrada Notas, pero comparten su catálogo, pestañas y editor.
-  { id: 'workspace', label: 'Espacio de trabajo', icon: 'notebook', group: 'create' },
-  { id: 'notes', label: 'Notas', icon: 'notebook', group: 'create' },
   // Herramientas — consultar la web, seguir novedades y procesar archivos.
   // Vistas universales: disponibles en todos los tipos de vault.
   { id: 'browser', label: 'Nodus Browser', icon: 'globe', group: 'tools' },
@@ -142,6 +137,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'compass', label: 'Nodus Compass', icon: 'compass', group: 'tools' },
   { id: 'studyFocus', label: 'Nodus Focus', icon: 'focus', group: 'tools' },
   { id: 'toolkit', label: 'Nodus Tools', icon: 'tools', group: 'tools' },
+  // One Scriptor shortcut per vault; stable route ids preserve links and snapshots.
+  { id: 'workspace', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' },
+  { id: 'notes', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' },
   { id: 'settings', label: 'Ajustes', icon: 'settings' },
 ];
 
@@ -150,11 +148,15 @@ export const NAV_ITEMS: NavItem[] = [
  * adding a tool never expands the vault-type allow-lists. 'home' is the catalogue. */
 export type ToolkitPage = 'home' | ToolkitToolPage;
 
-export type ToolkitStandalonePage = Extract<View, 'browser' | 'radar' | 'compass' | 'studyFocus'>;
+export type ToolkitStandalonePage = Extract<View, 'browser' | 'radar' | 'compass' | 'workspace' | 'notes' | 'studyFocus'>;
 export type ToolkitCatalogPage = ToolkitToolPage | ToolkitStandalonePage;
 
 export function isToolkitStandalonePage(page: ToolkitCatalogPage): page is ToolkitStandalonePage {
-  return page === 'browser' || page === 'radar' || page === 'compass' || page === 'studyFocus';
+  return page === 'browser' || page === 'radar' || page === 'compass' || page === 'workspace' || page === 'notes' || page === 'studyFocus';
+}
+
+export function scriptorViewForVault(vaultType: unknown): 'workspace' | 'notes' | 'studyFocus' {
+  return normalizeVaultType(vaultType) === 'academic' ? 'workspace' : 'notes';
 }
 
 export interface ToolkitToolDef {
@@ -172,6 +174,14 @@ export interface ToolkitToolDef {
 
 /** Single source of truth for the toolkit catalogue. */
 export const TOOLKIT_TOOLS = ([
+  {
+    page: 'workspace',
+    name: 'Nodus Scriptor',
+    description: 'Redacta, organiza y revisa artículos, tesis, notas y documentos.',
+    icon: 'notebook',
+    state: 'wip',
+    testid: 'scriptor',
+  },
   {
     page: 'studyFocus', name: 'Nodus Focus', icon: 'focus', state: 'wip', testid: 'focus',
     description: 'Concentra tu trabajo con un temporizador y un espacio que se adapta a cada bóveda.',
@@ -291,7 +301,7 @@ export function pinnedToolkitSidebarItems(pages: unknown): ToolkitSidebarNavItem
 
 const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>>> = {
   estudio: {
-    notes: 'Espacio de trabajo',
+    notes: 'Nodus Scriptor',
   },
   docencia: {
     studyCourses: 'Cursos, asignaturas y grupos',
@@ -300,7 +310,7 @@ const VAULT_TYPE_LABELS: Partial<Record<VaultType, Partial<Record<View, string>>
     studyChat: 'Research chat',
     studyIdeas: 'Ideas',
     studyGraph: 'Grafo',
-    notes: 'Espacio de trabajo',
+    notes: 'Nodus Scriptor',
   },
   primary_sources: {
     timeline: 'Cronología',

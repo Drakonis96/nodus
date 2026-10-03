@@ -222,6 +222,8 @@ export const api = {
     request<{ results?: JsonRecord[]; mode?: string }>(
       `/api/v1/spaces/${encoded(spaceId)}/search?q=${encodeURIComponent(query)}&limit=50`,
     ),
+  editorReferences: (spaceId: string,options?:{includePassages?:boolean;search?:string}) =>
+    request<{ items: import('@shared/editorReferences').EditorReference[] }>(`/api/v1/spaces/${encoded(spaceId)}/editor-references${options?.includePassages?'?passages=1&q='+encodeURIComponent(options.search??''):''}`),
   stateOfArt: (spaceId: string) =>
     request<{
       questions?: JsonRecord[];
@@ -748,9 +750,13 @@ export const api = {
       },
       body: JSON.stringify(input),
     }),
+  inspectAcademicArtifact:(id:string,expectedRevision:number,csrfToken?:string)=>request<{issues:import('@shared/academicDocument').AcademicIssue[]}>(`/api/v2/me/artifacts/${encoded(id)}/academic-export`,{method:'POST',headers:{'Content-Type':'application/json',...(csrfToken?{'X-CSRF-Token':csrfToken}:{})},body:JSON.stringify({format:'check',expectedRevision})}),
+  exportAcademicArtifact: (id:string,format:import('@shared/academicDocument').AcademicExportFormat,expectedRevision:number,acceptWarnings:boolean,csrfToken?:string)=>request<{base64:string;mime:string;fileName:string;html:string}>(`/api/v2/me/artifacts/${encoded(id)}/academic-export`,{method:'POST',headers:{'Content-Type':'application/json',...(csrfToken?{'X-CSRF-Token':csrfToken}:{})},body:JSON.stringify({format,expectedRevision,acceptWarnings})}),
+  artifact: (id: string) => request<{ artifact: UserArtifact }>(`/api/v2/me/artifacts/${encoded(id)}`),
   updateArtifact: (
     id: string,
     input: {
+      expectedRevision?: number;
       title?: string;
       content?: string;
       metadata?: Record<string, unknown>;

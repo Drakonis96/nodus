@@ -116,7 +116,7 @@ try {
   await page.getByTestId('update-ready-notice').waitFor({ state: 'detached' });
   assert.equal(await page.getByTestId('startup-update-modal').count(), 0);
 
-  for (const label of ['Buscar', 'Población', 'Personas', 'Fuentes', 'Análisis', 'Redes', 'Notas']) {
+  for (const label of ['Buscar', 'Población', 'Personas', 'Fuentes', 'Análisis', 'Redes', 'Nodus Scriptor']) {
     assert.equal(await page.getByRole('button', { name: label, exact: true }).count(), 1, `${label} appears once`);
   }
   assert.equal(await page.getByRole('button', { name: 'Árbol', exact: true }).count(), 0, 'genealogy tree is absent');

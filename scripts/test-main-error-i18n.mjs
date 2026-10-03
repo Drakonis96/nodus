@@ -191,6 +191,26 @@ test('every parameterized pattern keeps its runtime values and translates around
   }
 });
 
+test('Scriptor errors preserve recovery codes and unsupported formula elements through IPC', () => {
+  const messages = [
+    'REVISION_CONFLICT: La nota ha cambiado en otra sesión. El borrador se conserva.',
+    'ACADEMIC_PROJECTION_CONFLICT: Esta edición eliminaría citas o notas estructuradas. Abre Scriptor para resolverla; el borrador se conserva.',
+  ];
+  for (const language of LANGUAGES) {
+    for (const message of messages) {
+      const localized = localizeIpcPayload({ ok: false, error: message }, language);
+      assert.equal(localized.ok, false);
+      assert.ok(localized.error.startsWith(message.split(':')[0] + ':'), 'draft recovery remains detectable');
+      assert.notEqual(localized.error, message);
+      assert.ok(!GENERIC.has(localized.error));
+    }
+    const formula = localizeRuntimeError('La fórmula contiene un elemento no compatible con Word: merror', language);
+    assert.ok(formula.endsWith(' merror'), 'the rejected element stays available to diagnose the export');
+    assert.notEqual(formula, 'La fórmula contiene un elemento no compatible con Word: merror');
+    assert.ok(!GENERIC.has(formula));
+  }
+});
+
 test('catalogue and server-address errors keep their specific cause through IPC in every UI language', () => {
   const messages = [
     ['El proveedor no devolvió un catálogo de modelos válido.', 'The provider did not return a valid model catalogue.'],

@@ -19,6 +19,7 @@ import type {
 
 /** Lo mínimo que el editor necesita saber de aquello que está editando. */
 export interface EditorDocument {
+  editorRevision?: number;
   id: string;
   title: string;
   contentMarkdown: string;
@@ -41,6 +42,8 @@ export interface EditorDocumentPort<TDocument extends EditorDocument = EditorDoc
   improveTarget(documentId: string): { documentId?: string | null; noteId?: string | null };
   /** Los documentos a los que se puede enlazar al soltar uno dentro del texto. */
   listLinkTargets(): Promise<Array<{ id: string; title: string }>>;
+  listReferences?(): Promise<import('@shared/editorReferences').EditorReference[]>;
+  referenceKind?: 'note' | 'studyDocument';
   /** El tipo MIME que arrastra la lista de este espacio. */
   dragType: string;
   /** El enlace Markdown que abre otro documento del mismo espacio. */
@@ -49,6 +52,7 @@ export interface EditorDocumentPort<TDocument extends EditorDocument = EditorDoc
 
 /** El puerto de Estudio y Docencia: documentos de estudio. Es el de por defecto. */
 export const studyDocumentPort: EditorDocumentPort<import('@shared/studyOrg').StudyDocument> = {
+  referenceKind: 'studyDocument',
   loadEditorData: (documentId) => window.nodus.getStudyDocEditorData(documentId),
   save: (documentId, input) => window.nodus.updateStudyDoc(documentId, input),
   restoreVersion: (documentId, versionId) => window.nodus.restoreStudyDocVersion(documentId, versionId),
@@ -56,6 +60,7 @@ export const studyDocumentPort: EditorDocumentPort<import('@shared/studyOrg').St
   updateAnnotation: (id, patch) => window.nodus.updateStudyAnnotation(id, patch),
   improveTarget: (documentId) => ({ documentId }),
   listLinkTargets: async () => (await window.nodus.getStudyWorkspace()).documents.map((document) => ({ id: document.id, title: document.title })),
+  listReferences: () => window.nodus.listEditorReferences(),
   dragType: 'application/x-nodus-study-doc',
   linkHref: (documentId) => `nodus://study/doc/${documentId}`,
 };
@@ -66,18 +71,20 @@ export const studyDocumentPort: EditorDocumentPort<import('@shared/studyOrg').St
  * columna que lee media aplicación.
  */
 export const workspaceNotePort: EditorDocumentPort<EditorDocument & { noteId: string }> = {
+  referenceKind: 'note',
   loadEditorData: (noteId) => window.nodus.getWorkspaceNoteEditorData(noteId),
   save: async (noteId, input) => noteAsEditorDocument(await window.nodus.updateWorkspaceNote(noteId, input)),
   restoreVersion: async (noteId, versionId) => noteAsEditorDocument(await window.nodus.restoreWorkspaceNoteVersion(noteId, versionId)),
   createAnnotation: (noteId, input) => window.nodus.createWorkspaceAnnotation(noteId, input),
   updateAnnotation: (id, patch) => window.nodus.updateWorkspaceAnnotation(id, patch),
   improveTarget: (noteId) => ({ noteId }),
-  listLinkTargets: async () => (await window.nodus.getNotesTree()).notes.map((note) => ({ id: note.id, title: note.title })),
+  listLinkTargets: async () => (await window.nodus.getNotesTree()).notes.filter(note=>!note.trashedAt).map((note) => ({ id: note.id, title: note.title })),
+  listReferences: () => window.nodus.listEditorReferences(),
   dragType: 'application/x-nodus-workspace-note',
   linkHref: (noteId) => `nodus://note/${noteId}`,
 };
 
 /** Una nota vista como documento de editor. */
-export function noteAsEditorDocument(note: { id: string; title: string; content: string }): EditorDocument & { noteId: string } {
-  return { id: note.id, noteId: note.id, title: note.title, contentMarkdown: note.content, favorite: false };
+export function noteAsEditorDocument(note: { id: string; title: string; content: string; editorRevision?: number }): EditorDocument & { noteId: string } {
+  return { id: note.id, noteId: note.id, title: note.title, contentMarkdown: note.content, favorite: false, editorRevision: note.editorRevision };
 }

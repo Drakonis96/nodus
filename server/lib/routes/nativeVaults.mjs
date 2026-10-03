@@ -237,7 +237,9 @@ export function createNativeVaultRoutes({ store, authorize, json, jsonBody, body
    */
   async function handleLegacyRead(req, res, url) {
     if (!url.pathname.startsWith('/api/v1/spaces/') || !['GET', 'HEAD'].includes(req.method)) return false;
-    const segments = url.pathname.slice('/api/v1/spaces/'.length).split('/').filter(Boolean).map(decodeURIComponent);
+    let segments;
+    try { segments = url.pathname.slice('/api/v1/spaces/'.length).split('/').filter(Boolean).map(decodeURIComponent); }
+    catch { json(res, 400, { error: 'bad_path' }); return true; }
     if (!segments[0]) return false;
     // Leave private and operational subroutes to the existing API router. In
     // particular, intercepting personal-annotations would turn a private

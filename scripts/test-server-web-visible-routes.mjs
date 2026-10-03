@@ -50,7 +50,7 @@ test('structured immersion plans are rendered as sections rather than stringifie
 
 test('switching vaults dismisses the selector before navigating to the new home', () => {
   const app = read('src/serverWeb/App.tsx');
-  assert.match(app, /onSelect=\{\(id\) => \{[^}]*setActiveId\(id\);\s*setVaultsOpen\(false\);\s*navigate\('\/'\);/);
+  assert.match(app, /onSelect=\{async \(id\) => \{\s*if \(!await flushServerEditors\(\)\) return;[^}]*setActiveId\(id\);\s*setVaultsOpen\(false\);\s*navigate\('\/'\);/, 'save pending drafts before switching, then dismiss the selector before navigation');
   // Header actions are wrapped by HoverLabelButton for the accessible hover label;
   // assert the semantic hook and its action instead of coupling this contract to
   // the presentational Icon wrapper.

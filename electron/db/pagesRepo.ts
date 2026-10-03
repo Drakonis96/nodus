@@ -1,7 +1,11 @@
+import {academicMarkdownProjection} from '@shared/academicProjection';
+import type { AcademicMetadata } from '@shared/academicDocument';
+import { readPageAcademicMetadata } from '@shared/pageYjs';
 import { createHash, randomUUID } from 'node:crypto';
 import * as Y from 'yjs';
 import { getDb } from './database';
-import { readPageYDocument, writePageYDocument } from '@shared/pageYjs';
+import { readPageYDocument, readPageNativeDocument, writePageYDocument } from '@shared/pageYjs';
+import { blockNoteToPageBlocks, markdownToBlockNote, validateBlockNoteDocument, type BlockNoteDocument } from '@shared/blockNoteDocument';
 import {
   PAGE_BLOCK_TYPES,
   markdownToPageBlocks,
@@ -277,13 +281,18 @@ function loadYDoc(documentRow: Row): Y.Doc {
   return doc;
 }
 
-function buildDocument(page: Page, row: Row): PageDocument {
-  const doc = loadYDoc(row);
+function buildDocument(page: Page, row: Row, doc = loadYDoc(row)): PageDocument {
   const blocks = listPageBlocks(page.id);
-  const markdown = normalizeMarkdown(pageBlocksToMarkdown(blocks));
+  const native=readPageNativeDocument(doc);
+  // Existing native documents keep their established Markdown until an actual edit.
+  // Recomputing a new projection while opening would normalize their cache silently.
+  const markdown = normalizeMarkdown(native&&doc.getMap('editor').has('academicMetadata')?academicMarkdownProjection(native,readPageAcademicMetadata(doc)):pageBlocksToMarkdown(blocks));
   return {
     page,
     blocks,
+    nativeDocument: native,
+    academicMetadata: readPageAcademicMetadata(doc),
+    schemaVersion: Number(doc.getMap('editor').get('schemaVersion') ?? 1),
     yjsState: Y.encodeStateAsUpdate(doc),
     stateVector: Y.encodeStateVector(doc),
     revision: Number(row.revision),
@@ -295,12 +304,18 @@ function buildDocument(page: Page, row: Row): PageDocument {
 }
 
 type PageHistorySnapshot = {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
   page: Page;
   blocks: PageBlock[];
   documentRevision: number;
 };
 
 type PageHistoryDelta = {
+  academicMetadata?: AcademicMetadata;
+  nativeDocument?: BlockNoteDocument | null;
+  schemaVersion?: number;
   page: Record<string, { before: unknown; after: unknown }>;
   blocks: { upsert: PageBlock[]; remove: string[] };
   documentRevision: number;
@@ -311,11 +326,13 @@ const HISTORY_PAGE_FIELDS = [
   'revision', 'updatedBy', 'updatedAt',
 ] as const satisfies ReadonlyArray<keyof Page>;
 
-function capturePageHistorySnapshot(pageId: string): PageHistorySnapshot {
+function capturePageHistorySnapshot(pageId: string, loadedDoc?: Y.Doc): PageHistorySnapshot {
   const page = getPage(pageId);
   if (!page) throw new Error('La página no existe.');
   const documentRow = ensureDocumentRow(page);
-  return { page, blocks: listPageBlocks(pageId, true), documentRevision: Number(documentRow.revision) };
+  const doc = loadedDoc ?? loadYDoc(documentRow);
+  return { page, blocks: listPageBlocks(pageId, true), documentRevision: Number(documentRow.revision), nativeDocument: readPageNativeDocument(doc),
+    academicMetadata: readPageAcademicMetadata(doc), schemaVersion: Number(doc.getMap('editor').get('schemaVersion') ?? 1) };
 }
 
 function pageHistoryDelta(before: PageHistorySnapshot, after: PageHistorySnapshot): PageHistoryDelta {
@@ -337,7 +354,7 @@ function pageHistoryDelta(before: PageHistorySnapshot, after: PageHistorySnapsho
     if (!old || JSON.stringify(semantic(old)) !== JSON.stringify(semantic(block))) upsert.push(block);
   }
   const remove = before.blocks.filter((block) => !current.has(block.id)).map((block) => block.id);
-  return { page, blocks: { upsert, remove }, documentRevision: after.documentRevision };
+  return { page, blocks: { upsert, remove }, documentRevision: after.documentRevision, nativeDocument: after.nativeDocument, academicMetadata: after.academicMetadata, schemaVersion: after.schemaVersion };
 }
 
 function pageHistorySummary(delta: PageHistoryDelta, reason: string): string {
@@ -408,9 +425,10 @@ function recordPageHistory(
   actorId: string,
   reason: string,
   restoredFromRevision: number | null = null,
+  loadedDoc?: Y.Doc,
 ): PageRevision {
   ensurePageHistory(pageId, before);
-  return insertPageRevision(pageId, capturePageHistorySnapshot(pageId), actorId, reason, before, restoredFromRevision);
+  return insertPageRevision(pageId, capturePageHistorySnapshot(pageId, loadedDoc), actorId, reason, before, restoredFromRevision);
 }
 
 function toPageRevision(row: Row): PageRevision {
@@ -461,6 +479,9 @@ function applyPageHistoryDelta(snapshot: PageHistorySnapshot, delta: PageHistory
     page,
     blocks: [...blocks.values()].sort((a, b) => a.order - b.order || a.id.localeCompare(b.id)),
     documentRevision: delta.documentRevision,
+    nativeDocument: delta.nativeDocument === undefined ? snapshot.nativeDocument : delta.nativeDocument,
+    academicMetadata: delta.academicMetadata ?? snapshot.academicMetadata,
+    schemaVersion: delta.schemaVersion ?? snapshot.schemaVersion,
   };
 }
 
@@ -489,6 +510,9 @@ export function getPageRevision(pageId: string, revision: number): PageRevisionS
   if (!historical) return null;
   return {
     revision: historical.revision,
+    nativeDocument: historical.snapshot.nativeDocument,
+    academicMetadata: historical.snapshot.academicMetadata,
+    schemaVersion: historical.snapshot.schemaVersion,
     page: historical.snapshot.page,
     blocks: historical.snapshot.blocks,
     markdown: normalizeMarkdown(pageBlocksToMarkdown(historical.snapshot.blocks.map((block) => ({
@@ -670,7 +694,8 @@ function persistDocument(
   const timestamp = now();
   const sequence = Number(documentRow.next_update_sequence);
   const nextRevision = Number(documentRow.revision) + 1;
-  const markdown = normalizeMarkdown(pageBlocksToMarkdown(drafts));
+  const native=readPageNativeDocument(doc);
+  const markdown = normalizeMarkdown(native?academicMarkdownProjection(native,readPageAcademicMetadata(doc)):pageBlocksToMarkdown(drafts));
   const markdownHash = sha256(markdown);
   const nextCount = Number(documentRow.update_count) + 1;
   materializeBlocks(page.id, drafts, actor, timestamp);
@@ -703,9 +728,12 @@ function persistDocument(
     db.prepare('DELETE FROM page_document_updates WHERE page_id = ? AND sequence_no <= ?').run(page.id, sequence);
   }
   if (history.record !== false) {
-    recordPageHistory(page.id, history.before, actor, history.reason, history.restoredFromRevision ?? null);
+    recordPageHistory(page.id, history.before, actor, history.reason, history.restoredFromRevision ?? null, doc);
   }
-  return getPageDocument(page.id)!;
+  // The transaction already holds the up-to-date Y.Doc. Replaying all persisted
+  // updates again for history and the response needlessly blocks Electron's loop.
+  const savedPage = getPage(page.id)!;
+  return buildDocument(savedPage, ensureDocumentRow(savedPage), doc);
 }
 
 export function savePageDocument(input: SavePageDocumentInput): PageMutationResult {
@@ -724,12 +752,13 @@ export function savePageDocument(input: SavePageDocumentInput): PageMutationResu
         },
       };
     }
-    const before = capturePageHistorySnapshot(page.id);
-    ensurePageHistory(page.id, before);
-    const drafts = normalizeDrafts(page.id, input.blocks);
     const doc = loadYDoc(documentRow);
+    const before = capturePageHistorySnapshot(page.id, doc);
+    ensurePageHistory(page.id, before);
+    const native = input.nativeDocument == null ? input.nativeDocument : validateBlockNoteDocument(input.nativeDocument);
+    const drafts = normalizeDrafts(page.id, native ? blockNoteToPageBlocks(native) : input.blocks);
     const vector = Y.encodeStateVector(doc);
-    writePageYDocument(doc, page.title, drafts);
+    writePageYDocument(doc, page.title, drafts, native, input.schemaVersion, input.academicMetadata);
     const update = Y.encodeStateAsUpdate(doc, vector);
     return { ok: true, document: persistDocument(page, documentRow, doc, update, drafts, input.actorId ?? 'local', {
       before, reason: input.reason ?? 'content',
@@ -759,8 +788,13 @@ export function applyPageDocumentUpdate(
     const doc = loadYDoc(documentRow);
     Y.applyUpdate(doc, update, actor);
     const projected = readPageYDocument(doc);
-    const drafts = normalizeDrafts(pageId, projected.blocks);
-    return { ok: true, document: persistDocument(page, documentRow, doc, update, drafts, actor, {
+    const incomingNative = readPageNativeDocument(doc);
+    const nativeChanged = JSON.stringify(incomingNative) !== JSON.stringify(before.nativeDocument ?? null);
+    const drafts = normalizeDrafts(pageId, nativeChanged && incomingNative ? blockNoteToPageBlocks(incomingNative) : projected.blocks);
+    const vector = Y.encodeStateVector(doc);
+    writePageYDocument(doc, projected.title, drafts, nativeChanged ? incomingNative : undefined, Number(doc.getMap('editor').get('schemaVersion')) || 1);
+    const reconciliation = Y.encodeStateAsUpdate(doc, vector);
+    return { ok: true, document: persistDocument(page, documentRow, doc, Y.mergeUpdates([update, reconciliation]), drafts, actor, {
       before, reason: 'remote-update',
     }) };
   })();
@@ -922,10 +956,13 @@ export function replacePageFromMarkdown(
   expectedRevision: number,
   actor = 'local',
 ): PageMutationResult {
+  const previous = getPageDocument(pageId)?.nativeDocument;
+  const native = previous ? markdownToBlockNote(markdown, previous) : undefined;
   return savePageDocument({
     pageId,
     expectedRevision,
     blocks: markdownToPageBlocks(markdown),
+    nativeDocument: native,
     actorId: actor,
     reason: 'markdown-import',
   });
@@ -959,7 +996,7 @@ export function restorePageRevision(
     })));
     const doc = loadYDoc(documentRow);
     const vector = Y.encodeStateVector(doc);
-    writePageYDocument(doc, target.page.title, drafts);
+    writePageYDocument(doc, target.page.title, drafts, target.nativeDocument ?? null, target.schemaVersion, target.academicMetadata);
     const update = Y.encodeStateAsUpdate(doc, vector);
     persistDocument(page, documentRow, doc, update, drafts, actor, {
       before, reason: 'restore-revision', restoredFromRevision: revision, record: false,

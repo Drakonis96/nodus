@@ -17,6 +17,7 @@ let activeStudyAssistantRequestId: string | null = null;
 let activeStudySttRequestId: string | null = null;
 
 export const academicApi: AcademicApi = {
+  exportAcademicDocument: input => ipcRenderer.invoke('workspace:academic:export',input),
   getResearchCorpusSources: () => ipcRenderer.invoke('research:corpus:sources'),
   setResearchZoteroAutomatic: enabled => ipcRenderer.invoke('research:zotero:automatic', enabled),
   getZoteroMcpStatus: notebookId => ipcRenderer.invoke('research:zotero:status', notebookId),
@@ -825,6 +826,8 @@ export const academicApi: AcademicApi = {
   getCitationPreview: (ref) => ipcRenderer.invoke('citations:preview', ref),
   searchVaultContent: (query, kinds, semantic, limit) => ipcRenderer.invoke('search:vaultContent', query, kinds, semantic, limit),
   globalSearch: (query, limitPerKind, kinds) => ipcRenderer.invoke('search:global', query, limitPerKind, kinds),
+  inspectAcademicDocument: input => ipcRenderer.invoke('workspace:academic:inspect',input),
+  listEditorReferences: options => ipcRenderer.invoke('editor:references',options),
   getSearchResultDetail: (kind, id) => ipcRenderer.invoke('search:detail', kind, id),
   semanticSearch: (query, options) => ipcRenderer.invoke('search:semantic', query, options),
   findSimilarToIdea: (globalId, limit) => ipcRenderer.invoke('search:similarIdea', globalId, limit),

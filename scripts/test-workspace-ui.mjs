@@ -81,7 +81,7 @@ test('the Workspace edits notes and ideas with the Study and Teaching editor', a
   assert.match(editor, /const port = portProp \?\? \(studyDocumentPort as EditorDocumentPort\)/,
     'the study behaviour remains the default, so existing call sites are untouched');
   assert.match(editor, /showTabs \? \(/, 'the tab strip is optional but still the default');
-  assert.match(editor, /data-testid="editor-title"/, 'without tabs the title stays editable in a title bar');
+  assert.match(editor, /testId="editor-title"/, 'the document canvas contains an editable title');
   assert.match(view, /onTestimonyLink=\{onTestimonyLink\}/, 'testimonial notes preserve their interview deep links');
   assert.match(editor, /onTestimonyLink=\{onTestimonyLink\}/, 'the shared preview forwards testimony links to Markdown');
 
@@ -131,8 +131,8 @@ test('every vault uses the Workspace experience without losing its own section n
     readSource('src/app/views/corpus.tsx'), readSource('@shell'),
   ]);
 
-  assert.match(navigation, /\{ id: 'workspace', label: 'Espacio de trabajo', icon: 'notebook', group: 'create' \}/,
-    'the Workspace is a sidebar section of the writing group');
+  assert.match(navigation, /\{ id: 'workspace', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' \}/,
+    'Scriptor is a sidebar shortcut in Tools');
   assert.match(vaultTypes, /workspace: \['academic'\]/, 'only the academic route is named Workspace');
   for (const replaced of ['writing', 'projects', 'notes']) {
     const scoped = new RegExp(`${replaced}: \\[(?!'academic')`);
@@ -140,8 +140,8 @@ test('every vault uses the Workspace experience without losing its own section n
     assert.match(vaultTypes, new RegExp(`${replaced}: \\[[^\\]]*'genealogy'`), `${replaced} survives untouched elsewhere`);
   }
   assert.match(registry, /workspace: \(\{ navigate, noteTarget, settings[,\s}]/, 'the academic Workspace is routable');
-  assert.match(registry, /notes:[\s\S]*<WorkspaceView[\s\S]*title=\{ctx\.isEstudio \|\| ctx\.isDocencia \? 'Espacio de trabajo' : 'Notas'\}/,
-    'general Notes routes reuse the same Workspace catalogue while Study and Teaching expose its product name');
+  assert.match(registry, /notes:[\s\S]*<WorkspaceView[\s\S]*title="Nodus Scriptor"/,
+    'general Notes routes reuse the Scriptor catalogue');
   assert.match(registry, /isPrimarySources[\s\S]*<PrimarySourcesNotesView/,
     'primary sources keeps its evidence-aware note implementation');
   assert.match(app, /setView\(isAcademic \? 'workspace' : 'notes'\)/,

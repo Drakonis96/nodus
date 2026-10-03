@@ -1,3 +1,4 @@
+import { useEditorialShellFocus } from "../components/workspace/editorialFocus";
 import {
   lazy,
   Suspense,
@@ -22,6 +23,7 @@ import {
   groupedNav,
   navItemLabel,
   NAV_ITEMS,
+  scriptorViewForVault,
   type NavItem,
   type View,
 } from "../navigation";
@@ -42,6 +44,7 @@ import nodusLogoOrange from "../assets/nodus-logo-orange.svg";
 import nodusLogoViolet from "../assets/nodus-logo-violet.svg";
 import nodusLogoCyan from "../assets/nodus-logo-cyan.svg";
 import { api, ApiError } from "./api";
+import { flushServerEditors } from "./editorNavigation";
 import {
   ConversationServerView,
   DeepResearchServerView,
@@ -57,6 +60,8 @@ import {
   type AcademicTarget,
 } from "./academic/AcademicDetailExplorer";
 import { ServerSettingsView, type TabId } from "./settings";
+import { blankProfile } from "./settings/ServerSettingsView";
+import { ToolsServerView } from "./ToolsServerView";
 import { ServerVaultManager, surfaceForView, VaultSurfaceView } from "./vaults";
 import { NativeContentAuthoring } from "./vaults/NativeContentAuthoring";
 import { AcademicToolsServerView } from "./AcademicToolsServerView";
@@ -314,7 +319,6 @@ const SERVER_TOOL_VIEWS = new Set<View>([
   "browser",
   "radar",
   "compass",
-  "toolkit",
 ]);
 const ACTIVE_VAULT_STORAGE_KEY = "nodus-server-active-vault";
 const SERVER_NAV_COLLAPSED_STORAGE_KEY = "nodus-server-nav-collapsed";
@@ -366,7 +370,8 @@ function routeFromLocation(): Route {
   return { kind: "view", view: "home" };
 }
 
-function navigate(path: string) {
+async function navigate(path: string) {
+  if (!await flushServerEditors()) return;
   window.history.pushState({}, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
@@ -450,6 +455,7 @@ function visibleNav(type: VaultType): NavItem[] {
     dedicated ??
       (type === "genealogy" ? GENEALOGY_VIEW_IDS : STANDARD_VIEW_IDS),
   );
+  allowed.add('toolkit');
   return NAV_ITEMS.filter(
     (item) =>
       !SERVER_TOOL_VIEWS.has(item.id) &&
@@ -938,7 +944,7 @@ function Sidebar({
     ...SERVER_TOOL_VIEWS,
   ]);
   const button = (item: NavItem) => {
-    const active = activeView === item.id;
+    const active = activeView === item.id || (['workspace','notes'].includes(activeView) && ['workspace','notes'].includes(item.id));
     const label = t(navItemLabel(item, type));
     return (
       <button
@@ -1050,6 +1056,7 @@ function Sidebar({
         {button(canonicalLibrary)}
         {specialized}
         {renderGroups(remaining)}
+        {renderGroups(groups.filter(group => group.id === 'tools'))}
         <div className="mt-auto border-t border-neutral-800/70 pt-2">
           {button(canonicalSettings)}
         </div>
@@ -1777,6 +1784,7 @@ export default function App() {
     () => localStorage.getItem(SERVER_NAV_COLLAPSED_STORAGE_KEY) === "1",
   );
   const [drawer, setDrawer] = useState(false);
+  const editorialFocus = useEditorialShellFocus();
   const [pendingView, setPendingView] = useState<View | null>(null);
   const [vaultsOpen, setVaultsOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => {
@@ -1806,7 +1814,17 @@ export default function App() {
     useRef<PortableProfileValues["appearance"]["theme"]>("system");
   const viewHostRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    const listener = () => setRoute(routeFromLocation());
+    let approvedPath = location.pathname + location.search + location.hash;
+    let sequence = 0;
+    const listener = async () => {
+      const requestedPath = location.pathname + location.search + location.hash;
+      const request = ++sequence;
+      const saved = await flushServerEditors();
+      if (request !== sequence) return;
+      if (!saved) { history.replaceState({}, '', approvedPath); return; }
+      approvedPath = requestedPath;
+      setRoute(routeFromLocation());
+    };
     addEventListener("popstate", listener);
     return () => removeEventListener("popstate", listener);
   }, []);
@@ -2417,9 +2435,25 @@ export default function App() {
           }
         />,
       );
+    if (route.view === 'toolkit') {
+      const scriptorView = scriptorViewForVault(type);
+      const pinned = !profile?.workspace.sidebarHidden.includes(scriptorView);
+      return <ToolsServerView pinned={pinned} onOpen={() => void navigate(`/view/${scriptorView}`)} onTogglePinned={async () => {
+        const current = profile ?? { ...blankProfile(theme,(await api.aiPreferences()).preferences) };
+        const hidden = current.workspace.sidebarHidden;
+        const next = {
+          ...current,
+          appearance: profile ? current.appearance : {...current.appearance,uiLanguage:language,appTheme},
+          workspace: {...current.workspace,scriptorSidebarVersion:1,sidebarCustomized:true,sidebarHidden:pinned ? [...new Set([...hidden,'workspace','notes'])] : hidden.filter(id => id !== 'workspace' && id !== 'notes')},
+        };
+        const result = await api.updateProfilePreferences(next,me.csrfToken);
+        if (result.profile.values) window.dispatchEvent(new CustomEvent('nodus-profile-updated',{detail:result.profile.values}));
+      }} />;
+    }
     if (route.view === "workspace" || route.view === "notes")
       return (
         <PrivateNotesServerView
+          userId={me.user?.id ?? 'authenticated'}
           key={active.id}
           spaceId={active.id}
           csrfToken={me.csrfToken}
@@ -2550,6 +2584,7 @@ export default function App() {
       }
       data-testid="app-shell"
       data-surface="server"
+      data-editorial-focus={editorialFocus.active ? "true" : undefined}
     >
       <header
         ref={setHeaderEl}
@@ -2704,7 +2739,8 @@ export default function App() {
             active={active}
             isAdmin={me.user?.role === "admin"}
             csrfToken={me.csrfToken}
-            onSelect={(id) => {
+            onSelect={async (id) => {
+              if (!await flushServerEditors()) return;
               localStorage.setItem(ACTIVE_VAULT_STORAGE_KEY, id);
               setActiveId(id);
               setVaultsOpen(false);
@@ -2726,7 +2762,7 @@ export default function App() {
       <div className="flex min-h-0 min-w-0 flex-1">
         <nav
           id="server-sidebar-navigation"
-          className={`server-desktop-nav relative shrink-0 overflow-hidden border-r border-neutral-800 ${navCollapsed ? "hidden" : ""}`}
+          className={`server-desktop-nav relative shrink-0 overflow-hidden border-r border-neutral-800 ${(editorialFocus.active ? !editorialFocus.navigationOpen : navCollapsed) ? "hidden" : ""}`}
           data-testid="resizable-sidebar"
           data-sidebar-compact={
             sidebarWidth <= SERVER_SIDEBAR_COMPACT_THRESHOLD ? "true" : "false"

@@ -1,3 +1,4 @@
+import { readWorkspacePreferences, writeWorkspacePreferences } from './workspacePreferences';
 // What a section remembers when you leave it and come back.
 //
 // Changing `view` swaps the whole element at App.tsx's single render point, so React
@@ -148,6 +149,11 @@ export interface DictionarySnapshot {
  * reading just as surely as dropping the filter does.
  */
 export interface WorkspaceSnapshot {
+  pinnedActionIds?: string[];
+  layout?: 'editorial' | 'navigator';
+  catalogView?: 'list' | 'cards';
+  contextOpen?: boolean;
+  focusMode?: boolean;
   scope: WorkspaceScope;
   expanded: string[];
   search: string;
@@ -375,7 +381,9 @@ export function readViewSnapshot<K extends SnapshotView>(
   view: K,
 ): ViewSnapshots[K] | undefined {
   const live = !vaultId || slot?.vaultId !== vaultId ? undefined : slot?.values[view];
-  if (live || !vaultId || !isPreferenceView(view)) return live;
+  if (live || !vaultId) return live;
+  if (view === 'workspace' || view === 'notes') return { scope: { kind: 'all' }, expanded: [], search: '', kindFilter: '', selectedTags: [], openIds: [], activeId: null, placement: null, ...readWorkspacePreferences(vaultId) } as unknown as ViewSnapshots[K];
+  if (!isPreferenceView(view)) return live;
   // Nothing in memory: either the first visit of the run, or the first after a
   // vault change. Both are exactly when the preferences kept on disk are the only
   // record of how the reader wants this gallery, so they become the seed.
@@ -435,6 +443,7 @@ export function patchViewSnapshot<K extends SnapshotView>(
   // The galleries' ordering, read filter and grid-vs-list are preferences rather
   // than places, so they go on through to disk. Everything else in the patch stops
   // here, and a patch mentioning none of the three costs nothing.
+  if (view === 'workspace' || view === 'notes') writeWorkspacePreferences(vaultId, patch as Partial<WorkspaceSnapshot>);
   if (isPreferenceView(view)) writeFilterPreferences(vaultId, view, patch as GalleryFilterPreferences);
 }
 

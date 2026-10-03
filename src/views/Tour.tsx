@@ -49,7 +49,7 @@ export const ACADEMIC_TOUR_STEPS: TourStep[] = [
     target: 'nav-workspace',
     view: 'workspace',
     title: 'Escribe sin salir del corpus',
-    body: 'Espacio de trabajo reúne notas, borradores y proyectos de escritura. Conserva los enlaces internos a fuentes e ideas para que puedas volver a la evidencia mientras redactas. No hace falta usarlo hasta que tengas algo que desarrollar.',
+    body: 'Redacta, organiza y revisa artículos, tesis, notas y documentos.',
   },
   {
     title: 'Lo demás puede esperar',

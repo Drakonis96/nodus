@@ -52,6 +52,7 @@ class FakeStorage {
 globalThis.localStorage = new FakeStorage();
 
 const store = bundleOf('src/app/viewSnapshots.ts', 'viewSnapshots.cjs');
+const editorialPreferences = bundleOf('src/app/workspacePreferences.ts', 'workspacePreferences.cjs');
 // Bundled apart from the store on purpose: a second instance of the module shares
 // no memory with the first, so anything the two agree on came through the disk.
 const preferences = bundleOf('src/app/filterPreferences.ts', 'filterPreferences.cjs');
@@ -60,6 +61,17 @@ const { readingBlocks, topBlockIndex } = bundleOf('src/readingPlace.ts', 'readin
 const { groupParenthesizedCitations } = bundleOf('src/markdownCitationGroups.ts', 'markdownCitationGroups.cjs');
 
 test.after(async () => { await rm(bundleDir, { recursive: true, force: true }); });
+
+test('editorial preferences survive a fresh snapshot and remain scoped to user and vault', () => {
+  const scope = 'server:user-one:vault-editorial';
+  store.patchViewSnapshot(scope, 'workspace', { layout: 'navigator', catalogView: 'cards', contextOpen: true, focusMode: true, pinnedActionIds: ['read', 'note'] });
+  store.clearViewSnapshots();
+  assert.deepEqual(editorialPreferences.readWorkspacePreferences(scope), { layout: 'navigator', catalogView: 'cards', contextOpen: true, focusMode: true, pinnedActionIds: ['read', 'note'] });
+  assert.equal(store.readViewSnapshot(scope, 'workspace').catalogView, 'cards');
+  for (const other of ['server:user-two:vault-editorial','server:user-one:other-vault']) {
+    assert.deepEqual(editorialPreferences.readWorkspacePreferences(other), { layout: 'editorial', catalogView: 'list', contextOpen: false, focusMode: false, pinnedActionIds: [] });
+  }
+});
 
 const AUTHORS_CUT = { query: 'ricoeur', sortBy: 'ideas', synthFilter: 'with', savedOnly: true, filtersOpen: true };
 

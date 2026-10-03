@@ -1,19 +1,28 @@
+import {assertAcademicSupplement} from '@shared/academicProjection';
+import {openEvidenceAtPage} from '../../evidenceJump';
+import { AcademicTools, AcademicPanel, desktopAcademicSources, type AcademicToolsHandle } from './AcademicTools';
+import { normalizeAcademicMetadata, type AcademicMetadata } from '@shared/academicDocument';
+import { readEditorialDraft, retainEditorialDraft, clearEditorialDraft, downloadEditorialDraft } from '../workspace/editorialDrafts';
+import { flushEditorialDraft } from '../workspace/flushEditorialDraft';
+import { EditorialActionBar, EditorialActionMenu, type EditorialAction } from '../workspace/EditorialActions';
+import { readWorkspacePreferences } from '../../app/workspacePreferences';
+import { patchViewSnapshot } from '../../app/viewSnapshots';
+import { EditorialHeader, EditorialTitle, EditorialInspector } from '../workspace/EditorialChrome';
+import { useEditorialFocus } from '../workspace/editorialFocus';
+import '../workspace/editorialWorkspace.css';
 import { useStudyFocusReduced } from '../focus/StudyFocusContext';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, DragEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, DragEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Crepe } from '@milkdown/crepe';
-import { commandsCtx, editorViewCtx, parserCtx } from '@milkdown/core';
-import { redoCommand, undoCommand } from '@milkdown/plugin-history';
-import { closeHistory, redoDepth, undoDepth } from '@milkdown/prose/history';
-import { toggleInlineCodeCommand, turnIntoTextCommand, wrapInHeadingCommand } from '@milkdown/preset-commonmark';
-import { insert } from '@milkdown/utils';
-import '@milkdown/crepe/theme/common/style.css';
-import '@milkdown/crepe/theme/classic.css';
+import { documentReferences, parseEditorReference } from '@shared/editorReferences';
+import { EditorialReferences } from './EditorReferences';
+import { BlockNoteCanvas, type BlockNoteCanvasHandle } from './BlockNoteCanvas';
+import { markdownToBlockNote, type BlockNoteDocument } from '@shared/blockNoteDocument';
 import TurndownService from 'turndown';
 import { diffWordsWithSpace } from 'diff';
 import type {
   StudyAnnotation,
+  StudyBlockAnchor,
   StudyDocEditorData,
   StudyDocStyle,
   StudyDocVersion,
@@ -32,13 +41,12 @@ import type { StudySentenceContext, StudySynonymAlternative } from '@shared/stud
 import { studySentenceContext } from '@shared/studySynonyms';
 import type { AppSettings } from '@shared/types';
 import { Markdown } from '../Markdown';
-import type { TestimonyDeepLink } from '@shared/testimonyDeepLinks';
+import { parseTestimonyLink, type TestimonyDeepLink } from '@shared/testimonyDeepLinks';
 import { ModelPicker } from '../ModelPicker';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { TextInputModal } from '../TextInputModal';
-import { getActiveLang, t } from '../../i18n';
+import { t } from '../../i18n';
 import { DocOutline } from './DocOutline';
-import { anchorToolbarToPointer } from './pointerAnchoredToolbar';
 import { StudyDictation } from './StudyDictation';
 import { StudyImproveDialog } from './StudyImproveDialog';
 import { AudioPanel } from '../AudioPanel';
@@ -49,7 +57,7 @@ type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
 // Match Nodi quick notes: changes feel immediate without writing once per
 // keystroke, and a navigation flush below guarantees the last edit is durable.
-const STUDY_AUTOSAVE_DELAY_MS = 600;
+const STUDY_AUTOSAVE_DELAY_MS = 800;
 
 interface ImproveTarget {
   from: number;
@@ -58,6 +66,7 @@ interface ImproveTarget {
   scope: StudyImproveScope;
   initialStyleId?: string;
   visual?: boolean;
+  range?: { from: number; to: number };
 }
 
 interface SynonymPanelState {
@@ -82,18 +91,6 @@ const STUDY_KIND_LABEL: Record<StudyDocumentKind, string> = {
   grabacion: 'Grabación', transcripcion: 'Transcripción', banco: 'Banco de preguntas', test: 'Test', examen: 'Examen',
 };
 
-/** Crepe renders these controls without labels or accessible names. Their order is
- * stable in the toolbar feature; attach Nodus' translated names as soon as the
- * Vue-owned toolbar appears. */
-const BUILT_IN_SELECTION_TOOLBAR_LABELS = [
-  'Negrita',
-  'Cursiva',
-  'Tachado',
-  'Código en línea',
-  'Fórmula en línea',
-  'Enlace',
-] as const;
-
 const BUILT_IN_STUDY_STYLE_TOOLTIPS: Record<string, string> = {
   'builtin:academic': 'Académico · Registro académico preciso y argumentación ordenada.',
   'builtin:formal': 'Formal · Tono formal sin volver el texto artificial.',
@@ -116,213 +113,7 @@ function studyStyleTooltip(style: StudyStyle): string {
   return [style.name, style.description].filter(Boolean).join(' · ');
 }
 
-function labelBuiltInSelectionToolbar(toolbar: HTMLElement): void {
-  const buttons = toolbar.querySelectorAll<HTMLButtonElement>(':scope > button.toolbar-item');
-  buttons.forEach((button, index) => {
-    const key = BUILT_IN_SELECTION_TOOLBAR_LABELS[index];
-    if (!key) return;
-    const label = t(key);
-    button.classList.add('study-selection-tooltip');
-    button.dataset.studyTooltip = label;
-    button.setAttribute('aria-label', label);
-  });
-}
-
-interface MilkdownCanvasHandle {
-  insertText: (text: string, replaceSelection: boolean) => void;
-  insertMarkdown: (markdown: string) => void;
-  selectionSnapshot: () => { text: string; occurrence: number };
-  runInlineCommand: (command: 'code' | 'formula') => void;
-  setHeading: (level: number) => void;
-  setTextColor: (color: string) => void;
-  undo: () => void;
-  redo: () => void;
-  replaceAllMarkdown: (markdown: string, options?: { addToHistory?: boolean; closeHistory?: boolean }) => void;
-}
-
-interface EditorHistoryState {
-  canUndo: boolean;
-  canRedo: boolean;
-}
-
-const MilkdownCanvas = forwardRef<MilkdownCanvasHandle, {
-  documentId: string;
-  value: string;
-  spellcheck: boolean;
-  language: string;
-  onChange: (markdown: string) => void;
-  onHistoryChange: (state: EditorHistoryState) => void;
-  onOpenRecording: (recordingId: string, timestamp?: number | null) => void;
-  onToolbarElement: (element: HTMLElement | null) => void;
-}>(({ documentId, value, spellcheck, language, onChange, onHistoryChange, onOpenRecording, onToolbarElement }, ref) => {
-  const rootRef = useRef<HTMLDivElement>(null);
-  const crepeRef = useRef<Crepe | null>(null);
-  const initialValueRef = useRef(value);
-  const changeRef = useRef(onChange);
-  changeRef.current = onChange;
-  const historyChangeRef = useRef(onHistoryChange);
-  historyChangeRef.current = onHistoryChange;
-  const activeUiLanguage = getActiveLang();
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-    const crepe = new Crepe({
-      root,
-      defaultValue: initialValueRef.current,
-      features: { [Crepe.Feature.AI]: false },
-      featureConfigs: {
-        [Crepe.Feature.Placeholder]: { text: t('Empieza a escribir o usa / para insertar un bloque…') },
-      },
-    });
-    crepeRef.current = crepe;
-    crepe.on((listener) => listener.markdownUpdated((ctx, markdown) => {
-      changeRef.current(markdown);
-      const state = ctx.get(editorViewCtx).state;
-      historyChangeRef.current({ canUndo: undoDepth(state) > 0, canRedo: redoDepth(state) > 0 });
-    }));
-    let disposed = false;
-    let toolbarObserver: MutationObserver | null = null;
-    let anchoredToolbar: HTMLElement | null = null;
-    let detachAnchor: (() => void) | null = null;
-    void crepe.create().then(() => {
-      if (disposed) return;
-      const editable = root.querySelector('[contenteditable="true"]');
-      editable?.setAttribute('spellcheck', spellcheck ? 'true' : 'false');
-      editable?.setAttribute('lang', language);
-      editable?.setAttribute('aria-label', t('Editor del apunte'));
-      const findToolbar = () => {
-        const toolbar = root.querySelector<HTMLElement>('.milkdown-toolbar') ?? root.parentElement?.querySelector<HTMLElement>('.milkdown-toolbar') ?? null;
-        if (!toolbar) return null;
-        labelBuiltInSelectionToolbar(toolbar);
-        let host = toolbar.querySelector<HTMLElement>('.study-selection-tools-host');
-        if (!host) {
-          host = document.createElement('span');
-          host.className = 'study-selection-tools-host';
-          toolbar.append(host);
-        }
-        if (anchoredToolbar !== toolbar) {
-          detachAnchor?.();
-          anchoredToolbar = toolbar;
-          detachAnchor = anchorToolbarToPointer(root.parentElement ?? root, toolbar);
-        }
-        onToolbarElement(host);
-        return host;
-      };
-      findToolbar();
-      toolbarObserver = new MutationObserver(() => { findToolbar(); });
-      toolbarObserver.observe(root.parentElement ?? root, { childList: true, subtree: true });
-    });
-    return () => { disposed = true; toolbarObserver?.disconnect(); detachAnchor?.(); onToolbarElement(null); crepeRef.current = null; void crepe.destroy(); };
-  }, [documentId, spellcheck, language]);
-
-  // Changing the interface language should update the labels in place. Recreating
-  // the editor here would risk replacing an unsaved document with its initial value.
-  useEffect(() => {
-    const root = rootRef.current;
-    const toolbar = root?.querySelector<HTMLElement>('.milkdown-toolbar') ?? root?.parentElement?.querySelector<HTMLElement>('.milkdown-toolbar') ?? null;
-    if (toolbar) labelBuiltInSelectionToolbar(toolbar);
-  }, [activeUiLanguage]);
-
-  useImperativeHandle(ref, () => ({
-    insertText(text, replaceSelection) {
-      crepeRef.current?.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { from, to } = view.state.selection;
-        view.dispatch(view.state.tr.insertText(text, from, replaceSelection ? to : from).scrollIntoView());
-        view.focus();
-      });
-    },
-    insertMarkdown(markdown) {
-      crepeRef.current?.editor.action((ctx) => {
-        insert(markdown)(ctx);
-        ctx.get(editorViewCtx).focus();
-      });
-    },
-    selectionSnapshot() {
-      let snapshot = { text: '', occurrence: 0 };
-      crepeRef.current?.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const text = view.state.doc.textBetween(view.state.selection.from, view.state.selection.to, '\n');
-        const before = view.state.doc.textBetween(0, view.state.selection.from, '\n');
-        let occurrence = 0;
-        let cursor = text ? before.indexOf(text) : -1;
-        while (cursor >= 0) {
-          occurrence += 1;
-          cursor = before.indexOf(text, cursor + text.length);
-        }
-        snapshot = { text, occurrence };
-      });
-      return snapshot;
-    },
-    runInlineCommand(command) {
-      crepeRef.current?.editor.action((ctx) => {
-        const commands = ctx.get(commandsCtx);
-        if (command === 'code') commands.call(toggleInlineCodeCommand.key);
-        else commands.call('ToggleLatex');
-        ctx.get(editorViewCtx).focus();
-      });
-    },
-    setHeading(level) {
-      crepeRef.current?.editor.action((ctx) => {
-        const commands = ctx.get(commandsCtx);
-        if (level === 0) commands.call(turnIntoTextCommand.key);
-        else commands.call(wrapInHeadingCommand.key, level);
-        ctx.get(editorViewCtx).focus();
-      });
-    },
-    setTextColor(color) {
-      crepeRef.current?.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const { from, to } = view.state.selection;
-        const selected = view.state.doc.textBetween(from, to, ' ');
-        if (!selected) return;
-        const safe = selected.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        insert(`<span style="color: ${color}">${safe}</span>`)(ctx);
-        ctx.get(editorViewCtx).focus();
-      });
-    },
-    undo() {
-      crepeRef.current?.editor.action((ctx) => {
-        ctx.get(commandsCtx).call(undoCommand.key);
-        const view = ctx.get(editorViewCtx);
-        view.focus();
-        historyChangeRef.current({ canUndo: undoDepth(view.state) > 0, canRedo: redoDepth(view.state) > 0 });
-      });
-    },
-    redo() {
-      crepeRef.current?.editor.action((ctx) => {
-        ctx.get(commandsCtx).call(redoCommand.key);
-        const view = ctx.get(editorViewCtx);
-        view.focus();
-        historyChangeRef.current({ canUndo: undoDepth(view.state) > 0, canRedo: redoDepth(view.state) > 0 });
-      });
-    },
-    replaceAllMarkdown(markdown, options = {}) {
-      crepeRef.current?.editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx);
-        const parsed = ctx.get(parserCtx)(markdown);
-        if (!parsed) return;
-        let transaction = view.state.tr.replaceWith(0, view.state.doc.content.size, parsed.content);
-        if (options.addToHistory === false) transaction = transaction.setMeta('addToHistory', false);
-        if (options.closeHistory) transaction = closeHistory(transaction);
-        view.dispatch(transaction);
-        view.focus();
-      });
-    },
-  }), []);
-
-  return <div ref={rootRef} className="study-milkdown min-h-full" onClick={(event) => {
-    const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="nodus://study/recording/"]');
-    if (!anchor) return;
-    event.preventDefault(); event.stopPropagation();
-    const match = anchor.getAttribute('href')?.match(/^nodus:\/\/study\/recording\/([^?]+)(?:\?(.*))?$/);
-    if (!match) return;
-    const timestamp = new URLSearchParams(match[2] ?? '').get('t');
-    onOpenRecording(decodeURIComponent(match[1]), timestamp == null ? null : Number(timestamp));
-  }} />;
-});
-MilkdownCanvas.displayName = 'MilkdownCanvas';
+interface EditorHistoryState { canUndo: boolean; canRedo: boolean }
 
 function VersionDiff({ version, current }: { version: StudyDocVersion; current: string }) {
   const pieces = useMemo(() => diffWordsWithSpace(version.contentMarkdown, current), [version.id, current]);
@@ -393,8 +184,21 @@ export function StudyEditor({
   onTrash,
   onOpenLinkedDocument,
   onOpenRecording,
-  onTestimonyLink,
+  onTestimonyLink, onNavigateLink,
+  contextSources, contextDetails, headerContent, navigatorContent, location, pinnedActionIds: pinnedActionIdsProp, onPinnedActionsChange, contextOpen: contextOpenProp, onContextOpenChange, focusMode: focusModeProp, onFocusModeChange, onRegisterFlush,
 }: {
+  pinnedActionIds?: string[];
+  onPinnedActionsChange?: (ids: string[]) => void;
+  contextSources?: ReactNode;
+  contextDetails?: ReactNode;
+  headerContent?: ReactNode;
+  navigatorContent?: ReactNode;
+  location?: string;
+  contextOpen?: boolean;
+  onContextOpenChange?: (open: boolean) => void;
+  focusMode?: boolean;
+  onFocusModeChange?: (focus: boolean) => void;
+  onRegisterFlush?: (flush: () => Promise<boolean>) => void;
   settings: AppSettings;
   documents: EditorDocument[];
   tags?: StudyTag[];
@@ -417,20 +221,41 @@ export function StudyEditor({
   onOpenLinkedDocument: (id: string) => void;
   onOpenRecording: (id: string, timestamp?: number | null) => void;
   onTestimonyLink?: (link: TestimonyDeepLink) => void;
+  onNavigateLink?: (href: string) => boolean;
 }) {
   const port = portProp ?? (studyDocumentPort as EditorDocumentPort);
   const active = documents.find((document) => document.id === activeId) ?? documents[0];
   const [data, setData] = useState<StudyDocEditorData | null>(null);
   const [title, setTitle] = useState(active?.title ?? '');
-  const [draft, setDraft] = useState(active?.contentMarkdown ?? '');
+  const [draft, setDraftState] = useState(active?.contentMarkdown ?? '');
+  const [nativeDocument, setNativeDocument] = useState<BlockNoteDocument | null>(null);
+  const [academicMetadata,setAcademicMetadata] = useState<AcademicMetadata>(()=>normalizeAcademicMetadata(null));
+  const academicRef = useRef(academicMetadata);academicRef.current=academicMetadata;
+  const academicTools=useRef<AcademicToolsHandle>(null);
+  const nativeRef = useRef<BlockNoteDocument | null>(null);
+  const revisionRef = useRef(new Map<string, number>());
+  const [saveError, setSaveError] = useState('');
+  const [recoveredDraft, setRecoveredDraft] = useState(false);
+  const hydratedIdRef = useRef('');
+  const draftScope = port.dragType;
+  const setDraft: typeof setDraftState = (value) => setDraftState(current => {
+    const next = typeof value === 'function' ? value(current) : value;
+    let native:BlockNoteDocument;try{assertAcademicSupplement(current,next);native=markdownToBlockNote(next,nativeRef.current);}catch(error){setSaveError(error instanceof Error?error.message:String(error));return current;}
+    nativeRef.current = native; setNativeDocument(native); return next;
+  });
   const [style, setStyle] = useState<StudyDocStyle>(DEFAULT_STUDY_DOC_STYLE);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [raw, setRaw] = useState(false);
   const [split, setSplit] = useState(false);
-  const [focusMode, setFocusMode] = useState(false);
+  const [localFocus, setLocalFocus] = useState(false);
+  const focusMode = focusModeProp ?? localFocus;
+  const setFocusMode = (focus: boolean) => { if (focus) setContextOpen(false); setLocalFocus(focus); onFocusModeChange?.(focus); };
+  const [localContextOpen, setLocalContextOpen] = useState(false);
+  const contextOpen = contextOpenProp ?? localContextOpen;
+  const setContextOpen = (open: boolean) => { setLocalContextOpen(open); onContextOpenChange?.(open); };
+  const editorialFocus = useEditorialFocus(focusMode, setFocusMode);
+  const [contextTab, setContextTab] = useState<'sources' | 'comments' | 'details' | 'outline' | 'history' | 'assistant' | 'checks' | 'structure'>('sources');
   const globalFocus = useStudyFocusReduced();
-  const [fullscreen, setFullscreen] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showStyle, setShowStyle] = useState(false);
   const [showDictation, setShowDictation] = useState(false);
@@ -445,7 +270,7 @@ export function StudyEditor({
   const [search, setSearch] = useState('');
   const [replacement, setReplacement] = useState('');
   const [dictionaryWord, setDictionaryWord] = useState('');
-  const [textDialog, setTextDialog] = useState<{ kind: 'comment' | 'tag'; selectedText?: string } | null>(null);
+  const [textDialog, setTextDialog] = useState<{ kind: 'comment' | 'tag'; selectedText?: string; from?: number; anchor?: StudyBlockAnchor } | null>(null);
   const [showImprovePrompts, setShowImprovePrompts] = useState(false);
   const [quickImproveStyles, setQuickImproveStyles] = useState<StudyStyle[]>([]);
   const [selectionImprove, setSelectionImprove] = useState<{ x: number; y: number; target: ImproveTarget } | null>(null);
@@ -453,6 +278,14 @@ export function StudyEditor({
   const [synonymPanel, setSynonymPanel] = useState<SynonymPanelState | null>(null);
   const [improveStreamingStyleId, setImproveStreamingStyleId] = useState<string | null>(null);
   const [improveStreamError, setImproveStreamError] = useState('');
+  const [improvePreview, setImprovePreview] = useState('');
+  const [lastImprovement, setLastImprovement] = useState<string | null>(null);
+  const improveCancelled = useRef(false);
+  const improvementRunning = useRef(false);
+  const improveTargetRef = useRef<ImproveTarget | null>(null);
+  useEffect(() => () => {
+    if (improvementRunning.current) { improveCancelled.current = true; void window.nodus.cancelStudyImprove(); }
+  }, []);
   const [historyState, setHistoryState] = useState<EditorHistoryState>({ canUndo: false, canRedo: false });
   const [selectedVersion, setSelectedVersion] = useState<StudyDocVersion | null>(null);
   const [editorRevision, setEditorRevision] = useState(0);
@@ -460,19 +293,46 @@ export function StudyEditor({
   const baselineRef = useRef('');
   const activeIdRef = useRef(active?.id ?? '');
   const latestSignatureRef = useRef('');
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const saveLatestRef = useRef<(reason: 'autosave' | 'manual' | 'command') => Promise<void>>(async () => undefined);
+  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const savedSignaturesRef = useRef(new Map<string,string>());
+  const saveLatestRef = useRef<(reason: 'autosave' | 'manual' | 'command') => Promise<boolean>>(async () => true);
   const rawRef = useRef(raw);
-  const milkdownRef = useRef<MilkdownCanvasHandle>(null);
+  const canvasRef = useRef<BlockNoteCanvasHandle>(null);
   const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const rawSelection = useRef<{ id: string; content: string; from: number; to: number } | null>(null);
+  const [localPins, setLocalPins] = useState<string[]>([]);
+  const preferenceVault = useRef<string | null>(null);
+  useEffect(() => {
+    if (pinnedActionIdsProp) return;
+    let alive = true;
+    void window.nodus.getActiveVault().then(vault => { if (alive && vault) { preferenceVault.current = vault.id; setLocalPins(readWorkspacePreferences(vault.id).pinnedActionIds ?? []); } });
+    return () => { alive = false; };
+  }, [pinnedActionIdsProp]);
+  const pinnedActionIds = pinnedActionIdsProp ?? localPins;
+  const setPinnedActionIds = (ids: string[]) => {
+    setLocalPins(ids); onPinnedActionsChange?.(ids);
+    if (!onPinnedActionsChange && preferenceVault.current) patchViewSnapshot(preferenceVault.current, 'workspace', { pinnedActionIds: ids });
+  };
+  const preserveSelection = () => {
+    if (raw && rawTextareaRef.current) rawSelection.current = { id: active.id, content: draft, from: rawTextareaRef.current.selectionStart, to: rawTextareaRef.current.selectionEnd };
+    else canvasRef.current?.preserveSelection();
+  };
+  const restoreSelection = () => {
+    const checkpoint = rawSelection.current;
+    if (raw && checkpoint?.id === active.id && checkpoint.content === draft) {
+      rawTextareaRef.current?.focus(); rawTextareaRef.current?.setSelectionRange(checkpoint.from, checkpoint.to);
+    } else if (!raw) canvasRef.current?.restoreSelection();
+  };
   const synonymPanelRef = useRef<HTMLDivElement>(null);
   const synonymSessionRef = useRef(0);
   const turndown = useMemo(() => new TurndownService({ headingStyle: 'atx', bulletListMarker: '-', codeBlockStyle: 'fenced' }), []);
 
-  const loadData = useCallback(async (documentId: string) => {
+  const loadData = useCallback(async (documentId: string, adoptRevision = false) => {
     const next = await port.loadEditorData(documentId);
-    setData(next);
-    setStyle(next.style);
+    // Refreshing comments or links must not bless a newer document revision
+    // while the canvas still contains the older text.
+    if (adoptRevision || !revisionRef.current.has(documentId)) revisionRef.current.set(documentId, next.revision ?? 0);
+    if (documentId === activeIdRef.current) setData(next);
     return next;
   }, [port]);
 
@@ -487,15 +347,32 @@ export function StudyEditor({
   useEffect(() => {
     if (!active) return;
     setTitle(active.title);
-    setDraft(active.contentMarkdown);
+    setDraftState(active.contentMarkdown);
+    setNativeDocument(null); nativeRef.current = null; hydratedIdRef.current = ''; setSaveError(''); setRecoveredDraft(false);
     baselineRef.current = JSON.stringify({ title: active.title, content: active.contentMarkdown, style: DEFAULT_STUDY_DOC_STYLE, language: 'es-ES', dictionary: [] });
     setSaveState('saved');
     setEditingTitle(false);
     setSelectedVersion(null);
     setHistoryState({ canUndo: false, canRedo: false });
     setEditorRevision((value) => value + 1);
-    void loadData(active.id).then((next) => {
-      baselineRef.current = JSON.stringify({ title: active.title, content: active.contentMarkdown, style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
+    void loadData(active.id,true).then((next) => {
+      if (active.id !== activeIdRef.current) return;
+      const loadedTitle = next.documentTitle ?? active.title;
+      const loadedContent = next.contentMarkdown ?? active.contentMarkdown;
+      const native = next.nativeDocument ?? markdownToBlockNote(loadedContent);
+      setAcademicMetadata(normalizeAcademicMetadata(next.academicMetadata));
+      setTitle(loadedTitle); setDraftState(loadedContent); setStyle(next.style); setNativeDocument(native); nativeRef.current = native;
+      baselineRef.current = JSON.stringify({ title: loadedTitle, content: loadedContent, nativeDocument: native, academicMetadata:normalizeAcademicMetadata(next.academicMetadata), style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
+      savedSignaturesRef.current.set(active.id,baselineRef.current);
+      const recovered = readEditorialDraft(draftScope,active.id);
+      if (recovered) {
+        if(recovered.academicMetadata)setAcademicMetadata(normalizeAcademicMetadata(recovered.academicMetadata));
+        setTitle(recovered.title); setDraftState(recovered.contentMarkdown); nativeRef.current = recovered.nativeDocument ?? markdownToBlockNote(recovered.contentMarkdown); setNativeDocument(nativeRef.current);
+        if (recovered.style) setStyle(recovered.style as StudyDocStyle);
+        revisionRef.current.set(active.id,recovered.revision); setRecoveredDraft(true); setSaveState('dirty');
+        if (recovered.revision !== next.revision) { setSaveState('error'); setSaveError(t('La versión guardada ha cambiado. Recupera el borrador o carga la versión actual.')); }
+      }
+      hydratedIdRef.current = active.id;
     });
   }, [active?.id, loadData]);
 
@@ -511,8 +388,8 @@ export function StudyEditor({
       to = nextLine === -1 ? draft.length : nextLine;
       if (draft.slice(from, to).trim()) return { from, to, text: draft.slice(from, to), scope: 'paragraph' };
     }
-    const snapshot = milkdownRef.current?.selectionSnapshot();
-    const selection = snapshot?.text || window.getSelection()?.toString() || '';
+    const snapshot = raw ? undefined : canvasRef.current?.selectionSnapshot();
+    const selection = snapshot?.text ?? '';
     if (selection.trim()) {
       let from = -1;
       let cursor = 0;
@@ -522,7 +399,7 @@ export function StudyEditor({
         cursor = from + selection.length;
       }
       if (from < 0) from = draft.indexOf(selection);
-      if (from >= 0) return { from, to: from + selection.length, text: selection, scope: 'selection', visual: !raw };
+      if (from >= 0 || (!raw && snapshot)) return { from: Math.max(0, from), to: Math.max(0, from) + selection.length, text: selection, scope: 'selection', visual: !raw, range: snapshot?.range };
     }
     if (!allowFallback) return null;
     if (!window.confirm(t('No hay texto seleccionado. ¿Quieres mejorar el documento completo?'))) return null;
@@ -545,19 +422,26 @@ export function StudyEditor({
   };
 
   const replaceImprovedSelection = (base: string, target: ImproveTarget, text: string, commitToHistory = false) => {
+    if (target.visual && target.range && commitToHistory) {
+      canvasRef.current?.replaceSelectionMarkdown(target.range, text);
+      setSaveState('dirty');
+      return;
+    }
     const next = `${base.slice(0, target.from)}${text}${base.slice(target.to)}`;
     setDraft(next);
-    if (!raw) milkdownRef.current?.replaceAllMarkdown(next, { addToHistory: commitToHistory, closeHistory: commitToHistory });
+    if (!raw) canvasRef.current?.replaceAllMarkdown(next, { addToHistory: commitToHistory, closeHistory: commitToHistory });
     setSaveState('dirty');
   };
 
   const runQuickImprovement = async (style: StudyStyle, target = selectionImprove?.target ?? resolveImproveSelection(false)) => {
-    if (settings.academicMode === 'manual' || !target || improveStreamingStyleId || !active || !data) return;
+    if (!target || improveStreamingStyleId || !active || !data) return;
     const base = draft;
     let streamed = '';
     let frame = 0;
-    const flush = () => { frame = 0; replaceImprovedSelection(base, target, streamed); };
-    setImproveStreamingStyleId(style.id); setImproveStreamError(''); setSelectionImprove(null);
+    const flush = () => { frame = 0; setImprovePreview(streamed); };
+    improveCancelled.current = false;
+    improvementRunning.current = true;
+    setImproveStreamingStyleId(style.id); setImprovePreview(''); setLastImprovement(null); setImproveStreamError(''); setSelectionImprove(null);
     try {
       const result = await window.nodus.improveStudyText({
         ...port.improveTarget(active.id), subjectId, text: target.text, styleId: style.id, scope: target.scope,
@@ -570,16 +454,21 @@ export function StudyEditor({
         if (!frame) frame = window.requestAnimationFrame(flush);
       } });
       if (frame) window.cancelAnimationFrame(frame);
-      // Streamed previews never enter the undo stack. Restore the pre-request
-      // document invisibly, then commit the complete rewrite as one history step.
-      if (!raw) milkdownRef.current?.replaceAllMarkdown(base, { addToHistory: false });
+      if (improveCancelled.current) return;
+      // Preview is separate from the native document: cancellation never mutates
+      // the original, and the complete selection replacement is one undo step.
       replaceImprovedSelection(base, target, result.text, true);
+      setLastImprovement(style.name);
       await window.nodus.updateStudyImprovementAction(result.logId, 'replace');
     } catch (cause) {
       if (frame) window.cancelAnimationFrame(frame);
-      setDraft(base); if (!raw) milkdownRef.current?.replaceAllMarkdown(base, { addToHistory: false });
-      setImproveStreamError(cause instanceof Error ? cause.message : String(cause));
-    } finally { setImproveStreamingStyleId(null); }
+      if (!improveCancelled.current) setImproveStreamError(cause instanceof Error ? cause.message : String(cause));
+    } finally { improvementRunning.current = false; setImproveStreamingStyleId(null); setImprovePreview(''); }
+  };
+
+  const openImprovePrompts = (target = resolveImproveSelection(false)) => {
+    improveTargetRef.current = target;
+    setShowImprovePrompts(true);
   };
 
   const closeSynonymPanel = () => {
@@ -661,12 +550,19 @@ export function StudyEditor({
     const closeOnOutsidePointer = (event: PointerEvent) => {
       if (!synonymPanelRef.current?.contains(event.target as Node)) closeSynonymPanel();
     };
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') closeSynonymPanel(); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      // The BlockNote formatting popover consumes Escape before it bubbles.
+      // Dismiss the foreground synonyms panel first, retaining the selection.
+      event.preventDefault();
+      event.stopPropagation();
+      closeSynonymPanel();
+    };
     document.addEventListener('pointerdown', closeOnOutsidePointer);
-    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', closeOnEscape, true);
     return () => {
       document.removeEventListener('pointerdown', closeOnOutsidePointer);
-      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', closeOnEscape, true);
     };
   }, [synonymPanel?.sessionId]);
 
@@ -675,56 +571,81 @@ export function StudyEditor({
   // applying an alternative to stale text.
   useEffect(() => { closeSynonymPanel(); }, [active?.id, draft]);
 
-  const currentSignature = JSON.stringify({ title, content: draft, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
+  const currentSignature = JSON.stringify({ title, content: draft, nativeDocument, academicMetadata, style, language: data?.spellcheckLanguage, dictionary: data?.customDictionary });
   activeIdRef.current = active?.id ?? '';
   latestSignatureRef.current = currentSignature;
   rawRef.current = raw;
   useEffect(() => {
-    if (!active || !data || improveStreamingStyleId || currentSignature === baselineRef.current) return;
+    if (!active || !data || hydratedIdRef.current !== active.id || improveStreamingStyleId) return;
+    if (currentSignature === baselineRef.current) {
+      // Undo can return to the persisted document without making another save.
+      // Clear its previous dirty status and recovery draft, keeping real conflicts.
+      if (!saveError) { setSaveState('saved'); setRecoveredDraft(false); clearEditorialDraft(draftScope,active.id); }
+      return;
+    }
+    retainEditorialDraft(draftScope,active.id,{title,contentMarkdown:draft,nativeDocument:nativeRef.current,academicMetadata:academicRef.current,revision:revisionRef.current.get(active.id) ?? 0,style});
+    if (saveError) return;
     setSaveState('dirty');
     const timer = window.setTimeout(() => void save('autosave'), STUDY_AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [currentSignature, active?.id, data != null, improveStreamingStyleId]);
+  }, [currentSignature, active?.id, data?.revision, improveStreamingStyleId, saveError]);
 
   const save = async (reason: 'autosave' | 'manual' | 'command') => {
+    if (improvementRunning.current) return false;
     // Never persist a partial AI stream. Its complete result marks the editor
     // dirty and enters this same autosave path when streaming finishes.
-    if (!active || improveStreamingStyleId || currentSignature === baselineRef.current) return;
+    if (!active || !data || hydratedIdRef.current !== active.id || currentSignature === baselineRef.current) return true;
+    if (improveStreamingStyleId) return false;
     const snapshot = {
       id: active.id,
       signature: currentSignature,
       title,
       contentMarkdown: draft,
+      nativeDocument: nativeRef.current,
+      academicMetadata:academicRef.current,
       style,
       spellcheckLanguage: data?.spellcheckLanguage,
       customDictionary: data?.customDictionary,
       reason,
     };
     const operation = saveQueueRef.current.catch(() => undefined).then(async () => {
-      if (snapshot.id !== activeIdRef.current || snapshot.signature !== latestSignatureRef.current) return;
-      setSaveState('saving');
+      if (savedSignaturesRef.current.get(snapshot.id) === snapshot.signature) return true;
+      if (snapshot.id === activeIdRef.current) setSaveState('saving');
       try {
         const updated = await port.save(snapshot.id, {
           title: snapshot.title,
           contentMarkdown: snapshot.contentMarkdown,
+          nativeDocument: snapshot.nativeDocument,
+          expectedRevision: revisionRef.current.get(snapshot.id),
+          schemaVersion: 2,
+          academicMetadata:snapshot.academicMetadata,
           style: snapshot.style,
           spellcheckLanguage: snapshot.spellcheckLanguage,
           customDictionary: snapshot.customDictionary,
           reason: snapshot.reason,
         });
-        if (snapshot.id !== activeIdRef.current || snapshot.signature !== latestSignatureRef.current) return;
-        baselineRef.current = snapshot.signature;
-        setSaveState('saved');
+        const next = await port.loadEditorData(snapshot.id);
+        revisionRef.current.set(snapshot.id, updated.editorRevision ?? next.revision ?? 0);
+        savedSignaturesRef.current.set(snapshot.id,snapshot.signature);
         onSaved(updated);
-        await loadData(snapshot.id);
-      } catch {
-        if (snapshot.id === activeIdRef.current && snapshot.signature === latestSignatureRef.current) setSaveState('error');
+        if (snapshot.id === activeIdRef.current) {
+          baselineRef.current = snapshot.signature;
+          setData(next);
+          if (snapshot.signature === latestSignatureRef.current) { setSaveState('saved'); setSaveError(''); setRecoveredDraft(false); clearEditorialDraft(draftScope,snapshot.id); }
+        }
+        return true;
+      } catch (error) {
+        if (snapshot.id === activeIdRef.current) { setSaveState('error'); setSaveError(error instanceof Error ? error.message : String(error)); }
+        return false;
       }
     });
     saveQueueRef.current = operation;
-    await operation;
+    return await operation;
   };
   saveLatestRef.current = save;
+  const flushLatest = useCallback(() => flushEditorialDraft(() => saveLatestRef.current('autosave'), () => !hydratedIdRef.current || latestSignatureRef.current === baselineRef.current), []);
+  useEffect(() => { onRegisterFlush?.(flushLatest); }, [onRegisterFlush,flushLatest]);
+  useEffect(() => window.nodus.onBeforeEditorLeave(flushLatest), [flushLatest]);
 
   // The debounce cleanup cancels its timer when this editor disappears. Flush
   // the live render snapshot so leaving the vault cannot discard the last edit.
@@ -734,13 +655,14 @@ export function StudyEditor({
     const keydown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void save('manual'); }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') { event.preventDefault(); setShowSearch(true); }
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); setShowImprovePrompts(settings.academicMode !== 'manual'); }
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); openImprovePrompts(); }
     };
     window.addEventListener('keydown', keydown);
     return () => window.removeEventListener('keydown', keydown);
   });
 
-  if (!active || !data) return <div className="flex h-full items-center justify-center"><Spinner label={t('Cargando editor…')} /></div>;
+  if (!active || !data) return <div className="editorial-editor flex h-full min-h-0 flex-col">
+      <EditorialHeader title={active?.title ?? ''} location={location} status={t('Cargando editor…')} contextOpen={contextOpen} focus={focusMode} onContext={() => setContextOpen(!contextOpen)} onFocus={() => void editorialFocus.toggleFocus()} leading={headerContent} /><div className="flex flex-1 items-center justify-center"><Spinner label={t('Cargando editor…')} /></div></div>;
 
   const stats = studyDocumentStats(draft);
   const styleVars = {
@@ -757,7 +679,7 @@ export function StudyEditor({
   const insertMarkdown = (markdown: string) => {
     const snippet = `${markdown.replace(/^\n+|\n+$/g, '')}\n`;
     if (!raw) {
-      milkdownRef.current?.insertMarkdown(snippet);
+      canvasRef.current?.insertMarkdown(snippet);
       return;
     }
     const textarea = rawTextareaRef.current;
@@ -776,7 +698,7 @@ export function StudyEditor({
   const runEditorHistory = (direction: 'undo' | 'redo') => {
     setImproveStreamError('');
     if (!raw) {
-      milkdownRef.current?.[direction]();
+      canvasRef.current?.[direction]();
       return;
     }
     const textarea = rawTextareaRef.current;
@@ -798,12 +720,34 @@ export function StudyEditor({
   };
   const activateDocument = async (documentId: string) => {
     if (documentId === active.id) return;
-    await save('autosave');
+    if (!await flushLatest()) return;
     onActivate(documentId);
   };
   const openLinkedDocument = async (documentId: string) => {
-    await save('autosave');
+    if (!await flushLatest()) return;
     onOpenLinkedDocument(documentId);
+  };
+  const navigateReference = async (href: string,evidence?:import('@shared/academicDocument').AcademicEvidence) => {
+    if (!await flushLatest()) return;
+    if(href.startsWith('nodus://passage/')) {
+      const passage=await window.nodus.getPassage(decodeURIComponent(href.slice('nodus://passage/'.length))).catch(()=>null);
+      if(passage){await openEvidenceAtPage(passage.nodus_id,{location:evidence?.pageLabel??passage.page_label,sourceRef:passage.source_ref,pageNumber:evidence?.physicalPage??passage.page_number});return;}
+      setSaveError(t('La evidencia ya no está disponible.'));return;
+    }
+    if(evidence&&href.startsWith('nodus://work/')){await openEvidenceAtPage(decodeURIComponent(href.slice('nodus://work/'.length)),{location:evidence.pageLabel??null,sourceRef:null,pageNumber:evidence.physicalPage??null});return;}
+    if (onNavigateLink?.(href)) return;
+    const testimony = parseTestimonyLink(href);
+    if (testimony && onTestimonyLink) { onTestimonyLink(testimony); return; }
+    const reference = parseEditorReference(href);
+    if (reference && reference.kind === (port.referenceKind ?? 'studyDocument')) {
+      onOpenLinkedDocument(reference.id); return;
+    }
+    if (reference) {
+      const label = documentReferences(nativeRef.current).find(item => item.href === href)?.title ?? '';
+      window.dispatchEvent(new CustomEvent('nodus:open-editor-reference', { detail: { href, label } }));
+    } else if (/^https?:\/\//i.test(href)) void window.nodus.openExternal(href);
+    else if(href.startsWith('nodus://library/')){if(!await flushLatest())return;window.dispatchEvent(new CustomEvent('nodus:open-library-item',{detail:{itemId:decodeURIComponent(href.slice('nodus://library/'.length))}}));}
+    else if (href.startsWith('nodus://')) { setContextOpen(true); setContextTab('sources'); }
   };
   const requestClose = (documentId: string) => setPendingCloseId(documentId);
   const confirmClose = async () => {
@@ -811,17 +755,18 @@ export function StudyEditor({
     if (!documentId) return;
     // `save` is signature-based, so calling it unconditionally also covers the
     // tiny interval before the dirty-state effect has painted.
-    if (documentId === active.id) await save('autosave');
+    if (documentId === active.id && !await flushLatest()) return;
     setPendingCloseId(null);
     onClose(documentId);
   };
   const jumpToHeading = (_item: StudyOutlineItem, index: number) => {
-    const heading = document.querySelectorAll('.study-milkdown .ProseMirror h1, .study-milkdown .ProseMirror h2, .study-milkdown .ProseMirror h3, .study-milkdown .ProseMirror h4, .study-milkdown .ProseMirror h5, .study-milkdown .ProseMirror h6')[index];
+    const heading = document.querySelectorAll('.nodus-blocknote .ProseMirror h1, .nodus-blocknote .ProseMirror h2, .nodus-blocknote .ProseMirror h3, .nodus-blocknote .ProseMirror h4, .nodus-blocknote .ProseMirror h5, .nodus-blocknote .ProseMirror h6')[index];
     heading?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
   const openCommentDialog = () => {
-    const selectedText = window.getSelection()?.toString().trim() ?? '';
-    setTextDialog({ kind: 'comment', selectedText });
+    const selection = raw ? undefined : canvasRef.current?.selectionSnapshot();
+    const target = resolveImproveSelection(false);
+    setTextDialog({ kind: 'comment', selectedText: target?.text ?? '', from: target?.from ?? 0, anchor: selection?.text ? selection.anchor : undefined });
   };
   const submitTextDialog = async (value: string) => {
     if (textDialog?.kind === 'tag') {
@@ -830,18 +775,22 @@ export function StudyEditor({
       return;
     }
     const selectedText = textDialog?.selectedText ?? '';
-    const from = selectedText ? Math.max(0, draft.indexOf(selectedText)) : 0;
-    await port.createAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment: value });
+    const from = textDialog?.from ?? 0;
+    await port.createAnnotation(active.id, { from, to: from + selectedText.length, selectedText, comment: value, anchor: textDialog?.anchor });
     await loadData(active.id);
     setTextDialog(null);
   };
   const restoreVersion = async (version: StudyDocVersion) => {
     if (!window.confirm(t('¿Restaurar esta versión? El estado actual seguirá disponible en el historial.'))) return;
+    if (!await flushLatest()) return;
     const restored = await port.restoreVersion(active.id, version.id);
     setTitle(restored.title); setDraft(restored.contentMarkdown); onSaved(restored);
-    setEditorRevision((value) => value + 1);
-    const next = await loadData(active.id);
-    baselineRef.current = JSON.stringify({ title: restored.title, content: restored.contentMarkdown, style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
+    const next = await loadData(active.id,true);
+    const native = next.nativeDocument ?? markdownToBlockNote(restored.contentMarkdown);
+    setAcademicMetadata(normalizeAcademicMetadata(next.academicMetadata));
+    nativeRef.current = native; setNativeDocument(native); setStyle(next.style); setEditorRevision(value=>value+1);
+    baselineRef.current = JSON.stringify({ title: restored.title, content: restored.contentMarkdown, nativeDocument: native, academicMetadata:normalizeAcademicMetadata(next.academicMetadata), style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
+    savedSignaturesRef.current.set(active.id,baselineRef.current);
     setSaveState('saved');
   };
   const updateAnnotation = async (annotation: StudyAnnotation, patch: Parameters<EditorDocumentPort['updateAnnotation']>[1]) => {
@@ -863,12 +812,50 @@ export function StudyEditor({
     }
     if (snippet) {
       if (raw) setDraft((current) => `${current}${current.endsWith('\n') || !current ? '' : '\n\n'}${snippet}\n`);
-      else milkdownRef.current?.insertMarkdown(snippet);
+      else canvasRef.current?.insertMarkdown(snippet);
     }
   };
 
+  const locked = Boolean(improveStreamingStyleId);
+  const actions: EditorialAction[] = [
+    { id: 'undo', label: t('Deshacer'), icon: 'undo', group: t('Edición'), essential: true, testId: 'study-editor-undo', disabled: locked || (!raw && !historyState.canUndo), shortcut: 'Ctrl/⌘+Z', keyShortcuts: 'Control+Z Meta+Z', onSelect: () => runEditorHistory('undo') },
+    { id: 'redo', label: t('Rehacer'), icon: 'redo', group: t('Edición'), essential: true, testId: 'study-editor-redo', disabled: locked || (!raw && !historyState.canRedo), shortcut: 'Ctrl+Y / Ctrl/⌘+Shift+Z', keyShortcuts: 'Control+Y Control+Shift+Z Meta+Shift+Z', onSelect: () => runEditorHistory('redo') },
+    { id: 'link', label: t('Enlazar con Nodus'), icon: 'link', group: t('Fuentes'), essential: true, testId: 'editor-reference-insert', disabled: raw || locked, shortcut: '[[', onSelect: () => canvasRef.current?.openReferenceMenu() },
+    { id: 'cite', label: t('Citar fuente'), icon: 'quote', group: t('Fuentes'), essential: true, testId: 'academic-cite', disabled: raw || locked, onSelect: () => academicTools.current?.open('cite') },
+    { id: 'improve', label: t('Prompts de mejora'), icon: 'sparkles', group: t('Revisión'), essential: true, testId: 'study-improve-toggle', disabled: locked, shortcut: 'Ctrl/⌘+Shift+I', keyShortcuts: 'Control+Shift+I Meta+Shift+I', pressed: showImprovePrompts, onSelect: () => openImprovePrompts() },
+    { id: 'comment', label: t('Añadir comentario'), icon: 'chat', group: t('Revisión'), essential: true, onSelect: openCommentDialog },
+    { id: 'find', label: t('Buscar y reemplazar'), icon: 'search', group: t('Búsqueda'), essential: true, pressed: showSearch, shortcut: 'Ctrl/⌘+F', keyShortcuts: 'Control+F Meta+F', onSelect: () => setShowSearch(!showSearch) },
+    { id: 'save', label: t('Guardar'), icon: 'save', group: t('Documento'), shortcut: 'Ctrl/⌘+S', keyShortcuts: 'Control+S Meta+S', onSelect: () => void save('manual') },
+    ...(onUpdateMetadata ? [{ id: 'favorite', label: t('Favorito'), icon: 'star', group: t('Documento'), testId: 'study-doc-favorite', pressed: active.favorite, onSelect: () => void onUpdateMetadata({ favorite: !active.favorite }) }] : []),
+    { id: 'close', label: t('Cerrar editor'), icon: 'arrowLeft', group: t('Documento'), pinnable: false, onSelect: () => requestClose(active.id) },
+    { id: 'crossref', label: t('Referencia cruzada'), icon: 'link', group: t('Escritura académica'), testId: 'academic-crossref', disabled: raw || locked, onSelect: () => academicTools.current?.open('crossref') },
+    { id: 'note', label: t('Nota al pie'), icon: 'notebook', group: t('Escritura académica'), disabled: raw || locked, onSelect: () => academicTools.current?.open('note') },
+    { id: 'evidence', label: t('Vincular evidencia'), icon: 'link', group: t('Escritura académica'), disabled: raw || locked, onSelect: () => academicTools.current?.open('evidence') },
+    { id: 'manuscript', label: t('Manuscrito y citas'), icon: 'settings', group: t('Escritura académica'), onSelect: () => academicTools.current?.open('settings') },
+    { id: 'delivery', label: t('Preparar entrega'), icon: 'external', group: t('Escritura académica'), testId: 'academic-delivery', onSelect: () => academicTools.current?.open('delivery') },
+    { id: 'dictation', label: t('Dictado por voz'), icon: 'microphone', group: t('Voz'), testId: 'study-dictation-toggle', pressed: showDictation, onSelect: () => setShowDictation(!showDictation) },
+    { id: 'read', label: t('Lectura por voz'), icon: 'play', group: t('Voz'), testId: 'study-audio-toggle', pressed: showAudio, onSelect: () => { const target = resolveImproveSelection(false); setAudioSelection(target?.text ?? ''); setAudioCursor(rawTextareaRef.current?.selectionStart ?? target?.from ?? 0); setShowAudio(value => !value); } },
+    { id: 'markdown', label: t('Markdown crudo'), icon: 'code', group: t('Vistas'), pressed: raw, onSelect: () => { if (raw) setEditorRevision(value => value + 1); setRaw(!raw); } },
+    { id: 'split', label: t('Dividir vista'), icon: 'columns', group: t('Vistas'), pressed: split, onSelect: () => setSplit(!split) },
+    { id: 'style', label: t('Apariencia y metadatos'), icon: 'palette', group: t('Vistas'), testId: 'study-doc-style', pressed: showStyle, onSelect: () => { setShowStyle(!showStyle); setContextOpen(true); setContextTab('details'); } },
+    { id: 'history', label: t('Historial de versiones'), icon: 'clock', group: t('Vistas'), onSelect: () => { setContextOpen(true); setContextTab('history'); } },
+    { id: 'table', label: t('Insertar tabla'), icon: 'table', group: t('Inserción'), onSelect: () => setTableDialogOpen(true) },
+    { id: 'quote', label: t('Insertar cita'), icon: 'quote', group: t('Inserción'), onSelect: () => insertCommand('cita') },
+    { id: 'image', label: t('Insertar imagen'), icon: 'image', group: t('Inserción'), onSelect: () => insertCommand('imagen') },
+    { id: 'audio', label: t('Insertar bloque de audio'), icon: 'play', group: t('Inserción'), onSelect: () => insertCommand('audio') },
+    { id: 'quiz', label: t('Insertar pregunta de test'), icon: 'help', group: t('Inserción'), onSelect: () => insertCommand('test') },
+    { id: 'code', label: t('Código en línea'), icon: 'code', group: t('Inserción'), testId: 'study-inline-code', disabled: raw || locked, onSelect: () => canvasRef.current?.runInlineCommand('code') },
+    { id: 'formula', label: t('Fórmula en línea'), icon: 'sigma', group: t('Inserción'), testId: 'study-inline-formula', disabled: raw || locked, onSelect: () => canvasRef.current?.runInlineCommand('formula') },
+    { id: 'print', label: t('Vista previa de impresión'), icon: 'external', group: t('Gestión'), onSelect: () => window.print() },
+    { id: 'duplicate', label: t('Duplicar'), icon: 'copy', group: t('Gestión'), onSelect: () => void onDuplicate() },
+    { id: 'trash', label: t('Mover a la papelera'), icon: 'trash', group: t('Gestión'), pinnable: false, onSelect: () => void onTrash() },
+  ];
+
   return (
-    <div style={styleVars} className={`study-editor-shell flex h-full min-h-0 flex-col bg-stone-100 text-stone-900 dark:bg-neutral-950 dark:text-neutral-100 ${fullscreen ? 'fixed inset-0 z-[100]' : ''} study-theme-${style.theme}`}>
+    <div style={styleVars} className={`study-editor-shell editorial-editor flex h-full min-h-0 flex-col bg-stone-100 text-stone-900 dark:bg-neutral-950 dark:text-neutral-100 ${focusMode ? 'editorial-focus' : ''} study-theme-${style.theme}`}>
+{nativeDocument&&<AcademicTools ref={academicTools} id={active.id} title={title} document={nativeDocument} metadata={academicMetadata} onChange={setAcademicMetadata} canvas={canvasRef} unresolvedComments={data?.annotations.filter(a=>!a.resolvedAt).length??0} adapter={{inspect:()=>window.nodus.inspectAcademicDocument({documentId:active.id,kind:port.referenceKind==='note'?'note':'study',expectedRevision:revisionRef.current.get(active.id)}),searchSources:desktopAcademicSources,rootKind:port.referenceKind==='note'?'note':'study',loadChapter:async(id,kind)=>{const data=kind==='note'?await window.nodus.getWorkspaceNoteEditorData(id):await studyDocumentPort.loadEditorData(id);return data.nativeDocument??markdownToBlockNote(data.contentMarkdown??'');},searchEvidence:async query=>(await window.nodus.listEditorReferences({includePassages:true,search:query})).filter(ref=>['idea','work','passage'].includes(ref.kind)&&ref.title.toLowerCase().includes(query.toLowerCase())).slice(0,50).map(ref=>({href:ref.href,title:ref.title,pageLabel:ref.pageLabel,physicalPage:ref.physicalPage})),listChapters:async()=>{const [notes,study]=await Promise.all([window.nodus.getNotesTree(),window.nodus.getStudyWorkspace()]);return [...notes.notes.filter(note=>!note.trashedAt).map(note=>({documentId:note.id,title:note.title,kind:'note' as const})),...study.documents.map(doc=>({documentId:doc.id,title:doc.title,kind:'study' as const}))];},flush:()=>flushLatest(),export:(format,acceptWarnings)=>window.nodus.exportAcademicDocument({documentId:active.id,kind:port.referenceKind==='note'?'note':'study',expectedRevision:revisionRef.current.get(active.id),format,acceptWarnings})}} />}
+      <EditorialHeader title={title} location={location} status={t(saveState === 'saved' ? 'Guardado' : saveState === 'saving' ? 'Guardando…' : saveState === 'dirty' ? 'Sin guardar' : 'Error al guardar')} contextOpen={contextOpen} focus={focusMode} onContext={() => setContextOpen(!contextOpen)} onFocus={() => void editorialFocus.toggleFocus()} navigationOpen={editorialFocus.navigationOpen} onNavigation={editorialFocus.toggleNavigation} leading={<>
+        {headerContent}
       {showTabs ? (
         <div className="study-editor-tabs flex min-h-10 items-end gap-1 overflow-x-auto border-b border-stone-200 bg-stone-50 px-2 pt-1 dark:border-neutral-800 dark:bg-neutral-950">
           {documents.map((document) => (
@@ -891,96 +878,36 @@ export function StudyEditor({
             </div>
           ))}
         </div>
-      ) : (
-        // Sin pestañas propias, el título necesita seguir siendo editable: es el único
-        // sitio donde se renombra lo que se está escribiendo.
-        <div className="study-editor-titlebar flex min-h-10 items-center gap-2 border-b border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-neutral-800 dark:bg-neutral-950">
-          <Icon name={documentIcon} size={13} className="shrink-0 text-neutral-500" />
-          <input
-            data-testid="editor-title"
-            aria-label={t('Título del apunte')}
-            className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none ring-0"
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            onBlur={() => void save('manual')}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') { event.preventDefault(); event.currentTarget.blur(); }
-              if (event.key === 'Escape') { event.preventDefault(); setTitle(active.title); }
-            }}
-          />
+      ) : null}
+</>} onPreserveSelection={preserveSelection} options={<>
+        <EditorialActionMenu actions={actions} pins={pinnedActionIds} onPinsChange={setPinnedActionIds} beforeAction={restoreSelection} />
+        <div className="study-insert-toolbar" data-testid="study-insert-toolbar">
+          <label htmlFor="study-heading-level">{t('Nivel de título')}</label>
+          <select id="study-heading-level" data-testid="study-heading-level" className="input" defaultValue="" title={t('Insertar título')}
+            onChange={event => { restoreSelection(); if (event.target.value) insertHeading(Number(event.target.value)); event.target.value = ''; }}>
+            <option value="" disabled>H</option>{[1, 2, 3, 4, 5, 6].map(level => <option key={level} value={level}>H{level}</option>)}
+          </select>
         </div>
-      )}
-
-      <div className="study-editor-toolbar flex flex-wrap items-center gap-1 border-b border-stone-200 bg-white/80 px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50">
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Cerrar editor')} aria-label={t('Cerrar editor')} onClick={() => requestClose(active.id)}><Icon name="arrowLeft" size={14} /></button>
-        <span data-testid="study-editor-save-state" role="status" aria-live="polite" className={`mr-2 text-[10px] ${saveState === 'error' ? 'text-red-400' : saveState === 'saved' ? 'text-emerald-500' : 'text-amber-400'}`}>
-          {t(saveState === 'saved' ? 'Guardado automático' : saveState === 'saving' ? 'Guardando…' : saveState === 'dirty' ? 'Cambios sin guardar' : 'Error al guardar')}
-        </span>
-        {onUpdateMetadata && <button data-testid="study-doc-favorite" className="btn btn-ghost h-8 w-8 p-0" title={t('Favorito')} aria-label={t('Favorito')} onClick={() => void onUpdateMetadata({ favorite: !active.favorite })}>
-          <Icon name="star" size={13} className={active.favorite ? 'text-amber-400' : ''} />
-        </button>}
-        <button className="btn btn-primary h-8 w-8 p-0" title={t('Guardar')} aria-label={t('Guardar')} onClick={() => void save('manual')}><Icon name="save" size={13} /></button>
-        <span className="mx-0.5 h-5 w-px bg-stone-200 dark:bg-neutral-700" aria-hidden="true" />
-        <button type="button" data-testid="study-editor-undo" className="btn btn-ghost h-8 w-8 p-0" disabled={Boolean(improveStreamingStyleId) || (!raw && !historyState.canUndo)} onClick={() => runEditorHistory('undo')} title={`${t('Deshacer')} (Ctrl/⌘+Z)`} aria-label={t('Deshacer')} aria-keyshortcuts="Control+Z Meta+Z"><Icon name="undo" size={13} /></button>
-        <button type="button" data-testid="study-editor-redo" className="btn btn-ghost h-8 w-8 p-0" disabled={Boolean(improveStreamingStyleId) || (!raw && !historyState.canRedo)} onClick={() => runEditorHistory('redo')} title={`${t('Rehacer')} (Ctrl+Y / Ctrl/⌘+Shift+Z)`} aria-label={t('Rehacer')} aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"><Icon name="redo" size={13} /></button>
-        <span className="mx-0.5 h-5 w-px bg-stone-200 dark:bg-neutral-700" aria-hidden="true" />
-        <button className={`btn btn-ghost h-8 w-8 p-0 ${raw ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Markdown crudo')} aria-label={t('Markdown crudo')} onClick={() => {
-          if (raw) setEditorRevision((value) => value + 1); setRaw(!raw);
-        }}><Icon name="code" size={13} /></button>
-        <button className={`btn btn-ghost h-8 w-8 p-0 ${split ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Dividir vista')} aria-label={t('Dividir vista')} onClick={() => setSplit(!split)}><Icon name="columns" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Buscar y reemplazar')} aria-label={t('Buscar y reemplazar')} onClick={() => setShowSearch(!showSearch)}><Icon name="search" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" onClick={openCommentDialog} title={t('Añadir comentario')} aria-label={t('Añadir comentario')}><Icon name="chat" size={13} /></button>
-        <button data-testid="study-dictation-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showDictation ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setShowDictation(!showDictation)} title={t('Dictado por voz')} aria-label={t('Dictado por voz')}><Icon name="microphone" size={13} /></button>
-        <button data-testid="study-audio-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showAudio ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => {
-          const target = resolveImproveSelection(false);
-          setAudioSelection(target?.text ?? '');
-          setAudioCursor(rawTextareaRef.current?.selectionStart ?? target?.from ?? 0);
-          setShowAudio((value) => !value);
-        }} title={t('Lectura por voz')} aria-label={t('Lectura por voz')}><Icon name="play" size={13} /></button>
-        {settings.academicMode !== 'manual' && <>
-        <button data-testid="study-improve-toggle" className={`btn btn-ghost h-8 w-8 p-0 ${showImprovePrompts ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300' : ''}`} onClick={() => setShowImprovePrompts(settings.academicMode !== 'manual')} title={`${t('Prompts de mejora')} (⌘⇧I)`} aria-label={t('Prompts de mejora')}><Icon name="wand" size={13} /></button>
-        <div data-testid="study-editor-model-picker" className="study-editor-model-picker-wrap min-w-32 max-w-52 flex-1 sm:flex-none">
-          <ModelPicker settings={settings} value={aiModel} onChange={setAiModel} compact menu allowEmpty={false} triggerModelOnly ariaLabel={t('Modelo de IA para mejorar texto')} className="study-editor-model-picker" />
-        </div>
-        </>}
-        {(settings.academicMode === 'manual' ? [] : quickImproveStyles).map((prompt) => <button type="button" key={prompt.id} data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn btn-ghost h-8 w-8 p-0 text-teal-700 dark:text-teal-300" title={`${prompt.name} · ${prompt.description}`} aria-label={prompt.name} disabled={Boolean(improveStreamingStyleId)} onClick={() => void runQuickImprovement(prompt)}><ImproveStyleMark style={prompt} size={15} /></button>)}
-        <button data-testid="study-doc-style" className={`study-editor-style-button btn btn-ghost h-8 w-8 p-0 ${showStyle ? 'is-active bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Apariencia y metadatos')} aria-label={t('Apariencia y metadatos')} onClick={() => setShowStyle(!showStyle)}><Icon name="palette" size={16} /></button>
-        <button className={`btn btn-ghost h-8 w-8 p-0 ${showHistory ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} title={t('Historial de versiones')} aria-label={t('Historial de versiones')} onClick={() => setShowHistory(!showHistory)}><Icon name="clock" size={13} /></button>
-        <button className={`btn btn-ghost h-8 w-8 p-0 ${focusMode ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' : ''}`} onClick={() => setFocusMode(!focusMode)} aria-pressed={focusMode} title={t('Ocultar paneles')} aria-label={t('Ocultar paneles')}><Icon name="eye" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => setFullscreen(!fullscreen)} title={t('Pantalla completa')} aria-label={t('Pantalla completa')}><Icon name="fit" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => window.print()} title={t('Vista previa de impresión')} aria-label={t('Vista previa de impresión')}><Icon name="external" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" onClick={() => void onDuplicate()} title={t('Duplicar')} aria-label={t('Duplicar')}><Icon name="copy" size={13} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0 text-red-400" onClick={() => {
-          void onTrash();
-        }} title={t('Mover a la papelera')} aria-label={t('Mover a la papelera')}><Icon name="trash" size={13} /></button>
-        <span className="ml-auto py-1 text-[10px] text-neutral-600">{stats.words} {t('palabras')} · {stats.readingMinutes} min</span>
-      </div>
-
-      <div className="study-insert-toolbar flex flex-wrap items-center gap-1 border-b border-stone-200 bg-stone-50 px-3 py-1.5 dark:border-neutral-800 dark:bg-transparent" data-testid="study-insert-toolbar">
-        <label className="sr-only" htmlFor="study-heading-level">{t('Nivel de título')}</label>
-        <select id="study-heading-level" data-testid="study-heading-level" className="input h-8 w-[4.5rem] px-2 text-xs" defaultValue="" title={t('Insertar título')}
-          onChange={(event) => { if (event.target.value) insertHeading(Number(event.target.value)); event.target.value = ''; }}>
-          <option value="" disabled>H</option>
-          {[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}
-        </select>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Insertar tabla')} aria-label={t('Insertar tabla')} onClick={() => setTableDialogOpen(true)}><Icon name="table" size={14} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Insertar cita')} aria-label={t('Insertar cita')} onClick={() => insertCommand('cita')}><Icon name="quote" size={14} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Insertar imagen')} aria-label={t('Insertar imagen')} onClick={() => insertCommand('imagen')}><Icon name="image" size={14} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Insertar bloque de audio')} aria-label={t('Insertar bloque de audio')} onClick={() => insertCommand('audio')}><Icon name="play" size={14} /></button>
-        <button className="btn btn-ghost h-8 w-8 p-0" title={t('Insertar pregunta de test')} aria-label={t('Insertar pregunta de test')} onClick={() => insertCommand('test')}><Icon name="help" size={14} /></button>
-        <button data-testid="study-inline-code" className="btn btn-ghost h-8 w-8 p-0" disabled={raw} title={t('Código en línea')} aria-label={t('Código en línea')} onClick={() => milkdownRef.current?.runInlineCommand('code')}><Icon name="code" size={14} /></button>
-        <button data-testid="study-inline-formula" className="btn btn-ghost h-8 w-8 p-0 font-serif text-base" disabled={raw} title={t('Fórmula en línea')} aria-label={t('Fórmula en línea')} onClick={() => milkdownRef.current?.runInlineCommand('formula')}>ƒx</button>
-      </div>
-
+      </>} />
+      <EditorialActionBar actions={actions} pins={pinnedActionIds} beforeAction={restoreSelection} onPreserveSelection={preserveSelection} status={`${stats.words} ${t('palabras')} · ${stats.readingMinutes} min`} />
+      {(saveError || recoveredDraft) && <div className={`editorial-save-error${saveError ? '' : ' editorial-draft-recovered'}`} role={saveError ? 'alert' : 'status'}><span>{saveError || t('Se ha recuperado tu borrador local.')}</span><button onClick={() => void save('manual')}>{t(saveError ? 'Reintentar' : 'Guardar')}</button><button onClick={() => downloadEditorialDraft({ title, contentMarkdown: draft, nativeDocument: nativeRef.current, academicMetadata, style })}>{t('Recuperar borrador')}</button><button onClick={() => void (async () => {
+        const next = await loadData(active.id,true); const native = next.nativeDocument ?? markdownToBlockNote(next.contentMarkdown ?? active.contentMarkdown);
+        setAcademicMetadata(normalizeAcademicMetadata(next.academicMetadata));
+        const nextTitle = next.documentTitle ?? active.title; const nextContent = next.contentMarkdown ?? active.contentMarkdown;
+        setTitle(nextTitle); setDraftState(nextContent); setStyle(next.style); nativeRef.current = native; setNativeDocument(native);
+        baselineRef.current = JSON.stringify({ title: nextTitle, content: nextContent, nativeDocument: native, academicMetadata:normalizeAcademicMetadata(next.academicMetadata), style: next.style, language: next.spellcheckLanguage, dictionary: next.customDictionary });
+        savedSignaturesRef.current.set(active.id,baselineRef.current);
+        clearEditorialDraft(draftScope,active.id); setRecoveredDraft(false); setSaveError(''); setSaveState('saved'); setEditorRevision(value => value+1);
+      })()}>{t('Cargar versión actual')}</button></div>}
       {improveStreamError && <div data-testid="study-improve-stream-error" className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"><Icon name="alert" size={13} /><span className="min-w-0 flex-1">{improveStreamError}</span><span>{t('El original permanece intacto.')}</span><button onClick={() => setImproveStreamError('')} aria-label={t('Cerrar')}><Icon name="x" size={12} /></button></div>}
-      {improveStreamingStyleId && <div data-testid="study-improve-streaming" className="flex items-center gap-2 border-b border-teal-200 bg-teal-50 px-3 py-2 text-xs text-teal-800 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-200"><Spinner label={t('Mejorando texto…')} /><span>{quickImproveStyles.find((style) => style.id === improveStreamingStyleId)?.name}</span></div>}
+
 
       {showSearch && (
-        <div className="study-search-toolbar flex items-center gap-2 border-b border-stone-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50">
-          <input autoFocus className="input h-8 flex-1" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Buscar en el documento')} />
+        <div className="study-search-toolbar editorial-searchbar flex flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-3 py-2 dark:border-neutral-800 dark:bg-neutral-900/50">
+          <input autoFocus className="input h-8 flex-1" aria-label={t('Buscar en el documento')} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('Buscar en el documento')} />
           <span className="w-20 text-center text-xs text-neutral-600">{searchCount} {t('coincidencias')}</span>
-          <input className="input h-8 flex-1" value={replacement} onChange={(event) => setReplacement(event.target.value)} placeholder={t('Reemplazar por')} />
-          <button disabled={!search} className="btn btn-ghost h-8" onClick={() => { setDraft(draft.split(search).join(replacement)); if (!raw) setEditorRevision((value) => value + 1); }}>{t('Reemplazar todo')}</button>
+          <input className="input h-8 flex-1" aria-label={t('Reemplazar por')} value={replacement} onChange={(event) => setReplacement(event.target.value)} placeholder={t('Reemplazar por')} />
+          <button disabled={!search} className="btn btn-ghost h-8" onClick={() => { setDraft(draft.split(search).join(replacement)); if (!raw) setEditorRevision((value) => value + 1); }}>{t('Reemplazar todo')}</button><button className="editorial-header-action" aria-label={t('Cerrar búsqueda')} onClick={()=>setShowSearch(false)}><Icon name="x" size={14} /></button>
         </div>
       )}
       {showDictation && <StudyDictation
@@ -990,7 +917,7 @@ export function StudyEditor({
         customDictionary={data.customDictionary}
         onInsert={(text, scope) => {
           if (!raw) {
-            milkdownRef.current?.insertText(text, scope === 'selection');
+            canvasRef.current?.insertText(text, scope === 'selection');
             return;
           }
           const textarea = rawTextareaRef.current;
@@ -1033,8 +960,48 @@ export function StudyEditor({
         localOnly
         compact
       /></div>}
-      {showStyle && !globalFocus && (
-        <div className="grid grid-cols-2 gap-2 border-b border-neutral-800 bg-neutral-900/40 px-4 py-3 sm:grid-cols-4 lg:grid-cols-8">
+
+      <div className="editorial-editor-body flex min-h-0 flex-1" onInputCapture={() => setLastImprovement(null)} onMouseUp={(event) => showSelectionImproveShortcuts(event)} onKeyUp={() => showSelectionImproveShortcuts()} onDragOver={(event) => {
+        if (event.dataTransfer.types.includes(port.dragType) || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
+      }} onDrop={(event) => void handleEditorDrop(event)}>
+
+        {navigatorContent}
+        <div className={`editorial-writing-column relative min-w-0 flex-1 overflow-hidden ${split ? 'grid grid-cols-2 divide-x divide-neutral-800' : ''}`}>
+          <div className="editorial-improvement-feedback">
+      {improveStreamingStyleId && <section data-testid="study-improve-streaming" className="editorial-improvement-preview" aria-label={t('Mejorando texto…')}><header><Spinner label={t('Mejorando texto…')} /><span>{quickImproveStyles.find((style) => style.id === improveStreamingStyleId)?.name}</span><button data-testid="study-improve-cancel" onClick={() => { improveCancelled.current = true; void window.nodus.cancelStudyImprove(); }}>{t('Cancelar')}</button></header><p data-testid="study-improve-preview" aria-live="off">{improvePreview || t('Preparando…')}</p></section>}
+      {lastImprovement && <div data-testid="study-improve-complete" className="editorial-improvement-complete"><Icon name="sparkles" size={14} /><span>{lastImprovement}</span><button data-testid="study-improve-undo" onClick={() => { runEditorHistory('undo'); setLastImprovement(null); }}>{t('Deshacer')}</button><button onClick={() => setLastImprovement(null)} aria-label={t('Cerrar')}><Icon name="x" size={12} /></button></div>}
+          </div>
+          <div className="editorial-document-scroll h-full min-h-0 overflow-y-auto">
+            <EditorialTitle testId="editor-title" value={title} onChange={setTitle} readOnly={Boolean(improveStreamingStyleId)} />
+            {raw ? (
+              <textarea ref={rawTextareaRef} data-testid="study-markdown-editor" aria-label={t('Editor Markdown')} disabled={Boolean(improveStreamingStyleId)} className="h-full min-h-[560px] w-full resize-none bg-white p-6 font-mono text-sm leading-6 text-stone-800 outline-none dark:bg-neutral-950 dark:text-neutral-300"
+                spellCheck lang={data.spellcheckLanguage} value={draft} onChange={(event) => setDraft(event.target.value)}
+                onPaste={(event) => {
+                  const html = event.clipboardData.getData('text/html');
+                  if (!html) return;
+                  event.preventDefault();
+                  const markdown = turndown.turndown(html);
+                  const start = event.currentTarget.selectionStart; const end = event.currentTarget.selectionEnd;
+                  setDraft(`${draft.slice(0, start)}${markdown}${draft.slice(end)}`);
+                }} />
+            ) : (
+              nativeDocument && <BlockNoteCanvas ref={canvasRef} key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft} nativeDocument={nativeDocument} academicMetadata={academicMetadata} onAcademicAction={(action,payload)=>academicTools.current?.open(action,payload)} editable={!improveStreamingStyleId}
+                spellcheck language={data.spellcheckLanguage} onChange={(value, native) => { if (!rawRef.current) { setDraftState(value); nativeRef.current = native; setNativeDocument(native); } }} onHistoryChange={setHistoryState} onOpenRecording={onOpenRecording} listReferences={port.listReferences} onNavigateLink={href => void navigateReference(href)} onWikiLink={reference => void port.listLinkTargets().then(targets => { const target=targets.find(item=>item.id===reference || item.title===reference); if(target) void openLinkedDocument(target.id); })} onToolbarElement={setSelectionToolbar} />
+            )}
+          </div>
+          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} onTestimonyLink={onTestimonyLink} /></div>}
+        </div>
+
+        {!globalFocus && contextOpen && (
+          <EditorialInspector activeTab={contextTab} tabs={(['sources','comments','details'] as const).map(id=>({id,label:t(id==='sources'?'Fuentes':id==='comments'?'Comentarios':'Detalles')}))} onTabChange={id=>setContextTab(id as typeof contextTab)} onClose={()=>setContextOpen(false)}>
+            <div className="editorial-context-views"><button aria-pressed={contextTab === 'structure'} onClick={() => setContextTab('structure')}>{t('Estructura')}</button><button aria-pressed={contextTab === 'checks'} onClick={() => setContextTab('checks')}>{t('Comprobaciones')}</button><button aria-pressed={contextTab === 'outline'} onClick={() => setContextTab('outline')}>{t('Esquema')}</button><button aria-pressed={contextTab === 'history'} onClick={() => { setContextTab('history'); }}>{t('Historial')}</button><button aria-pressed={contextTab === 'assistant'} onClick={() => setContextTab('assistant')}>{t('Asistente')}</button></div>
+            {contextTab === 'sources' && <><AcademicPanel document={nativeDocument??[]} metadata={academicMetadata} onChange={setAcademicMetadata} canvas={canvasRef.current} view="sources" onOpenSource={(href,evidence)=>void navigateReference(href,evidence)} onSettings={()=>academicTools.current?.open('settings')} /><EditorialReferences items={documentReferences(nativeDocument)} onOpen={href => void navigateReference(href)} />{contextSources}</>}
+            {(contextTab==='checks'||contextTab==='structure')&&<AcademicPanel document={nativeDocument??[]} metadata={academicMetadata} onChange={setAcademicMetadata} canvas={canvasRef.current} view={contextTab} unresolvedComments={data.annotations.filter(a=>!a.resolvedAt).length} onOpenSource={(href,evidence)=>void navigateReference(href,evidence)} onSettings={()=>academicTools.current?.open('settings')} />}
+            {contextTab === 'details' && contextDetails}
+            {contextTab === 'outline' && <DocOutline markdown={draft} onJump={jumpToHeading} />}
+            {contextTab === 'assistant' && <div className="p-4"><div data-testid="study-editor-model-picker"><ModelPicker settings={settings} value={aiModel} onChange={setAiModel} compact menu allowEmpty={false} triggerModelOnly /></div><button className="btn mt-3" onClick={() => openImprovePrompts()}>{t('Prompts de mejora')}</button>{quickImproveStyles.map(prompt => <button data-testid={`study-toolbar-quick-improve-${prompt.id.replace(':', '-')}`} className="btn w-full mt-2" key={prompt.id} onClick={() => void runQuickImprovement(prompt)}>{prompt.name}</button>)}</div>}
+      {contextTab === 'details' && (
+        <div className="grid grid-cols-2 gap-3 p-4">
           {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Tipo de material')}<select data-testid="study-doc-kind" className="input mt-1 w-full" value={active.kind} onChange={(event) => void onUpdateMetadata({ kind: event.target.value as StudyDocumentKind })}>{STUDY_DOCUMENT_KINDS.map((kind) => <option key={kind} value={kind}>{t(STUDY_KIND_LABEL[kind])}</option>)}</select></label>}
           {onUpdateMetadata && <label className="text-[10px] text-neutral-500">{t('Color')}<input data-testid="study-doc-color" type="color" className="input mt-1 h-9 w-full p-1" value={active.color || '#0f766e'} onChange={(event) => void onUpdateMetadata({ color: event.target.value })} /></label>}
           <label className="text-[10px] text-neutral-500">{t('Tipografía')}<select className="input mt-1 w-full" value={style.fontFamily} onChange={(event) => setStyle({ ...style, fontFamily: event.target.value as StudyDocStyle['fontFamily'] })}><option value="serif">Serif</option><option value="sans">Sans</option><option value="mono">Mono</option></select></label>
@@ -1068,41 +1035,15 @@ export function StudyEditor({
         </div>
       )}
 
-      <div className="flex min-h-0 flex-1" onMouseUp={(event) => showSelectionImproveShortcuts(event)} onKeyUp={() => showSelectionImproveShortcuts()} onDragOver={(event) => {
-        if (event.dataTransfer.types.includes(port.dragType) || event.dataTransfer.types.includes('text/uri-list')) event.preventDefault();
-      }} onDrop={(event) => void handleEditorDrop(event)}>
-        {!focusMode && !globalFocus && <DocOutline markdown={draft} onJump={jumpToHeading} />}
-        <div className={`min-w-0 flex-1 overflow-y-auto ${split ? 'grid grid-cols-2 divide-x divide-neutral-800' : ''}`}>
-          <div className="min-h-full overflow-y-auto">
-            {raw ? (
-              <textarea ref={rawTextareaRef} className="h-full min-h-[560px] w-full resize-none bg-white p-6 font-mono text-sm leading-6 text-stone-800 outline-none dark:bg-neutral-950 dark:text-neutral-300"
-                spellCheck lang={data.spellcheckLanguage} value={draft} onChange={(event) => setDraft(event.target.value)}
-                onPaste={(event) => {
-                  const html = event.clipboardData.getData('text/html');
-                  if (!html) return;
-                  event.preventDefault();
-                  const markdown = turndown.turndown(html);
-                  const start = event.currentTarget.selectionStart; const end = event.currentTarget.selectionEnd;
-                  setDraft(`${draft.slice(0, start)}${markdown}${draft.slice(end)}`);
-                }} />
-            ) : (
-              <MilkdownCanvas ref={milkdownRef} key={`${active.id}-${editorRevision}`} documentId={`${active.id}-${editorRevision}`} value={draft}
-                spellcheck language={data.spellcheckLanguage} onChange={(value) => { if (!rawRef.current) setDraft(value); }} onHistoryChange={setHistoryState} onOpenRecording={onOpenRecording} onToolbarElement={setSelectionToolbar} />
-            )}
-          </div>
-          {split && <div className="min-h-full overflow-y-auto bg-stone-50 p-8 text-stone-900 dark:bg-neutral-900/20 dark:text-neutral-100"><Markdown content={draft} verify={false} onStudyDocument={(documentId) => void openLinkedDocument(documentId)} onStudyRecording={onOpenRecording} onTestimonyLink={onTestimonyLink} /></div>}
-        </div>
-
-        {!focusMode && !globalFocus && (showHistory || data.annotations.length > 0 || data.backlinks.length > 0) && (
-          <aside className="w-72 shrink-0 overflow-y-auto border-l border-neutral-800 bg-neutral-950/50 p-3">
-            {data.annotations.length > 0 && (
+            {contextTab === 'comments' && data.annotations.length === 0 && <div className="editorial-empty"><p>{t('No hay comentarios en este documento.')}</p><button className="editorial-header-action mt-3" onClick={()=>setTextDialog({kind:'comment'})}><Icon name="chat" size={13} />{t('Añadir comentario')}</button></div>}
+            {contextTab === 'comments' && data.annotations.length > 0 && (
               <section className="mb-5">
                 <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Comentarios y fragmentos')}</h3>
                 <div className="space-y-2">{data.annotations.map((annotation) => (
                   <div key={annotation.id} className={`rounded-lg border p-2.5 ${annotation.resolvedAt ? 'border-neutral-900 opacity-50' : 'border-neutral-800'}`}>
-                    {annotation.selectedText && <p className="mb-1 line-clamp-2 border-l-2 border-indigo-600 pl-2 text-[10px] italic text-neutral-500">{annotation.selectedText}</p>}
+                    {annotation.anchorStatus && annotation.anchorStatus !== 'attached' && <p className="text-xs text-amber-600">{t(annotation.anchorStatus === 'ambiguous' ? 'Anclaje ambiguo' : 'Bloque original no localizado')}</p>}{annotation.selectedText && <p className="mb-1 line-clamp-2 border-l-2 border-indigo-600 pl-2 text-[10px] italic text-neutral-500">{annotation.selectedText}</p>}
                     <p className="text-xs leading-5 text-neutral-300">{annotation.comment}</p>
-                    <div className="mt-2 flex gap-1">
+                    <div className="editorial-comment-actions mt-2 flex flex-wrap gap-1">
                       <button className="text-[10px] text-neutral-600 hover:text-indigo-300" onClick={() => void updateAnnotation(annotation, { pinned: !annotation.pinned })}>{annotation.pinned ? t('Desfijar') : t('Fijar')}</button>
                       <button className="text-[10px] text-neutral-600 hover:text-indigo-300" onClick={() => void updateAnnotation(annotation, { locked: !annotation.locked })}>{annotation.locked ? t('Desbloquear') : t('Bloquear')}</button>
                       <button className="ml-auto text-[10px] text-neutral-600 hover:text-emerald-300" onClick={() => void updateAnnotation(annotation, { resolved: !annotation.resolvedAt })}>{annotation.resolvedAt ? t('Reabrir') : t('Resolver')}</button>
@@ -1111,7 +1052,7 @@ export function StudyEditor({
                 ))}</div>
               </section>
             )}
-            {data.backlinks.length > 0 && (
+            {contextTab === 'sources' && data.backlinks.length > 0 && (
               <section className="mb-5">
                 <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Backlinks')}</h3>
                 {data.backlinks.map((link) => {
@@ -1120,7 +1061,7 @@ export function StudyEditor({
                 })}
               </section>
             )}
-            {showHistory && (
+            {contextTab === 'history' && (
               <section>
                 <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">{t('Historial de versiones')}</h3>
                 {data.versions.length === 0 ? <p className="text-xs text-neutral-600">{t('El historial aparecerá después del primer cambio guardado.')}</p> : data.versions.map((version) => (
@@ -1134,12 +1075,12 @@ export function StudyEditor({
                 ))}
               </section>
             )}
-          </aside>
+          </EditorialInspector>
         )}
-        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" />{(settings.academicMode === 'manual' ? [] : quickImproveStyles).map((prompt) => {
+        {selectionImprove && selectionToolbar && createPortal(<><div className="divider" data-testid="study-selection-tools-divider" /><button type="button" data-testid="study-selection-improve" className="toolbar-item study-selection-tool" onPointerDown={event => { event.preventDefault(); openImprovePrompts(selectionImprove.target); }}><Icon name="sparkles" size={16} />{t('Mejorar con IA')}</button>{quickImproveStyles.map((prompt) => {
           const label = studyStyleTooltip(prompt);
-          return <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool study-selection-tooltip" data-study-tooltip={label} aria-label={label} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>;
-        })}{settings.academicMode !== 'manual' && <button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger study-selection-tooltip" data-study-tooltip={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button>}<label className="toolbar-item study-selection-color study-selection-tooltip" data-study-tooltip={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" aria-label={t('Color del texto')} type="color" defaultValue="#0f766e" onInput={(event) => milkdownRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><span className="study-selection-tooltip" data-study-tooltip={t('Nivel de título')}><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { milkdownRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></span></>, selectionToolbar)}
+          return <button type="button" key={prompt.id} data-testid={`study-quick-improve-${prompt.id.replace(':', '-')}`} className="toolbar-item study-selection-tool" title={label} aria-label={label} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); void runQuickImprovement(prompt, selectionImprove.target); }}><ImproveStyleMark style={prompt} /></button>;
+        })}{settings.academicMode !== 'manual' && <button type="button" data-testid="study-synonyms-toggle" className="toolbar-item study-selection-tool study-synonyms-trigger" title={t('Sinónimos con IA')} aria-label={t('Sinónimos con IA')} disabled={Boolean(improveStreamingStyleId)} onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openSynonymPanel(event.currentTarget, selectionImprove.target); }}><Icon name="aiSynonyms" size={16} /></button>}<label className="toolbar-item study-selection-color" title={t('Color del texto')} aria-label={t('Color del texto')}><Icon name="palette" size={16} /><input data-testid="study-selection-text-color" aria-label={t('Color del texto')} type="color" defaultValue="#0f766e" onInput={(event) => canvasRef.current?.setTextColor((event.target as HTMLInputElement).value)} /></label><span title={t('Nivel de título')}><select data-testid="study-selection-heading" className="study-selection-heading" defaultValue="" aria-label={t('Nivel de título')} onPointerDown={(event) => event.stopPropagation()} onChange={(event) => { canvasRef.current?.setHeading(Number(event.target.value)); event.target.value = ''; }}><option value="" disabled>H</option><option value="0">{t('Párrafo')}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>H{level}</option>)}</select></span></>, selectionToolbar)}
       </div>
       {synonymPanel && createPortal(
         <div ref={synonymPanelRef} data-testid="study-synonyms-panel" role="dialog" aria-label={t('Alternativas de sinónimos')} className="study-synonyms-panel" style={{ left: synonymPanel.x, top: synonymPanel.y }}>
@@ -1206,7 +1147,7 @@ export function StudyEditor({
           onCancel={() => setTextDialog(null)}
         />
       )}
-      {showImprovePrompts && <StudyImproveDialog onClose={() => setShowImprovePrompts(false)} onToolbarChanged={setQuickImproveStyles} />}
+      {showImprovePrompts && createPortal(<StudyImproveDialog onClose={() => setShowImprovePrompts(false)} onToolbarChanged={setQuickImproveStyles} onApply={prompt => { setShowImprovePrompts(false); const target = improveTargetRef.current ?? resolveImproveSelection(true); if (target) void runQuickImprovement(prompt, target); }} />, document.body)}
     </div>
   );
 }

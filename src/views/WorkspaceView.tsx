@@ -1,6 +1,8 @@
+import { normalizeAcademicMetadata, cloneAcademicDocument } from '@shared/academicDocument';
+import { EditorialCards, EditorialNavigator, CatalogViewControl, EditorialCreateTrigger, EditorialCatalogRow } from '../components/workspace/EditorialChrome';
+import '../components/workspace/editorialWorkspace.css';
 import { notifyDataChanged } from '../hooks';
 import { ManualIdeaEditor } from './ManualIdeaEditor';
-import { ManualIndexStatus } from '../components/ManualIndexStatus';
 // El espacio de trabajo de la bóveda académica: notas, ideas y colecciones en una sola
 // vista, y el mismo editor que ya usan Estudio y Docencia.
 //
@@ -69,6 +71,16 @@ function collectionChildren(collections: NoteFolder[]): Map<string | null, NoteF
     bucket.sort((a, b) => a.orderIdx - b.orderIdx || a.name.localeCompare(b.name));
   }
   return map;
+}
+
+function folderPath(id: string, folders: NoteFolder[]): string {
+  const names: string[] = []; const visited = new Set<string>();
+  let current = folders.find(folder => folder.id === id);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id); names.unshift(current.name);
+    current = folders.find(folder => folder.id === current?.parentId);
+  }
+  return names.join(' / ');
 }
 
 /** Una colección y todo lo que cuelga de ella: lo que se ve al seleccionarla. */
@@ -483,7 +495,7 @@ export function WorkspaceView({
   snapshot,
   onSnapshotChange,
   onOpenGraph,
-  title = 'Espacio de trabajo',
+  title = 'Nodus Scriptor',
   onTestimonyLink,
   onOpenResearchConversation,
   onOpenStudyDocument,
@@ -499,8 +511,7 @@ export function WorkspaceView({
   snapshot?: WorkspaceSnapshot;
   onSnapshotChange?: (patch: Partial<WorkspaceSnapshot>) => void;
   onOpenGraph?: (target: PendingGraphNavigationTarget) => void;
-  /** Los demás vaults conservan el nombre de sección «Notas» usando esta misma vista. */
-  title?: 'Espacio de trabajo' | 'Notas';
+  title?: 'Nodus Scriptor';
   /** Los enlaces temporales de una nota testimonial abren su entrevista y minuto. */
   onTestimonyLink?: (link: TestimonyDeepLink) => void;
   onOpenResearchConversation?: (source: NoteResearchChatSource) => void;
@@ -511,6 +522,12 @@ export function WorkspaceView({
   /** Study and teaching vaults: notes can be linked to courses, subjects, topics and materials. */
   studyLinks?: { onOpenLocation: (target: StudyNavigationTarget) => void; onOpenMaterial: (id: string) => void };
 }) {
+  const [pinnedActionIds, setPinnedActionIds] = useState<string[]>(snapshot?.pinnedActionIds ?? []);
+  const [layout, setLayout] = useState<'editorial' | 'navigator'>(() => snapshot?.layout ?? 'editorial');
+  const [catalogView, setCatalogView] = useState<'list' | 'cards'>(() => snapshot?.catalogView ?? 'list');
+  const [contextOpen, setContextOpen] = useState(snapshot?.contextOpen ?? false);
+  const [focusMode, setFocusMode] = useState(false);
+  const flushRef = useRef<() => Promise<boolean>>(async () => true);
   const [tree, setTree] = useState<NotesTree>({ folders: [], notes: [] });
   const [links, setLinks] = useState<WorkspaceLibraryLink[]>([]);
   const [studyNoteLinks, setStudyNoteLinks] = useState<StudyNoteLink[]>([]);
@@ -521,6 +538,8 @@ export function WorkspaceView({
   // Restored as initial values only. The expanded folders are part of the cut:
   // collapsing back to the root loses the reader's route to what they were reading
   // just as surely as dropping the filter does.
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [sortOrder, setSortOrder] = useState('recent');
   const [scope, setScope] = useState<Scope>(() => snapshot?.scope ?? { kind: 'all' });
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(snapshot?.expanded ?? []));
   const [search, setSearch] = useState(() => snapshot?.search ?? '');
@@ -654,16 +673,16 @@ export function WorkspaceView({
           || note.content.toLocaleLowerCase().includes(needle)
           || note.tags.some((tag) => tag.toLocaleLowerCase().includes(needle));
       })
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [tree.notes, scope, children, kindFilter, search, selectedTags]);
+      .sort((a, b) => sortOrder === 'title' ? a.title.localeCompare(b.title) : sortOrder === 'oldest' ? a.updatedAt.localeCompare(b.updatedAt) : b.updatedAt.localeCompare(a.updatedAt));
+  }, [tree.notes, scope, children, kindFilter, search, selectedTags, sortOrder]);
 
   // The registry rebuilds the callback on every render of the shell, so a ref keeps
   // its identity out of the effect's dependencies.
   const report = useRef(onSnapshotChange);
   report.current = onSnapshotChange;
   useEffect(() => {
-    report.current?.({ scope, expanded: [...expanded], search, kindFilter, selectedTags, openIds, activeId });
-  }, [activeId, expanded, kindFilter, openIds, scope, search, selectedTags]);
+    report.current?.({ scope, expanded: [...expanded], search, kindFilter, selectedTags, openIds, activeId, layout, catalogView, contextOpen, focusMode, pinnedActionIds });
+  }, [activeId, expanded, kindFilter, openIds, scope, search, selectedTags, layout, catalogView, contextOpen, focusMode, pinnedActionIds]);
 
   // This list is not paged — the filtered set renders whole — so the placement is
   // scroll alone. It is still an id: row heights change with the window, and the
@@ -686,12 +705,14 @@ export function WorkspaceView({
   );
   const active = openTabs.find((note) => note.id === activeId) ?? null;
 
-  const openNote = (id: string) => {
+  const openNote = async (id: string) => {
+    if (activeId && !await flushRef.current()) return;
     setOpenIds((current) => current.includes(id) ? current : [...current, id]);
     setActiveId(id);
   };
 
-  const closeNote = (id: string) => {
+  const closeNote = async (id: string) => {
+    if (activeId === id && !await flushRef.current()) return;
     setOpenIds((current) => current.filter((candidate) => candidate !== id));
     setActiveId((current) => {
       if (current !== id) return current;
@@ -716,16 +737,20 @@ export function WorkspaceView({
   };
 
   const duplicateNote = async (note: Note) => {
+    if (activeId === note.id && !await flushRef.current()) return;
+    const data = await window.nodus.getWorkspaceNoteEditorData(note.id);
     const copy = await window.nodus.createNote({
       title: `${note.title} (${t('copia')})`, content: note.content,
       kind: note.kind === 'idea' ? 'markdown' : note.kind, folderId: note.folderId, tags: note.tags,
     });
+    if(data.nativeDocument){const cloned=cloneAcademicDocument(data.nativeDocument,data.academicMetadata);await window.nodus.updateWorkspaceNote(copy.id,{title:copy.title,contentMarkdown:copy.content,nativeDocument:cloned.document,academicMetadata:cloned.metadata,style:data.style});}
     await refresh();
     openNote(copy.id);
   };
 
   const moveToTrash = async (ids: string[]) => {
     const unique = [...new Set(ids)];
+    if (activeId && unique.includes(activeId) && !await flushRef.current()) return;
     await window.nodus.trashNotes(unique);
     closeNotes(unique);
     setSelected(new Set());
@@ -777,47 +802,55 @@ export function WorkspaceView({
     openNote(created.id);
   };
 
+  const createManuscript = async () => {
+    const collectionId=targetCollectionId();
+    const folderId=collectionId??(await window.nodus.createNoteFolder({name:t('Nuevo manuscrito')})).id;
+    const folderIds=new Set([folderId]);for(let count=0;count<tree.folders.length;count++)for(const folder of tree.folders)if(folder.parentId&&folderIds.has(folder.parentId))folderIds.add(folder.id);
+    const chapters=tree.notes.filter(note=>note.folderId&&folderIds.has(note.folderId)&&!note.trashedAt&&note.source?.note!=='academic-manuscript').sort((a,b)=>a.orderIdx-b.orderIdx).map(note=>({documentId:note.id,kind:'note' as const,title:note.title,included:true}));
+    const created=await window.nodus.createNote({title:t('Nuevo manuscrito'),content:'',folderId,kind:'markdown',source:{origin:'markdown',ref:folderId,note:'academic-manuscript'}});
+    const metadata=normalizeAcademicMetadata(null);metadata.manuscript={kind:'paper',chapters,authors:'',abstract:'',keywords:'',includeContents:false,paper:'A4',marginMm:25};
+    await window.nodus.updateWorkspaceNote(created.id,{title:created.title,contentMarkdown:'',nativeDocument:[],academicMetadata:metadata,schemaVersion:2});
+    await refresh();openNote(created.id);
+  };
+
   const selectedCollection = scope.kind === 'collection' ? tree.folders.find((folder) => folder.id === scope.id) ?? null : null;
   const contextNote = itemContextMenu ? tree.notes.find((note) => note.id === itemContextMenu.noteId) ?? null : null;
 
-  const editorPane = active && (settings.academicMode === 'manual' && itemKind(active) === 'idea' && active.source?.ref ? (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <ManualIndexStatus />
-      <ManualIdeaEditor key={active.id} note={active} globalId={active.source.ref} manual onSaved={() => { void refresh(); notifyDataChanged(); }} onOpenGraph={onOpenGraph} />
-    </div>
-  ) : (
-    <div className="flex min-h-0 flex-1">
+  const workspaceTabs = (      <WorkspaceTabStrip
+        alwaysShowHome
+        homeLabel={t(title)}
+        homeIcon="notebook"
+        homeTestId="workspace-tab-home"
+        tabTestId={(tab) => `workspace-tab-${tab.key}`}
+        closeTestId={(tab) => `workspace-tab-close-${tab.key}`}
+        tabs={openTabs.map((note) => ({ key: note.id, title: note.title, icon: KIND_ICON[itemKind(note)] }))}
+        activeKey={active?.id ?? null}
+        onActivateHome={() => { void flushRef.current().then(saved => { if (saved) setActiveId(null); }); }}
+        onActivateTab={openNote}
+        onCloseTab={closeNote}
+      />
+  );
+
+  const editorPane = active && (
+    <div className="flex min-h-0 min-w-0 flex-1 relative">
       <div className="min-h-0 min-w-0 flex-1 flex flex-col">
-        {settings.academicMode === 'manual' && <ManualIndexStatus />}
         <Suspense fallback={<div className="grid h-full place-items-center"><Spinner label={t('Cargando editor…')} /></div>}>
           <StudyEditor
-            key={active.id}
-            settings={settings}
-            port={workspaceNotePort}
-            showTabs={false}
-            documentIcon={KIND_ICON[itemKind(active)]}
-            documents={[noteAsEditorDocument(active)]}
-            activeId={active.id}
-            onActivate={openNote}
-            onClose={closeNote}
-            onSaved={(updated) => {
-              if (settings.academicMode === 'manual') notifyDataChanged();
-              setTree((current) => ({
-                ...current,
-                notes: current.notes.map((note) => note.id === updated.id
-                  ? { ...note, title: updated.title, content: updated.contentMarkdown, updatedAt: new Date().toISOString() }
-                  : note),
-              }));
+            pinnedActionIds={pinnedActionIds} onPinnedActionsChange={setPinnedActionIds}
+            navigatorContent={layout === 'navigator' && <EditorialNavigator items={visible.map(note => ({ id: note.id, title: note.title, snippet: plainSnippet(note.content) }))} activeId={active.id} search={search} onSearch={setSearch} onOpen={openNote} onClose={() => setLayout('editorial')} collectionControl={<select className="input" aria-label={t('Colección')} value={scope.kind === 'collection' ? scope.id : scope.kind} onChange={event => setScope(event.target.value === 'all' ? { kind: 'all' } : event.target.value === 'unfiled' ? { kind: 'unfiled' } : { kind: 'collection', id: event.target.value })}><option value="all">{t('Todo')}</option><option value="unfiled">{t('Sin colección')}</option>{tree.folders.map(folder => <option key={folder.id} value={folder.id}>{folder.name}</option>)}</select>} />}
+            location={active.folderId ? folderPath(active.folderId, tree.folders) : t('Sin colección')}
+            contextOpen={contextOpen} onContextOpenChange={setContextOpen}
+            focusMode={focusMode} onFocusModeChange={focus => { setFocusMode(focus); if (focus) setLayout('editorial'); }}
+            onNavigateLink={href => {
+              const study = href.match(/^nodus:\/\/study\/(doc|material)\/([^?]+)/);
+              if(study) { const handler=study[1]==='doc'?onOpenStudyDocument:onOpenStudyMaterial; if(handler){handler(decodeURIComponent(study[2]));return true;} }
+              const world=href.match(/^nodus:\/\/world\/([^/]+)\/(.+)/);if(world&&onOpenWorldEntry){onOpenWorldEntry(world[1],decodeURIComponent(world[2]));return true;}
+              const citation=href.match(/^nodus:\/\/(idea|work|gap|contradiction)\/([^?]+)/);if(citation&&onOpenGraph){onOpenGraph(citation[1]==='work'?{workId:decodeURIComponent(citation[2])}:{nodeId:decodeURIComponent(citation[2])});return true;}
+              return false;
             }}
-            onDuplicate={async () => duplicateNote(active)}
-            onTrash={async () => setPendingNoteDelete(active)}
-            onOpenLinkedDocument={openNote}
-            onOpenRecording={() => undefined}
-            onTestimonyLink={onTestimonyLink}
-          />
-        </Suspense>
-      </div>
-      <aside className="library-theme-panel hidden w-[260px] shrink-0 flex-col overflow-y-auto border-l border-neutral-800 bg-neutral-950/80 xl:flex">
+            onRegisterFlush={flush => { flushRef.current = flush; }}
+            headerContent={<><button className="editorial-header-action" aria-label={t('Navegador de documentos')} aria-pressed={layout === 'navigator'} onClick={() => setLayout(layout === 'navigator' ? 'editorial' : 'navigator')}><Icon name="list" size={14} /></button>{workspaceTabs}</>}
+            contextDetails={<>
         <div className="px-3 py-3">
           <b className="text-[10px] uppercase tracking-wider text-neutral-500">{t('Detalles')}</b>
           <p className="mt-1 truncate text-xs font-medium" title={active.title}>{active.title}</p>
@@ -843,14 +876,6 @@ export function WorkspaceView({
           </select>
         </div>
         <WorkspaceTagsEditor note={active} onChanged={refresh} />
-        <ResearchNoteProvenancePanel
-          note={active}
-          onOpenConversation={onOpenResearchConversation}
-          onOpenStudyDocument={onOpenStudyDocument}
-          onOpenStudyMaterial={onOpenStudyMaterial}
-          onOpenStudyRecording={onOpenStudyRecording}
-          onOpenWorldEntry={onOpenWorldEntry}
-        />
         {itemKind(active) === 'idea' && active.source?.ref && onOpenGraph && (
           <div className="px-3 pb-3">
             <button className="btn btn-ghost w-full text-xs" onClick={() => onOpenGraph({ nodeId: active.source!.ref!, label: active.title })}>
@@ -869,10 +894,45 @@ export function WorkspaceView({
             onChanged={refreshStudyLinks}
           />
         )}
-        <LibraryLinksPanel ownerKind="note" ownerId={active.id} ownerLabel={active.title} links={links} onChanged={refresh} />
-      </aside>
+            </>}
+            contextSources={<>
+        <ResearchNoteProvenancePanel
+          note={active}
+          onOpenConversation={onOpenResearchConversation}
+          onOpenStudyDocument={onOpenStudyDocument}
+          onOpenStudyMaterial={onOpenStudyMaterial}
+          onOpenStudyRecording={onOpenStudyRecording}
+          onOpenWorldEntry={onOpenWorldEntry}
+        />
+        <LibraryLinksPanel ownerKind="note" ownerId={active.id} ownerLabel={active.title} links={links} onChanged={refresh} />              {settings.academicMode === 'manual' && itemKind(active) === 'idea' && active.source?.ref && <ManualIdeaEditor key={active.id} note={active} globalId={active.source.ref} linksOnly manual onSaved={() => { void refresh(); notifyDataChanged(); }} onOpenGraph={onOpenGraph} />}
+            </>}
+            settings={settings}
+            port={workspaceNotePort}
+            showTabs={false}
+            documentIcon={KIND_ICON[itemKind(active)]}
+            documents={[noteAsEditorDocument(active)]}
+            activeId={active.id}
+            onActivate={openNote}
+            onClose={closeNote}
+            onSaved={(updated) => {
+              if (settings.academicMode === 'manual') notifyDataChanged();
+              setTree((current) => ({
+                ...current,
+                notes: current.notes.map((note) => note.id === updated.id
+                  ? { ...note, title: updated.title, content: updated.contentMarkdown, updatedAt: new Date().toISOString() }
+                  : note),
+              }));
+            }}
+            onDuplicate={async () => duplicateNote(active)}
+            onTrash={async () => setPendingNoteDelete(active)}
+            onOpenLinkedDocument={openNote}
+            onOpenRecording={() => undefined}
+            onTestimonyLink={onTestimonyLink}
+          />
+        </Suspense>
+      </div>
     </div>
-  ));
+  );
 
   const browser = (
     <div data-testid="workspace-view" className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
@@ -886,17 +946,18 @@ export function WorkspaceView({
         <div className="library-header-actions">
           {scope.kind === 'trash' ? <button data-testid="workspace-empty-trash" className="btn btn-ghost h-8 border border-red-500/30 text-xs text-red-400" disabled={!trashedNotes.length} onClick={() => setPendingPermanentDeleteIds(trashedNotes.map((note) => note.id))}>
             <Icon name="trash" size={13} /> {t('Vaciar papelera')}
-          </button> : <><button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
+          </button> : <details className="editorial-options editorial-create-options"><EditorialCreateTrigger /><div className="editorial-create-menu"><button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
             <Icon name="bulb" size={13} /> {t('Idea')}
           </button>
           <button data-testid="workspace-create-note" className="btn btn-primary h-8 text-xs" onClick={() => void createItem('note')}>
             <Icon name="notebook" size={13} /> {t('Nota')}
-          </button></>}
+          </button><button data-testid="workspace-create-manuscript" className="btn btn-ghost" onClick={()=>void createManuscript()}>{t('Manuscrito')}</button><button className="btn btn-ghost" onClick={() => setCreatingCollection(true)}>{t('Colección')}</button></div></details>}
+          <button className="editorial-header-action editorial-collection-toggle" onClick={() => setCollectionsOpen(!collectionsOpen)}>{t('Colecciones')}</button><CatalogViewControl value={catalogView} onChange={setCatalogView} />
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="library-theme-panel hidden w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 lg:flex">
+        <aside className={`editorial-collections library-theme-panel w-[238px] shrink-0 flex-col border-r border-neutral-800 bg-neutral-950/80 ${collectionsOpen ? 'is-open' : ''}`}>
           <div className="flex items-center gap-1 px-3 py-3">
             <b className="min-w-0 flex-1 text-[11px] uppercase tracking-wider text-neutral-500">{t('Colecciones')}</b>
             <button
@@ -1009,7 +1070,7 @@ export function WorkspaceView({
               <option value="note">{t('Notas')}</option>
               <option value="idea">{t('Ideas')}</option>
             </select>
-            <div className="relative" ref={tagFilterRef}>
+            <select aria-label={t('Ordenar documentos')} className="input h-8 text-xs" value={sortOrder} onChange={event => setSortOrder(event.target.value)}><option value="recent">{t('Recientes')}</option><option value="oldest">{t('Más antiguos')}</option><option value="title">{t('Título')}</option></select><div className="relative" ref={tagFilterRef}>
               <button
                 data-testid="workspace-tag-filter"
                 type="button"
@@ -1063,6 +1124,8 @@ export function WorkspaceView({
             </div>
           )}
 
+          <div ref={listRef} data-testid="workspace-item-list" className="library-catalog-scroll min-h-0 flex-1 overflow-y-auto">
+            {catalogView === 'cards' && scope.kind !== 'trash' && <><h2 className="editorial-catalog-subtitle">{t('Recientes')}</h2><EditorialCards items={visible.slice(0,3).map(note => ({ id: note.id, title: note.title, snippet: plainSnippet(note.content), collection: tree.folders.find(folder => folder.id === note.folderId)?.name }))} onOpen={openNote} /><h2 className="editorial-catalog-subtitle">{t('Otros documentos')}</h2></>}
           <div data-testid="workspace-table-header" className="grid h-9 shrink-0 grid-cols-[28px_22px_minmax(0,1fr)_minmax(120px,0.45fr)_72px] items-center border-b border-neutral-800 px-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-600">
             <input
               data-testid="workspace-select-all"
@@ -1076,24 +1139,23 @@ export function WorkspaceView({
               aria-label={t('Seleccionar todos los elementos visibles')}
             />
             <span />
-            <span>{t('Título')}</span>
+            <span>{t('Título / Colección')}</span>
             <span>{t('Etiquetas')}</span>
             <span className="text-right">{t('Modificado')}</span>
           </div>
 
-          <div ref={listRef} data-testid="workspace-item-list" className="library-catalog-scroll min-h-0 flex-1 overflow-y-auto">
             {loading && <p className="px-4 py-6 text-xs text-neutral-500"><Spinner /> {t('Cargando…')}</p>}
             {!loading && visible.length === 0 && (
               <p className="px-4 py-6 text-xs leading-5 text-neutral-500">
                 {scope.kind === 'trash' ? t('La papelera está vacía.') : (search || selectedTags.length ? t('Ningún elemento coincide.') : t('Todavía no hay nada aquí. Crea una nota o una idea para empezar.'))}
               </p>
             )}
-            {visible.map((note) => {
+            {(catalogView === 'cards' && scope.kind !== 'trash' ? visible.slice(3) : visible).map((note) => {
               const kind = itemKind(note);
               const linkCount = links.filter((link) => link.ownerKind === 'note' && link.ownerId === note.id).length;
               const studyLinksOfNote = studyLinkCounts.get(note.id) ?? [];
               return (
-                <div
+                <EditorialCatalogRow data-selected={selected.has(note.id)}
                   key={note.id}
                   data-testid={`workspace-item-${note.id}`}
                   data-anchor-id={note.id}
@@ -1116,7 +1178,7 @@ export function WorkspaceView({
                   <input type="checkbox" checked={selected.has(note.id)} onChange={(event) => toggleSelected(note.id, event.target.checked)} onClick={(event) => event.stopPropagation()} aria-label={tx('Seleccionar {name}', { name: note.title })} />
                   <Icon name={KIND_ICON[kind]} size={14} className={`mt-0.5 shrink-0 ${kind === 'idea' ? 'text-amber-400' : 'text-neutral-500'}`} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">{note.title}</span>
+                    <span className="block truncate text-sm">{note.title}</span><small className="text-[10px] text-neutral-500">{tree.folders.find(folder => folder.id === note.folderId)?.name ?? t('Sin colección')}</small>
                     <span className="mt-0.5 block truncate text-[11px] text-neutral-500">{plainSnippet(note.content) || t('Sin contenido')}</span>
                   </span>
                   <span className="flex min-w-0 flex-wrap gap-1 pr-2">
@@ -1125,8 +1187,8 @@ export function WorkspaceView({
                     {linkCount > 0 && <span className="flex items-center gap-1 text-[10px] text-neutral-600" title={tx('{n} elemento(s) de biblioteca enlazado(s)', { n: linkCount })}><Icon name="link" size={10} />{linkCount}</span>}
                     {studyLinksOfNote.length > 0 && <span data-testid={`workspace-item-study-links-${note.id}`} className="flex items-center gap-1 text-[10px] text-indigo-400/80" title={[tx('Vinculada en {n} sitio(s)', { n: studyLinksOfNote.length }), ...studyLinksOfNote.map((link) => studyNoteLinkLabel(link, studyOrganization))].filter(Boolean).join('\n')}><Icon name="graduation" size={10} />{studyLinksOfNote.length}</span>}
                   </span>
-                  <span className="shrink-0 text-right text-[10px] tabular-nums text-neutral-600">{formatRelative(note.trashedAt ?? note.updatedAt)}</span>
-                </div>
+                  <span className="shrink-0 text-right text-[10px] tabular-nums text-neutral-600">{formatRelative(note.trashedAt ?? note.updatedAt)}<span className="editorial-row-actions"><button aria-label={t('Opciones del documento')} onClick={event => { event.stopPropagation(); setItemContextMenu({ noteId: note.id, x: Math.min(event.clientX,window.innerWidth-250), y: Math.min(event.clientY,window.innerHeight-340) }); }}>···</button></span></span>
+                </EditorialCatalogRow>
               );
             })}
           </div>
@@ -1136,19 +1198,9 @@ export function WorkspaceView({
   );
 
   return (
-    <div className="library-theme flex h-full min-h-0 flex-col">
-      <WorkspaceTabStrip
-        homeLabel={t(title)}
-        homeIcon="notebook"
-        homeTestId="workspace-tab-home"
-        tabTestId={(tab) => `workspace-tab-${tab.key}`}
-        closeTestId={(tab) => `workspace-tab-close-${tab.key}`}
-        tabs={openTabs.map((note) => ({ key: note.id, title: note.title, icon: KIND_ICON[itemKind(note)] }))}
-        activeKey={active?.id ?? null}
-        onActivateHome={() => setActiveId(null)}
-        onActivateTab={setActiveId}
-        onCloseTab={closeNote}
-      />
+    <div className="library-theme editorial-workspace relative flex h-full min-h-0 flex-col">
+      {!active && <div className="editorial-editor-header"><button className="editorial-header-action" disabled aria-label={t('Navegador de documentos')}><Icon name="list" size={14} /></button><div className="editorial-header-leading">{workspaceTabs}</div></div>}
+
       <div className={`min-h-0 flex-1 overflow-hidden ${active ? 'hidden' : ''}`} aria-hidden={active ? true : undefined}>
         {browser}
       </div>

@@ -16,6 +16,8 @@
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -23,6 +25,11 @@ const outputDir = path.join(repoRoot, 'server/lib/core/generated');
 
 /** Entry points, and what the server calls them. */
 export const GENERATED = [
+  { entry: 'shared/academicProjection.ts', out: 'academicProjection.mjs' },
+  { entry: 'shared/academicDocument.ts', out: 'academicDocument.mjs' },
+  { entry: 'shared/academicDelivery.ts', out: 'academicDelivery.mjs' },
+  { entry: 'shared/editorReferences.ts', out: 'editorReferences.mjs' },
+  { entry: 'shared/blockNoteDocument.ts', out: 'blockNoteDocument.mjs' },
   { entry: 'shared/deepResearchReport.ts', out: 'deepResearchReport.mjs' },
   { entry: 'shared/vaultColors.ts', out: 'vaultColors.mjs' },
   { entry: 'shared/providerContextWindows.ts', out: 'providerContextWindows.mjs' },
@@ -57,6 +64,7 @@ export async function buildGenerated() {
     const code = BANNER + result.outputFiles[0].text;
     written.push({ file: path.join(outputDir, out), code });
   }
+  written.push({file:path.join(outputDir,'paged.polyfill.js'),code:await readFile(path.resolve(path.dirname(require.resolve('pagedjs')),'../dist/paged.polyfill.js'),'utf8')});
   return written;
 }
 

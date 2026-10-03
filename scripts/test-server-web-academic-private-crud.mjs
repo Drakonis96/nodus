@@ -10,8 +10,8 @@ const api = variants(fs.readFileSync(`${root}/src/serverWeb/api.ts`, 'utf8'));
 const app = variants(fs.readFileSync(`${root}/src/serverWeb/App.tsx`, 'utf8'));
 const navigation = variants(fs.readFileSync(`${root}/src/navigation.ts`, 'utf8'));
 
-test('the visible writing group contains only Workspace and legacy URLs canonicalize there', () => {
-  assert.match(navigation, /\{ id: 'workspace', label: 'Espacio de trabajo'/);
+test('Scriptor belongs to tools and legacy writing URLs canonicalize to the same workspace', () => {
+  assert.match(navigation, /\{ id: 'workspace', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' \}/);
   assert.doesNotMatch(navigation, /\{ id: 'writing', label:/);
   assert.doesNotMatch(navigation, /\{ id: 'projects', label:/);
   assert.match(app, /requested === ["']writing["'] \|\| requested === ["']projects["'] \? ["']workspace["']/);

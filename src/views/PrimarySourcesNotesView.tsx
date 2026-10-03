@@ -240,7 +240,7 @@ export function PrimarySourcesNotesView({
     <div className="library-theme-canvas flex h-full min-h-0 flex-col bg-neutral-950">
       <header data-testid="primary-sources-notes-header" className="library-header-bar min-h-14 shrink-0 border-b border-neutral-800 px-5 py-3">
         <div className="library-header-title min-w-0">
-          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="notebook" className="text-indigo-400" />{t('Notas')}</h1>
+          <h1 className="flex items-center gap-2 text-lg font-semibold"><Icon name="notebook" className="text-indigo-400" />Nodus Scriptor</h1>
           <p className="text-[11px] text-neutral-500">{workspace.notes.length} {t('Notas').toLocaleLowerCase()} · {workspace.collections.length} {t('Colecciones').toLocaleLowerCase()}</p>
         </div>
         <div className="library-header-actions">
@@ -368,7 +368,7 @@ export function PrimarySourcesNotesView({
   return (
     <div data-testid="primary-sources-notes" className="library-theme flex h-full min-h-0 flex-col">
       <WorkspaceTabStrip
-        homeLabel={t('Notas')}
+        homeLabel="Nodus Scriptor"
         homeIcon="notebook"
         homeTestId="primary-sources-notes-tab-home"
         tabTestId={(tab) => `primary-sources-notes-tab-${tab.key}`}

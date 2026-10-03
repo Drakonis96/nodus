@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { StudyStyle, StudyStyleInput } from '@shared/types';
 import { studyStyleIcon, validateStudyStylePrompt } from '@shared/studyImprove';
 import { normalizePromptLanguage } from '@shared/promptLanguageOptions';
@@ -6,11 +6,12 @@ import { getActiveLang, t, tx } from '../../i18n';
 import { Icon, ICON_NAMES, Spinner } from '../ui';
 import { IconEmojiPicker } from '../IconEmojiPicker';
 import { ConfirmModal } from '../ConfirmModal';
+import './studyImproveDialog.css';
 
 const TOOLBAR_LIMIT = 4;
 
 const newPrompt = (): StudyStyleInput => ({
-  name: '', prompt: '', icon: 'wand', color: '#0f766e', description: 'Prompt personalizado creado por el usuario.',
+  name: '', prompt: '', icon: 'sparkles', color: '#0f766e', description: 'Prompt personalizado creado por el usuario.',
   category: 'custom', language: 'auto', level: 'moderate', length: 'similar', systemPrompt: '', temperature: 0.2,
   maxOutputTokens: 2400, creativity: 0.1, locked: false, favorite: false, active: true,
 });
@@ -18,7 +19,7 @@ const newPrompt = (): StudyStyleInput => ({
 /** El formulario sólo edita icono; un prompt importado con emoji vuelve al icono por defecto. */
 const editableIcon = (style: StudyStyle) => {
   const icon = studyStyleIcon(style.icon);
-  return (ICON_NAMES as readonly string[]).includes(icon) ? icon : 'wand';
+  return (ICON_NAMES as readonly string[]).includes(icon) ? icon : 'sparkles';
 };
 
 function PromptMark({ style, size = 17 }: { style: Pick<StudyStyle, 'icon'>; size?: number }) {
@@ -26,10 +27,37 @@ function PromptMark({ style, size = 17 }: { style: Pick<StudyStyle, 'icon'>; siz
   return <Icon name={(ICON_NAMES as readonly string[]).includes(icon) ? icon : 'sparkles'} size={size} />;
 }
 
-export function StudyImproveDialog({ onToolbarChanged, onClose }: {
+export function StudyImproveDialog({ onToolbarChanged, onClose, onApply }: {
   onToolbarChanged: (styles: StudyStyle[]) => void;
   onClose: () => void;
+  onApply?: (style: StudyStyle) => void;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  const confirmationOpenRef = useRef(false);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    dialogRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.key === 'Escape') {
+        if (!confirmationOpenRef.current) { event.preventDefault(); closeRef.current(); }
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const activeDialog = confirmationOpenRef.current
+        ? [...document.querySelectorAll<HTMLElement>('[role=dialog]')].find(element => element.getAttribute('aria-label') === t('Eliminar prompt'))
+        : dialogRef.current;
+      const elements = [...activeDialog?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]') ?? []].filter(element => element.getClientRects().length);
+      const first = elements[0]; const last = elements.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.removeEventListener('keydown', keydown); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, []);
   const [styles, setStyles] = useState<StudyStyle[]>([]);
   const [toolbarIds, setToolbarIds] = useState<string[]>([]);
   const [selectedId, setSelectedId] = useState('builtin:academic');
@@ -37,8 +65,9 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
   /** `null` muestra la ficha; `create` y `edit` abren el mismo formulario. */
   const [editing, setEditing] = useState<{ mode: 'create' } | { mode: 'edit'; id: string } | null>(null);
   const [draft, setDraft] = useState<StudyStyleInput>(newPrompt);
-  const [visual, setVisual] = useState({ icon: 'wand', emoji: '' });
+  const [visual, setVisual] = useState({ icon: 'sparkles', emoji: '' });
   const [pendingDeletion, setPendingDeletion] = useState<StudyStyle | null>(null);
+  confirmationOpenRef.current = Boolean(pendingDeletion);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -74,7 +103,7 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
   };
 
   const startCreate = () => {
-    setDraft(newPrompt()); setVisual({ icon: 'wand', emoji: '' }); setEditing({ mode: 'create' }); setMessage('');
+    setDraft(newPrompt()); setVisual({ icon: 'sparkles', emoji: '' }); setEditing({ mode: 'create' }); setMessage('');
   };
 
   const startEdit = (style: StudyStyle) => {
@@ -120,52 +149,66 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
   };
 
   const warnings = validateStudyStylePrompt(draft.prompt, normalizePromptLanguage(getActiveLang()));
+  const builtInNotice = t('Los prompts incluidos no se pueden editar ni eliminar.');
+  const cancelDeletion = () => {
+    setPendingDeletion(null);
+    requestAnimationFrame(() => deleteButtonRef.current?.focus());
+  };
 
-  return <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/65 p-4" data-testid="study-improve-dialog" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section className="flex max-h-[78vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white text-neutral-900 shadow-2xl dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100">
-      <header className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300"><Icon name="wand" size={15} /></span>
-        <div className="min-w-0 flex-1"><h2 className="text-sm font-semibold">{t('Prompts de mejora')}</h2><p className="text-[11px] text-neutral-500">{t('Elige hasta cuatro accesos rápidos para la barra de escritura.')}</p></div>
-        <button data-testid="study-style-new" className="btn btn-primary h-8 px-3 text-xs" onClick={startCreate}><Icon name="plus" size={12} />{t('Nuevo prompt')}</button>
-        <button className="btn btn-ghost h-8 w-8 p-0" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" size={14} /></button>
+  return <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={t('Prompts de mejora')} className="study-prompts-backdrop" data-testid="study-improve-dialog" onMouseDown={(event) => { if (event.target === event.currentTarget && !pendingDeletion) onClose(); }}>
+    <section className="study-prompts-dialog">
+      <header className="study-prompts-header">
+        <Icon name="sparkles" size={18} className="study-prompts-heading-mark" />
+        <h2>{t('Prompts de mejora')}</h2>
+        <button type="button" className="study-prompts-close" onClick={onClose} aria-label={t('Cerrar')}><Icon name="x" size={16} /></button>
       </header>
-
-      <div className="grid min-h-0 flex-1 grid-cols-[250px_minmax(0,1fr)]">
-        <aside className="min-h-0 overflow-y-auto border-r border-neutral-200 p-3 dark:border-neutral-800">
-          <label className="relative block"><Icon name="search" size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" /><input className="input input-with-leading-icon h-8 w-full text-xs" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar prompts…')} /></label>
-          <div className="mt-3 space-y-1" data-testid="study-style-list">{filtered.map((style) => {
-            const inToolbar = toolbarIds.includes(style.id);
-            return <div key={style.id} className={`flex items-center rounded-lg border ${selectedId === style.id ? 'border-teal-400 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/30' : 'border-transparent hover:bg-neutral-50 dark:hover:bg-neutral-900'}`}>
-              <button className="flex min-w-0 flex-1 items-center gap-2 px-2 py-2 text-left" data-testid={`study-style-${style.id.replace(':', '-')}`} onClick={() => { setSelectedId(style.id); setEditing(null); setMessage(''); }}><span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-neutral-100 dark:bg-neutral-900"><PromptMark style={style} /></span><span className="min-w-0 truncate text-xs">{style.name}</span></button>
-              <button data-testid={`study-style-toolbar-${style.id.replace(':', '-')}`} className={`mr-1 grid h-7 w-7 place-items-center rounded-md ${inToolbar ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800'}`} title={inToolbar ? t('Quitar de la barra') : t('Mostrar en la barra')} aria-label={inToolbar ? t('Quitar de la barra') : t('Mostrar en la barra')} onClick={() => void toggleToolbar(style)}><Icon name="star" size={12} /></button>
-            </div>;
-          })}</div>
+      <div className="study-prompts-toolbar">
+        <label className="study-prompts-search"><Icon name="search" size={15} /><input data-testid="study-prompt-search" type="search" className="input" aria-label={t('Buscar prompts…')} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Buscar prompts…')} /></label>
+        <button type="button" data-testid="study-style-new" className="btn study-prompts-new" onClick={startCreate}><Icon name="plus" size={14} />{t('Nuevo prompt')}</button>
+      </div>
+      <div className="study-prompts-layout">
+        <aside className="study-prompts-sidebar">
+          <div className="study-prompts-list" data-testid="study-style-list" role="list" aria-label={t('Prompts de mejora')}>
+            {filtered.map((style) => {
+              const inToolbar = toolbarIds.includes(style.id);
+              return <div key={style.id} className={`study-prompts-row${selectedId === style.id ? ' is-selected' : ''}`} role="listitem">
+                <button type="button" className="study-prompts-choice" data-testid={`study-style-${style.id.replace(':', '-')}`} aria-pressed={selectedId === style.id} title={style.name} onClick={() => { setSelectedId(style.id); setEditing(null); setMessage(''); }}><PromptMark style={style} size={16} /><span>{style.name}</span></button>
+                <button type="button" data-testid={`study-style-toolbar-${style.id.replace(':', '-')}`} className={`study-prompts-pin${inToolbar ? ' is-pinned' : ''}`} aria-pressed={inToolbar} title={inToolbar ? t('Quitar de la barra') : t('Mostrar en la barra')} aria-label={inToolbar ? t('Quitar de la barra') : t('Mostrar en la barra')} onClick={() => void toggleToolbar(style)}><Icon name="star" size={13} /></button>
+              </div>;
+            })}
+            {!filtered.length && <p className="study-prompts-empty" role="status">{t(query.trim() ? 'Sin resultados' : 'No hay prompts guardados.')}</p>}
+          </div>
+          <div className="study-prompts-shortcuts"><Icon name="star" size={13} /><span>{toolbarIds.length}/{TOOLBAR_LIMIT}</span><p>{t('Elige hasta cuatro accesos rápidos para la barra de escritura.')}</p></div>
         </aside>
-
-        <main className="min-h-0 overflow-y-auto p-4">
-          {editing ? <div data-testid="study-style-editor" className="space-y-3">
-            <h3 className="text-sm font-semibold">{editing.mode === 'edit' ? t('Editar prompt') : t('Añadir prompt')}</h3>
-            <label className="block text-xs text-neutral-500">{t('Título')}<input data-testid="study-prompt-title" autoFocus className="input mt-1 w-full" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-            <label className="block text-xs text-neutral-500">{t('Icono')}<IconEmojiPicker icon={visual.icon} emoji="" allowEmoji={false} onChange={(value) => setVisual({ icon: value.icon, emoji: '' })} /></label>
-            <label className="block text-xs text-neutral-500">{t('Prompt')}<textarea data-testid="study-prompt-text" className="input mt-1 min-h-32 w-full resize-y py-2" value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={t('Indica exactamente cómo debe transformar el texto seleccionado…')} /></label>
-            {warnings.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">{warnings.map((warning) => <p key={warning}>⚠ {warning}</p>)}</div>}
-            <div className="flex justify-end gap-2"><button className="btn btn-ghost" onClick={() => setEditing(null)}>{t('Cancelar')}</button><button data-testid="study-prompt-save" className="btn btn-primary" disabled={busy} onClick={() => void savePrompt()}>{busy ? <Spinner label={t('Guardando…')} /> : editing.mode === 'edit' ? t('Guardar cambios') : t('Guardar prompt')}</button></div>
-          </div> : selected ? <article data-testid="study-prompt-detail">
-            <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300"><PromptMark style={selected} size={20} /></span><div><h3 className="font-semibold">{selected.name}</h3><p className="text-[11px] text-neutral-500">{selected.builtIn ? t('Prompt incluido') : t('Prompt personalizado')}</p></div></div>
-            <p className="mt-4 rounded-lg bg-neutral-50 p-3 text-sm leading-6 text-neutral-600 dark:bg-neutral-900/60 dark:text-neutral-300">{selected.description || t('Sin descripción.')}</p>
-            <h4 className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-neutral-500">{t('Prompt guardado')}</h4>
-            <pre className="mt-2 whitespace-pre-wrap rounded-lg border border-neutral-200 bg-white p-3 font-sans text-xs leading-5 text-neutral-700 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300">{selected.prompt}</pre>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button className={`btn ${toolbarIds.includes(selected.id) ? 'btn-primary' : 'btn-ghost border border-neutral-300 dark:border-neutral-700'}`} onClick={() => void toggleToolbar(selected)}><Icon name="star" size={12} />{toolbarIds.includes(selected.id) ? t('Visible en la barra') : t('Mostrar en la barra')}</button>
-              {selected.builtIn
-                ? <p className="text-[11px] text-neutral-500">{t('Los prompts incluidos no se pueden editar ni eliminar.')}</p>
-                : <>
-                  <button data-testid="study-prompt-edit" className="btn btn-ghost border border-neutral-300 dark:border-neutral-700" disabled={busy} onClick={() => startEdit(selected)}><Icon name="edit" size={12} />{t('Editar')}</button>
-                  <button data-testid="study-prompt-delete" className="btn btn-ghost border border-red-300 text-red-600 dark:border-red-900 dark:text-red-400" disabled={busy} onClick={() => { setMessage(''); setPendingDeletion(selected); }}><Icon name="trash" size={12} />{t('Eliminar')}</button>
-                </>}
+        <main className="study-prompts-main" data-testid={!editing && selected ? 'study-prompt-detail' : undefined}>
+          {editing ? <>
+            <div className="study-prompts-detail-header"><h3>{t(editing.mode === 'edit' ? 'Editar prompt' : 'Añadir prompt')}</h3></div>
+            <div className="study-prompts-content" data-testid="study-style-editor">
+              <label className="study-prompts-field">{t('Título')}<input data-testid="study-prompt-title" autoFocus className="input" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+              <label className="study-prompts-field">{t('Icono')}<IconEmojiPicker icon={visual.icon} emoji="" allowEmoji={false} onChange={(value) => setVisual({ icon: value.icon, emoji: '' })} /></label>
+              <label className="study-prompts-field study-prompts-text-field">{t('Prompt')}<textarea data-testid="study-prompt-text" className="input" value={draft.prompt} onChange={(event) => setDraft({ ...draft, prompt: event.target.value })} placeholder={t('Indica exactamente cómo debe transformar el texto seleccionado…')} /></label>
+              {draft.prompt.trim() && warnings.length > 0 && <div className="study-prompts-warning">{warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>}
             </div>
-          </article> : <div className="grid h-full place-items-center text-sm text-neutral-500">{t('No hay prompts guardados.')}</div>}
-          {message && <p className="mt-3 text-xs text-teal-700 dark:text-teal-300" role="status">{message}</p>}
+          </> : selected ? <>
+            <div className="study-prompts-detail-header">
+              <div className="study-prompts-identity"><PromptMark style={selected} size={18} /><div><h3>{selected.name}</h3><p>{t(selected.builtIn ? 'Prompt incluido' : 'Prompt personalizado')}</p></div></div>
+              <div className="study-prompts-detail-actions">
+                <button type="button" data-testid="study-prompt-edit" className="btn" disabled={busy || selected.builtIn} title={selected.builtIn ? builtInNotice : t('Editar prompt')} onClick={() => startEdit(selected)}><Icon name="edit" size={13} />{t('Editar')}</button>
+                <button type="button" ref={deleteButtonRef} data-testid="study-prompt-delete" className="btn study-prompts-delete" disabled={busy || selected.builtIn} title={selected.builtIn ? builtInNotice : t('Eliminar prompt')} onClick={() => { setMessage(''); setPendingDeletion(selected); }}><Icon name="trash" size={13} />{t('Eliminar')}</button>
+              </div>
+            </div>
+            <article className="study-prompts-content" data-testid="study-prompt-content" key={selected.id}>
+              <p className="study-prompts-description">{selected.description || t('Sin descripción.')}</p>
+              {selected.builtIn && <p className="study-prompts-builtin-notice">{builtInNotice}</p>}
+              <h4>{t('Prompt guardado')}</h4>
+              <pre className="study-prompts-text">{selected.prompt}</pre>
+            </article>
+          </> : <div className="study-prompts-content study-prompts-empty">{t('No hay prompts guardados.')}</div>}
+          {message && <p className="study-prompts-message" role="status">{message}</p>}
+          <footer className="study-prompts-footer">
+            {editing ? <div className="study-prompts-save-actions"><button type="button" className="btn" onClick={() => setEditing(null)}>{t('Cancelar')}</button><button type="button" data-testid="study-prompt-save" className="btn study-prompts-primary" disabled={busy} onClick={() => void savePrompt()}>{busy ? <Spinner label={t('Guardando…')} /> : t(editing.mode === 'edit' ? 'Guardar cambios' : 'Guardar prompt')}</button></div>
+              : selected && <><button type="button" className="btn study-prompts-shortcut-toggle" aria-pressed={toolbarIds.includes(selected.id)} onClick={() => void toggleToolbar(selected)}><Icon name="star" size={13} />{t(toolbarIds.includes(selected.id) ? 'Visible en la barra' : 'Mostrar en la barra')}</button>{onApply && <button type="button" data-testid="study-prompt-apply" className="btn study-prompts-primary" onClick={() => onApply(selected)}><Icon name="sparkles" size={14} />{t('Mejorar con IA')}</button>}</>}
+          </footer>
         </main>
       </div>
     </section>
@@ -175,7 +218,8 @@ export function StudyImproveDialog({ onToolbarChanged, onClose }: {
       title={t('Eliminar prompt')}
       message={tx('Se eliminará «{name}» de tus prompts de mejora. Esta acción no se puede deshacer.', { name: pendingDeletion.name })}
       confirmLabel={t('Eliminar')}
-      onCancel={() => setPendingDeletion(null)}
+      autoFocusConfirm={false}
+      onCancel={cancelDeletion}
       onConfirm={() => void deletePrompt(pendingDeletion)}
     />}
   </div>;

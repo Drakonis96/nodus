@@ -8,16 +8,16 @@ export const VAULT_DOC_TOPICS: readonly NodusDocTopic[] = [
     title: { es: 'Bóveda académica: secciones y flujo', en: 'Academic vault: sections and flow' },
     keywords: ['academico', 'academic', 'investigacion', 'zotero', 'corpus', 'barra lateral academica', 'secciones', 'investigacion academica', 'tesis', 'paper'],
     body: {
-      es: `- Secciones: Inicio; Explorar (Buscar, Biblioteca, Grafo, Mapa de argumentos, Ideas, Autores); Analizar (Diccionario, Inmersión, Estado de la cuestión, Hipótesis y Ruta de lectura —estas dos ocultas de fábrica—, Deep Research); Escribir (Espacio de trabajo); Herramientas (Nodus Browser, Nodus Radar, Nodus Compass, Nodus Tools) y Ajustes.
-- Diccionario y Espacio de trabajo son exclusivos de este tipo. Huecos y Debates no tienen entrada propia en el menú: son pestañas dentro de Estado de la cuestión.
+      es: `- Secciones: Inicio; Explorar (Buscar, Biblioteca, Grafo, Mapa de argumentos, Ideas, Autores); Analizar (Diccionario, Inmersión, Estado de la cuestión, Hipótesis y Ruta de lectura —estas dos ocultas de fábrica—, Deep Research); Herramientas (Nodus Browser, Nodus Radar, Nodus Compass, Nodus Tools, Nodus Scriptor) y Ajustes.
+- Diccionario es exclusivo de este tipo. Nodus Scriptor está disponible en todas las bóvedas desde Nodus Tools. Huecos y Debates no tienen entrada propia en el menú: son pestañas dentro de Estado de la cuestión.
 - La biblioteca se alimenta de Zotero o de archivos sueltos; el análisis del corpus produce ideas, evidencias, resúmenes y pasajes citables sobre los que trabajan Grafo, Ideas, Autores y el chat de investigación.
-- Flujo habitual: añadir o sincronizar obras → analizarlas (ligero o profundo) → revisar ideas y autores → explorar el grafo y el mapa de argumentos → cubrir huecos y debates → escribir en Espacio de trabajo o generar un informe con Deep Research.
-- El chat de investigación (botón Asistente de la cabecera) responde con el corpus y puede guardar el resultado en el Espacio de trabajo.`,
-      en: `- Sections: Home; Explore (Search, Library, Graph, Argument map, Ideas, Authors); Analyse (Dictionary, Immersion, State of the art, Hypotheses and Reading path —the last two hidden by default—, Deep Research); Write (Workspace); Tools (Nodus Browser, Nodus Radar, Nodus Compass, Nodus Tools) and Settings.
-- Dictionary and Workspace are exclusive to this type. Gaps and Debates have no menu entry of their own: they are tabs inside State of the art.
+- Flujo habitual: añadir o sincronizar obras → analizarlas (ligero o profundo) → revisar ideas y autores → explorar el grafo y el mapa de argumentos → cubrir huecos y debates → escribir en Nodus Scriptor o generar un informe con Deep Research.
+- El chat de investigación (botón Asistente de la cabecera) responde con el corpus y puede guardar el resultado en Nodus Scriptor.`,
+      en: `- Sections: Home; Explore (Search, Library, Graph, Argument map, Ideas, Authors); Analyse (Dictionary, Immersion, State of the art, Hypotheses and Reading path —the last two hidden by default—, Deep Research); Tools (Nodus Browser, Nodus Radar, Nodus Compass, Nodus Tools, Nodus Scriptor) and Settings.
+- Dictionary is exclusive to this type. Nodus Scriptor is available in every vault from Nodus Tools. Gaps and Debates have no menu entry of their own: they are tabs inside State of the art.
 - The library is fed by Zotero or loose files; corpus analysis produces ideas, evidence, summaries and citable passages that Graph, Ideas, Authors and the research chat work from.
-- The usual flow: add or sync works → analyse them (light or deep) → review ideas and authors → explore the graph and the argument map → cover gaps and debates → write in the Workspace or generate a report with Deep Research.
-- The research chat (header Assistant button) answers from the corpus and can save its result into the Workspace.`,
+- The usual flow: add or sync works → analyse them (light or deep) → review ideas and authors → explore the graph and the argument map → cover gaps and debates → write in Nodus Scriptor or generate a report with Deep Research.
+- The research chat (header Assistant button) answers from the corpus and can save its result to Nodus Scriptor.`,
     },
     related: ['sections-library', 'sections-graph', 'sections-ideas-authors'],
   },
@@ -68,7 +68,7 @@ export const VAULT_DOC_TOPICS: readonly NodusDocTopic[] = [
     keywords: ['estudio', 'study', 'curso', 'asignatura', 'apuntes', 'examen', 'flashcards', 'horario', 'calendario', 'repaso', 'estudiar'],
     body: {
       es: `- Fase BETA. La jerarquía es Curso > Asignatura; dentro de una asignatura hay carpetas, temas, subtemas, apuntes y materiales.
-- Secciones: Cursos y asignaturas, Horarios, Calendario, Buscar, Materiales, Grabaciones (grupo Organización); Research chat, Ideas de estudio, Grafo de estudio, Banco de preguntas, Revisión, Investigación de estudio (Analizar); Espacio de trabajo (Escribir); Herramientas y Ajustes.
+- Secciones: Cursos y asignaturas, Horarios, Calendario, Buscar, Materiales, Grabaciones (grupo Organización); Research chat, Ideas de estudio, Grafo de estudio, Banco de preguntas, Revisión, Investigación de estudio (Analizar); Herramientas (Nodus Tools y Nodus Scriptor) y Ajustes.
 - Horarios usa un icono de reloj y Calendario uno de calendario. En Horarios, al pulsar una celda se abre un desplegable para añadir una asignatura existente o una actividad independiente.
 - El Calendario tiene vistas mensual, semanal y anual, eventos con avisos y exportación a iCloud o Google Calendar (archivo .ics).
 - Materiales admite PDF, documentos, presentaciones y audio, con visor y notas de material. Grabaciones graba o importa audio, transcribe, diariza y genera notas.
@@ -76,7 +76,7 @@ export const VAULT_DOC_TOPICS: readonly NodusDocTopic[] = [
 - Ideas y Grafo de estudio se aíslan por asignatura. Con «Modo de lectura» activo (Ajustes > Interfaz, solo en Estudio) la interfaz reduce distracciones.
 - Si en Ajustes > Modelos IA se elige «Procesar automáticamente», los materiales nuevos se analizan con IA sin preguntar; por defecto Nodus pregunta cada vez.`,
       en: `- BETA phase. The hierarchy is Course > Subject; inside a subject there are folders, topics, subtopics, notes and materials.
-- Sections: Courses and subjects, Schedule, Calendar, Search, Materials, Recordings (Organisation group); Research chat, Study ideas, Study graph, Question bank, Review, Study research (Analyse); Workspace (Write); Tools and Settings.
+- Sections: Courses and subjects, Schedule, Calendar, Search, Materials, Recordings (Organisation group); Research chat, Study ideas, Study graph, Question bank, Review, Study research (Analyse); Tools (Nodus Tools and Nodus Scriptor) and Settings.
 - Schedule uses a clock icon and Calendar a calendar icon. In Schedule, clicking a cell opens a dropdown to add an existing subject or a standalone activity.
 - Calendar offers month, week and year views, events with reminders and export to iCloud or Google Calendar (.ics file).
 - Materials accepts PDFs, documents, presentations and audio, with a viewer and material notes. Recordings records or imports audio, transcribes, diarises and generates notes.
@@ -93,14 +93,14 @@ export const VAULT_DOC_TOPICS: readonly NodusDocTopic[] = [
     keywords: ['docencia', 'teaching', 'profesor', 'alumnado', 'grupos', 'calificaciones', 'rubricas', 'examen', 'evaluacion', 'clase', 'unidad didactica'],
     body: {
       es: `- Fase BETA. Reutiliza la organización Curso > Asignatura de Estudio y añade el espacio de trabajo docente. Grupos pertenecen a una asignatura y a un curso académico.
-- Secciones: Organización (Buscar, Cursos asignaturas y grupos, Grupos, Horarios, Calendario, Materiales, Grabaciones); Analizar (Research chat, Ideas, Grafo); Evaluación (Banco de preguntas, Rúbricas, Exámenes, Calificaciones); Crear (Diseño de unidades, Espacio de trabajo).
+- Secciones: Organización (Buscar, Cursos asignaturas y grupos, Grupos, Horarios, Calendario, Materiales, Grabaciones); Analizar (Research chat, Ideas, Grafo); Evaluación (Banco de preguntas, Rúbricas, Exámenes, Calificaciones); Crear (Diseño de unidades); Herramientas (Nodus Tools y Nodus Scriptor).
 - Guía docente / Programación, Situaciones de aprendizaje, Adaptaciones y Proyectos de innovación están «En diseño»: abren su hilo de feedback y no deben describirse como funciones terminadas.
 - Privacidad por diseño: la IA no recibe listas, notas ni respuestas del alumnado, y no existen funciones de IA para calificar, perfilar o evaluar alumnado.
 - Calificaciones es un cuaderno basado en el plan de evaluación congelado al publicar; una revisión crea una versión nueva, y la nota es una proyección de valor y estado.
 - Exámenes genera un documento imprimible con cabecera, logos, secciones enumeradas y exportación a DOCX o PDF. Rúbricas permite crear criterios y niveles, con pesos por criterio que suman 100 y avisos de calidad, y exportar a PDF.
 - Diseño de unidades es un Deep Research con estructura fijable por el docente que cita los materiales del curso.`,
       en: `- BETA phase. It reuses Study's Course > Subject organisation and adds the teaching workspace. Groups belong to a subject and an academic year.
-- Sections: Organisation (Search, Courses subjects and groups, Groups, Schedule, Calendar, Materials, Recordings); Analyse (Research chat, Ideas, Graph); Assessment (Question bank, Rubrics, Exams, Grades); Create (Unit design, Workspace).
+- Sections: Organisation (Search, Courses subjects and groups, Groups, Schedule, Calendar, Materials, Recordings); Analyse (Research chat, Ideas, Graph); Assessment (Question bank, Rubrics, Exams, Grades); Create (Unit design); Tools (Nodus Tools and Nodus Scriptor).
 - Teaching guide / Syllabus, Learning situations, Adaptations and Innovation projects are "In design": they open their feedback thread and must not be described as finished features.
 - Privacy by design: the AI never receives student lists, notes or answers, and there are no AI features for grading, profiling or assessing students.
 - Grades is a gradebook built on the assessment plan frozen when published; a revision creates a new version, and the mark is a projection of value and state.

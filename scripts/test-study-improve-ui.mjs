@@ -7,13 +7,13 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFile(path.join(root, file), 'utf8');
 
-test('study improvement is selection-first, streamed in place and committed to the editor history', async () => {
+test('study improvement previews the selection and commits it to the editor history', async () => {
   const [editor, dialog, stylesheet] = await Promise.all([
     read('src/components/editor/StudyEditor.tsx'),
     read('src/components/editor/StudyImproveDialog.tsx'),
     read('src/index.css'),
   ]);
-  assert.match(editor, /data-testid="study-improve-toggle"/);
+  assert.match(editor, /testId: 'study-improve-toggle'/);
   assert.match(editor, /resolveImproveSelection/);
   assert.match(editor, /createPortal/);
   assert.match(editor, /selectionToolbar/);
@@ -25,12 +25,12 @@ test('study improvement is selection-first, streamed in place and committed to t
   assert.match(editor, /runQuickImprovement/);
   assert.match(editor, /requestAnimationFrame\(flush\)/);
   assert.match(editor, /addToHistory: commitToHistory/);
-  assert.match(editor, /replaceAllMarkdown\(base, \{ addToHistory: false \}\)/);
+  assert.match(editor, /if \(improveCancelled\.current\) return;/);
+  assert.match(editor, /replaceImprovedSelection\(base, target, result\.text, true\)/);
   assert.match(editor, /closeHistory: commitToHistory/);
   assert.match(editor, /data-testid="study-improve-streaming"/);
-  assert.match(editor, /bg-teal-50[^]*dark:bg-teal-950/);
-  assert.match(editor, /data-testid="study-editor-undo"/);
-  assert.match(editor, /data-testid="study-editor-redo"/);
+  assert.match(editor, /testId: 'study-editor-undo'/);
+  assert.match(editor, /testId: 'study-editor-redo'/);
   assert.match(editor, /data-testid="study-synonyms-toggle"/);
   assert.match(editor, /name="aiSynonyms"/);
   assert.doesNotMatch(stylesheet, /\.study-milkdown \.milkdown-toolbar \.study-synonyms-trigger\s*\{[^}]*\b(?:border|background)\s*:/, 'the idle synonyms action must not have persistent framed styling');
@@ -43,7 +43,8 @@ test('study improvement is selection-first, streamed in place and committed to t
   assert.match(editor, /previousAlternatives/);
   assert.match(editor, /studySentenceContext/);
   assert.match(editor, /suggestStudySynonyms/);
-  assert.doesNotMatch(editor, /study-improve-undo|improveUndo|undoImprovement/);
+  assert.match(editor, /study-improve-undo[^]*runEditorHistory\('undo'\)/);
+  assert.doesNotMatch(editor, /improveUndo|undoImprovement/);
   assert.doesNotMatch(editor, /event\.key\.toLowerCase\(\) === 'z'/);
   assert.match(editor, /El original permanece intacto/);
   assert.doesNotMatch(dialog, /Transformación libre/);
@@ -53,8 +54,6 @@ test('study improvement is selection-first, streamed in place and committed to t
 test('the compact prompt manager creates prompts and limits the toolbar to four', async () => {
   const dialog = await read('src/components/editor/StudyImproveDialog.tsx');
   assert.match(dialog, /const TOOLBAR_LIMIT = 4/);
-  assert.match(dialog, /max-w-2xl/);
-  assert.match(dialog, /bg-white[^]*dark:bg-neutral-950/);
   assert.match(dialog, /studyImproveToolbarStyleIds/);
   assert.match(dialog, /createStudyStyle/);
   assert.match(dialog, /validateStudyStylePrompt/);
@@ -75,8 +74,10 @@ test('only user prompts can be edited or deleted, and deleting asks first', asyn
     read('src/components/editor/StudyImproveDialog.tsx'),
     read('electron/db/studyStylesRepo.ts'),
   ]);
-  // The edit and delete controls live behind `selected.builtIn`, so the presets stay read-only.
-  assert.match(dialog, /selected\.builtIn\s*\n?\s*\?[^]*Los prompts incluidos no se pueden editar ni eliminar\.[^]*study-prompt-edit/);
+  // Controls stay visible, but presets remain read-only.
+  for (const action of ['edit', 'delete']) {
+    assert.match(dialog, new RegExp(`data-testid="study-prompt-${action}"[^>]*disabled=\\{busy \\|\\| selected\\.builtIn\\}`));
+  }
   assert.match(dialog, /data-testid="study-prompt-edit"/);
   assert.match(dialog, /data-testid="study-prompt-delete"/);
   assert.match(dialog, /updateStudyStyle\(editing\.id/);

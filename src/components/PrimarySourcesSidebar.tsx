@@ -27,7 +27,6 @@ export const PRIMARY_SOURCES_SIDEBAR_ITEMS: PrimarySourcesSidebarItem[] = [
   { id: 'map', label: 'Mapa', icon: 'map', group: 'sources' },
   { id: 'relations', label: 'Relaciones', icon: 'network', group: 'sources' },
   { id: 'researchChat', label: 'Research chat', icon: 'chat', group: 'analyze' },
-  { id: 'notes', label: 'Notas', icon: 'notebook', group: 'interpretation' },
 ];
 
 const GROUPS = [

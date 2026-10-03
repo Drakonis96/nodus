@@ -16,6 +16,7 @@ import { EMPTY_CUSTOM_EVENT_TYPES, sanitizeCustomEventTypes } from '@shared/even
 import { sanitizeCustomThemes } from '@shared/appThemes';
 import { isPipelineLogMaxEntries, isPipelineLogRetention } from '@shared/pipelineLogs';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
+import { migrateScriptorSidebar } from '../../shared/scriptorNavigation.mjs';
 import { isResearchEffort } from '@shared/researchReasoning';
 import { recoverV23SharedModelPrefs, recoverV23VaultEmbeddingSelection } from './modelPrefsRecovery';
 import {
@@ -266,6 +267,7 @@ const DEFAULTS: Omit<AppSettings, 'providerKeys' | 'lockedProviderKeys'> = {
   sidebarOrder: [],
   sidebarHidden: [],
   sidebarCustomized: false,
+  scriptorSidebarVersion: 1,
   // A new profile starts with Nodus Drift pinned, the way Nodus Browser is in the sidebar. A profile that
   // already saved its pins keeps them: this is only where a profile with none starts from.
   toolkitPinnedPages: ['drift'],
@@ -353,6 +355,10 @@ export function getSettings(): AppSettings {
     }
   }
   const merged = { ...DEFAULTS, ...parsed };
+  const scriptorMigration = migrateScriptorSidebar(parsed);
+  const { changed: scriptorMigrated, ...scriptorPreferences } = scriptorMigration;
+  Object.assign(merged, scriptorPreferences);
+  if (scriptorMigrated) writeRaw('app', JSON.stringify({ ...parsed, ...scriptorPreferences }));
   const storedConcurrencyVersion = Number.isInteger(parsed.aiConcurrencyVersion)
     ? Number(parsed.aiConcurrencyVersion)
     : 0;

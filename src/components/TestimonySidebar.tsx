@@ -41,9 +41,6 @@ export const TESTIMONY_GROUPS: TestimonyGroup[] = [
     { label: 'Research chat', icon: 'chat', view: 'researchChat' },
     { label: 'Contrastes', icon: 'scale', view: 'testimonyContrasts' },
   ] },
-  { id: 'register', label: 'Registrar', items: [
-    { label: 'Notas', icon: 'notebook', view: 'notes' },
-  ] },
 ];
 
 export function TestimonySidebar({

@@ -1,4 +1,6 @@
 import { SHOW_FOCUS_PAGE_EVENT, openFocusLayout, openFocusTimer, toggleFocusTimer, useStudyFocusActions, useStudyFocusLayout, useStudyFocusReduced } from './components/focus/StudyFocusContext';
+import { useEditorialShellFocus } from './components/workspace/editorialFocus';
+import { parseEditorReference } from '@shared/editorReferences';
 import { FocusExitDialog, FocusLayoutDialog, type FocusSectionOption } from './components/focus/FocusDialogs';
 import { focusDefaultSectionVisible, focusLayoutVisible } from '@shared/studyFocus';
 import { FocusCompletionNotice, FocusHeader } from './components/focus/FocusHeader';
@@ -277,6 +279,7 @@ export function App() {
   // sección y volver no pierde el sitio aunque la vista se desmonte.
   const [toolkitPage, setToolkitPage] = useState<ToolkitPage>('home');
   const [navCollapsed, setNavCollapsed] = useState(() => localStorage.getItem('nodus.navCollapsed') === '1');
+  const editorialFocus = useEditorialShellFocus();
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = Number(localStorage.getItem('nodus.sidebarWidth'));
     return Number.isFinite(stored)
@@ -1290,6 +1293,25 @@ export function App() {
     return () => window.removeEventListener('nodus:open-research-note', open);
   }, [openNoteFromSearch]);
 
+  useEffect(() => {
+    const open = (event: Event) => {
+      const detail = (event as CustomEvent<{ href?: unknown; label?: unknown }>).detail;
+      if (typeof detail?.href !== 'string') return;
+      const reference = parseEditorReference(detail.href);
+      if (!reference) return;
+      const { kind, id } = reference;
+      if (kind === 'idea') openIdea(id);
+      else if (kind === 'passage') {void window.nodus.getPassage(id).then(passage=>{if(passage)void import('./evidenceJump').then(({openEvidenceAtPage})=>openEvidenceAtPage(passage.nodus_id,{location:passage.page_label,sourceRef:passage.source_ref,pageNumber:passage.page_number}));});}
+      else if (kind === 'work') navigate('graph', { workId: id });
+      else if (kind === 'author') openAuthor(id, typeof detail.label === 'string' ? detail.label : '');
+      else if (kind === 'note') openNoteFromSearch(id);
+      else if (kind === 'studyDocument') { setStudyTarget({ kind: 'document', id }); setView('studyCourses'); }
+      else if (kind === 'studyMaterial') { setStudyMaterialTarget({ id }); setView('studyLibrary'); }
+    };
+    window.addEventListener('nodus:open-editor-reference', open);
+    return () => window.removeEventListener('nodus:open-editor-reference', open);
+  }, [navigate, openIdea, openAuthor, openNoteFromSearch, setView]);
+
   const openResearchConversation = useCallback((target: Omit<ResearchConversationNavigationTarget, 'nonce'>) => {
     setResearchConversationTarget({ ...target, nonce: Date.now() });
     setView(target.surface === 'database'
@@ -1505,6 +1527,7 @@ export function App() {
       className="h-full flex flex-col"
       style={{ '--vault-accent': dockColorForVaultType(activeVault?.type) } as React.CSSProperties}
       data-testid="app-shell"
+      data-editorial-focus={editorialFocus.active ? 'true' : undefined}
       data-vault-type={activeVault?.type}
       data-focus-reduced={focusReduced}
       data-interface-scale={settings.interfaceScale}
@@ -1829,7 +1852,7 @@ export function App() {
             onOpenLibrary={openFocusLibrary}
           />
         )}
-        {!navCollapsed && !focusReduced && (
+        {(editorialFocus.active ? editorialFocus.navigationOpen : !navCollapsed && !focusReduced) && (
           <nav
             data-testid="resizable-sidebar"
             data-sidebar-compact={sidebarCompact ? 'true' : 'false'}

@@ -214,7 +214,7 @@ export const corpusViews = {
   },
 
   // Notas, ideas y colecciones con una única experiencia visual. La ruta académica
-  // conserva el nombre Espacio de trabajo; el resto entra por su sección Notas.
+  // mantiene las rutas antiguas bajo el nombre Nodus Scriptor en Nodus Tools.
   workspace: ({ navigate, noteTarget, settings, snapshots, openResearchConversation }) => (
     <WorkspaceView
       settings={settings}
@@ -231,7 +231,7 @@ export const corpusViews = {
     : (
       <WorkspaceView
         settings={ctx.settings}
-        title={ctx.isEstudio || ctx.isDocencia ? 'Espacio de trabajo' : 'Notas'}
+        title="Nodus Scriptor"
         snapshot={ctx.snapshots.read('notes')}
         onSnapshotChange={(patch) => ctx.snapshots.patch('notes', patch)}
         onOpenGraph={(target) => ctx.navigate('graph', target)}
