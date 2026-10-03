@@ -113,17 +113,17 @@ test('el sidebar y la lista de navegación no pueden separarse', () => {
   // El grupo «Herramientas» lo pinta App.tsx aparte para todas las bóvedas dedicadas
   // (`navGroups.filter(group => group.id === 'tools')`), así que sus entradas son las
   // únicas de la lista que no están en el sidebar propio de Testimonios.
-  const paintedByShell = new Set(['toolkit', 'compass', 'browser', 'radar', 'studyFocus']);
+  const paintedByShell = new Set(['toolkit', 'compass', 'browser', 'radar', 'studyFocus', 'notes']);
   assert.equal(navigation.NAV_ITEMS.find((item) => item.id === 'studyFocus')?.group, 'tools');
   assert.deepEqual([...sidebarViews].sort(), nav.filter((id) => !paintedByShell.has(id)).sort());
 });
 
 test('no hay un grupo «Escribir» que solo contenga Notas', () => {
   const groupIds = TESTIMONY_GROUPS.map((group) => group.id);
-  assert.deepEqual(groupIds, ['explore', 'analyze', 'register']);
-  const register = TESTIMONY_GROUPS.find((group) => group.id === 'register');
-  assert.equal(register.label, 'Registrar');
-  assert.deepEqual(register.items.map((item) => item.view), ['notes']);
+  assert.deepEqual(groupIds, ['explore', 'analyze']);
+  const scriptor = navigation.NAV_ITEMS.find((item) => item.id === 'notes');
+  assert.equal(scriptor.label, 'Nodus Scriptor');
+  assert.equal(scriptor.group, 'tools', 'Scriptor remains available through the universal tools group');
 });
 
 test('el prompt pack existe, dice qué NO puede hacer la IA y no promete verificar hechos', () => {

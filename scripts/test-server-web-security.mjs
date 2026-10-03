@@ -112,6 +112,7 @@ test('Server web sessions are read-only while personal annotations stay private 
     assert.equal(rootApp.status, 200, 'the authenticated browser app is canonical at the web root');
     assert.match(rootApp.headers.get('content-security-policy') || '', /connect-src 'self'/);
     assert.match(rootApp.headers.get('content-security-policy') || '', /worker-src 'self' blob:/);
+    assert.match(rootApp.headers.get('content-security-policy') || '', /media-src 'self' data: blob:/);
     assert.match(rootApp.headers.get('content-security-policy') || '', /font-src 'self' data:/);
     assert.match(rootApp.headers.get('content-security-policy') || '', /img-src 'self' data: blob: https:\/\/\*\.tile\.openstreetmap\.org/);
     assert.match(rootApp.headers.get('content-security-policy') || '', /frame-ancestors 'none'/);

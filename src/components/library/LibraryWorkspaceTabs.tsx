@@ -41,6 +41,7 @@ export function WorkspaceTabStrip({
   onActivateHome,
   onActivateTab,
   onCloseTab,
+  alwaysShowHome = false,
 }: {
   homeLabel: string;
   homeIcon: string;
@@ -52,13 +53,22 @@ export function WorkspaceTabStrip({
   onActivateHome: () => void;
   onActivateTab: (key: string) => void;
   onCloseTab: (key: string) => void;
+  alwaysShowHome?: boolean;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const focusAfterActivation = useRef(false);
 
   useEffect(() => {
     const active = stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
-    active?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    // Scroll this strip only. scrollIntoView also moves outer scroll containers,
+    // which makes the workspace header and sidebar jump during activation.
+    const strip = stripRef.current;
+    if (active && strip) {
+      const item = active.getBoundingClientRect();
+      const bounds = strip.getBoundingClientRect();
+      const delta = item.left < bounds.left ? item.left - bounds.left : item.right > bounds.right ? item.right - bounds.right : 0;
+      if (delta) strip.scrollLeft += delta;
+    }
     // Activation can load a document asynchronously. Wait for its selected tab,
     // rather than moving focus to the old one on the next animation frame.
     if (active && focusAfterActivation.current) {
@@ -67,7 +77,7 @@ export function WorkspaceTabStrip({
     }
   }, [activeKey, tabs.length]);
 
-  if (!tabs.length) return null;
+  if (!tabs.length && !alwaysShowHome) return null;
 
   const activateAdjacentTab = (currentKey: string | null, direction: -1 | 1) => {
     const keys: Array<string | null> = [null, ...tabs.map((tab) => tab.key)];
@@ -87,7 +97,7 @@ export function WorkspaceTabStrip({
     }
     focusAfterActivation.current = true;
     if (event.key === 'Home') onActivateHome();
-    else if (event.key === 'End') onActivateTab(tabs[tabs.length - 1].key);
+    else if (event.key === 'End') { if (tabs.length) onActivateTab(tabs[tabs.length - 1].key); else onActivateHome(); }
     else activateAdjacentTab(key, event.key === 'ArrowLeft' ? -1 : 1);
     requestAnimationFrame(() => {
       stripRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();

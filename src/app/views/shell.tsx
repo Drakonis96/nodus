@@ -12,7 +12,7 @@ const StudyFocusView = lazy(() => import('../../views/StudyFocusView').then((mod
 
 export const shellViews = {
   studyFocus: () => <StudyFocusView />,
-  researchChat: ({ settings, assistantTarget, researchConversationTarget, openNoteFromSearch, isAcademic, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded isAcademic={isAcademic} initialTarget={assistantTarget} initialConversationTarget={researchConversationTarget} notesDestinationLabel={isAcademic ? 'Espacio de trabajo' : 'Notas'} onOpenSavedNote={openNoteFromSearch} isGenealogy={isGenealogy} />,
+  researchChat: ({ settings, assistantTarget, researchConversationTarget, openNoteFromSearch, isAcademic, isGenealogy, activeVault }) => <ResearchAssistantModal key={activeVault?.id} settings={settings} embedded isAcademic={isAcademic} initialTarget={assistantTarget} initialConversationTarget={researchConversationTarget} notesDestinationLabel="Nodus Scriptor" onOpenSavedNote={openNoteFromSearch} isGenealogy={isGenealogy} />,
   browser: () => <NodusBrowserView />,
   radar: ({ radarTarget }) => <RadarView target={radarTarget} />,
   compass: ({ snapshots }) => <CompassView snapshot={snapshots.read('compass')} onSnapshotChange={(patch) => snapshots.patch('compass', patch)} />,

@@ -138,7 +138,7 @@ const MODEL_TASKS: Array<{ id: string; label: string }> = [
   { id: "nodi", label: "Nodi" },
   { id: "deepResearch", label: "Deep Research" },
   { id: "immersion", label: "Inmersión" },
-  { id: "writing", label: "Espacio de trabajo" },
+  { id: "writing", label: "Nodus Scriptor" },
   { id: "argumentMap", label: "Mapa de argumentos" },
   { id: "author", label: "Autores" },
   { id: "dictionary", label: "Diccionario" },
@@ -207,7 +207,7 @@ const themeDraftFrom = (theme?: CustomAppTheme): Omit<CustomAppTheme, "id"> => {
 };
 const themeSlug = (label: string) => `custom-${label.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "theme"}`;
 
-function blankProfile(
+export function blankProfile(
   theme: "dark" | "light",
   preferences: AIPreferences = {},
 ): PortableProfileValues {
@@ -285,6 +285,7 @@ function blankProfile(
       sidebarOrder: [],
       sidebarHidden: [],
       sidebarCustomized: false,
+      scriptorSidebarVersion: 1,
       toolkitPinnedPages: [],
       aiConcurrencyMode: "automatic",
       aiConcurrencyVersion: 1,

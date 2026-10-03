@@ -1,3 +1,5 @@
+import { cloneNativeDocument, parseNativeDocument } from '@shared/blockNoteDocument';
+import { updateStudyDoc } from './studyEditorRepo';
 import crypto from 'node:crypto';
 import type {
   CreateStudyAcademicYearInput,
@@ -550,8 +552,16 @@ export function updateStudyEntity(kind: StudyEntityKind, id: string, patch: Reco
     if (typeof value === 'boolean') return value ? 1 : 0;
     return value;
   });
-  db.prepare(`UPDATE ${table} SET ${entries.map(([key]) => `${column(key)} = ?`).join(', ')}, updated_at = ? WHERE id = ?`)
-    .run(...values, now(), id);
+  db.transaction(() => {
+    if (kind === 'document' && ('contentMarkdown' in patch || 'title' in patch)) {
+      const current = getStudyEntity('document',id) as StudyDocument | null;
+      if (current) updateStudyDoc(id,{title: String(patch.title ?? current.title), contentMarkdown: String(patch.contentMarkdown ?? current.contentMarkdown),reason:'manual'});
+    }
+    // The legacy editor has already updated the canonical document and its
+    // projections. This second statement only applies its other metadata.
+    const other = entries.map((entry,index)=>({entry,value:values[index]})).filter(({entry:[key]})=>kind !== 'document' || !['title','contentMarkdown'].includes(key));
+    if (other.length) db.prepare(`UPDATE ${table} SET ${other.map(({entry:[key]}) => `${column(key)} = ?`).join(', ')}, updated_at = ? WHERE id = ?`).run(...other.map(item=>item.value),now(),id);
+  })();
   return getStudyEntity(kind, id);
 }
 
@@ -857,6 +867,12 @@ export function applyStudyTemplate(id: string, name?: string): StudyCourse | Stu
   })();
 }
 
+function copyNativeStudyDocument(sourceId: string, targetId: string): void {
+  const row = getDb().prepare('SELECT native_document_json, native_schema_version, style_json, spellcheck_language, custom_dictionary_json FROM study_docs WHERE id = ?').get(sourceId) as Row;
+  const native = parseNativeDocument(row.native_document_json);
+  getDb().prepare('UPDATE study_docs SET native_document_json = ?, native_schema_version = ?, style_json = ?, spellcheck_language = ?, custom_dictionary_json = ? WHERE id = ?').run(native ? JSON.stringify(cloneNativeDocument(native)) : null, row.native_schema_version, row.style_json, row.spellcheck_language, row.custom_dictionary_json, targetId);
+}
+
 export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCourse | StudySubject | StudyTopic | StudyFolder | StudyDocument {
   const db = getDb();
   return db.transaction(() => {
@@ -868,6 +884,7 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
         description: original.description, color: original.color, icon: original.icon, emoji: original.emoji,
         imageData: original.imageData, year: original.year,
       });
+      copyNativeStudyDocument(id, copy.id);
       const placements = db.prepare('SELECT * FROM study_placements WHERE document_id = ?').all(id) as Row[];
       for (const placementRow of placements) {
         const placement = toPlacement(placementRow);
@@ -936,6 +953,7 @@ export function duplicateStudyTree(kind: StudyEntityKind, id: string): StudyCour
         const old = getStudyEntity('document', placement.documentId) as StudyDocument;
         const copy = createStudyDocument({ title: old.title, kind: old.kind, contentMarkdown: old.contentMarkdown,
           description: old.description, color: old.color, icon: old.icon, emoji: old.emoji, imageData: old.imageData, year: old.year });
+        copyNativeStudyDocument(old.id, copy.id);
         copyId = copy.id; docMap.set(old.id, copy.id);
       }
       const mapped: StudyPlacementInput = {

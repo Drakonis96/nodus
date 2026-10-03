@@ -24,16 +24,20 @@ test('the generated bundle carries no dependency the server does not have', asyn
   const { readFile } = await import('node:fs/promises');
   const path = await import('node:path');
   const { fileURLToPath } = await import('node:url');
+  const { isBuiltin } = await import('node:module');
   const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
   for (const { out } of GENERATED) {
     const code = await readFile(path.join(repoRoot, 'server/lib/core/generated', out), 'utf8');
-    // The server installs nothing. An import of anything other than a Node builtin would be
-    // a module that cannot resolve inside the image — and it would only fail in production.
+    // Shared bundles must resolve only Node builtins. Their third-party modules
+    // are bundled rather than depending on the separate server package inventory.
     const imports = [...code.matchAll(/^import .*? from ["']([^"']+)["'];?$/gm)].map((m) => m[1]);
-    const external = imports.filter((id) => !id.startsWith('node:'));
+    const external = imports.filter((id) => !isBuiltin(id));
     assert.deepEqual(external, [], `${out} imports ${external.join(', ')}, which the server image has no way to resolve`);
-    assert.ok(!/require\(/.test(code), `${out} uses require(), which an ESM server cannot run`);
+    // esbuild's local __require() function for bundled CommonJS is valid ESM;
+    // a free require() call would depend on the unavailable CommonJS global.
+    assert.ok(!/(?:^|[^\w$])require\s*\(/m.test(code), `${out} uses a free require(), which an ESM server cannot run`);
+    await import(new URL(`../server/lib/core/generated/${out}`, import.meta.url));
   }
 });
 

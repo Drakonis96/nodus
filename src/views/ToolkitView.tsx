@@ -6,7 +6,7 @@ import { effectiveSidebarHidden } from '@shared/vaultTypes';
 import { normalizeToolkitToolPages } from '@shared/toolkitNavigation';
 import { Icon } from '../components/ui';
 import { t } from '../i18n';
-import { TOOLKIT_TOOLS, isToolkitStandalonePage, toolkitSidebarId, type ToolkitCatalogPage, type ToolkitStandalonePage, type ToolkitPage } from '../navigation';
+import { TOOLKIT_TOOLS, isToolkitStandalonePage, scriptorViewForVault, toolkitSidebarId, type ToolkitCatalogPage, type ToolkitStandalonePage, type ToolkitPage } from '../navigation';
 import { ToolkitConvertView } from './ToolkitConvertView';
 import { ToolkitProtectView } from './ToolkitProtectView';
 import { ToolkitPresenterView } from './ToolkitPresenterView';
@@ -102,11 +102,13 @@ export function ToolkitView({
   const pinnedPages = normalizeToolkitToolPages(settings?.toolkitPinnedPages);
   const pinned = new Set(pinnedPages);
 
+  const destination = (page: ToolkitCatalogPage): ToolkitCatalogPage => page === 'workspace' ? scriptorViewForVault(vaultType) : page;
   const isToolPinned = (toolPage: ToolkitCatalogPage) => isToolkitStandalonePage(toolPage)
-    ? Boolean(settings && !sidebarHidden.includes(toolPage))
+    ? Boolean(settings && !sidebarHidden.includes(destination(toolPage)))
     : pinned.has(toolPage);
 
   const togglePinned = async (toolPage: ToolkitCatalogPage) => {
+    toolPage = destination(toolPage);
     if (!settings || pinBusy) return;
     setPinBusy(toolPage);
     try {
@@ -170,7 +172,7 @@ export function ToolkitView({
               <Icon name="tools" size={22} />
             </span>
             <div className="min-w-0">
-              <h1 className="toolkit-page-title text-lg font-semibold text-neutral-900 dark:text-neutral-100">{t('Herramientas')}</h1>
+              <h1 className="toolkit-page-title text-lg font-semibold text-neutral-900 dark:text-neutral-100">Nodus Tools</h1>
               <p className="toolkit-page-description text-sm text-neutral-500">
                 {t('Explora fuentes, sigue novedades y trabaja con tus archivos sin salir de Nodus.')}
               </p>
@@ -216,7 +218,7 @@ export function ToolkitView({
                 state={tool.state}
                 pinned={isToolPinned(tool.page)}
                 pinBusy={!settings || pinBusy !== null}
-                onOpen={() => isToolkitStandalonePage(tool.page) ? onOpenView(tool.page) : onNavigate(tool.page)}
+                onOpen={() => { const target = destination(tool.page); if (isToolkitStandalonePage(target)) onOpenView(target); else onNavigate(target); }}
                 onTogglePinned={() => void togglePinned(tool.page)}
               />
             ))}

@@ -69,6 +69,7 @@ export function installRuntimeHooks(userDataPath, overrides = {}) {
       // A shared entry is either a file (shared/x.ts) or a directory barrel
       // (shared/x/index.ts) — fall back to the index so a package-style import resolves.
       const base = path.join(repoRoot, request.replace('@shared/', 'shared/'));
+      if (/\.(?:mjs|json)$/.test(base)) return originalResolveFilename.call(this, base, parent, isMain, options);
       const asFile = `${base}.ts`;
       return fs.existsSync(asFile) ? asFile : path.join(base, 'index.ts');
     }

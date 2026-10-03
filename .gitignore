@@ -89,6 +89,7 @@ legal/generated/*
 # the bundler reuses these whenever the digest matches instead of re-fetching.
 !legal/generated/GPL-3.0.txt
 !legal/generated/LGPL-3.0.txt
+!legal/generated/MPL-2.0.txt
 !legal/generated/CC-BY-4.0.txt
 !legal/generated/APACHE-2.0.txt
 !legal/generated/ONNX_RUNTIME_LICENSE.txt

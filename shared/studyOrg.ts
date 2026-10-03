@@ -65,6 +65,7 @@ export interface StudyFolder extends StudyNamedEntity {
 }
 
 export interface StudyDocument extends StudyBaseEntity {
+  editorRevision?: number;
   title: string;
   kind: StudyDocumentKind;
   contentMarkdown: string;

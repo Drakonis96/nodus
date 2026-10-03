@@ -1,9 +1,10 @@
-// Selection ribbon — it belongs above the pointer, not above the selection box.
+// Reader selection ribbon — it belongs above the pointer, not above the selection box.
 //
 // Dragging a selection down a page leaves the bounding box starting at the first
 // click, so placing the ribbon over that box parks it far from the pointer that
 // finished the selection. These tests fix the arithmetic of the placement and
-// the offset correction applied over Milkdown's own positioner.
+// the reader placement arithmetic. Scriptor uses BlockNote's native positioner,
+// whose bounds and selection preservation are exercised in e2e-smoke.mjs.
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -99,7 +100,7 @@ test('the offset moves a floating element by the drift of its own answer', () =>
   assert.deepEqual(next, { x: 60, y: -40 });
 });
 
-test('the ribbon is anchored to the pointer in the reader and in the editor', () => {
+test('the reader follows the pointer and Scriptor uses its shared native toolbar', () => {
   const reader = fs.readFileSync(path.join(repoRoot, 'src/components/ReaderSelectionActions.tsx'), 'utf8');
   // Matched across line breaks: the formatter may wrap the ternary, but the rule
   // it encodes -- the pointer wins over the selection box -- must stay.
@@ -108,7 +109,10 @@ test('the ribbon is anchored to the pointer in the reader and in the editor', ()
   assert.match(reader, /document\.addEventListener\(['"]pointerup['"], onPointerUp, true\)/);
   assert.match(reader, /target\.closest\(['"]\[data-reader-selection-actions\]['"]\)/);
   const editor = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyEditor.tsx'), 'utf8');
-  assert.match(editor, /anchorToolbarToPointer\(root\.parentElement \?\? root, toolbar\)/);
+  const canvas = fs.readFileSync(path.join(repoRoot, 'src/components/editor/BlockNoteCanvas.tsx'), 'utf8');
+  assert.match(editor, /<BlockNoteCanvas[^]*onToolbarElement=\{setSelectionToolbar\}/);
+  assert.match(canvas, /<FormattingToolbarController formattingToolbar=\{SelectionToolbar\}/);
+  assert.match(canvas, /<span ref=\{mountToolbar\} className="study-selection-tools-host"/);
 });
 
 test('a highlight the reader clicks offers the whole ribbon, plus the trash', () => {
@@ -123,10 +127,10 @@ test('a highlight the reader clicks offers the whole ribbon, plus the trash', ()
   assert.ok(recolor.indexOf('onCreateAnnotation(') < recolor.indexOf('onDeleteAnnotation('), 'the new colour is written first');
 });
 
-test('the editor toolbar keeps out of sight until the pointer is released', () => {
+test('the legacy pointer positioning helper hides its toolbar until release', () => {
   const anchored = fs.readFileSync(path.join(repoRoot, 'src/components/editor/pointerAnchoredToolbar.ts'), 'utf8');
-  // Milkdown shows its toolbar on every selection change; while the button is
-  // down the selection is still growing and the toolbar must not follow it.
+  // While the button is down the selection is still growing. This helper's
+  // contract is independent of BlockNote's native formatting controller.
   assert.match(anchored, /write\('visibility', dragging \? 'hidden' : ''\)/);
   assert.match(anchored, /if \(dragging \|\| !pointer \|\| toolbar\.dataset\.show !== 'true'\) return/);
   assert.match(anchored, /dragging = true/);

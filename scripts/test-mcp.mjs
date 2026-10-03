@@ -1046,7 +1046,7 @@ try {
   const project = await callTool(server, 'nodus_get_project', { projectId: 'project-1', includeChapterText: false });
   assert.equal(project.stats.chapters, 1);
   assert.equal('currentMarkdown' in project.chapters[0], false);
-  assert.match(project.chapters[0].currentMarkdownSnippet, /Capitulo/);
+  assert.equal(project.chapters[0].currentMarkdownSnippet, 'Contenido sobre turismo visual y memoria.', 'MCP reads the canonical manuscript note instead of its stale chapter cache');
 
   const noteSearch = await callTool(server, 'nodus_search_notes', { query: 'turismo', limit: 10, offset: 0 });
   assert.equal(noteSearch.total, 1);
@@ -1065,6 +1065,10 @@ try {
     folderId: folder.id,
   });
   assert.equal(createdNote.folderId, folder.id);
+
+  const updatedManuscript = await callTool(server, 'nodus_update_note', { id: 'note-1', content: '# Capitulo actualizado\n\nEdición compatible desde MCP.' });
+  const refreshedProject = await callTool(server, 'nodus_get_project', { projectId: 'project-1', includeChapterText: true });
+  assert.equal(refreshedProject.chapters[0].currentMarkdown, updatedManuscript.content, 'legacy Markdown writes are immediately visible in the manuscript');
 
   const aiError = await callToolRaw(server, 'nodus_search_ideas', { query: 'turismo', limit: 5 });
   assert.equal(aiError.isError, true);

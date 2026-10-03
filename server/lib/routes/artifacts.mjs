@@ -1,3 +1,4 @@
+import { exportAcademicArtifact } from '../core/academicExport.mjs';
 const JSON_LIMIT = 2 * 1024 * 1024;
 
 /** Private notes, collections and AI drafts. The URL deliberately contains no user id. */
@@ -80,6 +81,12 @@ export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, art
       scope: mutation ? 'materials.write' : 'materials.read',
     });
     if (!artifactVaultAuth) return true;
+    if (req.method === 'POST' && segments[5] === 'academic-export' && segments.length === 6) {
+      const input=await jsonBody(req,JSON_LIMIT);
+      try {json(res,200,await exportAcademicArtifact(artifact,input,artifacts,auth.user.id));}
+      catch(error){json(res,error.status||422,{error:'academic_export_failed',error_description:String(error.message||error)});}
+      return true;
+    }
     if (req.method === 'GET' && segments[5] === 'document.pdf') {
       if (artifact.kind !== 'deep-research' || typeof renderPdf !== 'function') { json(res, 404, { error: 'artifact_not_found' }); return true; }
       let bytes;
@@ -108,7 +115,7 @@ export function createArtifactRoutes({ authorize, json, jsonBody, publicUrl, art
     if (req.method === 'PATCH') {
       const input = await jsonBody(req, JSON_LIMIT);
       try { json(res, 200, { artifact: artifacts.update(auth.user.id, id, input) }); }
-      catch (error) { json(res, 400, { error: 'invalid_artifact', error_description: String(error?.message || error) }); }
+      catch (error) { json(res, error.status === 409 ? 409 : 400, { error: error.status === 409 ? 'revision_conflict' : 'invalid_artifact', error_description: String(error?.message || error) }); }
       return true;
     }
     if (req.method === 'DELETE') {

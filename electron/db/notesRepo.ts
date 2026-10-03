@@ -1,3 +1,5 @@
+import {assertAcademicSupplement} from '@shared/academicProjection';
+import { assertAcademicProjection } from '@shared/blockNoteDocument';
 import { v4 as uuid } from 'uuid';
 import type {
   CreateNoteFolderInput,
@@ -12,7 +14,7 @@ import type {
 } from '@shared/types';
 import { getDb } from './database';
 import { currentEmbeddingConfig, encodeEmbedding, embeddingTextHash } from './ideasRepo';
-import { synchronizeNotePage } from './pagesRepo';
+import { synchronizeNotePage, getPageDocumentForNote } from './pagesRepo';
 import { deleteStudyNoteLinksFor } from './studyNoteLinksRepo';
 import { notifyAuthoredResearchSourceChanged } from '../ai/researchCorpusEvents';
 
@@ -276,6 +278,7 @@ export function updateNote(input: UpdateNoteInput): Note | null {
   }
   const title = input.title !== undefined ? input.title.trim() || 'Nota sin título' : existing.title;
   const content = input.content !== undefined ? input.content : existing.content;
+  if(input.content!==undefined){const page=getPageDocumentForNote(input.id);if(page)assertAcademicSupplement(page.markdown,content);if(page?.nativeDocument)assertAcademicProjection(page.nativeDocument,content);}
   const tags = input.tags !== undefined ? normalizeTags(input.tags) : existing.tags;
   const folderId = input.folderId !== undefined ? input.folderId : existing.folderId;
   const orderIdx = folderChanged ? nextNoteOrder(folderId) : existing.orderIdx;

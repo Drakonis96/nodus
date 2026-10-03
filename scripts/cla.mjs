@@ -16,6 +16,20 @@ export function agreement(text) {
   };
 }
 
+export function compatibleAgreements(cla) {
+  // PR #1052 changed only the maintainer's GitHub handle and repository links.
+  // Pin BOTH documents: no normalization or version-only matching may extend
+  // this exception to future edits, even if the version number stays the same.
+  if (cla.digest !== '28018d5b63a8adcded0dfde9323a88f3c5e8611460b9bc27f3f1c67013e48aca') return [cla];
+  const previous = agreement(cla.text
+    .replace('([jorgepb96](https://github.com/jorgepb96))', '([Drakonis96](https://github.com/Drakonis96))')
+    .replace('[Nodus Research](https://github.com/jorgepb96/nodus)', '[Nodus Research](https://github.com/Drakonis96/nodus)'));
+  if (previous.digest !== '68b2b9153b43fb63d3f8d7bee0156375d02005d3023dc73822994a0273fdbaf1') {
+    throw new Error('Unexpected historical CLA document; inspect the username compatibility exception.');
+  }
+  return [cla, previous];
+}
+
 export function acceptance(comment, cla) {
   // The GitHub account, not a name written in the body, is the signer. Reject
   // edited comments (including maintainer edits) and all automated accounts.
@@ -129,6 +143,26 @@ export function validateRecord(record, cla, userId) {
   return record;
 }
 
+export async function getSignatureRecord(github, repo, cla, userId) {
+  for (const acceptedAgreement of compatibleAgreements(cla)) {
+    try {
+      const { data } = await github.rest.repos.getContent({
+        ...repo, path: signaturePath(acceptedAgreement, userId), ref: SIGNATURE_BRANCH,
+      });
+      // Validate against the document actually signed, retaining its original
+      // statement, text, digest and evidence. Never copy or rewrite signatures.
+      return validateRecord(
+        JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')),
+        acceptedAgreement,
+        userId,
+      );
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
+  }
+  return null;
+}
+
 export async function run({ github, context, core, document }) {
   const repo = context.repo;
   const cla = agreement(document ?? await readFile(new URL('../CLA.md', import.meta.url), 'utf8'));
@@ -140,7 +174,9 @@ export async function run({ github, context, core, document }) {
     'Contributors retain ownership and grant Jorge Pérez Burgueño permission to relicense their contributions.',
     'Read the exact agreement below. To accept, post this exact statement as a **new comment from your own GitHub account** on an open PR:',
     `\n\`\`\`text\n${cla.statement}\n\`\`\``,
-    'The public acceptance record is reused for this exact agreement. All human authors and coauthors must accept. AI-assisted contributions are welcome; the responsible person signs. A checkbox is not a signature.',
+    'The public acceptance record is reused for this exact agreement.'
+      + (compatibleAgreements(cla).length > 1 ? ' Recorded acceptances from before the maintainer username change are also recognized.' : '')
+      + ' All human authors and coauthors must accept. AI-assisted contributions are welcome; the responsible person signs. A checkbox is not a signature.',
   ];
   const prs = await github.paginate(github.rest.pulls.list, { ...repo, state: 'open', per_page: 100 });
   if (!prs.length) {
@@ -158,18 +194,9 @@ export async function run({ github, context, core, document }) {
     await ensureSignatureBranch(github, repo);
     const getRecord = async (userId) => {
       if (records.has(userId)) return records.get(userId);
-      try {
-        const { data } = await github.rest.repos.getContent({
-          ...repo, path: signaturePath(cla, userId), ref: SIGNATURE_BRANCH,
-        });
-        const record = validateRecord(JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')), cla, userId);
-        records.set(userId, record);
-        return record;
-      } catch (error) {
-        if (error.status !== 404) throw error;
-        records.set(userId, null);
-        return null;
-      }
+      const record = await getSignatureRecord(github, repo, cla, userId);
+      records.set(userId, record);
+      return record;
     };
     // Scan all open PRs on every event. A signature can unblock multiple PRs,
     // and pending workflow runs can be replaced by GitHub's concurrency queue.

@@ -410,6 +410,11 @@
       "destination": "LEGALIZE_MIT_LICENSE.txt",
       "url": "https://raw.githubusercontent.com/legalize-dev/legalize/aff918cc915c474f061f3f66df81ed4d7d4020e9/LICENSE",
       "sha256": "f8a290cf7fca8ff960bf034ee37632305021751a92c1cb94a447f95a39c73cad"
+    },
+    {
+      "destination": "MPL-2.0.txt",
+      "url": "https://raw.githubusercontent.com/TypeCellOS/BlockNote/v0.55.0/packages/core/LICENSE",
+      "sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1"
     }
   ]
 }

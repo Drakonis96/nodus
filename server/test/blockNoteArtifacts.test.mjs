@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { withServer } from '../../scripts/lib/nodusServerHarness.mjs';
+test('native BlockNote artifacts keep structure, versions and revision conflicts across sessions', async () => {
+ await withServer({label:'blocknote-artifacts',ai:true},async ctx=>{
+  const vaultId=await ctx.createSpace('Native document');
+  const owner=await ctx.createUser('native-owner@example.test','native-owner-password-long',[{spaceId:vaultId,role:'reader'}]);
+  const stranger=await ctx.createUser('native-stranger@example.test','native-stranger-password-long',[{spaceId:vaultId,role:'reader'}]);
+  const cookie=await ctx.signIn(owner.email,owner.password);const csrf=await ctx.csrf(cookie);
+  const call=(method,url,body)=>fetch(ctx.origin+url,{method,headers:{cookie,origin:ctx.origin,'x-csrf-token':csrf,'content-type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
+  const native=[{id:'web-root',type:'bulletListItem',props:{textColor:'violet'},content:[{type:'text',text:'Fuente',styles:{bold:true}}],children:[{id:'web-child',type:'checkListItem',props:{checked:true},content:[{type:'text',text:'Cita',styles:{italic:true}}],children:[]}]}];
+  const response=await call('POST','/api/v2/me/artifacts',{vaultId,kind:'workspace-note',title:'Nativa',metadata:{surface:'workspace',nativeDocument:native}});
+  assert.equal(response.status,201);const {artifact}=await response.json();
+  assert.deepEqual(artifact.metadata.nativeDocument,native);
+  const changed=structuredClone(native);changed[0].props.textColor='red';
+  const saved=await call('PATCH',`/api/v2/me/artifacts/${artifact.id}`,{expectedRevision:1,metadata:{...artifact.metadata,nativeDocument:changed}});
+  assert.equal(saved.status,200);const current=(await saved.json()).artifact;
+  assert.deepEqual(current.metadata.nativeDocument,changed);
+  assert.deepEqual(current.metadata.editorVersions[0].nativeDocument,native);
+  assert.equal(current.content,artifact.content,'format-only edits keep Markdown and still create versions');
+  assert.equal((await call('PATCH',`/api/v2/me/artifacts/${artifact.id}`,{expectedRevision:1,content:'stale'})).status,409);
+  const reopened=(await (await call('GET',`/api/v2/me/artifacts/${artifact.id}`)).json()).artifact;
+  assert.deepEqual(reopened.metadata.nativeDocument,changed);
+  const sensitive=structuredClone(changed);sensitive[0].props.apiKey='sk-fixture-secret-1234567890123456';
+  assert.equal((await call('PATCH',`/api/v2/me/artifacts/${artifact.id}`,{expectedRevision:current.revision,metadata:{...current.metadata,nativeDocument:sensitive}})).status,400,'security rejection never persists a silently altered native document');
+  assert.deepEqual((await(await call('GET',`/api/v2/me/artifacts/${artifact.id}`)).json()).artifact.metadata.nativeDocument,changed);
+  const strangerCookie=await ctx.signIn(stranger.email,stranger.password);
+  assert.equal((await fetch(`${ctx.origin}/api/v2/me/artifacts/${artifact.id}`,{headers:{cookie:strangerCookie}})).status,404);
+ });
+});

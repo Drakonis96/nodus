@@ -2,6 +2,16 @@ import Foundation
 import Network
 import Security
 
+protocol PresenterMessageConnection: AnyObject {
+    var onMessage: ((Message) -> Void)? { get set }
+    var onState: ((NWConnection.State) -> Void)? { get set }
+    func send(_ message: Message, completion: ((Error?) -> Void)?)
+    func cancel()
+}
+extension PresenterMessageConnection {
+    func send(_ message: Message) { send(message, completion: nil) }
+}
+
 public enum PresenterTLS {
     public static func parameters(key: Data, identity: String) -> NWParameters {
         let tls = NWProtocolTLS.Options()
@@ -20,7 +30,7 @@ public enum PresenterTLS {
 }
 
 /// All methods and callbacks are used on its supplied serial queue.
-public final class FramedConnection {
+public final class FramedConnection: PresenterMessageConnection {
     public let connection: NWConnection
     public var onMessage: ((Message) -> Void)?
     public var onState: ((NWConnection.State) -> Void)?

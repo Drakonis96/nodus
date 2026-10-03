@@ -164,16 +164,16 @@ export const SECTION_DOC_TOPICS: readonly NodusDocTopic[] = [
   {
     id: 'sections-workspace-notes',
     area: 'sections',
-    title: { es: 'Espacio de trabajo y Notas', en: 'Workspace and Notes' },
-    keywords: ['espacio de trabajo', 'workspace', 'notas', 'notes', 'colecciones', 'editor', 'etiquetas', 'papelera', 'duplicar nota', 'enlazar biblioteca', 'nota'],
+    title: { es: 'Nodus Scriptor', en: 'Nodus Scriptor' },
+    keywords: ['nodus scriptor', 'nodus tools', 'espacio de trabajo', 'workspace', 'notas', 'notes', 'colecciones', 'editor', 'etiquetas', 'papelera', 'duplicar nota', 'enlazar biblioteca', 'nota'],
     body: {
-      es: `- El Espacio de trabajo organiza colecciones que contienen notas e ideas, con el mismo editor que usan Estudio y Docencia.
+      es: `- Nodus Scriptor organiza colecciones que contienen notas e ideas, con el mismo editor que usan Estudio y Docencia.
 - Acciones: crear nota o idea, buscar, etiquetar y filtrar por etiquetas, mover a colección, duplicar, enviar a la papelera, restaurar, eliminar definitivamente, enlazar con la biblioteca, abrir en pestaña, copiar el título y ver el panel de detalles.
-- En los demás tipos de bóveda la sección equivalente se llama «Notas» y comparte editor y acciones.
+- Se abre desde Nodus Tools o su acceso fijado en Herramientas, en todos los tipos de bóveda. Puedes ocultar el acceso manualmente; las rutas antiguas siguen funcionando. El lienzo editorial usa un fondo blanco y formato contextual por bloques.
 - En Testimonios, las notas enlazan de vuelta al minuto exacto del fragmento; en Fuentes primarias, al documento y su evidencia.`,
-      en: `- The Workspace organises collections that hold notes and ideas, with the same editor Study and Teaching use.
+      en: `- Nodus Scriptor organises collections that hold notes and ideas, with the same editor Study and Teaching use.
 - Actions: create a note or an idea, search, tag and filter by tag, move to a collection, duplicate, send to trash, restore, delete permanently, link to the library, open in a tab, copy the title and open the details panel.
-- In the other vault types the equivalent section is called "Notes" and shares the same editor and actions.
+- Open it from Nodus Tools or its pinned shortcut under Tools, in every vault type. You can hide the shortcut manually; old routes still work. The editorial canvas uses a white background and contextual block formatting.
 - In Testimonies, notes link back to the exact minute of the excerpt; in Primary sources, to the document and its evidence.`,
     },
     related: ['sections-search'],

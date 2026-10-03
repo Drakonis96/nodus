@@ -118,12 +118,14 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
     readFile(path.join(repoRoot, 'src/i18n.en.ts'), 'utf8'),
   ]);
   // The whole promised structure stays visible while it is built one section at a time.
-  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Research chat', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Notas', 'Escenas', 'Manuscrito']) {
+  for (const label of ['Enciclopedia', 'Personajes', 'Lugares', 'Facciones', 'Culturas', 'Cronología', 'Familias', 'Dinastías', 'Research chat', 'Reglas del mundo', 'Conflictos', 'Arcos narrativos', 'Continuidad', 'Preguntas abiertas', 'Escenas', 'Manuscrito']) {
     assert.match(sidebar, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `${label} appears in the worldbuilding sidebar`);
   }
+  const navigation = await readFile(path.join(repoRoot, 'src/navigation.ts'), 'utf8');
+  assert.match(navigation, /\{ id: 'notes', label: 'Nodus Scriptor', icon: 'notebook', group: 'tools' \}/, 'universal notes moved to tools while the specialised Manuscript stays in this sidebar');
   // Every announced section is now wired up: nothing in this sidebar is inert. Enciclopedia, Personajes and
   // Lugares are this vault's own views; Cronología, Mapa, Relaciones and Familias are the
-  // records views reused over the shared ontology; Notas is universal.
+  // records views reused over the shared ontology; Scriptor is universal in Tools.
   // Every announced item now navigates. The inert branch stays in the component because it
   // is how the NEXT announced section gets shown before it is built (the teaching sidebar
   // uses it too), but nothing in this vault is inert any more — so the property asserted
@@ -135,8 +137,9 @@ test('the worldbuilding sidebar keeps its full announced shape, with only the bu
   );
   assert.deepEqual(
     [...sidebar.matchAll(/\bview: '(\w+)'/g)].map((m) => m[1]).sort(),
-    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'search', 'timeline', 'tree', 'worldChat']
+    ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'places', 'questions', 'relations', 'rules', 'scenes', 'search', 'timeline', 'tree', 'worldChat']
   );
+  // The transverse Scriptor route is allowed too, although Tools supplies its button.
   // Every wired view must actually be allowed for the vault type, or the sidebar offers a
   // button that navigates to a section the scoping then refuses to render.
   for (const view of ['arcs', 'characters', 'conflicts', 'continuity', 'cultures', 'dynasties', 'encyclopedia', 'factions', 'manuscript', 'map', 'notes', 'places', 'questions', 'relations', 'rules', 'scenes', 'search', 'timeline', 'tree', 'worldChat']) {

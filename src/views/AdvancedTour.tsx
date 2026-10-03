@@ -103,8 +103,8 @@ const STEPS: AdvancedTourStep[] = [
   {
     stage: 'Paso 6 · Escribir',
     view: 'workspace',
-    title: 'Espacio de trabajo: notas y borradores con fuentes verificables',
-    body: 'El Espacio de trabajo reúne notas, borradores y organización en una única superficie. Conserva las citas clicables y permite estructurar el manuscrito sin separar artificialmente Escritura y Proyectos.',
+    title: 'Nodus Scriptor',
+    body: 'Redacta, organiza y revisa artículos, tesis, notas y documentos.',
   },
   {
     stage: 'Paso 6 · Escribir',

@@ -1147,8 +1147,8 @@ try {
   // measured on the real rendered shell rather than trusted from the classes.
   await page.locator('[data-tour="toolkit"]').click();
   await page.getByTestId('toolkit-home').waitFor({ timeout: 30_000 });
-  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-drift', 'toolkit-card-focus', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
-  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all eleven tools in alphabetical order');
+  const toolCards = ['toolkit-card-apps', 'toolkit-card-browser', 'toolkit-card-compass', 'toolkit-card-convert', 'toolkit-card-drift', 'toolkit-card-focus', 'toolkit-card-protect', 'toolkit-card-radar', 'toolkit-card-scriptor', 'toolkit-card-translate', 'toolkit-card-aiocr', 'toolkit-card-presenter'];
+  assert.deepEqual(await page.locator('.toolkit-card').evaluateAll((cards) => cards.map((card) => card.dataset.testid)), toolCards, 'the shared catalogue shows all twelve tools in alphabetical order');
   const cardBoxes = [];
   for (const testId of toolCards) {
     const box = await page.getByTestId(testId).boundingBox();
@@ -1698,9 +1698,11 @@ try {
   console.log('[e2e] workspace: a legacy project reads as a collection with its document inside');
 
   // Una nota y una idea, cada una con su icono, abiertas a la vez en pestañas.
+  if (await page.locator('.editorial-workspace .editorial-options').getAttribute('open') === null) await page.locator('.editorial-workspace .editorial-options > summary').click();
   await page.getByTestId('workspace-create-note').click();
   await page.getByTestId('editor-title').waitFor({ timeout: 20_000 });
   await page.getByTestId('workspace-tab-home').click();
+  if (await page.locator('.editorial-workspace .editorial-options').getAttribute('open') === null) await page.locator('.editorial-workspace .editorial-options > summary').click();
   await page.getByTestId('workspace-create-idea').click();
   await page.getByTestId('editor-title').waitFor({ timeout: 20_000 });
   assert.equal(
@@ -1708,8 +1710,8 @@ try {
     2,
     'a note and an idea stay open side by side in tabs'
   );
-  // El editor es el de Estudio: su barra de inserción y su estado de guardado están ahí.
-  await page.getByTestId('study-insert-toolbar').waitFor({ timeout: 10_000 });
+  // Notes and ideas use the same native canvas and save-status contract as Study.
+  await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 10_000 });
   await page.getByTestId('study-editor-save-state').waitFor({ timeout: 10_000 });
   console.log('[e2e] workspace: notes and ideas open in tabs with the full Study editor');
 
@@ -2063,9 +2065,17 @@ try {
   assert.match(await page.locator('body').innerText(), /Cursos y asignaturas/, 'study-specific sidebar is rendered');
   console.log('[e2e] study logo, search padding, sidebar flow and creation dialogs ok');
 
+  const openEditorOptions = async () => {
+    const options = page.locator('.editorial-editor-header .editorial-options');
+    if (await options.getAttribute('open') === null) await options.locator('summary').click();
+  };
+  const clickEditorAction = async button => {
+    if (!await button.isVisible()) await openEditorOptions();
+    await button.click();
+  };
   if (process.env.NODUS_E2E_MATERIAL_ANNOTATIONS_ONLY !== '1') {
-  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('study-dictation-toggle').click();
+  await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
+  await clickEditorAction(page.getByTestId('study-dictation-toggle'));
   await page.getByTestId('study-dictation').waitFor({ timeout: 30_000 });
   assert.match(await page.getByTestId('study-dictation').innerText(), /ONNX|Local|offline/i, 'dictation panel defaults to the offline ONNX backend');
   await page.getByTestId('study-dictation').getByRole('button', { name: 'Dictado', exact: true }).click();
@@ -2087,7 +2097,7 @@ try {
   await page.getByTestId('study-dictation-discard').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-dictation-discard').click();
   await page.getByTestId('study-dictation-start').waitFor({ timeout: 30_000 });
-  await page.getByTestId('study-dictation-toggle').click();
+  await clickEditorAction(page.getByTestId('study-dictation-toggle'));
   console.log('[e2e] study dictation panel + fake microphone capture ok');
   if (process.env.NODUS_E2E_STT_UI_ONLY === '1') {
     const recordingId = await page.evaluate(async () => (await window.nodus.createStudyRecording({
@@ -2106,8 +2116,8 @@ try {
     console.log('[e2e] focused dictation + recording language UI smoke passed');
     process.exit(0);
   }
-  await page.getByTestId('study-doc-favorite').click();
-  await page.getByTestId('study-doc-style').click();
+  await clickEditorAction(page.getByTestId('study-doc-favorite'));
+  await clickEditorAction(page.getByTestId('study-doc-style'));
   await page.getByTestId('study-doc-kind').selectOption('manual');
   await page.getByTestId('study-doc-color').fill('#22c55e');
   await waitForCondition('metadatos del editor de estudio', () => page.evaluate(async () => {
@@ -2116,9 +2126,9 @@ try {
     return document?.favorite === true && document.kind === 'manual' && document.color === '#22c55e';
   }));
   console.log('[e2e] study editor metadata controls ok');
-  await page.getByRole('button', { name: /Markdown crudo/ }).click();
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
   const editorMarkdown = '# Tema smoke\n\nTexto **importante** con $x^2$.\n\n| A | B |\n| --- | --- |\n| 1 | 2 |';
-  await page.locator('.study-editor-shell textarea').fill(editorMarkdown);
+  await page.getByTestId('study-markdown-editor').fill(editorMarkdown);
   // Exercise the editor's real autosave and poll the persisted state directly;
   // dispatching a second manual save would make this smoke assertion depend on
   // runner timing instead of the durability contract it is meant to verify.
@@ -2150,8 +2160,9 @@ try {
   await page.getByTestId('study-improve-toggle').click();
   await page.getByTestId('study-improve-dialog').waitFor();
   const improveDialogBox = await page.getByTestId('study-improve-dialog').locator('section').first().boundingBox();
-  assert.ok(improveDialogBox && improveDialogBox.width <= 680, `prompt manager stays compact (${improveDialogBox?.width}px)`);
+  assert.ok(improveDialogBox && improveDialogBox.width <= 960, `prompt manager fits its responsive two-column surface (${improveDialogBox?.width}px)`);
   assert.equal(await page.locator('[data-testid^="study-style-builtin-"]').count(), 13, 'all predefined improvement styles are visible');
+  assert.ok(await page.getByTestId('study-prompt-search').isVisible(), 'the prompt library exposes search');
   await page.getByTestId('study-style-builtin-academic').click();
   await page.getByText('Registro académico preciso y argumentación ordenada.', { exact: true }).waitFor();
   assert.equal(await page.getByText('Conservar significado', { exact: true }).count(), 0);
@@ -2165,11 +2176,12 @@ try {
   await page.getByRole('button', { name: 'flask', exact: true }).click();
   await page.getByTestId('study-prompt-save').click();
   await page.getByText('Prompt guardado.', { exact: true }).waitFor();
-  await page.getByTestId('study-improve-dialog').locator('header button').last().click();
+  await page.getByTestId('study-improve-dialog').getByRole('button', { name: 'Cerrar', exact: true }).click();
 
-  await page.getByRole('button', { name: /Markdown crudo/ }).click();
-    await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
+    await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
+  await page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
+    root.focus();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
@@ -2215,54 +2227,60 @@ try {
   });
   assert.equal(failedImprovement, true, 'the deterministic provider failure reaches the renderer bridge');
   const unchangedAfterImprovement = await page.evaluate(async () => (await window.nodus.getStudyWorkspace()).documents.find((item) => item.title === 'Apunte smoke')?.contentMarkdown);
-  // Milkdown may canonicalize equivalent table separators when leaving raw
+  // The native canvas can normalize equivalent table separators when leaving raw
   // mode; the selected source phrase itself must remain byte-for-byte intact.
   assert.match(unchangedAfterImprovement ?? '', /Texto \*\*importante\*\* con \$x\^2\$\./, 'failed improvement leaves the selected Markdown untouched');
   console.log('[e2e] compact prompt manager + four contextual streaming shortcuts + failure preservation ok');
 
-  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown .katex').first().waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown table.children').first().waitFor({ timeout: 30_000 });
-  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+  await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
+  await page.locator('.nodus-blocknote .katex').first().waitFor({ timeout: 30_000 });
+  await page.locator('.nodus-blocknote table').first().waitFor({ timeout: 30_000 });
+  await page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
+    root.focus();
     const range = document.createRange();
     range.selectNodeContents(root); range.collapse(false);
     const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range);
   });
+  await openEditorOptions();
   await page.getByTestId('study-heading-level').selectOption('2');
-  await page.locator('.study-milkdown .ProseMirror h2').first().waitFor({ timeout: 30_000 });
-  assert.equal(await page.locator('.study-milkdown .ProseMirror').getByText('## Título', { exact: true }).count(), 0, 'visual heading insertion creates a heading node rather than literal Markdown');
-  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+  await page.keyboard.press('Escape');
+  await page.locator('.nodus-blocknote .bn-editor h2').first().waitFor({ timeout: 30_000 });
+  assert.equal(await page.locator('.nodus-blocknote .bn-editor').getByText('## Título', { exact: true }).count(), 0, 'visual heading insertion creates a heading node rather than literal Markdown');
+  await page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
+    root.focus();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
       const index = node.textContent?.indexOf('Texto') ?? -1;
       if (index < 0) continue;
       const range = document.createRange(); range.setStart(node, index); range.setEnd(node, index + 5);
-      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return;
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); document.dispatchEvent(new Event('selectionchange')); root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return;
     }
     throw new Error('Text selection fixture not found');
   });
-  await page.getByTestId('study-inline-code').click();
-  assert.ok(await page.locator('.study-milkdown .ProseMirror code').count() > 0, 'inline-code button formats the visual selection');
-  await page.locator('.study-milkdown .ProseMirror').evaluate((root) => {
+  await page.waitForTimeout(120);
+  await clickEditorAction(page.getByTestId('study-inline-code'));
+  assert.ok(await page.locator('.nodus-blocknote .bn-editor code').count() > 0, 'inline-code button formats the visual selection');
+  await page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
+    root.focus();
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
       const index = node.textContent?.indexOf('importante') ?? -1;
       if (index < 0) continue;
       const range = document.createRange(); range.setStart(node, index); range.setEnd(node, index + 10);
-      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); return;
+      const selection = window.getSelection(); selection?.removeAllRanges(); selection?.addRange(range); document.dispatchEvent(new Event('selectionchange')); root.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return;
     }
     throw new Error('Formula selection fixture not found');
   });
-  await page.getByTestId('study-inline-formula').click();
-  assert.ok(await page.locator('.study-milkdown .ProseMirror [data-type="math_inline"]').count() > 0, 'formula button converts selected visual text into inline math');
+  await page.waitForTimeout(120);
+  await clickEditorAction(page.getByTestId('study-inline-formula'));
+  assert.ok(await page.locator('.nodus-blocknote .bn-editor [data-inline-content-type="nodusFormula"]').count() > 0, 'formula button converts selected visual text into inline math');
   // The floating selection ribbon: out of sight while the pointer is still down,
   // and placed over the point where the selection was released rather than over
   // the box of the whole selection, which starts wherever the drag began.
-  const floatingRibbon = page.locator('.milkdown-toolbar');
-  await floatingRibbon.waitFor({ state: 'attached', timeout: 10_000 });
-  const measureEditorLine = () => page.getByRole('textbox', { name: 'Editor del apunte', exact: true }).evaluate((root) => {
+  const floatingRibbon = page.locator('.bn-formatting-toolbar');
+  const measureEditorLine = () => page.locator('.nodus-blocknote .bn-editor').evaluate((root) => {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     const candidates = [];
     let node;
@@ -2297,42 +2315,25 @@ try {
   // The arithmetic itself is covered by scripts/test-selection-ribbon-position.mjs.
   if (!editorDrag) console.log('[e2e] editor selection ribbon geometry skipped: no editor line to drag over');
   else {
-    await page.waitForFunction(() => document.querySelector('.milkdown-toolbar')?.style.visibility === 'hidden', undefined, { timeout: 10_000 });
     await page.mouse.up();
     await floatingRibbon.waitFor({ state: 'visible', timeout: 10_000 });
-    // This toolbar can be nearly as wide as the editor column it is positioned in,
-    // so it is centred on the pointer only where that column leaves room.
-    const measureRibbon = async () => {
-      const box = await floatingRibbon.boundingBox();
-      const column = await floatingRibbon.evaluate((node) => {
-        const parent = node.offsetParent instanceof HTMLElement ? node.offsetParent.getBoundingClientRect() : null;
-        return { left: Math.max(8, parent?.left ?? 8), right: Math.min(window.innerWidth - 8, parent?.right ?? window.innerWidth - 8) };
-      });
-      return { box, wanted: Math.min(Math.max(editorDrag.to.x - box.width / 2, column.left), column.right - box.width) };
-    };
-    // floating-ui can move the toolbar again after it turns visible; the pointer anchor
-    // re-applies its correction on a 30 ms timer (rAF does not run in the CI window), so
-    // one early read can land between the two. Wait for the placement to settle.
-    let placement = await measureRibbon();
-    for (let attempt = 0; attempt < 20 && Math.abs(placement.box.x - placement.wanted) > 2; attempt += 1) {
-      await page.waitForTimeout(50);
-      placement = await measureRibbon();
-    }
-    const ribbonBox = placement.box;
-    const wanted = placement.wanted;
-    assert.ok(Math.abs(ribbonBox.x - wanted) <= 2, `the editor ribbon follows the pointer inside its column (${ribbonBox.x} vs ${wanted})`);
-    assert.ok(ribbonBox.y + ribbonBox.height <= editorDrag.to.y, 'the editor ribbon sits above the pointer');
-    assert.ok(ribbonBox.y + ribbonBox.height >= editorDrag.to.y - 90, 'the editor ribbon hugs the released line rather than the first one');
+    const ribbonBox = await floatingRibbon.boundingBox();
+    const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+    assert.ok(ribbonBox.x >= 0 && ribbonBox.x + ribbonBox.width <= viewport.width, 'the native selection toolbar fits horizontally');
+    assert.ok(ribbonBox.y >= 0 && ribbonBox.y + ribbonBox.height <= viewport.height, 'the native selection toolbar fits vertically');
+    assert.ok((await page.evaluate(() => getSelection()?.toString() ?? '')).trim(), 'opening the native toolbar preserves the selected text');
     await page.keyboard.press('ArrowRight');
     await floatingRibbon.waitFor({ state: 'hidden', timeout: 10_000 });
   }
 
   const splitButton = page.getByRole('button', { name: 'Dividir vista', exact: true });
-  await splitButton.click();
-  assert.match(await splitButton.getAttribute('class'), /bg-indigo-100/, 'active split-view control uses its light-theme state');
+  await clickEditorAction(splitButton);
+  await openEditorOptions();
+  assert.equal(await splitButton.getAttribute('aria-pressed'), 'true', 'the split-view control exposes its active state');
+  await page.keyboard.press('Escape');
   await page.locator('.study-editor-shell .md .katex').first().waitFor({ timeout: 30_000 });
   assert.match(await page.locator('body').innerText(), /Tema smoke/, 'document outline and WYSIWYG content render');
-  console.log('[e2e] study Milkdown editor + metadata + raw Markdown + versioning ok');
+  console.log('[e2e] study BlockNote editor + metadata + raw Markdown + versioning ok');
   }
   }
 
@@ -2558,18 +2559,18 @@ try {
     await page.getByText(label, { exact: true }).last().click();
   }
   await page.getByText('Apunte smoke', { exact: true }).last().click();
-  await page.locator('.study-milkdown .ProseMirror').first().waitFor({ timeout: 30_000 });
+  await page.locator('.nodus-blocknote .bn-editor').first().waitFor({ timeout: 30_000 });
 
   // ── Study narration: selection/cursor modes, formula speech and dictionary ─
-  await page.getByRole('button', { name: /Markdown crudo/ }).click();
-  const narrationTextarea = page.locator('.study-editor-shell textarea').first();
+  await clickEditorAction(page.getByRole('button', { name: 'Markdown crudo', exact: true }));
+  const narrationTextarea = page.getByTestId('study-markdown-editor').first();
   await narrationTextarea.evaluate((element) => {
     const text = element.value;
     const from = Math.max(0, text.indexOf('Texto'));
     element.focus(); element.setSelectionRange(from, Math.min(text.length, from + 18));
     element.dispatchEvent(new Event('select', { bubbles: true }));
   });
-  await page.getByTestId('study-audio-toggle').click();
+  await clickEditorAction(page.getByTestId('study-audio-toggle'));
   await page.getByTestId('study-audio-panel').waitFor({ timeout: 30_000 });
   await page.getByTestId('study-audio-mode').selectOption('selection');
   const narrationSegments = await page.evaluate(async () => window.nodus.getAudioSegments('study_document', (await window.nodus.getStudyWorkspace()).documents.find((document) => document.title === 'Apunte smoke').id, {
@@ -3050,7 +3051,7 @@ try {
   await page.getByTestId('primary-sources-nav-search').click();
   await page.getByTestId('primary-sources-search-input').fill('San Martín');
   await page.getByTestId('primary-sources-search-result').first().waitFor({ timeout: 30_000 });
-  await page.getByTestId('primary-sources-nav-notes').click();
+  await page.locator('[data-tour="nav-notes"]').click();
   await page.getByTestId('primary-sources-notes').waitFor({ timeout: 30_000 });
 
   // Primary Sources reuses the universal Toolkit catalogue. Its old dedicated

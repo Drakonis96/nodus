@@ -7,6 +7,7 @@
  * this boundary, even when a future setting is added to Desktop.
  */
 import { APP_THEME_IDS, sanitizeCustomThemes } from './appThemes.mjs';
+import { migrateScriptorSidebar } from './scriptorNavigation.mjs';
 
 export const SERVER_PROFILE_PREFERENCES_VERSION = 1;
 
@@ -61,7 +62,7 @@ const STUDY_KEYS = new Set([
   'maxInputChars', 'maxOutputTokens', 'temperature', 'retryCount', 'studentPseudonyms',
 ]);
 const WORKSPACE_KEYS = new Set([
-  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'toolkitPinnedPages', 'aiConcurrencyMode', 'aiConcurrencyVersion', 'concurrency', 'deepContextMode',
+  'sidebarOrder', 'sidebarHidden', 'sidebarCustomized', 'scriptorSidebarVersion', 'toolkitPinnedPages', 'aiConcurrencyMode', 'aiConcurrencyVersion', 'concurrency', 'deepContextMode',
   'standardChunkWords', 'longChunkWords',
 ]);
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{0,47}$/;
@@ -236,6 +237,7 @@ export function extractServerProfilePreferences(settings) {
       sidebarOrder: Array.isArray(settings.sidebarOrder) ? settings.sidebarOrder : [],
       sidebarHidden: Array.isArray(settings.sidebarHidden) ? settings.sidebarHidden : [],
       sidebarCustomized: settings.sidebarCustomized,
+      scriptorSidebarVersion: settings.scriptorSidebarVersion,
       toolkitPinnedPages: Array.isArray(settings.toolkitPinnedPages) ? settings.toolkitPinnedPages : [],
       aiConcurrencyMode: settings.aiConcurrencyMode,
       aiConcurrencyVersion: settings.aiConcurrencyVersion,
@@ -312,6 +314,7 @@ export function desktopSettingsPatchFromServerProfile(value) {
     sidebarOrder: [...profile.workspace.sidebarOrder],
     sidebarHidden: [...profile.workspace.sidebarHidden],
     sidebarCustomized: profile.workspace.sidebarCustomized,
+    scriptorSidebarVersion: profile.workspace.scriptorSidebarVersion,
     toolkitPinnedPages: [...profile.workspace.toolkitPinnedPages],
     aiConcurrencyMode: profile.workspace.aiConcurrencyMode,
     aiConcurrencyVersion: profile.workspace.aiConcurrencyVersion,
@@ -336,6 +339,10 @@ export function sanitizeServerProfilePreferences(value) {
   const audio = object(ai.audio); exactKeys(audio, AUDIO_KEYS);
   const study = object(ai.studyPolicy); exactKeys(study, STUDY_KEYS);
   const workspace = object(root.workspace); exactKeys(workspace, WORKSPACE_KEYS);
+  const { changed: _scriptorMigrated, ...scriptorWorkspace } = migrateScriptorSidebar({
+    sidebarOrder: strings(workspace.sidebarOrder), sidebarHidden: strings(workspace.sidebarHidden),
+    scriptorSidebarVersion: workspace.scriptorSidebarVersion === undefined ? 0 : number(workspace.scriptorSidebarVersion, 0, 100, true),
+  });
 
   const favorites = Array.isArray(ai.favorites) ? ai.favorites : fail();
   if (favorites.length > 100) fail();
@@ -425,7 +432,7 @@ export function sanitizeServerProfilePreferences(value) {
       },
     },
     workspace: {
-      sidebarOrder: strings(workspace.sidebarOrder), sidebarHidden: strings(workspace.sidebarHidden),
+      ...scriptorWorkspace,
       sidebarCustomized: bool(workspace.sidebarCustomized),
       toolkitPinnedPages: workspace.toolkitPinnedPages === undefined ? [] : strings(workspace.toolkitPinnedPages),
       // Version 1 records an explicit selector choice. Older/missing values are

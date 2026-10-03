@@ -160,7 +160,7 @@ function ensureZoteroTitleMarkupColumn(db: Database.Database): void {
 
 // Versioned, append-only migrations. Never edit an existing migration's SQL once
 // shipped — add a new one. The current schema version is the highest applied.
-export const SCHEMA_VERSION = 197;
+export const SCHEMA_VERSION = 199;
 
 export const migrations: Migration[] = [
   {
@@ -9576,6 +9576,19 @@ export const migrations: Migration[] = [
       created_at   TEXT NOT NULL
     );
   ` },
+  { version: 198, up: 'SELECT 1;', after: (db) => {
+    // Earlier branch builds can have all or part of these additive columns under
+    // a different version. Complete the schema without replacing saved documents.
+    for (const table of ['study_docs', 'study_doc_versions', 'note_versions']) {
+      addColumnIfMissing(db, table, 'native_document_json', 'TEXT');
+      addColumnIfMissing(db, table, 'native_schema_version', 'INTEGER NOT NULL DEFAULT 1');
+    }
+    addColumnIfMissing(db, 'study_docs', 'editor_revision', 'INTEGER NOT NULL DEFAULT 0');
+    for (const table of ['study_annotations', 'note_annotations']) addColumnIfMissing(db, table, 'anchor_json', 'TEXT');
+  } },
+  { version: 199, up: 'SELECT 1;', after: (db) => {
+    for (const table of ['study_docs', 'study_doc_versions', 'note_versions']) addColumnIfMissing(db, table, 'academic_metadata_json', 'TEXT');
+  } },
 ];
 
 /**

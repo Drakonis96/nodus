@@ -69,14 +69,13 @@ test('dedicated vaults expose only their own fixed navigation', () => {
   assert.equal(navigation.dedicatedVaultNavIds('genealogy'), null);
 });
 
-test('Docencia exposes Unit design and the Workspace under Crear with stable settings ids', () => {
+test('Docencia keeps Unit design under Crear; Scriptor is provided by Tools', () => {
   const create = TEACHING_GROUPS.find((group) => group.label === 'Crear');
   assert.ok(create, 'Crear is present');
   assert.deepEqual(
     create.items.map((item) => ({ label: item.label, id: teachingItemId(item) })),
     [
       { label: 'Diseño de unidades', id: 'teachingUnits' },
-      { label: 'Espacio de trabajo', id: 'notes' },
     ],
   );
   const ids = TEACHING_GROUPS.flatMap((group) => group.items.map(teachingItemId));

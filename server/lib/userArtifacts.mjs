@@ -1,7 +1,23 @@
+import {academicMarkdownProjection,assertAcademicSupplement} from './core/generated/academicProjection.mjs';
+import { normalizeAcademicMetadata } from './core/generated/academicDocument.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { redactStructured, redactText } from './ai/redact.mjs';
+import { blockNoteToMarkdown, markdownToBlockNote, parseNativeDocument, validateBlockNoteDocument } from './core/generated/blockNoteDocument.mjs';
+
+function cleanMetadata(value) {
+  const metadata = value && typeof value === 'object' && !Array.isArray(value) ? redactStructured(value, { maxDepth: 256 }) : {};
+  if (metadata.nativeDocument != null) {
+    const native = validateBlockNoteDocument(value.nativeDocument);
+    // The existing artifact security policy may reject a document, but must
+    // never silently rewrite its canonical JSON and then report a saved draft.
+    if (JSON.stringify(native) !== JSON.stringify(metadata.nativeDocument)) throw new Error('El documento contiene datos sensibles que el servidor no puede guardar. Conserva o recupera el borrador.');
+    metadata.nativeDocument = native;
+  }
+  if(value?.academicMetadata !== undefined){const academic=normalizeAcademicMetadata(value.academicMetadata);if(JSON.stringify(academic)!==JSON.stringify(normalizeAcademicMetadata(metadata.academicMetadata)))throw new Error('Los datos académicos contienen información sensible. Conserva el borrador.');metadata.academicMetadata=academic;}
+  return metadata;
+}
 
 const VERSION = 1;
 const MAX_ITEMS = 10_000;
@@ -110,14 +126,14 @@ export class UserArtifactStore {
       kind: cleanKind(input.kind),
       title: cleanText(input.title, 240),
       content: cleanText(input.content, 2_000_000),
-      metadata: input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata)
-        ? redactStructured(input.metadata) : {},
+      metadata: cleanMetadata(input.metadata),
       sourceJobId: input.sourceJobId == null ? null : safeId(input.sourceJobId, 'job id'),
       publication: null,
       revision: 1,
       createdAt: now,
       updatedAt: now,
     };
+    if (artifact.metadata.nativeDocument) artifact.content = academicMarkdownProjection(artifact.metadata.nativeDocument,artifact.metadata.academicMetadata);
     state.artifacts.push(artifact);
     this.write(ownerUserId, state);
     return { ...artifact };
@@ -129,10 +145,24 @@ export class UserArtifactStore {
     const state = this.read(ownerUserId);
     const artifact = state.artifacts.find((entry) => entry.id === id && entry.ownerUserId === ownerUserId);
     if (!artifact) return null;
+    if (patch.expectedRevision !== undefined && (!Number.isInteger(patch.expectedRevision) || patch.expectedRevision !== artifact.revision)) {
+      const error = new Error('REVISION_CONFLICT: El documento ha cambiado en otra sesión. El borrador se conserva.');
+      error.status = 409;
+      throw error;
+    }
+    const previousNative = parseNativeDocument(artifact.metadata?.nativeDocument);
+    const suppliedNative = patch.metadata?.nativeDocument;
+    if(suppliedNative===undefined&&patch.content!==undefined)assertAcademicSupplement(artifact.content,String(patch.content));
+    const native = suppliedNative !== undefined ? (suppliedNative === null ? null : validateBlockNoteDocument(suppliedNative)) : previousNative && patch.content !== undefined ? markdownToBlockNote(String(patch.content), previousNative) : previousNative;
+    if (native && (patch.content !== undefined || suppliedNative !== undefined || patch.title !== undefined || patch.metadata?.academicMetadata !== undefined)) {
+      const previous = { title: artifact.title, content: artifact.content, nativeDocument: previousNative, schemaVersion: artifact.metadata?.schemaVersion ?? 1, academicMetadata: artifact.metadata?.academicMetadata, savedAt: artifact.updatedAt };
+      const versions = [...(Array.isArray(artifact.metadata?.editorVersions) ? artifact.metadata.editorVersions : []), previous].slice(-60);
+      patch = { ...patch, content: academicMarkdownProjection(native,patch.metadata?.academicMetadata??artifact.metadata.academicMetadata), metadata: { ...artifact.metadata, ...(patch.metadata ?? {}), nativeDocument: native, schemaVersion: 2, editorVersions: versions } };
+    }
     if (patch.title !== undefined) artifact.title = cleanText(patch.title, 240);
     if (patch.content !== undefined) artifact.content = cleanText(patch.content, 2_000_000);
-    if (patch.metadata !== undefined) artifact.metadata = patch.metadata && typeof patch.metadata === 'object' && !Array.isArray(patch.metadata)
-      ? redactStructured(patch.metadata) : {};
+    if (patch.metadata !== undefined) artifact.metadata = cleanMetadata(patch.metadata);
+    if (artifact.metadata.nativeDocument && (patch.content !== undefined || patch.metadata?.nativeDocument !== undefined)) artifact.content = academicMarkdownProjection(artifact.metadata.nativeDocument,artifact.metadata.academicMetadata);
     artifact.revision = Number(artifact.revision || 0) + 1;
     artifact.updatedAt = new Date().toISOString();
     this.write(ownerUserId, state);

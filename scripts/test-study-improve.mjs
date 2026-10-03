@@ -207,12 +207,11 @@ try {
 
   const dialogSource = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyImproveDialog.tsx'), 'utf8');
   const editorSource = fs.readFileSync(path.join(repoRoot, 'src/components/editor/StudyEditor.tsx'), 'utf8');
-  assert.match(dialogSource, /max-h-\[78vh\].*max-w-2xl/);
   assert.match(dialogSource, /Puedes mostrar un máximo de cuatro prompts en la barra/);
   assert.match(dialogSource, /study-prompt-title/); assert.match(dialogSource, /study-prompt-text/); assert.match(dialogSource, /IconEmojiPicker/);
   for (const removed of ['Conservar significado', 'Transformación libre', "t('Nivel')", "t('Longitud')"]) assert.doesNotMatch(dialogSource, new RegExp(removed));
-  assert.match(editorSource, /createPortal/); assert.match(editorSource, /milkdown-toolbar/);
-  assert.match(editorSource, /study-selection-text-color/); assert.match(editorSource, /study-selection-heading/); assert.match(editorSource, /study-selection-tools-host/); assert.match(editorSource, /study-toolbar-quick-improve/);
+  assert.match(editorSource, /createPortal/); assert.match(editorSource, /onToolbarElement=\{setSelectionToolbar\}/);
+  assert.match(editorSource, /study-selection-text-color/); assert.match(editorSource, /study-selection-heading/); assert.match(editorSource, /onToolbarElement=\{setSelectionToolbar\}/); assert.match(editorSource, /study-toolbar-quick-improve/);
   assert.doesNotMatch(editorSource, /study-improve-selection-toolbar/); assert.match(editorSource, /requestAnimationFrame\(flush\)/);
   assert.match(editorSource, /updateStudyImprovementAction\(result\.logId, 'replace'\)/); assert.match(editorSource, /Ctrl\/⌘\+Z/);
 
@@ -248,7 +247,10 @@ function installRuntimeHooks(userDataPath) {
     dialog: {}, shell: {}, BrowserWindow: class {},
   };
   Module._resolveFilename = function resolveFilename(request, parent, isMain, options) {
-    if (request.startsWith('@shared/')) return path.join(repoRoot, `${request.replace('@shared/', 'shared/')}.ts`);
+    if (request.startsWith('@shared/')) {
+      const resolved = path.join(repoRoot, request.replace('@shared/', 'shared/'));
+      return /\.(?:mjs|json)$/.test(resolved) ? resolved : `${resolved}.ts`;
+    }
     return originalResolveFilename.call(this, request, parent, isMain, options);
   };
   Module._load = function load(request, parent, isMain) {
