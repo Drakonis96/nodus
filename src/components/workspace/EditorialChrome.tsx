@@ -4,6 +4,9 @@ import { getActiveLang, t } from '../../i18n';
 import { EDITORIAL_WORKSPACE_TRANSLATIONS } from '../../i18n.editorialWorkspace';
 import './editorialWorkspace.css';
 export interface EditorialItem { id: string; title: string; snippet: string; collection?: string }
+export function EditorialCreateTrigger() {
+  return <summary role="button" className="editorial-create-trigger" aria-label={t('Crear')} title={t('Crear')}><Icon name="plus" size={16} /></summary>;
+}
 export function EditorialCatalogRow({className = '',...props}: HTMLAttributes<HTMLDivElement>) {
   return <div {...props} className={`editorial-catalog-row ${className}`} />;
 }

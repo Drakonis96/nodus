@@ -1,5 +1,5 @@
 import { normalizeAcademicMetadata, cloneAcademicDocument } from '@shared/academicDocument';
-import { EditorialCards, EditorialNavigator, CatalogViewControl, EditorialCatalogRow } from '../components/workspace/EditorialChrome';
+import { EditorialCards, EditorialNavigator, CatalogViewControl, EditorialCreateTrigger, EditorialCatalogRow } from '../components/workspace/EditorialChrome';
 import '../components/workspace/editorialWorkspace.css';
 import { notifyDataChanged } from '../hooks';
 import { ManualIdeaEditor } from './ManualIdeaEditor';
@@ -946,7 +946,7 @@ export function WorkspaceView({
         <div className="library-header-actions">
           {scope.kind === 'trash' ? <button data-testid="workspace-empty-trash" className="btn btn-ghost h-8 border border-red-500/30 text-xs text-red-400" disabled={!trashedNotes.length} onClick={() => setPendingPermanentDeleteIds(trashedNotes.map((note) => note.id))}>
             <Icon name="trash" size={13} /> {t('Vaciar papelera')}
-          </button> : <details className="editorial-options"><summary>{t('Crear')} +</summary><div className="editorial-create-menu"><button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
+          </button> : <details className="editorial-options editorial-create-options"><EditorialCreateTrigger /><div className="editorial-create-menu"><button data-testid="workspace-create-idea" className="btn btn-secondary h-8 text-xs" onClick={() => void createItem('idea')}>
             <Icon name="bulb" size={13} /> {t('Idea')}
           </button>
           <button data-testid="workspace-create-note" className="btn btn-primary h-8 text-xs" onClick={() => void createItem('note')}>

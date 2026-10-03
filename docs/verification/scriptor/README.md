@@ -49,3 +49,9 @@ The AI streaming regression controls only the provider transport; real UI, selec
 After merging current main, 133 focused checks and 50 translation/Focus/security checks passed. The final general `npm run test:e2e` completed successfully through the real Electron app, including Scriptor/Study writing, prompts, selection, native persistence, voice, Primary Sources, Worldbuilding, and Genealogy; it reported no renderer page errors and schema v199. Lint, both typechecks, Desktop/Server Web builds, and license verification also passed locally. The complete repository test inventory remains a separate CI requirement.
 
 Follow-up fixes ensure Escape closes the foreground synonyms panel before the native formatting popover handles it, and the production Server image includes the portable sidebar migration dependency. The Server image health check and cross-repository capability verification passed on Linux, macOS, and Windows on the preceding code commit.
+
+## Compact creation and tab clipping follow-up
+
+The catalogue creation trigger is now a 32 px icon-only plus with a translated accessible name, retaining the Note, Idea, Manuscript, and Collection menu. Its menu remains anchored below the trigger. Scriptor tab tracks reserve 4 px above and below their 28 px tabs, so borders and shadows are fully visible without changing the header height or application sidebar.
+
+Real Desktop and Server Web checks passed in light/dark themes at 1280×800, 1440×900, and 1920×1080 (12 combinations), covering the catalogue and editor, multiple open tabs, menu position/options, and keyboard activation. Desktop also verifies one application tooltip; Server Web retains its existing native title-tooltip behavior. Typechecks, targeted lint, and both renderer builds passed. [Creation menu](create-menu.png) and [editor tabs](editor-tabs.png) show isolated synthetic fixtures.

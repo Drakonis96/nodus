@@ -9,7 +9,7 @@ import { readEditorialDraft, retainEditorialDraft, clearEditorialDraft, download
 import { flushEditorialDraft } from '../components/workspace/flushEditorialDraft';
 import { BlockNoteCanvas, type BlockNoteCanvasHandle } from '../components/editor/BlockNoteCanvas';
 import { EditorialActionBar, EditorialActionMenu, type EditorialAction } from '../components/workspace/EditorialActions';
-import { EditorialHeader, EditorialTitle, EditorialNavigator, EditorialCards, CatalogViewControl, EditorialCatalogRow, EditorialInspector } from '../components/workspace/EditorialChrome';
+import { EditorialHeader, EditorialTitle, EditorialNavigator, EditorialCards, CatalogViewControl, EditorialCreateTrigger, EditorialCatalogRow, EditorialInspector } from '../components/workspace/EditorialChrome';
 import { markdownToBlockNote, parseNativeDocument, type BlockNoteDocument } from '@shared/blockNoteDocument';
 import { readViewSnapshot, patchViewSnapshot } from '../app/viewSnapshots';
 import {
@@ -1710,7 +1710,7 @@ export function PrivateNotesServerView({
       data-testid="private-notes-view"
     >
       {!active && <div className="editorial-editor-header"><button className="editorial-header-action" disabled aria-label={t('Navegador de documentos')}><Icon name="list" size={14} /></button><div className="editorial-header-leading">{tabs}</div></div>}
-      {!active && <header className="library-header-bar"><div className="library-header-title"><h1>Nodus Scriptor</h1><p>{items.length} {t('documentos')} · {t('Privado para ti')}</p></div><div className="library-header-actions"><button className="editorial-header-action editorial-collection-toggle" onClick={() => setCollectionsOpen(!collectionsOpen)}>{t('Colecciones')}</button><CatalogViewControl value={catalogView} onChange={setCatalogView} /><details className="editorial-options"><summary>{t('Crear')} +</summary><div className="editorial-create-menu"><button data-testid="workspace-server-create-note" onClick={() => void create()}>{t('Nota')}</button><button onClick={() => void create('idea')}>{t('Idea')}</button><button data-testid="workspace-server-create-manuscript" onClick={()=>void createManuscript()}>{t('Manuscrito')}</button><button onClick={() => void createFolder()}>{t('Colección')}</button></div></details></div></header>}
+      {!active && <header className="library-header-bar"><div className="library-header-title"><h1>Nodus Scriptor</h1><p>{items.length} {t('documentos')} · {t('Privado para ti')}</p></div><div className="library-header-actions"><button className="editorial-header-action editorial-collection-toggle" onClick={() => setCollectionsOpen(!collectionsOpen)}>{t('Colecciones')}</button><CatalogViewControl value={catalogView} onChange={setCatalogView} /><details className="editorial-options editorial-create-options"><EditorialCreateTrigger /><div className="editorial-create-menu"><button data-testid="workspace-server-create-note" onClick={() => void create()}>{t('Nota')}</button><button onClick={() => void create('idea')}>{t('Idea')}</button><button data-testid="workspace-server-create-manuscript" onClick={()=>void createManuscript()}>{t('Manuscrito')}</button><button onClick={() => void createFolder()}>{t('Colección')}</button></div></details></div></header>}
       {!active ? (
         <div className="flex min-h-0 flex-1">
           <aside className={`editorial-collections w-64 shrink-0 border-r border-neutral-200 dark:border-neutral-800 ${collectionsOpen ? 'is-open' : ''}`}>
